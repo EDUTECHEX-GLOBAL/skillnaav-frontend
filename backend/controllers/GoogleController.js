@@ -163,23 +163,14 @@ const googleCallback = async (req, res) => {
             <p>🔗 <a href="https://calendar.google.com" target="_blank">View your Google Calendar</a></p>
             <p>⚠️ Check your browser console for test event creation status</p>
           </div>
-          <p>You can now close this tab.</p>
+          <p>Redirecting...</p>
           <script>
-            console.log('Google Calendar integration completed for: ${email}');
-            setTimeout(() => {
-              if (window.opener) {
-                window.opener.postMessage({
-                  type: 'auth_success',
-                  email: '${email}',
-                  message: 'Calendar access granted'
-                }, '*');
-              }
-              window.close();
-            }, 5000);
-          </script>
-        </body>
-      </html>
-    `);
+        localStorage.setItem('redirectTab', 'offer-letter');
+        window.location.href = "/user-main-page";
+      </script>
+    </body>
+  </html>
+`);
 
   } catch (err) {
     console.error("Google callback error:", {
@@ -354,6 +345,78 @@ const createTestEvent = async (email) => {
 };
 
 // Enhanced function to add schedule to Google Calendar
+// ✅ Function for Online Events
+function buildOnlineEvent({ slot, dateStr, startDateTime, endDateTime, internshipTitle, finalEventLink }) {
+  return {
+    summary: `${slot.sectionSummary || 'Session'} Section by ${slot.instructor || 'Instructor'}`,
+    description: `Topic: ${slot.sectionSummary || 'Internship session'}
+    
+👨‍🏫 Instructor Name: ${slot.instructor || 'Not assigned'}
+
+🔗 Online Meeting Link: ${finalEventLink || 'Link not available'}
+
+📅 Date: ${formatDate(dateStr)}
+⏰ Time: ${slot.startTime} - ${slot.endTime} (IST)
+
+Generated on: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
+    `,
+    start: { dateTime: startDateTime, timeZone: 'Asia/Kolkata' },
+    end: { dateTime: endDateTime, timeZone: 'Asia/Kolkata' },
+    reminders: {
+      useDefault: false,
+      overrides: [
+        { method: 'email', minutes: 1440 }, // 1 day before
+        { method: 'popup', minutes: 60 }, 
+        { method: 'popup', minutes: 15 },
+        { method: 'popup', minutes: 1 }
+      ]
+    },
+    colorId: '9',
+    visibility: 'default',
+    status: 'confirmed',
+    conferenceData: (!finalEventLink && slot.includeMeet !== false) ? {
+      createRequest: {
+        requestId: `meet-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        conferenceSolutionKey: { type: 'hangoutsMeet' }
+      }
+    } : undefined
+  };
+}
+
+// ✅ Function for Offline Events
+function buildOfflineEvent({ slot, dateStr, startDateTime, endDateTime, internshipTitle }) {
+  return {
+    summary: `${slot.sectionSummary || 'Session'} Section by ${slot.instructor || 'Instructor'}`,
+    description: `Topic: ${slot.sectionSummary || 'Internship session'}
+
+👨‍🏫 Instructor Name: ${slot.instructor || 'Not assigned'}
+📅 Date: ${formatDate(dateStr)}
+⏰ Time: ${slot.startTime} - ${slot.endTime} (IST)
+
+📍 Location: ${slot.location?.address || 'Offline'}
+
+${slot.location?.mapLink ? `🗺️ Map: ${slot.location.mapLink}` : ''}
+
+Generated on: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
+    `,
+    location: slot.location?.mapLink || 'Offline',
+    start: { dateTime: startDateTime, timeZone: 'Asia/Kolkata' },
+    end: { dateTime: endDateTime, timeZone: 'Asia/Kolkata' },
+    reminders: {
+      useDefault: false,
+      overrides: [
+        { method: 'email', minutes: 1440 }, // 1 day before
+        { method: 'popup', minutes: 60 }, 
+        { method: 'popup', minutes: 15 },
+        { method: 'popup', minutes: 1 }
+      ]
+    },
+    colorId: '9',
+    visibility: 'default',
+    status: 'confirmed'
+  };
+}
+
 const addScheduleToGoogleCalendar = async ({ studentEmail, timetable, internshipTitle, defaultEventLink }) => {
   console.log('🚀 Starting calendar integration for:', studentEmail);
   console.log('📅 Timetable data:', JSON.stringify(timetable, null, 2));
@@ -515,47 +578,16 @@ const addScheduleToGoogleCalendar = async ({ studentEmail, timetable, internship
         // Use finalEventLink before the event object
         const finalEventLink = slot.eventLink || defaultEventLink; // fallback to default
 
-        // Create event object
-        const event = {
-          summary: `${internshipTitle} - ${slot.sectionSummary || 'Session'}`,
-          description: `
-${slot.sectionSummary || slot.description || 'Internship session'}
-
-🔗 Online Meeting Link: ${finalEventLink || 'Link not available'}
-
-📅 Date: ${formatDate(dateStr)}
-⏰ Time: ${slot.startTime} - ${slot.endTime} (IST)
-📍 Location: ${slot.location?.address || slot.location || 'Virtual'}
-
-Generated on: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
-  `,
-          location: slot.location?.address || slot.location || 'Virtual Meeting',
-          start: {
-            dateTime: startDateTime,
-            timeZone: 'Asia/Kolkata',
-          },
-          end: {
-            dateTime: endDateTime,
-            timeZone: 'Asia/Kolkata',
-          },
-          reminders: {
-            useDefault: false,
-            overrides: [
-              { method: 'email', minutes: 24 * 60 }, // 1 day before
-              { method: 'popup', minutes: 15 }       // 15 minutes before
-            ]
-          },
-          colorId: '9', // Blue color for internship events
-          visibility: 'default',
-          status: 'confirmed'
-        };
-
-        // If offline, update location and description
-        if (slot.type === 'offline' && slot.location && slot.location.address) {
-          event.location = slot.location.address;
-          event.description += `\n📍 Offline Location: ${slot.location.address}`;
-          if (slot.location.mapLink) {
-            event.description += `\n🗺️ Map: ${slot.location.mapLink}`;
+        let event;
+        if (slot.type === 'online') {
+          event = buildOnlineEvent({ slot, dateStr, startDateTime, endDateTime, internshipTitle, finalEventLink });
+        } else if (slot.type === 'offline') {
+          event = buildOfflineEvent({ slot, dateStr, startDateTime, endDateTime, internshipTitle });
+        } else if (slot.type === 'hybrid') {
+          if (slot.location?.address) {
+            event = buildOfflineEvent({ slot, dateStr, startDateTime, endDateTime, internshipTitle });
+          } else {
+            event = buildOnlineEvent({ slot, dateStr, startDateTime, endDateTime, internshipTitle, finalEventLink });
           }
         }
 

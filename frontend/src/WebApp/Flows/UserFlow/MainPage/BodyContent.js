@@ -56,7 +56,7 @@ const BodyContent = () => {
       content = <PremiumPage />;
       break;
       case "offer-letter":
-        content = <OfferLetter />;
+        content = <OfferLetter />;  
         break;
     default:
       content = <div>Select a tab</div>;
