@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Modal, Form, Input, Button, message, Skeleton } from "antd";
 import axios from "axios";
-import firebase from "firebase/compat/app";
-import "firebase/compat/storage";
+
 
 const { TextArea } = Input;
 
@@ -33,22 +32,38 @@ function AdminFeatures() {
     }
   }, []);
 
-  const handleFileUpload = (event) => {
-    const selectedFile = event.target.files[0];
-    if (selectedFile) {
-      setUploadingImage(true); // Set uploading image state to true
-      const storageRef = firebase.storage().ref();
-      const fileRef = storageRef.child(selectedFile.name);
+  const handleFileUpload = async (event) => {
+  const selectedFile = event.target.files[0];
+  if (!selectedFile) return;
 
-      fileRef.put(selectedFile).then((snapshot) => {
-        snapshot.ref.getDownloadURL().then((downloadURL) => {
-          setImageUrl(downloadURL);
-          setPreviewImageUrl(downloadURL);
-          setUploadingImage(false); // Set uploading image state to false after upload completes
-        });
-      });
+  setUploadingImage(true);
+
+  const reader = new FileReader();
+  reader.onloadend = () => setPreviewImageUrl(reader.result);
+  reader.readAsDataURL(selectedFile);
+
+  try {
+    const formData = new FormData();
+    formData.append("image", selectedFile);
+
+    const { data } = await axios.post("/api/upload/feature-image", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+
+    if (data.success) {
+      setImageUrl(data.imageUrl);
+      message.success("Feature image uploaded successfully");
+    } else {
+      message.error("Failed to upload image");
     }
-  };
+  } catch (err) {
+    console.error("S3 Upload Error:", err);
+    message.error("Image upload failed");
+  } finally {
+    setUploadingImage(false);
+  }
+};
+
 
   const onFinishEdit = async (values) => {
     try {

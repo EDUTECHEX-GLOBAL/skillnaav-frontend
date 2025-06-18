@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
-import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
-import { storage } from "./../../../../config/Firebase";
+
 import { useTabContext } from "./UserHomePageContext/HomePageContext";
 
 const COUNTRY_API_URL = 'https://restcountries.com/v3.1/all';
@@ -262,35 +261,31 @@ const PostAJob = () => {
   };
 
 
-  const handleFileUpload = async (event) => {
-    const selectedFile = event.target.files[0];
-    if (!selectedFile) return;
+   const handleFileUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
 
     setUploading(true);
     const reader = new FileReader();
     reader.onloadend = () => setPreviewUrl(reader.result);
-    reader.readAsDataURL(selectedFile);
+    reader.readAsDataURL(file);
 
     try {
-      const fileRef = ref(storage, `uploads/${selectedFile.name}`);
-      const uploadTask = uploadBytesResumable(fileRef, selectedFile);
+      const data = new FormData();
+      data.append("image", file);
 
-      uploadTask.on(
-        "state_changed",
-        (snapshot) => {
-          // You can add progress monitoring here if needed
-        },
-        (error) => {
-          console.error("Error uploading file:", error);
-        },
-        () => {
-          getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
-            setFormData((prev) => ({ ...prev, imgUrl: downloadURL }));
-          });
-        }
-      );
-    } catch (error) {
-      console.error("Error uploading file:", error);
+
+    const res = await axios.post("/api/upload/job-image", data, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      if (res.data.success) {
+        setFormData(prev => ({ ...prev, imgUrl: res.data.imageUrl }));
+      } else {
+        console.error("Upload failed:", res.data.message);
+      }
+    } catch (err) {
+      console.error("S3 upload error:", err);
     } finally {
       setUploading(false);
     }

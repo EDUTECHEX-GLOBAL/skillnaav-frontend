@@ -1,11 +1,11 @@
-const multer = require('multer');
-const multerS3 = require('multer-s3');
-const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
-const path = require('path');
-const fs = require('fs');
-require('dotenv').config();
+const multer = require("multer");
+const multerS3 = require("multer-s3");
+const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
+const path = require("path");
+const fs = require("fs");
+require("dotenv").config();
 
-// Configure S3 client with timeout and retry settings
+// ✅ Configure S3 client
 const s3 = new S3Client({
   region: process.env.AWS_REGION,
   credentials: {
@@ -13,13 +13,13 @@ const s3 = new S3Client({
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
   },
   requestHandler: {
-    requestTimeout: 30000, // 30 seconds timeout
-    socketTimeout: 30000   // 30 seconds socket timeout
+    requestTimeout: 30000,
+    socketTimeout: 30000,
   },
-  maxAttempts: 3, // Retry up to 3 times
+  maxAttempts: 3,
 });
 
-// Common upload configuration
+// ✅ Universal uploader factory function
 const createUploader = (bucket, folder, allowedTypes, sizeLimit) => {
   return multer({
     storage: multerS3({
@@ -36,7 +36,7 @@ const createUploader = (bucket, folder, allowedTypes, sizeLimit) => {
     fileFilter: (req, file, cb) => {
       const ext = path.extname(file.originalname).toLowerCase();
       const mimetype = file.mimetype;
-      
+
       if (allowedTypes.test(ext) && allowedTypes.test(mimetype)) {
         cb(null, true);
       } else {
@@ -47,22 +47,36 @@ const createUploader = (bucket, folder, allowedTypes, sizeLimit) => {
   });
 };
 
-// Configure uploaders
+// ✅ Reusable image uploader for subfolders like discover, vision, team, etc.
+const imageUploader = (subfolder, maxSizeMB = 3) => {
+  console.log("🪣 Uploading to bucket:", process.env.AWS_IMAGE_BUCKET);
+  console.log("📁 Subfolder:", subfolder);
+  return createUploader(
+    process.env.AWS_IMAGE_BUCKET,
+    subfolder,
+    /jpe?g|png|webp/,
+    maxSizeMB * 1024 * 1024
+  );
+};
+
+
+// ✅ Resume uploader
 const resumeUpload = createUploader(
   process.env.AWS_RESUME_BUCKET,
-  'resumes',
+  "resumes",
   /pdf|docx?/,
-  5 * 1024 * 1024 // 5MB
+  5 * 1024 * 1024
 );
 
+// ✅ Profile pic uploader
 const profilePicUpload = createUploader(
   process.env.AWS_PROFILE_PIC_BUCKET || process.env.AWS_RESUME_BUCKET,
-  'profile-pics',
+  "profile-pics",
   /jpe?g|png|gif/,
-  2 * 1024 * 1024 // 2MB
+  2 * 1024 * 1024
 );
 
-// Enhanced file upload with retry logic
+// ✅ Retry-enabled file upload (for buffers/files)
 const uploadFile = async (params, retries = 3) => {
   for (let i = 0; i < retries; i++) {
     try {
@@ -71,28 +85,29 @@ const uploadFile = async (params, retries = 3) => {
       return `https://${params.Bucket}.s3.${process.env.AWS_REGION}.amazonaws.com/${params.Key}`;
     } catch (err) {
       if (i === retries - 1) throw err;
-      await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+      await new Promise((resolve) => setTimeout(resolve, 1000 * (i + 1)));
     }
   }
 };
 
-// Upload offer letter implementations
+// ✅ Upload offer letter from file
 const uploadOfferLetter = async (localFilePath, fileName) => {
   const fileContent = fs.readFileSync(localFilePath);
   return uploadFile({
     Bucket: process.env.AWS_RESUME_BUCKET,
     Key: `offer-letters/${fileName}`,
     Body: fileContent,
-    ContentType: 'application/pdf',
+    ContentType: "application/pdf",
   });
 };
 
+// ✅ Upload offer letter from buffer
 const uploadOfferLetterBuffer = async (buffer, fileName) => {
   return uploadFile({
     Bucket: process.env.AWS_RESUME_BUCKET,
     Key: `offer-letters/${fileName}`,
     Body: buffer,
-    ContentType: 'application/pdf',
+    ContentType: "application/pdf",
   });
 };
 
@@ -101,4 +116,6 @@ module.exports = {
   profilePicUpload,
   uploadOfferLetter,
   uploadOfferLetterBuffer,
+  createUploader,  // if needed for custom cases
+  imageUploader,   // 📌 Use this for discover/team/vision/feature uploads
 };

@@ -1,4 +1,3 @@
-// src/components/InternshipList.js
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -14,50 +13,40 @@ import Modal from "./Modal";
 import ScheduleForm from "./ScheduleForm";
 import { ApplicationsTable, ShortlistedTable } from "./Tables";
 
- const api = axios.create({
-    baseURL: "http://localhost:5000/api",
-    timeout: 10000,
-  });
+const SHORTLIST_API_BASE_URL = process.env.REACT_APP_SHORTLIST_API_BASE_URL || "http://localhost:8001";
+
 const InternshipList = () => {
-  // --- Core data state ---
   const [internships, setInternships] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-
-  // --- Applications / Shortlist state ---
   const [applications, setApplications] = useState({});
   const [loadingApplications, setLoadingApplications] = useState({});
   const [shortlistedCandidates, setShortlistedCandidates] = useState({});
   const [modalData, setModalData] = useState({
     open: false,
     internshipId: null,
-    type: null, // "applications" or "shortlisted"
+    type: null,
     loading: false,
   });
 
-  // --- Offer‐letter overlay state ---
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [joiningDate, setJoiningDate] = useState("");
   const [templateId, setTemplateId] = useState("");
   const [templates, setTemplates] = useState([]);
   const [sendingOffer, setSendingOffer] = useState(false);
 
-  // --- Schedule modal state ---
   const [scheduleFormOpen, setScheduleFormOpen] = useState(false);
   const [selectedInternshipForSchedule, setSelectedInternshipForSchedule] = useState(null);
-  
 
   const partnerId = localStorage.getItem("partnerId");
- 
 
-  // Fetch internships on mount
   useEffect(() => {
     const fetchInternships = async () => {
       try {
         setLoading(true);
         if (!partnerId) throw new Error("Partner ID not found");
-        const { data } = await api.get(`/interns/partner/${partnerId}`);
+        const { data } = await axios.get(`/api/interns/partner/${partnerId}`);
         setInternships(data);
         setError(null);
       } catch (err) {
@@ -69,53 +58,34 @@ const InternshipList = () => {
     fetchInternships();
   }, [partnerId]);
 
-  // Helper: how many days/hours ago
   const calculateDaysAgo = (date) => {
     const posted = new Date(date);
     const now = new Date();
     const diff = now - posted;
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
     const hours = Math.floor(diff / (1000 * 60 * 60));
-    if (days === 0) {
-      if (hours === 0) return "Just now";
-      if (hours === 1) return "1 hour ago";
-      return `${hours} hours ago`;
-    }
+    if (days === 0) return hours === 0 ? "Just now" : `${hours} hour${hours > 1 ? "s" : ""} ago`;
     if (days === 1) return "Yesterday";
     return `${days}d ago`;
   };
 
-  // --- Applications handlers ---
   const fetchApplications = async (internshipId) => {
     try {
       setLoadingApplications(prev => ({ ...prev, [internshipId]: true }));
-  
-      // Fetch applications (assume API returns { applications: [] } if none)
-      const { data } = await api.get(`/applications/internship/${internshipId}`);
-  
-      // Safely set to an array (empty or not)
+      const { data } = await axios.get(`/api/applications/internship/${internshipId}`);
       setApplications(prev => ({
         ...prev,
-        [internshipId]: Array.isArray(data.applications) ? data.applications : []
+        [internshipId]: Array.isArray(data.applications) ? data.applications : [],
       }));
-  
     } catch (err) {
       console.warn("Could not fetch applications:", err.message);
-      // On error, just put an empty array
       setApplications(prev => ({ ...prev, [internshipId]: [] }));
     } finally {
-      // In either case, open the modal
       setLoadingApplications(prev => ({ ...prev, [internshipId]: false }));
-      setModalData({
-        open: true,
-        internshipId,
-        type: "applications",
-        loading: false
-      });
+      setModalData({ open: true, internshipId, type: "applications", loading: false });
     }
   };
-  
-  // --- Shortlist handlers ---
+
   const handleShortlist = async (id, description, skills) => {
     try {
       setModalData({ open: true, internshipId: id, type: "shortlisted", loading: true });
@@ -129,7 +99,7 @@ const InternshipList = () => {
       formData.append("internship_id", id);
 
       const { data } = await axios.post(
-        "http://localhost:8001/partner/shortlist",
+        `${SHORTLIST_API_BASE_URL}/partner/shortlist`,
         formData,
         { headers: { "Content-Type": "multipart/form-data" } }
       );
@@ -138,9 +108,9 @@ const InternshipList = () => {
         ...prev,
         [id]: data.shortlisted_candidates,
       }));
-      setModalData((prev) => ({ ...prev, loading: false }));
     } catch (err) {
       setError(err.message);
+    } finally {
       setModalData((prev) => ({ ...prev, loading: false }));
     }
   };
@@ -149,23 +119,22 @@ const InternshipList = () => {
     try {
       setModalData({ open: true, internshipId, type: "shortlisted", loading: true });
       const { data } = await axios.get(
-        `http://localhost:8001/partner/shortlisted/${internshipId}`
+        `${SHORTLIST_API_BASE_URL}/partner/shortlisted/${internshipId}`
       );
       setShortlistedCandidates((prev) => ({
         ...prev,
         [internshipId]: data.shortlisted_candidates,
       }));
-      setModalData((prev) => ({ ...prev, loading: false }));
     } catch (err) {
       setError(err.message);
+    } finally {
       setModalData((prev) => ({ ...prev, loading: false }));
     }
   };
 
-  // Update application status (Pending/Approved/Rejected)
   const updateApplicationStatus = async (studentId, status) => {
     try {
-      await api.put(`/applications/${studentId}/status`, { status });
+      await axios.put(`/api/applications/${studentId}/status`, { status });
       setApplications((prev) => {
         const updated = { ...prev };
         Object.keys(updated).forEach((key) => {
@@ -180,42 +149,32 @@ const InternshipList = () => {
     }
   };
 
-  // --- Offer letter handlers ---
   const handleSendOffer = (student) => {
-  const internship = internships.find(i => i._id === modalData.internshipId);
-  setSelectedStudent({ ...student, internship_id: modalData.internshipId });
-
-  // ✅ Set default joiningDate to internship.startDate (in yyyy-mm-dd format)
-  setJoiningDate(
-    internship?.startDate
-      ? new Date(internship.startDate).toISOString().split("T")[0]
-      : ""
-  );
-
-  setTemplateId("");
-
-  axios
-    .get(`/api/templates?partnerId=${partnerId}`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-    })
-    .then((res) => setTemplates(res.data))
-    .catch(console.error);
-};
-
-
-const handleSendOfferLetter = async () => {
-  if (!templateId || !joiningDate) return alert("Template and joining date required");
-
-  try {
-    setSendingOffer(true);
-
-    const internship = internships.find(
-      (i) => i._id === selectedStudent.internship_id
+    const internship = internships.find(i => i._id === modalData.internshipId);
+    setSelectedStudent({ ...student, internship_id: modalData.internshipId });
+    setJoiningDate(
+      internship?.startDate
+        ? new Date(internship.startDate).toISOString().split("T")[0]
+        : ""
     );
+    setTemplateId("");
 
-    await api.post(
-      `/offer-letters`,
-      {
+    axios
+      .get(`/api/templates?partnerId=${partnerId}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      })
+      .then((res) => setTemplates(res.data))
+      .catch(console.error);
+  };
+
+  const handleSendOfferLetter = async () => {
+    if (!templateId || !joiningDate) return alert("Template and joining date required");
+
+    try {
+      setSendingOffer(true);
+      const internship = internships.find(i => i._id === selectedStudent.internship_id);
+
+      await axios.post(`/api/offer-letters`, {
         student_id: selectedStudent._id,
         internshipId: internship._id,
         templateId,
@@ -231,30 +190,26 @@ const handleSendOfferLetter = async () => {
         jobDescription: internship.jobDescription,
         qualifications: internship.qualifications,
         contactInfo: {
-          name: "HR Manager",       // Replace with actual admin/partner data
+          name: "HR Manager",
           email: "hr@company.com",
           phone: "9876543210",
         },
         noticePeriod: "2 weeks",
-      },
-      {
+      }, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-      }
-    );
+      });
 
-    alert("Offer sent successfully!");
-    setSelectedStudent(null);
-  } catch (err) {
-    alert(err.response?.data?.error || err.message);
-  } finally {
-    setSendingOffer(false);
-  }
-};
+      alert("Offer sent successfully!");
+      setSelectedStudent(null);
+    } catch (err) {
+      alert(err.response?.data?.error || err.message);
+    } finally {
+      setSendingOffer(false);
+    }
+  };
 
-
-  // --- Schedule handler ---
   const handleSchedule = (internshipId) => {
     setSelectedInternshipForSchedule(internshipId);
     setScheduleFormOpen(true);

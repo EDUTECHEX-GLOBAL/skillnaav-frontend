@@ -3,14 +3,11 @@ import { Form, Input, Button, message, Upload, Spin } from "antd";
 import { useDispatch, useSelector } from "react-redux";
 import { ShowLoading, HideLoading } from "../../redux/rootSlice";
 import axios from "axios";
-import firebase from "firebase/compat/app";
-import "firebase/compat/storage";
 import {
   LoadingOutlined,
   UploadOutlined,
   DeleteOutlined,
 } from "@ant-design/icons";
-import ImageLazyLoad from "react-lazyload";
 
 const antIcon = <LoadingOutlined style={{ fontSize: 24 }} spin />;
 
@@ -58,29 +55,26 @@ const AdminDiscover = () => {
     }
   };
 
-  const handleDiscoverImageUpload = ({ file }) => {
-    const storageRef = firebase.storage().ref();
-    const fileRef = storageRef.child(`discover/${Date.now()}_${file.name}`);
-
+  const handleDiscoverImageUpload = async ({ file }) => {
+    const formData = new FormData();
+    formData.append("image", file);
     setUploading(true);
-
-    fileRef
-      .put(file)
-      .then((snapshot) => {
-        snapshot.ref.getDownloadURL().then((downloadURL) => {
-          setDiscoverImgUrl(downloadURL);
-          dispatch({
-            type: "UPDATE_DISCOVER_IMG_URL",
-            payload: downloadURL,
-          });
-          message.success("Discover image uploaded successfully");
-        });
-      })
-      .catch((error) => {
-        console.error("Discover image upload error:", error);
-        message.error("Failed to upload discover image");
-      })
-      .finally(() => setUploading(false));
+    try {
+      const { data } = await axios.post("/api/upload/discover-image", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      if (data.success) {
+        setDiscoverImgUrl(data.imageUrl);
+        message.success("Discover image uploaded successfully");
+      } else {
+        message.error("Failed to upload image");
+      }
+    } catch (error) {
+      console.error("Upload error:", error);
+      message.error("Upload error");
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleCompanyImageUpload = async ({ file }) => {
@@ -89,28 +83,27 @@ const AdminDiscover = () => {
       return;
     }
 
-    const storageRef = firebase.storage().ref();
-    const fileRef = storageRef.child(`company/${Date.now()}_${file.name}`);
-
+    const formData = new FormData();
+    formData.append("image", file);
     setUploading(true);
-
     try {
-      const snapshot = await fileRef.put(file);
-      const downloadURL = await snapshot.ref.getDownloadURL();
-
-      setCompImageUrls([...compImageUrls, downloadURL]);
-      dispatch({
-        type: "UPDATE_COMP_IMAGE_URLS",
-        payload: [...compImageUrls, downloadURL],
+      const { data } = await axios.post("/api/upload/company-image", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
       });
 
-      await axios.post("/api/skillnaav/add-discover-comp-img", {
-        imageUrl: downloadURL,
-      });
-      message.success("Company image uploaded successfully");
+      if (data.success) {
+        const updatedUrls = [...compImageUrls, data.imageUrl];
+        setCompImageUrls(updatedUrls);
+        await axios.post("/api/skillnaav/add-discover-comp-img", {
+          imageUrl: data.imageUrl,
+        });
+        message.success("Company image uploaded successfully");
+      } else {
+        message.error("Upload failed");
+      }
     } catch (error) {
-      console.error("Company image upload error:", error);
-      message.error("Failed to upload company image");
+      console.error("Upload error:", error);
+      message.error("Upload error");
     } finally {
       setUploading(false);
     }
@@ -159,7 +152,6 @@ const AdminDiscover = () => {
         layout="vertical"
         initialValues={discover}
       >
-        {/* Form items */}
         <Form.Item name="discoverheading" label="Discover Heading">
           <Input placeholder="Enter Discover Heading" />
         </Form.Item>
@@ -169,13 +161,11 @@ const AdminDiscover = () => {
         <Form.Item name="tryforfreebtn" label="Try for Free Button">
           <Input placeholder="Enter Try for Free Button" />
         </Form.Item>
-        <Form.Item
-          name="image"
-          label="Upload Discover Image"
-          valuePropName="fileList"
-          getValueFromEvent={(e) => (Array.isArray(e) ? e : e && e.fileList)}
-        >
-          {/* Discover Image Upload */}
+        <Form.Item name="viewpricebtn" label="View Pricing Button">
+          <Input placeholder="Enter View Pricing Button" />
+        </Form.Item>
+
+        <Form.Item label="Upload Discover Image">
           <Upload
             name="image"
             listType="picture-card"
@@ -203,14 +193,13 @@ const AdminDiscover = () => {
               Remove
             </Button>
           )}
-          {/* Guidelines */}
           <p className="text-sm text-gray-500 mt-2">
             Please upload a high-quality image with recommended dimensions of
             1200x800 pixels.
           </p>
         </Form.Item>
+
         <Form.Item label="Company Images">
-          {/* Company Image Upload */}
           <Upload
             name="image"
             listType="picture-card"
@@ -223,12 +212,10 @@ const AdminDiscover = () => {
               <span className="ml-2 text-gray-500">Upload Company Image</span>
             </div>
           </Upload>
-          {/* Guidelines */}
           <p className="text-sm text-gray-500 mt-2">
             Please upload up to 5 high-quality images with recommended
             dimensions of 800x800 pixels.
           </p>
-          {/* Uploaded Company Images */}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
             {compImageUrls.map((url, index) => (
               <div key={index} className="relative">
@@ -249,6 +236,7 @@ const AdminDiscover = () => {
             ))}
           </div>
         </Form.Item>
+
         {discovercompimg.length > 0 && (
           <div className="mt-8">
             <h2 className="text-xl font-bold mb-4 text-gray-700">
@@ -264,7 +252,7 @@ const AdminDiscover = () => {
                   />
                   <Button
                     type="link"
-                    onClick={() => handleImageRemove(image._id)}
+                    onClick={() => handleImageRemove(image.imageUrl)}
                     icon={<DeleteOutlined />}
                     className="absolute top-2 right-2 text-red-500"
                   >
@@ -275,7 +263,7 @@ const AdminDiscover = () => {
             </div>
           </div>
         )}
-        {/* Save Changes Button */}
+
         <Form.Item>
           <Button type="primary" htmlType="submit">
             Save Changes

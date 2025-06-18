@@ -48,6 +48,10 @@ const googleRoutes = require("./routes/webapp-routes/googleRoutes");
 // NEW: Import Offer Routes
 const offerLetterRoutes = require("./routes/webapp-routes/offerLetterRoutes");
 const scheduleRoutes = require("./routes/webapp-routes/scheduleRoutes");
+const uploadRoutes = require("./routes/uploadRoutes");
+
+
+app.use("/api/upload", uploadRoutes);
 
 // Define routes
 app.use("/api/users", userRoutes);

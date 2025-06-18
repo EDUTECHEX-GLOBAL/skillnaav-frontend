@@ -1,9 +1,6 @@
-// src/components/AdminVision.js
 import React, { useState, useEffect, useCallback } from "react";
 import { Modal, Form, Input, Button, message, List, Skeleton } from "antd";
 import axios from "axios";
-import firebase from "firebase/compat/app";
-import "firebase/compat/storage";
 
 const { TextArea } = Input;
 
@@ -23,47 +20,11 @@ const AdminVision = () => {
     fetchSkillnaavData();
   }, []);
 
-  const handleFileUpload = (event) => {
-    const selectedFile = event.target.files[0];
-    if (selectedFile) {
-      // Set uploading state to true to show loader
-      setUploading(true);
-
-      // Set the preview URL for instant feedback
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreviewUrl(reader.result);
-      };
-      reader.readAsDataURL(selectedFile);
-
-      // Upload to Firebase
-      const storageRef = firebase.storage().ref();
-      const fileRef = storageRef.child(selectedFile.name);
-      fileRef
-        .put(selectedFile)
-        .then((snapshot) => {
-          return snapshot.ref.getDownloadURL();
-        })
-        .then((downloadURL) => {
-          console.log(downloadURL);
-          setImgUrl(downloadURL);
-          setUploading(false); // Set uploading state to false after successful upload
-        })
-        .catch((error) => {
-          console.error("Error uploading file:", error);
-          setUploading(false); // Set uploading state to false on error
-          // Handle error as needed (e.g., show error message)
-        });
-    } else {
-      console.log("No file selected, so select one");
-    }
-  };
-
   const fetchSkillnaavData = useCallback(async () => {
     try {
       const response = await axios.get("/api/skillnaav/get-skillnaav-data");
       setSkillnaavData(response.data);
-      if (response.data.visionhead && response.data.visionhead.length > 0) {
+      if (response.data.visionhead?.length > 0) {
         setImgUrl(response.data.visionhead[0].visionImg || "");
         setPreviewUrl(response.data.visionhead[0].visionImg || "");
       }
@@ -71,6 +32,37 @@ const AdminVision = () => {
       console.error("Error fetching skillnaav data:", error);
     }
   }, []);
+
+  const handleFileUpload = async (event) => {
+    const selectedFile = event.target.files[0];
+    if (!selectedFile) return;
+
+    setUploading(true);
+    const reader = new FileReader();
+    reader.onloadend = () => setPreviewUrl(reader.result);
+    reader.readAsDataURL(selectedFile);
+
+    try {
+      const formData = new FormData();
+      formData.append("image", selectedFile);
+
+      const { data } = await axios.post("/api/upload/vision-image", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      if (data.success) {
+        setImgUrl(data.imageUrl);
+        message.success("Image uploaded successfully");
+      } else {
+        message.error("Failed to upload image");
+      }
+    } catch (error) {
+      console.error("S3 upload error:", error);
+      message.error("Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleFinish = useCallback(
     async (values) => {
@@ -82,7 +74,7 @@ const AdminVision = () => {
             `/api/skillnaav/update-visionhead/${_id}`,
             {
               ...values,
-              visionImg: imgUrl, // Include uploaded image URL in update
+              visionImg: imgUrl,
             }
           );
         } else if (modalData.type === "editPoint") {
@@ -93,10 +85,7 @@ const AdminVision = () => {
             values
           );
         } else if (modalData.type === "addPoint") {
-          response = await axios.post("/api/skillnaav/add-visionpoint", {
-            ...values,
-            visionImg: imgUrl, // Include uploaded image URL in creation
-          });
+          response = await axios.post("/api/skillnaav/add-visionpoint", values);
         }
 
         if (response.data.success) {
@@ -109,17 +98,17 @@ const AdminVision = () => {
           message.error(response.data.message);
         }
       } catch (error) {
-        message.error(`Error ${modalData.type} vision data: ${error.message}`);
+        message.error(`Error ${modalData.type}: ${error.message}`);
       }
     },
     [modalData, form, fetchSkillnaavData, imgUrl]
   );
 
   const handleDelete = useCallback(
-    async (visionpointId) => {
+    async (id) => {
       try {
         const response = await axios.delete(
-          `/api/skillnaav/delete-visionpoint/${visionpointId}`
+          `/api/skillnaav/delete-visionpoint/${id}`
         );
         if (response.data.success) {
           message.success(response.data.message);
@@ -139,8 +128,10 @@ const AdminVision = () => {
       setModalData({ isVisible: true, type, data });
       if (data) {
         form.setFieldsValue(data);
-        setImgUrl(data.visionImg || "");
-        setPreviewUrl(data.visionImg || "");
+        if (data.visionImg) {
+          setImgUrl(data.visionImg);
+          setPreviewUrl(data.visionImg);
+        }
       }
     },
     [form]
@@ -232,9 +223,8 @@ const AdminVision = () => {
         </div>
       </div>
 
-      {/* Edit/Add Vision Modal */}
       <Modal
-        visible={modalData.isVisible}
+        open={modalData.isVisible}
         title={
           modalData.type === "editHead"
             ? "Edit Vision Head"
@@ -253,44 +243,31 @@ const AdminVision = () => {
               <Form.Item
                 name="visionheading"
                 label="Vision Heading"
-                rules={[
-                  { required: true, message: "Please enter vision heading" },
-                ]}
+                rules={[{ required: true, message: "Please enter heading" }]}
               >
                 <TextArea rows={4} />
               </Form.Item>
               <Form.Item
                 name="visionsub"
                 label="Vision Sub Heading"
-                rules={[
-                  {
-                    required: true,
-                    message: "Please enter vision sub heading",
-                  },
-                ]}
+                rules={[{ required: true, message: "Please enter sub heading" }]}
               >
                 <TextArea rows={4} />
               </Form.Item>
               <Form.Item
-                name="visionImg"
-                label="Vision Image"
-                rules={[
-                  { required: true, message: "Please upload vision image" },
-                ]}
+                label="Upload Vision Image"
+                rules={[{ required: true, message: "Please upload image" }]}
               >
                 <input type="file" onChange={handleFileUpload} />
                 {uploading ? (
-                  <div className="mt-2 flex items-center">
+                  <div className="mt-2">
                     <Skeleton.Avatar active size="small" />
-                    <Skeleton.Button
-                      active
-                      style={{ marginLeft: 10, width: 150 }}
-                    />
+                    <Skeleton.Button active style={{ marginLeft: 10, width: 150 }} />
                   </div>
                 ) : previewUrl ? (
                   <img
                     src={previewUrl}
-                    alt="Vision Image"
+                    alt="Preview"
                     className="max-w-full h-auto rounded mt-2"
                     style={{ maxHeight: "200px", objectFit: "cover" }}
                   />

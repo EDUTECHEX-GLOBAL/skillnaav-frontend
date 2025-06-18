@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Modal, Form, Input, Button, message, List, Skeleton } from "antd";
 import axios from "axios";
-import firebase from "firebase/compat/app";
-import "firebase/compat/storage";
 
 const { TextArea } = Input;
 
@@ -34,29 +32,38 @@ const AdminTeam = () => {
     }
   }, []);
 
-  const handleFileUpload = (event) => {
-    const selectedFile = event.target.files[0];
+const handleFileUpload = async (event) => {
+  const selectedFile = event.target.files[0];
+  if (!selectedFile) return;
 
-    if (selectedFile) {
-      setUploading(true);
+  setUploading(true);
 
-      const storageRef = firebase.storage().ref();
-      const fileRef = storageRef.child(selectedFile.name);
-      fileRef
-        .put(selectedFile)
-        .then((snapshot) => snapshot.ref.getDownloadURL())
-        .then((url) => {
-          setImgUrl(url);
-          setPreviewUrl(url);
-          setUploading(false);
-        })
-        .catch((error) => {
-          console.error("Error uploading file:", error);
-          setUploading(false);
-          message.error("Failed to upload image");
-        });
+  const reader = new FileReader();
+  reader.onloadend = () => setPreviewUrl(reader.result);
+  reader.readAsDataURL(selectedFile);
+
+  try {
+    const formData = new FormData();
+    formData.append("image", selectedFile);
+
+    const { data } = await axios.post("/api/upload/team-image", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+
+    if (data.success) {
+      setImgUrl(data.imageUrl);
+      message.success("Image uploaded successfully");
+    } else {
+      message.error("Failed to upload image");
     }
-  };
+  } catch (err) {
+    console.error("Upload error:", err);
+    message.error("Upload error");
+  } finally {
+    setUploading(false);
+  }
+};
+
 
   const handleFormSubmit = async (values) => {
     const teamData = { ...values, image: imgUrl };
