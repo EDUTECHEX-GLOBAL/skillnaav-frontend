@@ -1,30 +1,27 @@
 from dotenv import load_dotenv
-
-load_dotenv()  # Load environment variables from .env file
+load_dotenv()
 
 import asyncio
 from fastapi import FastAPI, Form, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pymongo import MongoClient
-import fitz  # PyMuPDF for PDF parsing
-import spacy
+import fitz  # PyMuPDF
 import os
 import io
 import json
-import boto3  # type: ignore
-from botocore.exceptions import ClientError # type: ignore
+import docx2txt
+import tempfile
 from urllib.parse import urlparse
-from sklearn.feature_extraction.text import TfidfVectorizer  # type: ignore
-from sklearn.metrics.pairwise import cosine_similarity  # type: ignore
 from datetime import datetime
 from bson import ObjectId
-import time
+from sentence_transformers import SentenceTransformer, util
+import numpy as np
+import boto3
 
-# Utility to get current time as string
+# === Globals ===
 def now():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-# Helper to convert ObjectId to string
 def convert_object_ids(obj):
     if isinstance(obj, list):
         return [convert_object_ids(item) for item in obj]
@@ -33,74 +30,26 @@ def convert_object_ids(obj):
     else:
         return obj
 
-# Load spaCy model
-print(f"[{now()}] Loading spaCy model...")
-nlp = spacy.load('en_core_web_sm')
+print(f"[{now()}] Loading embedding model...")
+embedder = SentenceTransformer('all-MiniLM-L6-v2')
 
-# AWS Bedrock client setup
-aws_access_key_id = os.getenv("AWS_ACCESS_KEY_ID")
-aws_secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY")
-aws_region = os.getenv("AWS_REGION")
-if not all([aws_access_key_id, aws_secret_access_key, aws_region]):
-    raise ValueError("Missing AWS credentials or region in .env!")
-bedrock_client = boto3.client(
-    service_name="bedrock-runtime",
-    region_name=aws_region,
-    aws_access_key_id=aws_access_key_id,
-    aws_secret_access_key=aws_secret_access_key
-)
-
-# MongoDB connection
+# === MongoDB Setup ===
 db = MongoClient(os.getenv("MONGO_URI")).get_default_database()
 print(f"[{now()}] Connected to MongoDB: {db.name}")
 shortlist_collection = db["shortlisted_candidates"]
 applications_collection = db["applications"]
 
-# FastAPI app
+# === FastAPI Setup ===
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://www.skillnaav.com"],
+    allow_origins=["http://localhost:3000", "https://www.skillnaav.com", "https://skillnaav.com"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Bedrock invocation with improved backoff and dynamic truncation
-def invoke_bedrock(prompt_text: str) -> str:
-    # dynamically adjust prompt size to avoid token limits
-    max_prompt_length = 2000
-    safe_prompt = prompt_text[:max_prompt_length]
-    body = {"prompt": safe_prompt, "max_gen_len": 1000, "temperature": 0.5, "top_p": 0.9}
-    retries = 4
-    for attempt in range(1, retries + 1):
-        try:
-            resp = bedrock_client.invoke_model(
-                modelId="meta.llama3-8b-instruct-v1:0",
-                body=json.dumps(body),
-                contentType="application/json",
-                accept="application/json"
-            )
-            out = json.loads(resp['body'].read())
-            return out.get("generation", "")
-        except ClientError as e:
-            code = e.response.get('Error', {}).get('Code', '')
-            print(f"[{now()}] Bedrock ClientError (attempt {attempt}): {code} - {e}")
-            if code == 'ThrottlingException' and attempt < retries:
-                backoff = 2 ** attempt
-                print(f"[{now()}] Throttled. Sleeping for {backoff}s before retrying...")
-                time.sleep(backoff)
-                continue
-            # for other errors or last attempt, break
-            break
-        except Exception as e:
-            print(f"[{now()}] Bedrock Unexpected Error: {e}")
-            break
-
-    print(f"[{now()}] Bedrock invocation failed after {retries} attempts.")
-    return ""
-
-# Download resume from S3 with logging
+# === Resume Parsing ===
 def download_resume_from_s3(resume_url: str):
     print(f"[{now()}] Downloading resume from: {resume_url}")
     try:
@@ -121,7 +70,6 @@ def download_resume_from_s3(resume_url: str):
         print(f"[{now()}] S3 Download Error for {resume_url}: {e}")
         return None
 
-# Extract text from PDF
 def extract_text_from_pdf(pdf_file):
     text = ""
     try:
@@ -133,79 +81,59 @@ def extract_text_from_pdf(pdf_file):
         print(f"[{now()}] PDF Extract Error: {e}")
     return text
 
-# Extract resume info using spaCy
-def extract_resume_info(text):
-    skills = []
+def extract_text_from_docx(docx_file):
     try:
-        doc = nlp(text)
-        skills = [ent.text for ent in doc.ents if ent.label_ in ["ORG", "GPE"]]
+        docx_file.seek(0)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as temp_file:
+            temp_file.write(docx_file.read())
+            temp_path = temp_file.name
+        text = docx2txt.process(temp_path)
+        os.remove(temp_path)
+        return text
     except Exception as e:
-        print(f"[{now()}] NLP Extract Error: {e}")
-    return {"text": text, "skills": skills}
+        print(f"[{now()}] DOCX Extract Error: {e}")
+        return ""
 
-# Get readiness score with prompt truncation
-def get_readiness_score(resume_text: str, job_description: str, job_skills: list) -> int:
-    try:
-        prompt = (
-            f"Evaluate this resume out of 100.\nResume snippet:\n{resume_text[:500]}\n"
-            f"Job Description snippet:\n{job_description[:500]}\nSkills:{job_skills}"
-        )
-        score_txt = invoke_bedrock(prompt)
-        import re
-        m = re.search(r"\d+", score_txt)
-        return int(m.group()) if m else 0
-    except Exception as e:
-        print(f"[{now()}] Score Error: {e}")
-        return 0
-
-# TF-IDF similarity
-def calculate_similarity(resume_texts, job_description, job_skills):
-    if not resume_texts:
-        return []
-    job_details = job_description + " " + " ".join(job_skills)
-    docs = [job_details] + resume_texts
-    vec = TfidfVectorizer()
-    tfidf_matrix = vec.fit_transform(docs)
-    sims = cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:]).flatten()
-    return sims.tolist()
-
-# Process a single resume
-async def process_resume(resume_url, job_description, job_skills_list):
+async def process_resume(resume_url, job_embedding):
     application = await asyncio.get_event_loop().run_in_executor(
         None, lambda: applications_collection.find_one({"resumeUrl": resume_url})
     )
-    if application:
-        name = application.get("userName") or application.get("name") or "N/A"
-        email = application.get("userEmail") or application.get("email") or "N/A"
-        applied_date = (application.get("appliedDate") or application.get("applied_date")
-                        or application.get("appliedOn") or "N/A")
-        student_id = (application.get("studentId") or application.get("student_id")
-                      or application.get("studentID") or "N/A")
-    else:
-        name = email = applied_date = student_id = "N/A"
+    name = application.get("userName") or application.get("name") or "N/A" if application else "N/A"
+    email = application.get("userEmail") or application.get("email") or "N/A" if application else "N/A"
+    applied_date = (application.get("appliedDate") or application.get("applied_date")
+                    or application.get("appliedOn") or "N/A") if application else "N/A"
+    student_id = (application.get("studentId") or application.get("student_id")
+                  or application.get("studentID") or "N/A") if application else "N/A"
 
     file_stream = await asyncio.get_event_loop().run_in_executor(None, download_resume_from_s3, resume_url)
     if not file_stream:
         return None
-    text = await asyncio.get_event_loop().run_in_executor(None, extract_text_from_pdf, file_stream)
-    info = await asyncio.get_event_loop().run_in_executor(None, extract_resume_info, text)
-    readiness = await asyncio.get_event_loop().run_in_executor(None, get_readiness_score, text, job_description, job_skills_list)
 
-    if readiness > 60:
-        return {
-            "student_id": student_id,
-            "name": name,
-            "email": email,
-            "appliedDate": applied_date,
-            "resumeUrl": resume_url,
-            "readiness_score": readiness,
-            "text": info["text"],
-            "skills": info["skills"]
-        }
-    return None
+    ext = os.path.splitext(urlparse(resume_url).path)[-1].lower()
+    print(f"[{now()}] Extracting resume for {resume_url} as {ext}")
+    if ext == ".pdf":
+        text = await asyncio.get_event_loop().run_in_executor(None, extract_text_from_pdf, file_stream)
+    elif ext == ".docx":
+        text = await asyncio.get_event_loop().run_in_executor(None, extract_text_from_docx, file_stream)
+    else:
+        print(f"[{now()}] Unsupported file type: {ext}")
+        return None
 
-# Remaining endpoints
-@app.post("/partner/shortlist")
+    embedding = embedder.encode(text, convert_to_tensor=True)
+    similarity = util.cos_sim(embedding, job_embedding).item()
+    print(f"[{now()}] Similarity score for {email}: {similarity:.4f}")
+
+    return {
+        "student_id": student_id,
+        "name": name,
+        "email": email,
+        "appliedDate": applied_date,
+        "resumeUrl": resume_url,
+        "similarity_score": similarity,
+        "text": text
+    }
+
+@app.post("/ai/partner/shortlist")
 async def shortlist_candidates(
     internship_id: str = Form(...),
     job_description: str = Form(...),
@@ -222,31 +150,30 @@ async def shortlist_candidates(
     except Exception:
         job_skills_list = []
 
-    tasks = [process_resume(url, job_description, job_skills_list) for url in resumes]
+    job_text = job_description + " " + " ".join(job_skills_list)
+    job_embedding = embedder.encode(job_text, convert_to_tensor=True)
+
+    tasks = [process_resume(url, job_embedding) for url in resumes]
     results = await asyncio.gather(*tasks)
-    candidates = [c for c in results if c]
 
-    if candidates:
-        sims = calculate_similarity([c['text'] for c in candidates], job_description, job_skills_list)
-        for i, cand in enumerate(candidates):
-            cand['similarity_score'] = sims[i] if i < len(sims) else 0
-            cand['internship_id'] = ObjectId(internship_id)
+    candidates = [c for c in results if c and c['similarity_score'] >= 0.3]  # Updated threshold
 
-    candidates = sorted(candidates, key=lambda x: (x['readiness_score'], x.get('similarity_score', 0)), reverse=True)
+    for cand in candidates:
+        cand['internship_id'] = internship_obj_id
+
+    candidates = sorted(candidates, key=lambda x: x['similarity_score'], reverse=True)
+
     if candidates:
         shortlist_collection.insert_many(candidates)
 
     return {"shortlisted_candidates": convert_object_ids(candidates)}
 
-@app.get("/partner/shortlisted/{internship_id}")
+@app.get("/ai/partner/shortlisted/{internship_id}")
 async def get_shortlisted_candidates(internship_id: str):
     try:
         internship_obj_id = ObjectId(internship_id)
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid internship_id '{internship_id}': {e}"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid internship_id '{internship_id}': {e}")
     try:
         docs = list(shortlist_collection.find({"internship_id": internship_obj_id}))
         return {"shortlisted_candidates": convert_object_ids(docs)}

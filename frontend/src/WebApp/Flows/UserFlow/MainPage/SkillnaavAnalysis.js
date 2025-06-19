@@ -126,7 +126,7 @@ const SkillAnalysis = ({ job, onClose }) => {
       formData.append("job_description", job ? job.jobDescription : jobDescription);
       formData.append("required_skills", job ? job.qualifications.join(", ") : requiredSkills);
 
-      const response = await axios.post("http://localhost:8000/analyze-skills/", formData, {
+      const response = await axios.post("/ai/analyze-skills/", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
