@@ -79,10 +79,10 @@ app.use("/api/notifications", NotificationRoutes);
 app.use("/api/schedule", scheduleRoutes);
 
 // New route for skill gap analysis
-app.post("/api/analyze-skills", async (req, res) => {
+app.post("/analyze-skills", async (req, res) => {
   console.log("Received request:", req.body);
   try {
-    const response = await axios.post("/ai/analyze-skills", req.body);
+    const response = await axios.post("/analyze-skills", req.body);
     res.json(response.data);
   } catch (error) {
     console.error("Error from FastAPI:", error.response?.data || error.message);

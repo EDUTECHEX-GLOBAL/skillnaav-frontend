@@ -19,7 +19,7 @@ const SendOfferLetter = ({ student, internshipId, onSuccess }) => {
     try {
       setError(null);
       const response = await axios.get(
-        `http://localhost:5000/api/interns/${internshipId}`,
+        `/api/interns/${internshipId}`,
         { 
           headers: { 
             Authorization: `Bearer ${localStorage.getItem("token")}` 
@@ -63,7 +63,7 @@ const SendOfferLetter = ({ student, internshipId, onSuccess }) => {
       }
 
       const response = await axios.post(
-        "http://localhost:5000/api/offer-letters",
+        "/api/offer-letters",
         {
           student_id: student.student_id,
           name: student.name,

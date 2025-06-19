@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from "react";
 import axios from "axios";
 import { FaPaperclip, FaPaperPlane, FaSpinner, FaTimes } from "react-icons/fa";
 
+const SKILLGAP_API_BASE_URL = process.env.REACT_APP_SKILLGAP_API_BASE_URL || "http://localhost:8000";
+
 const SkillAnalysis = ({ job, onClose }) => {
   const [messages, setMessages] = useState([]);
   const [step, setStep] = useState(1);
@@ -126,9 +128,14 @@ const SkillAnalysis = ({ job, onClose }) => {
       formData.append("job_description", job ? job.jobDescription : jobDescription);
       formData.append("required_skills", job ? job.qualifications.join(", ") : requiredSkills);
 
-      const response = await axios.post("/ai/analyze-skills/", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+     const response = await axios.post(
+  `${SKILLGAP_API_BASE_URL}/analyze-skills/`,
+  formData,
+  {
+    headers: { "Content-Type": "multipart/form-data" },
+  }
+);
+
 
       const { readiness_score, user_skills, skill_gaps, recommendations, quizzes } = response.data;
 

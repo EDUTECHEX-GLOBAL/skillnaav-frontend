@@ -133,7 +133,7 @@ async def process_resume(resume_url, job_embedding):
         "text": text
     }
 
-@app.post("/ai/partner/shortlist")
+@app.post("/partner/shortlist")
 async def shortlist_candidates(
     internship_id: str = Form(...),
     job_description: str = Form(...),
@@ -168,7 +168,7 @@ async def shortlist_candidates(
 
     return {"shortlisted_candidates": convert_object_ids(candidates)}
 
-@app.get("/ai/partner/shortlisted/{internship_id}")
+@app.get("/partner/shortlisted/{internship_id}")
 async def get_shortlisted_candidates(internship_id: str):
     try:
         internship_obj_id = ObjectId(internship_id)
