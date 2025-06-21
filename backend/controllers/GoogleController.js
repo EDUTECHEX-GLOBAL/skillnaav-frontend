@@ -210,17 +210,22 @@ const googleCallback = async (req, res) => {
 };
 
 // Manual token exchange function
-async function exchangeCodeForTokens(code) {
-  const https = require('https');
-  const querystring = require('querystring');
+const https = require('https');
+const querystring = require('querystring');
 
+async function exchangeCodeForTokens(code) {
   const postData = querystring.stringify({
-    client_id: GOOGLE_CLIENT_ID,
-    client_secret: GOOGLE_CLIENT_SECRET,
+    client_id: process.env.GOOGLE_CLIENT_ID,
+    client_secret: process.env.GOOGLE_CLIENT_SECRET,
     code: code,
     grant_type: 'authorization_code',
-    redirect_uri: GOOGLE_REDIRECT_URI
+    redirect_uri: process.env.GOOGLE_REDIRECT_URI
   });
+
+  console.log("Sending token request to Google with:");
+  console.log("Code:", code);
+  console.log("Client ID:", process.env.GOOGLE_CLIENT_ID);
+  console.log("Redirect URI:", process.env.GOOGLE_REDIRECT_URI);
 
   const options = {
     hostname: 'oauth2.googleapis.com',
@@ -246,21 +251,21 @@ async function exchangeCodeForTokens(code) {
           const response = JSON.parse(data);
 
           if (response.error) {
-            console.error('Token exchange error response:', response);
+            console.error('❌ Token exchange error response:', response);
             reject(new Error(response.error_description || response.error));
           } else {
-            console.log('Token exchange successful');
+            console.log('✅ Token exchange successful');
             resolve(response);
           }
         } catch (parseErr) {
-          console.error('Failed to parse token response:', data);
+          console.error('❌ Failed to parse token response:', data);
           reject(new Error('Invalid response from Google OAuth'));
         }
       });
     });
 
     req.on('error', (err) => {
-      console.error('Token exchange request error:', err);
+      console.error('❌ Token exchange request error:', err);
       reject(err);
     });
 
@@ -268,6 +273,7 @@ async function exchangeCodeForTokens(code) {
     req.end();
   });
 }
+
 
 // Create a test event immediately after authentication
 const createTestEvent = async (email) => {
