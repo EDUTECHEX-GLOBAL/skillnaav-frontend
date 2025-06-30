@@ -50,9 +50,12 @@ const offerLetterRoutes = require("./routes/webapp-routes/offerLetterRoutes");
 const scheduleRoutes = require("./routes/webapp-routes/scheduleRoutes");
 const uploadRoutes = require("./routes/uploadRoutes");
 
+// NEW: Import Offer Routes
+const schoolAdminRoutes = require("./routes/webapp-routes/schoolAdmin/schoolAdminRoutes");
+
+
 
 app.use("/api/upload", uploadRoutes);
-
 // Define routes
 app.use("/api/users", userRoutes);
 app.use("/api/interns", internRoutes);
@@ -77,6 +80,9 @@ app.use("/api/google", googleRoutes);
 app.use('/api/offer-letters', offerLetterRoutes);
 app.use("/api/notifications", NotificationRoutes);
 app.use("/api/schedule", scheduleRoutes);
+
+// NEW: Add School Admin Routes
+app.use("/api/school-admin", schoolAdminRoutes);
 
 // New route for skill gap analysis
 app.post("/analyze-skills", async (req, res) => {

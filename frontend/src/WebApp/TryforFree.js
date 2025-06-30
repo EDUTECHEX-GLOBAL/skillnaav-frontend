@@ -1,11 +1,11 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import skillnaavlogo from "../assets/skillnaav_logo-250w.png";
+
 const TryforFree = () => {
   const navigate = useNavigate();
 
   const handleOptionClick = (path) => {
-    // Navigate to the specified path
     window.open(path, "_blank");
   };
 
@@ -59,68 +59,59 @@ const TryforFree = () => {
         }}
       >
         <button
-          style={{
-            backgroundColor: "#7F56D9", // User (Student) button color
-            color: "#fff",
-            border: "none",
-            padding: "15px 25px",
-            fontWeight: "600",
-            borderRadius: "10px",
-            cursor: "pointer",
-            fontSize: "1rem",
-            transition: "background-color 0.3s, transform 0.2s",
-            boxShadow: "0 4px 8px rgba(0, 0, 0, 0.2)",
-            outline: "none",
-          }}
+          style={buttonStyle("#7F56D9")}
           onClick={() => handleOptionClick("/user")}
           onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.98)")}
           onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
         >
           Continue as Student
         </button>
+
         <button
-          style={{
-            backgroundColor: "#009688", // Teal color for Partner button
-            color: "#fff",
-            border: "none",
-            padding: "15px 25px",
-            fontWeight: "600",
-            borderRadius: "10px",
-            cursor: "pointer",
-            fontSize: "1rem",
-            transition: "background-color 0.3s, transform 0.2s",
-            boxShadow: "0 4px 8px rgba(0, 0, 0, 0.2)",
-            outline: "none",
-          }}
+          style={buttonStyle("#009688")}
           onClick={() => handleOptionClick("/partner")}
           onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.98)")}
           onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
         >
           Continue as Partner
         </button>
+
         <button
-          style={{
-            backgroundColor: "#81d4fa", // Light blue color for Admin button
-            color: "#fff",
-            border: "none",
-            padding: "15px 25px",
-            fontWeight: "600",
-            borderRadius: "10px",
-            cursor: "pointer",
-            fontSize: "1rem",
-            transition: "background-color 0.3s, transform 0.2s",
-            boxShadow: "0 4px 8px rgba(0, 0, 0, 0.2)",
-            outline: "none",
-          }}
+          style={buttonStyle("#81d4fa")}
           onClick={() => handleOptionClick("/admin/login")}
           onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.98)")}
           onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
         >
           Continue as Admin
         </button>
+
+        {/* ✅ New School Admin Button */}
+        <button
+          style={buttonStyle("#FF7043")} // Orange tone for School Admin
+          onClick={() => handleOptionClick("/schooladmin/login")}
+          onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.98)")}
+          onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+        >
+          Continue as School Admin
+        </button>
       </div>
     </div>
   );
 };
+
+// Common button style generator
+const buttonStyle = (bgColor) => ({
+  backgroundColor: bgColor,
+  color: "#fff",
+  border: "none",
+  padding: "15px 25px",
+  fontWeight: "600",
+  borderRadius: "10px",
+  cursor: "pointer",
+  fontSize: "1rem",
+  transition: "background-color 0.3s, transform 0.2s",
+  boxShadow: "0 4px 8px rgba(0, 0, 0, 0.2)",
+  outline: "none",
+});
 
 export default TryforFree;
