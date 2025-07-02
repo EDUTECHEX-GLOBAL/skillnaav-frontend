@@ -8,17 +8,22 @@ const { notFound, errorHandler } = require("./middlewares/errorMiddleware");
 const cron = require("node-cron");
 const checkPremiumExpiration = require("./utils/checkpremiumExipiration");
 
+
 // Load environment variables
 dotenv.config();
 
 const app = express(); // Initialize express app
 
+// ✅ Middleware (must come before routes)
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
 // MongoDB Connection
 connectDB(); // Establish MongoDB connection
 
-// Middleware
-app.use(express.json()); // For parsing application/json
-app.use(express.urlencoded({ extended: true }));
+// ✅ Load your chatbot route after middleware is ready
+const chatRoute = require('./routes/chat');
+app.use('/api', chatRoute);
 
 app.use(
   cors({
@@ -27,7 +32,6 @@ app.use(
     credentials: true,
   })
 );
-
 
 // Routes
 const userRoutes = require("./routes/webapp-routes/userRoutes");

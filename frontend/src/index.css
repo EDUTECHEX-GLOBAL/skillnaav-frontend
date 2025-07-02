@@ -23,3 +23,18 @@ textarea {
   height: 100px;
   padding: 10px;
 }
+
+/* ── custom utility ─────────────────────────────────────────── */
+@layer utilities {
+  .scrollbar-none {
+    /* Firefox / IE / Edge */
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    /* Chrome / Safari / Opera */
+    width: 0 !important;
+    height: 0 !important;
+    background: transparent;
+  }
+}

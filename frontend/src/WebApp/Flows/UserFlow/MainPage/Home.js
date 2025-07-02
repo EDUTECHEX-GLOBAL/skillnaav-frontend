@@ -269,7 +269,7 @@ const Home = () => {
           </section>
         </>
       )}
-      <div className="fixed bottom-6 right-6 z-50">
+      <div className="fixed bottom-28 right-6 z-50">
         <button
           onClick={() => navigate("/skillnaav-analysis")}
           className=" text-white rounded-full shadow-lg p-4 hover:bg-blue-700 transition duration-300"

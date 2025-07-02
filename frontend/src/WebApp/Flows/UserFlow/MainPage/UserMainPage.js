@@ -3,20 +3,23 @@ import { Skeleton, Modal, Button } from "antd"; // Import Modal and Button
 import { useNavigate } from "react-router-dom"; // Import useNavigate
 import Navbar from "./Navbar";
 import Sidebar from "./Sidebar";
-import BodyContent from "./BodyContent"; 
+import BodyContent from "./BodyContent";
 import { TabProvider } from "./UserHomePageContext/HomePageContext";
-import axios from "axios"; 
+import axios from "axios";
 import PremiumPage from "./PremiumPage";
-
+import Chatbot from "../../../../components/Chatbot";
+import chatBotImage from "../../../../assets-webapp/chat-bot.png";
 
 const UserMainPage = () => {
   const [userInfo, setUserInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isApproved, setIsApproved] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const [showUpgradePopup, setShowUpgradePopup] = useState(false); 
+  const [showUpgradePopup, setShowUpgradePopup] = useState(false);
   const navigate = useNavigate(); // Initialize useNavigate
   const [showPricingModal, setShowPricingModal] = useState(false);
+  const [showChatbot, setShowChatbot] = useState(false);
+  const [hasResponse, setHasResponse] = useState(false);
 
   useEffect(() => {
     const handleResize = () => {
@@ -95,22 +98,24 @@ const UserMainPage = () => {
           )}
         </div>
       </div>
-     {/* Pricing Modal */}
-     {showPricingModal && (
-  <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-    <div className="relative bg-white p-6 rounded-lg shadow-lg max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-      {/* Close Button */}
-      <button
-        className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-full p-2 transition duration-200"
-        onClick={() => setShowPricingModal(false)}
-        aria-label="Close modal"
-      >
-        ✕
-      </button>
-      <PremiumPage />
-    </div>
-  </div>
-)}
+
+      {/* Pricing Modal */}
+      {showPricingModal && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+          <div className="relative bg-white p-6 rounded-lg shadow-lg max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            {/* Close Button */}
+            <button
+              className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-full p-2 transition duration-200"
+              onClick={() => setShowPricingModal(false)}
+              aria-label="Close modal"
+            >
+              ✕
+            </button>
+            <PremiumPage />
+          </div>
+        </div>
+      )}
+
       {/* Premium Upgrade Modal */}
       <Modal
         open={showUpgradePopup}
@@ -134,6 +139,44 @@ const UserMainPage = () => {
           </p>
         </div>
       </Modal>
+
+      {/* Chat Bot */}
+      {showChatbot && (
+        <div className="fixed bottom-5 right-5 w-[360px] max-h-[80vh] z-50 shadow-xl rounded-lg bg-white border">
+          {/* Header Bar */}
+          <div className="flex items-center justify-between bg-red-600 text-white p-3 rounded-t-lg">
+            <span className="font-semibold">Career Assistance</span>
+            <button
+              onClick={() => setShowChatbot(false)}
+              className="text-lg font-bold hover:text-gray-300"
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Chatbot UI */}
+          <div className="p-4 max-h-[calc(80vh-60px)] overflow-y-auto">
+            <Chatbot />
+          </div>
+        </div>
+      )}
+
+      {!showChatbot && (
+        <div
+          onClick={() => setShowChatbot(true)}
+          className="fixed bottom-5 right-5 z-50 cursor-pointer flex items-center gap-2 bg-white border shadow-md rounded-full px-4 py-2 hover:shadow-lg"
+        >
+          <div className="text-sm font-semibold text-red-600 leading-tight">
+            Career Assistance
+          </div>
+          <img
+            src={chatBotImage}
+            alt="Bot Avatar"
+            className="w-10 h-10 rounded-full border"
+          />
+        </div>
+      )}
+
     </TabProvider>
   );
 };
