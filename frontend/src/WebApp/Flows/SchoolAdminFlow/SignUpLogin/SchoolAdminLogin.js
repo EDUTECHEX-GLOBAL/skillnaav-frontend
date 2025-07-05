@@ -14,39 +14,48 @@ const SchoolAdminLogin = () => {
     setCredentials({ ...credentials, [e.target.name]: e.target.value });
   };
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setErrorMessage("");
+ const handleLogin = async (e) => {
+  e.preventDefault();
+  setErrorMessage("");
 
-    if (!credentials.email || !credentials.password) {
-      setErrorMessage("Please enter both email and password.");
-      return;
-    }
+  if (!credentials.email || !credentials.password) {
+    setErrorMessage("Please enter both email and password.");
+    return;
+  }
 
-    try {
-      setLoading(true);
-      const response = await fetch("/api/school-admin/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(credentials),
-      });
+  try {
+    setLoading(true);
 
-      const data = await response.json();
+    const response = await fetch("/api/school-admin/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(credentials),
+    });
 
-      if (response.ok) {
-        localStorage.setItem("schoolAdminToken", data.token);
-        localStorage.setItem("schoolAdminProfile", JSON.stringify(data));
-        navigate("/schooladmin/dashboard");
-      } else {
-        setErrorMessage(data.message || "Login failed. Please try again.");
+    const data = await response.json();
+
+    if (response.ok) {
+      if (!data.isApproved) {
+        // ❌ Show warning but don't log in or store token
+        setErrorMessage("Your account is not yet approved by the platform administrator.");
+        return;
       }
-    } catch (error) {
-      console.error("Login error:", error);
-      setErrorMessage("Something went wrong during login.");
-    } finally {
-      setLoading(false);
+
+      // ✅ Approved → proceed with login
+      localStorage.setItem("schoolAdminToken", data.token);
+      localStorage.setItem("schoolAdminProfile", JSON.stringify(data));
+      navigate("/schooladmin/dashboard");
+    } else {
+      setErrorMessage(data.message || "Login failed. Please try again.");
     }
-  };
+  } catch (error) {
+    console.error("Login error:", error);
+    setErrorMessage("Something went wrong during login.");
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return (
     <div className="min-h-screen flex font-poppins">

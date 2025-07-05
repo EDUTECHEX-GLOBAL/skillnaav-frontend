@@ -48,12 +48,39 @@ useEffect(() => {
     setIsDropdownOpen(!isDropdownOpen); // Toggle dropdown visibility when profile image is clicked
   };
 
-  const handleLogout = () => {
-    // Clear user information from localStorage
-    localStorage.removeItem("userInfo");
-    // Redirect to user login page
-    navigate("/user/login");
-  };
+const handleLogout = async () => {
+  const sessionId = localStorage.getItem("sessionId");
+  const token = JSON.parse(localStorage.getItem("userToken"));
+
+  if (sessionId && token) {
+    try {
+      await axios.post(
+        "/api/sessions/logout",
+        { sessionId },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      console.log("✅ Logout session recorded successfully");
+    } catch (error) {
+      console.error("❌ Failed to record logout session:", error.response?.data || error.message);
+    }
+  } else {
+    console.warn("⚠️ Missing sessionId or token in localStorage.");
+  }
+
+  // ✅ Clear sessionId and user data
+  localStorage.removeItem("sessionId");
+  localStorage.removeItem("userToken");
+  localStorage.removeItem("userInfo");
+
+  navigate("/user/login");
+};
+
+
 
   // Handle clicks outside of the dropdown
   useEffect(() => {

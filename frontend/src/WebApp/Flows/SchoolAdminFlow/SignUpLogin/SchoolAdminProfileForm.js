@@ -5,19 +5,22 @@ const SchoolAdminProfileForm = () => {
   const location = useLocation();
   const initialRegisterData = location.state || {};
   const navigate = useNavigate();
+
   const [formData, setFormData] = useState({
     schoolName: "",
+    schoolType: "",
+    schoolNumber: "",
     address: "",
     affiliation: "",
-    city: "",
-    state: "",
+    city: "Toronto",
+    province: "Ontario",
     postalCode: "",
-    country: "",
+    country: "Canada",
     website: "",
     contactPerson: "",
     contactEmail: "",
     contactPhone: "",
-    affiliation: "",
+    languageOfInstruction: "",
     verificationDoc: null,
   });
 
@@ -30,38 +33,36 @@ const SchoolAdminProfileForm = () => {
     }
   };
 
-const handleSubmit = async (e) => {
-  e.preventDefault();
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-  const combinedData = {
-    ...initialRegisterData,
-    ...formData,
-  };
+    const combinedData = {
+      ...initialRegisterData,
+      ...formData,
+    };
 
-  try {
-    const response = await fetch("/api/school-admin/register", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(combinedData),
-    });
+    try {
+      const response = await fetch("/api/school-admin/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(combinedData),
+      });
 
-    const data = await response.json();
+      const data = await response.json();
 
-    if (response.ok) {
-      alert("Registration submitted successfully!");
-      navigate("/schooladmin/login");
-    } else {
-      alert(data.message || "Registration failed.");
+      if (response.ok) {
+        alert("Registration submitted successfully!");
+        navigate("/schooladmin/login");
+      } else {
+        alert(data.message || "Registration failed.");
+      }
+    } catch (error) {
+      console.error("Error submitting profile:", error);
+      alert("An error occurred.");
     }
-  } catch (error) {
-    console.error("Error submitting profile:", error);
-    alert("An error occurred.");
-  }
-};
-
-
+  };
 
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center px-4 font-poppins">
@@ -70,30 +71,55 @@ const handleSubmit = async (e) => {
         className="bg-white shadow-xl rounded-xl w-full max-w-3xl p-8"
       >
         <h2 className="text-3xl font-bold text-blue-700 mb-8 text-center">
-          School Profile Details
+          School Profile Details (Canada)
         </h2>
 
-        {/* Section: School Info */}
+        {/* Institution Details */}
         <div>
           <h3 className="text-lg font-semibold text-gray-700 mb-4">Institution Details</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <input
               type="text"
               name="schoolName"
-              placeholder="School / University Name"
+              placeholder="School Name"
               value={formData.schoolName}
               onChange={handleChange}
               className="p-3 border border-gray-300 rounded-md"
               required
             />
+
+            <select
+              name="schoolType"
+              value={formData.schoolType}
+              onChange={handleChange}
+              className="p-3 border border-gray-300 rounded-md"
+              required
+            >
+              <option value="">Select School Type</option>
+              <option value="Public">Public</option>
+              <option value="Catholic">Catholic</option>
+              <option value="Private">Private</option>
+              <option value="Charter">Charter</option>
+            </select>
+
+            <input
+              type="text"
+              name="schoolNumber"
+              placeholder="School Number (if applicable)"
+              value={formData.schoolNumber}
+              onChange={handleChange}
+              className="p-3 border border-gray-300 rounded-md"
+            />
+
             <input
               type="text"
               name="affiliation"
-              placeholder="Affiliation (e.g., CBSE)"
+              placeholder="Affiliation (e.g., TDSB)"
               value={formData.affiliation}
               onChange={handleChange}
               className="p-3 border border-gray-300 rounded-md"
             />
+
             <input
               type="text"
               name="city"
@@ -103,24 +129,29 @@ const handleSubmit = async (e) => {
               className="p-3 border border-gray-300 rounded-md"
               required
             />
+
             <input
               type="text"
-              name="state"
-              placeholder="State / Province"
-              value={formData.state}
+              name="province"
+              placeholder="Province (e.g., Ontario)"
+              value={formData.province}
               onChange={handleChange}
               className="p-3 border border-gray-300 rounded-md"
               required
             />
+
             <input
               type="text"
               name="postalCode"
-              placeholder="Postal Code / ZIP"
+              placeholder="Postal Code (e.g., M5V 2T6)"
               value={formData.postalCode}
               onChange={handleChange}
+              pattern="[A-Za-z]\d[A-Za-z][ -]?\d[A-Za-z]\d"
+              title="Format: A1A 1A1"
               className="p-3 border border-gray-300 rounded-md"
               required
             />
+
             <select
               name="country"
               value={formData.country}
@@ -129,10 +160,11 @@ const handleSubmit = async (e) => {
               required
             >
               <option value="">Select Country</option>
-              <option value="India">India</option>
               <option value="Canada">Canada</option>
               <option value="USA">USA</option>
+              <option value="India">India</option>
             </select>
+
             <input
               type="url"
               name="website"
@@ -144,7 +176,7 @@ const handleSubmit = async (e) => {
           </div>
         </div>
 
-        {/* Section: Address */}
+        {/* Full Address */}
         <div className="mt-6">
           <h3 className="text-lg font-semibold text-gray-700 mb-2">Full Address</h3>
           <textarea
@@ -158,7 +190,24 @@ const handleSubmit = async (e) => {
           />
         </div>
 
-        {/* Section: Contact Info */}
+        {/* Language of Instruction */}
+        <div className="mt-6">
+          <h3 className="text-lg font-semibold text-gray-700 mb-2">Language of Instruction</h3>
+          <select
+            name="languageOfInstruction"
+            value={formData.languageOfInstruction}
+            onChange={handleChange}
+            className="p-3 border border-gray-300 rounded-md w-full"
+            required
+          >
+            <option value="">Select Language</option>
+            <option value="English">English</option>
+            <option value="French">French</option>
+            <option value="Bilingual">Bilingual (English/French)</option>
+          </select>
+        </div>
+
+        {/* Contact Info */}
         <div className="mt-6">
           <h3 className="text-lg font-semibold text-gray-700 mb-4">Contact Details</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -192,7 +241,7 @@ const handleSubmit = async (e) => {
           </div>
         </div>
 
-        {/* Section: Verification */}
+        {/* Upload Verification Doc */}
         <div className="mt-6">
           <h3 className="text-lg font-semibold text-gray-700 mb-2">
             Upload Verification Document (optional)
@@ -205,7 +254,7 @@ const handleSubmit = async (e) => {
           />
         </div>
 
-        {/* Submit Button */}
+        {/* Submit */}
         <button
           type="submit"
           className="mt-8 w-full bg-blue-600 hover:bg-blue-700 text-white py-3 text-lg rounded-md font-semibold transition"

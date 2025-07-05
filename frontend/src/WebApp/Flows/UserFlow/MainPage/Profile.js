@@ -32,33 +32,42 @@ const ProfileForm = () => {
   const [isLevel2Open, setIsLevel2Open] = useState(false);
   const [isLevel3Open, setIsLevel3Open] = useState(false);
   const navigate = useNavigate();
+  const isValidDate = (date) => {
+  if (!date || typeof date !== 'string') return false;
+  if (date.toLowerCase().includes("not provided")) return false;
+  const parsed = new Date(date);
+  return !isNaN(parsed.getTime());
+};
+
 
   useEffect(() => {
-    const fetchUserProfile = async () => {
-      try {
-        const userInfo = JSON.parse(localStorage.getItem("userInfo"));
-        const token = userInfo?.token;
-  
-        if (token) {
-          const config = {
-            headers: { Authorization: `Bearer ${token}` },
-          };
-  
-          const { data } = await axios.get("/api/users/profile", config);
-          setUser((prevUser) => ({
-            ...prevUser,
-            ...data,
-            password: "",
-            confirmPassword: "",
-            dob: data.dob ? new Date(data.dob).toISOString().split("T")[0] : "",
-            profileImage: data.profileImage || prevUser.profileImage, // If profilePic exists, update state
-          }));
-        }
-      } catch (error) {
-        console.error("Error fetching profile:", error);
-        setErrorMessage("Failed to load profile data.");
-      }
-    };
+   const fetchUserProfile = async () => {
+  try {
+    const userInfo = JSON.parse(localStorage.getItem("userInfo"));
+    const token = userInfo?.token;
+
+    if (token) {
+      const config = {
+        headers: { Authorization: `Bearer ${token}` },
+      };
+
+      const { data } = await axios.get("/api/users/profile", config);
+
+      setUser((prevUser) => ({
+        ...prevUser,
+        ...data,
+        password: "",
+        confirmPassword: "",
+        dob: isValidDate(data.dob) ? new Date(data.dob).toISOString().split("T")[0] : "",
+        profileImage: data.profileImage || prevUser.profileImage,
+      }));
+    }
+  } catch (error) {
+    console.error("Error fetching profile:", error);
+    setErrorMessage("Failed to load profile data.");
+  }
+};
+
   
     fetchUserProfile();
   }, []);

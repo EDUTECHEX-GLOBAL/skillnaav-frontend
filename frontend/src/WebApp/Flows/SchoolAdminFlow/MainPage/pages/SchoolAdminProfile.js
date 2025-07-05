@@ -2,9 +2,9 @@ import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import axios from "axios";
 import {
-  FaSchool, FaMapMarkerAlt, FaCity, FaGlobe,
-  FaUserTie, FaEnvelope, FaPhone, FaAddressCard,
-  FaFlag, FaEdit
+  FaSchool, FaMapMarkerAlt, FaCity, FaGlobe, FaUserTie,
+  FaEnvelope, FaPhone, FaAddressCard, FaFlag, FaEdit,
+  FaLanguage, FaClipboardList, FaFileAlt
 } from "react-icons/fa";
 
 const SchoolAdminProfile = () => {
@@ -13,7 +13,7 @@ const SchoolAdminProfile = () => {
     affiliation: "",
     address: "",
     city: "",
-    state: "",
+    province: "",
     postalCode: "",
     country: "",
     website: "",
@@ -21,6 +21,10 @@ const SchoolAdminProfile = () => {
     contactEmail: "",
     contactPhone: "",
     bio: "",
+    schoolType: "",
+    schoolNumber: "",
+    languageOfInstruction: "",
+    verificationDoc: "",
   });
 
   const [isEditing, setIsEditing] = useState(false);
@@ -127,21 +131,19 @@ const SchoolAdminProfile = () => {
         </div>
 
         {/* Info */}
-        <motion.div
-          className="p-6 space-y-6"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-        >
+        <motion.div className="p-6 space-y-6" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>
           <InfoSection title="Personal Information">
             <IconInput icon={<FaSchool />} label="School Name" name="schoolName" value={formData.schoolName} editable={isEditing} onChange={handleChange} />
             <IconInput icon={<FaFlag />} label="Affiliation" name="affiliation" value={formData.affiliation} editable={isEditing} onChange={handleChange} />
+            <IconInput icon={<FaClipboardList />} label="School Type" name="schoolType" value={formData.schoolType} editable={isEditing} onChange={handleChange} />
+            <IconInput icon={<FaClipboardList />} label="School Number" name="schoolNumber" value={formData.schoolNumber} editable={isEditing} onChange={handleChange} />
+            <IconInput icon={<FaLanguage />} label="Language of Instruction" name="languageOfInstruction" value={formData.languageOfInstruction} editable={isEditing} onChange={handleChange} />
             <IconInput icon={<FaGlobe />} label="Website" name="website" value={formData.website} editable={isEditing} onChange={handleChange} />
           </InfoSection>
 
-          <InfoSection title="Additional Information">
+          <InfoSection title="Location Details">
             <IconInput icon={<FaCity />} label="City" name="city" value={formData.city} editable={isEditing} onChange={handleChange} />
-            <IconInput icon={<FaMapMarkerAlt />} label="State" name="state" value={formData.state} editable={isEditing} onChange={handleChange} />
+            <IconInput icon={<FaMapMarkerAlt />} label="Province" name="province" value={formData.province} editable={isEditing} onChange={handleChange} />
             <IconInput icon={<FaAddressCard />} label="Postal Code" name="postalCode" value={formData.postalCode} editable={isEditing} onChange={handleChange} />
             <IconInput icon={<FaGlobe />} label="Country" name="country" value={formData.country} editable={isEditing} onChange={handleChange} />
           </InfoSection>
@@ -179,6 +181,23 @@ const SchoolAdminProfile = () => {
               />
             ) : (
               <p className="bg-gray-50 p-2 border border-gray-300 rounded-md text-sm text-gray-800">{formData.bio}</p>
+            )}
+          </div>
+
+          {/* Verification Document (read-only display) */}
+          <div>
+            <h3 className="text-lg font-semibold text-gray-700 mb-2">Verification Document</h3>
+            {formData.verificationDoc ? (
+              <a
+                href={formData.verificationDoc}
+                target="_blank"
+                rel="noreferrer"
+                className="text-blue-600 underline text-sm"
+              >
+                View Uploaded Document
+              </a>
+            ) : (
+              <p className="text-sm text-gray-500">No document uploaded.</p>
             )}
           </div>
         </motion.div>

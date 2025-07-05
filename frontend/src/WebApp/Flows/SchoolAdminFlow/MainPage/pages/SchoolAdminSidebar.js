@@ -5,7 +5,7 @@ import {
   FaBriefcase,
   FaCreditCard,
   FaSignOutAlt,
-  FaIdCard, 
+  FaIdCard,
 } from "react-icons/fa";
 
 const SchoolAdminSidebar = ({ selectedTab, setSelectedTab }) => {
@@ -27,6 +27,13 @@ const SchoolAdminSidebar = ({ selectedTab, setSelectedTab }) => {
             onClick={() => setSelectedTab("students")}
           />
           <SidebarItem
+            label="Upload Students"
+            icon={<FaUserGraduate />}
+            active={selectedTab === "upload-students"}
+            onClick={() => setSelectedTab("upload-students")}
+          />
+
+          <SidebarItem
             label="Internship & Applications"
             icon={<FaBriefcase />}
             active={selectedTab === "internships"}
@@ -39,11 +46,11 @@ const SchoolAdminSidebar = ({ selectedTab, setSelectedTab }) => {
             onClick={() => setSelectedTab("subscriptions")}
           />
           <SidebarItem
-  label="Profile"
-  icon={<FaIdCard />}
-  active={selectedTab === "profile"}
-  onClick={() => setSelectedTab("profile")}
-/>
+            label="Profile"
+            icon={<FaIdCard />}
+            active={selectedTab === "profile"}
+            onClick={() => setSelectedTab("profile")}
+          />
 
         </nav>
       </div>
@@ -75,9 +82,8 @@ const SchoolAdminSidebar = ({ selectedTab, setSelectedTab }) => {
 const SidebarItem = ({ label, icon, active, onClick }) => (
   <button
     onClick={onClick}
-    className={`flex items-start w-full px-4 py-2 rounded-md text-sm font-bold transition-all duration-150 ${
-      active ? "bg-blue-100 text-blue-600" : "text-gray-700 hover:bg-blue-50"
-    }`}
+    className={`flex items-start w-full px-4 py-2 rounded-md text-sm font-bold transition-all duration-150 ${active ? "bg-blue-100 text-blue-600" : "text-gray-700 hover:bg-blue-50"
+      }`}
   >
     <span className="mt-0 mr-4 text-base">{icon}</span>
     <span className="leading-snug text-left break-words whitespace-normal">

@@ -7,6 +7,8 @@ import SchoolAdminProfile from "./pages/SchoolAdminProfile";
 
 import SchoolAdminNavbar from "./pages/SchoolAdminNavbar";
 import SchoolAdminSidebar from "./pages/SchoolAdminSidebar";
+import UploadStudents from "./pages/UploadStudents";
+
 
 const SchoolAdminDashboard = () => {
   const [selectedTab, setSelectedTab] = useState("dashboard");
@@ -22,6 +24,8 @@ const SchoolAdminDashboard = () => {
         return <DashboardHome />;
       case "students":
         return <StudentsList />;
+      case "upload-students":
+        return <UploadStudents />;
       case "internships":
         return <Internships />;
       case "subscriptions":

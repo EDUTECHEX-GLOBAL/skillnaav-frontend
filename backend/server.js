@@ -52,6 +52,10 @@ const uploadRoutes = require("./routes/uploadRoutes");
 
 // NEW: Import Offer Routes
 const schoolAdminRoutes = require("./routes/webapp-routes/schoolAdmin/schoolAdminRoutes");
+// NEW: Import School Admin Payment Routes
+const schoolAdminPaymentRoutes = require("./routes/webapp-routes/schoolAdmin/paymentRoutes");
+// NEW: Import School Admin Login Session Routes
+const schoolAdminLoginSessionRoutes = require("./routes/webapp-routes/schoolAdmin/LoginSessionRoutes");
 
 
 
@@ -83,6 +87,10 @@ app.use("/api/schedule", scheduleRoutes);
 
 // NEW: Add School Admin Routes
 app.use("/api/school-admin", schoolAdminRoutes);
+// NEW: Add School Admin Payment Routes
+app.use("/api/school-admin/payments", schoolAdminPaymentRoutes);
+// NEW: Add School Admin Login Session Routes
+app.use("/api/sessions", schoolAdminLoginSessionRoutes);
 
 // New route for skill gap analysis
 app.post("/analyze-skills", async (req, res) => {

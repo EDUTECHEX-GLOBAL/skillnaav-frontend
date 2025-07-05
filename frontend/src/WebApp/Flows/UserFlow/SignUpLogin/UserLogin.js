@@ -55,42 +55,48 @@ const UserLogin = () => {
   };
   
 
-  const handleSubmit = async (values, { setSubmitting }) => {
-    setError("");
-    setLoading(true);
-    try {
-      const config = {
-        headers: {
-          "Content-type": "application/json",
-        },
-      };
-      console.log("Sending login request with values:", values); // Debug
-      const { data } = await axios.post("/api/users/login", values, config);
-  
-      if (!data || !data.token) {
-        throw new Error("Invalid response from server");
-      }
-  
-      localStorage.clear(); // Clear existing tokens
-      localStorage.setItem("userToken", JSON.stringify(data.token));
-      localStorage.setItem("userInfo", JSON.stringify(data));
-  
-      console.log("User token stored in localStorage:", data.token); // Log the token here
-      console.log("User info:", data); // Log the user info here
-  
-      setLoading(false);
-      navigate("/user-main-page");
-    } catch (err) {
-      console.error("Login error:", err.response || err.message); // Debug
-      setError(
-        err.response && err.response.data && err.response.data.message
-          ? err.response.data.message
-          : "Something went wrong"
-      );
-      setLoading(false);
-      setSubmitting(false);
+ const handleSubmit = async (values, { setSubmitting }) => {
+  setError("");
+  setLoading(true);
+  try {
+    const config = {
+      headers: {
+        "Content-type": "application/json",
+      },
+    };
+
+    const { data } = await axios.post("/api/users/login", values, config);
+
+    if (!data || !data.token) {
+      throw new Error("Invalid response from server");
     }
-  };
+
+    localStorage.clear();
+    localStorage.setItem("userToken", JSON.stringify(data.token));
+    localStorage.setItem("userInfo", JSON.stringify(data));
+
+    // 🔁 Start login session & store sessionId
+    const sessionRes = await axios.post("/api/sessions/login", {}, {
+      headers: {
+        Authorization: `Bearer ${data.token}`,
+      },
+    });
+
+    if (sessionRes?.data?.sessionId) {
+      localStorage.setItem("sessionId", sessionRes.data.sessionId); // ✅ Store sessionId
+    }
+
+    setLoading(false);
+    navigate("/user-main-page");
+  } catch (err) {
+    console.error("Login error:", err.response || err.message);
+    setError(err.response?.data?.message || "Something went wrong");
+    setLoading(false);
+    setSubmitting(false);
+  }
+};
+
+
   
   
 

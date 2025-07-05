@@ -1,22 +1,38 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
 import StudentStatusModal from './StudentStatusModal';
 import { Search } from 'lucide-react';
 
-
-const students = [
-  {
-    name: 'Venkat Balaji',
-    email: 'srivenkatbalaji07@gmail.com',
-  },
-  {
-    name: 'Gnanesh Kumar',
-    email: 'gnaneshkumar09@gmail.com',
-  },
-];
-
 const StudentsList = () => {
+  const [students, setStudents] = useState([]);  // 👈 move 'students' to state
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // ✅ Move useEffect inside the component
+ useEffect(() => {
+  const fetchStudents = async () => {
+    const token = localStorage.getItem('schoolAdminToken'); // ✅ match login storage key
+
+
+    if (!token) {
+      console.warn("❌ No token found, skipping API call");
+      return;
+    }
+
+    try {
+      const res = await axios.get('/api/school-admin/students', {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      setStudents(res.data);
+    } catch (err) {
+      console.error("❌ Fetch error:", err.response?.data || err.message);
+    }
+  };
+
+  fetchStudents();
+}, []);
 
   const filteredStudents = students.filter(student =>
     student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -36,10 +52,9 @@ const StudentsList = () => {
             placeholder="Search by name or email"
             className="w-full pl-4 pr-10 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
-         <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-blue-600 pointer-events-none mt-2">
-  <Search size={18} />
-</div>
-
+          <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-blue-600 pointer-events-none mt-2">
+            <Search size={18} />
+          </div>
         </div>
       </div>
 
@@ -55,7 +70,7 @@ const StudentsList = () => {
           <tbody>
             {filteredStudents.length > 0 ? (
               filteredStudents.map((student, idx) => (
-                <tr key={idx} className="bg-white border-t border-blue-100 hover:bg-blue-50">
+                <tr key={student._id || idx} className="bg-white border-t border-blue-100 hover:bg-blue-50">
                   <td className="px-6 py-4">{student.name}</td>
                   <td className="px-6 py-4">{student.email}</td>
                   <td className="px-6 py-4">

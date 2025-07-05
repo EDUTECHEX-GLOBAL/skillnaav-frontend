@@ -111,6 +111,16 @@ const uploadOfferLetterBuffer = async (buffer, fileName) => {
   });
 };
 
+const csvUpload = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (ext === ".csv") cb(null, true);
+    else cb(new Error("Only .csv files allowed"), false);
+  },
+  limits: { fileSize: 2 * 1024 * 1024 }, // 2MB
+});
+
 module.exports = {
   resumeUpload,
   profilePicUpload,
@@ -118,4 +128,6 @@ module.exports = {
   uploadOfferLetterBuffer,
   createUploader,  // if needed for custom cases
   imageUploader,   // 📌 Use this for discover/team/vision/feature uploads
+  csvUpload,
+  uploadFile,
 };

@@ -15,11 +15,8 @@ const userwebappSchema = new mongoose.Schema(
     desiredField: { type: String, required: true },
     linkedin: { type: String, required: true },
     portfolio: { type: String },
-
-    // ✅ Keep only one profileImage field
     profileImage: { type: String, required: true },
 
-    // New fields added (optional)
     financialStatus: { type: String },
     state: { type: String },
     country: { type: String },
@@ -31,21 +28,26 @@ const userwebappSchema = new mongoose.Schema(
     adminApproved: { type: Boolean, default: false },
     isActive: { type: Boolean, default: false },
     isPremium: { type: Boolean, default: false },
+    premiumExpiration: { type: Date, default: null },
 
-    // Add premiumExpiration field
-    premiumExpiration: { type: Date, default: null }, // Default is null (no expiration)
+    // ✅ New field to track creator
+    schoolAdmin: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SchoolAdmin",
+    },
   },
   { timestamps: true }
 );
 
 // Hash password before saving
 userwebappSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) {
-    return next();
-  }
+  if (!this.isModified("password")) return next();
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
+  next();
 });
+
+
 
 // Compare hashed password with entered password
 userwebappSchema.methods.matchPassword = async function (enteredPassword) {
@@ -53,5 +55,4 @@ userwebappSchema.methods.matchPassword = async function (enteredPassword) {
 };
 
 const Userwebapp = mongoose.model("Userwebapp", userwebappSchema);
-
 module.exports = Userwebapp;
