@@ -26,6 +26,7 @@ import Sidebar from "./Sidebar";
 import BodyContent from "./BodyContent"; // Main content component
 import { TabProvider } from "./UserHomePageContext/HomePageContext";
 import axios from "axios"; // Import axios
+import PartnerDashboard from "./PartnerDashboard"; // Import the PartnerDashboard component
 
 const PartnerMainPage = () => {
   const [partnerInfo, setPartnerInfo] = useState(null);
@@ -77,42 +78,31 @@ const PartnerMainPage = () => {
   }, []); // Empty dependency array ensures this runs once when the component mounts
 
   return (
-    <TabProvider>
-      <div className={`flex ${isMobile ? "flex-col" : "flex-row"} relative`}>
-        {/* Sidebar */}
-        <Sidebar isMobile={isMobile} />
-
-        {/* Main Content */}
-        <div className="flex-1 flex flex-col">
-          <Navbar />
-
-          {/* Show loading skeleton while fetching data */}
-          {loading ? (
-            <div className="p-4">
-              <Skeleton active />
-            </div>
-          ) : (
-            <div className="relative flex-1">
-              {/* Render BodyContent */}
-              <BodyContent />
-
-              {/* Mask specific restricted features */}
-              {!adminApproved && (
-                <div className="absolute inset-0 bg-gray-500 opacity-50 z-10 flex items-center justify-center">
-                  <div className="bg-white p-4 rounded shadow-md text-center">
-                    <h2 className="text-lg font-semibold">Account Not Approved</h2>
-                    <p className="text-sm">
-                      Your account is not approved by an admin yet. Certain features are restricted until approval.
-                    </p>
-                  </div>
-                </div>
-              )}
+  <TabProvider>
+    <div className="relative">
+      {loading ? (
+        <div className="p-4">
+          <Skeleton active />
+        </div>
+      ) : (
+        <div className="relative flex flex-col min-h-screen">
+          <PartnerDashboard />
+          {!adminApproved && (
+            <div className="absolute inset-0 bg-gray-500 opacity-50 z-10 flex items-center justify-center">
+              <div className="bg-white p-4 rounded shadow-md text-center">
+                <h2 className="text-lg font-semibold">Account Not Approved</h2>
+                <p className="text-sm">
+                  Your account is not approved by an admin yet. Certain features are restricted until approval.
+                </p>
+              </div>
             </div>
           )}
         </div>
-      </div>
-    </TabProvider>
-  );
+      )}
+    </div>
+  </TabProvider>
+);
+
 };
 
 export default PartnerMainPage;

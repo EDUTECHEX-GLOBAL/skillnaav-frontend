@@ -12,6 +12,7 @@ import UploadStudents from "./pages/UploadStudents";
 
 const SchoolAdminDashboard = () => {
   const [selectedTab, setSelectedTab] = useState("dashboard");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const handleLogout = () => {
     localStorage.removeItem("schoolAdminToken");
@@ -39,20 +40,26 @@ const SchoolAdminDashboard = () => {
 
   return (
     <div className="h-screen flex flex-col font-poppins">
-      <SchoolAdminNavbar onLogout={handleLogout} />
+      <SchoolAdminNavbar
+        onLogout={handleLogout}
+        onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+      />
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden relative">
         <SchoolAdminSidebar
           selectedTab={selectedTab}
           setSelectedTab={setSelectedTab}
+          isOpen={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
         />
 
-        <main className="flex-1 overflow-y-auto p-6 bg-gray-50">
+        <main className="flex-1 overflow-y-auto p-4 bg-gray-50">
           {renderContent()}
         </main>
       </div>
     </div>
   );
 };
+
 
 export default SchoolAdminDashboard;

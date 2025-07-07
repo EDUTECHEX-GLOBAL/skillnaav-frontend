@@ -168,47 +168,51 @@ const InternshipList = () => {
   };
 
   const handleSendOfferLetter = async () => {
-    if (!templateId || !joiningDate) return alert("Template and joining date required");
+  if (!templateId || !joiningDate) return alert("Template and joining date required");
 
-    try {
-      setSendingOffer(true);
-      const internship = internships.find(i => i._id === selectedStudent.internship_id);
+  try {
+    setSendingOffer(true);
 
-      await axios.post(`/api/offer-letters`, {
-        student_id: selectedStudent._id,
-        internshipId: internship._id,
-        templateId,
-        name: selectedStudent.name,
-        email: selectedStudent.email,
-        position: internship.jobTitle,
-        company: internship.companyName,
-        location: internship.location,
-        duration: internship.endDateOrDuration,
-        startDate: joiningDate,
-        internshipType: internship.internshipType,
-        compensationDetails: internship.compensationDetails,
-        jobDescription: internship.jobDescription,
-        qualifications: internship.qualifications,
-        contactInfo: {
-          name: "HR Manager",
-          email: "hr@company.com",
-          phone: "9876543210",
-        },
-        noticePeriod: "2 weeks",
-      }, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
+    const internship = internships.find(i => i._id === selectedStudent.internship_id);
+    const schoolAdminId = localStorage.getItem("schoolAdminId");
 
-      alert("Offer sent successfully!");
-      setSelectedStudent(null);
-    } catch (err) {
-      alert(err.response?.data?.error || err.message);
-    } finally {
-      setSendingOffer(false);
-    }
-  };
+    await axios.post(`/api/offer-letters`, {
+      student_id: selectedStudent._id,
+      internshipId: internship._id,
+      templateId,
+      name: selectedStudent.name,
+      email: selectedStudent.email,
+      position: internship.jobTitle,
+      company: internship.companyName,
+      location: internship.location,
+      duration: internship.endDateOrDuration,
+      startDate: joiningDate,
+      internshipType: internship.internshipType,
+      compensationDetails: internship.compensationDetails,
+      jobDescription: internship.jobDescription,
+      qualifications: internship.qualifications,
+      contactInfo: {
+        name: "HR Manager",
+        email: "hr@company.com",
+        phone: "9876543210",
+      },
+      noticePeriod: "2 weeks",
+      schoolAdminId: schoolAdminId || null // ✅ Attach here
+    }, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    });
+
+    alert("Offer sent successfully!");
+    setSelectedStudent(null);
+  } catch (err) {
+    alert(err.response?.data?.error || err.message);
+  } finally {
+    setSendingOffer(false);
+  }
+};
+
 
   const handleSchedule = (internshipId) => {
     setSelectedInternshipForSchedule(internshipId);

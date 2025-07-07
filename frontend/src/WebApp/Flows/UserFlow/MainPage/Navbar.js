@@ -1,88 +1,73 @@
 import React, { useState, useRef, useEffect } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faUser, faSignOutAlt, faBell } from "@fortawesome/free-solid-svg-icons"; // Import the FontAwesome bell icon
-import logo from "../../../../assets-webapp/Skillnaav-logo.png"; // Replace with your actual logo path
-import { useTabContext } from "./UserHomePageContext/HomePageContext"; // Adjust path as needed
+import { faUser, faSignOutAlt, faBell, faBars } from "@fortawesome/free-solid-svg-icons";
+import logo from "../../../../assets-webapp/Skillnaav-logo.png";
+import { useTabContext } from "./UserHomePageContext/HomePageContext";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
-
-const Navbar = () => {
-  const { fine } = useTabContext();
+const Navbar = ({ onToggleSidebar }) => {
+  const { selectedTab, handleSelectTab } = useTabContext();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [userInfo, setUserInfo] = useState({ name: "", email: "", profileImage: "" });
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
+  const [userInfo, setUserInfo] = useState({ name: "", email: "", profileImage: "" });
   const [notifications, setNotifications] = useState([]);
-const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadCount, setUnreadCount] = useState(0);
 
+  useEffect(() => {
+    const storedUserInfo = JSON.parse(localStorage.getItem("userInfo"));
+    if (storedUserInfo) {
+      setUserInfo(storedUserInfo);
+      const studentId = storedUserInfo._id;
 
-  const { selectedTab, handleSelectTab } = useTabContext();
-useEffect(() => {
-  // Fetch user info
-  const storedUserInfo = JSON.parse(localStorage.getItem("userInfo"));
-  if (storedUserInfo) {
-    setUserInfo(storedUserInfo);
-    const studentId = storedUserInfo._id;
-
-    // Then fetch notifications
-    const fetchNotifications = async () => {
-      try {
-        const { data } = await axios.get(`/api/notifications/${studentId}`);
-        if (data.success) {
-          setNotifications(data.notifications);
-          const unread = data.notifications.filter(n => !n.isRead).length;
-          setUnreadCount(unread);
+      const fetchNotifications = async () => {
+        try {
+          const { data } = await axios.get(`/api/notifications/${studentId}`);
+          if (data.success) {
+            setNotifications(data.notifications);
+            const unread = data.notifications.filter((n) => !n.isRead).length;
+            setUnreadCount(unread);
+          }
+        } catch (err) {
+          console.error("Failed to fetch notifications:", err);
         }
-      } catch (err) {
-        console.error("Failed to fetch notifications:", err);
+      };
+
+      fetchNotifications();
+    }
+  }, []);
+
+  const handleUserClick = () => setIsDropdownOpen(!isDropdownOpen);
+
+  const handleLogout = async () => {
+    const sessionId = localStorage.getItem("sessionId");
+    const token = JSON.parse(localStorage.getItem("userToken"));
+
+    if (sessionId && token) {
+      try {
+        await axios.post(
+          "/api/sessions/logout",
+          { sessionId },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+        console.log("✅ Logout session recorded successfully");
+      } catch (error) {
+        console.error("❌ Failed to record logout session:", error.response?.data || error.message);
       }
-    };
+    }
 
-    fetchNotifications();
-  }
-}, []);
-
-
-  const handleUserClick = () => {
-    setIsDropdownOpen(!isDropdownOpen); // Toggle dropdown visibility when profile image is clicked
+    localStorage.removeItem("sessionId");
+    localStorage.removeItem("userToken");
+    localStorage.removeItem("userInfo");
+    navigate("/user/login");
   };
 
-const handleLogout = async () => {
-  const sessionId = localStorage.getItem("sessionId");
-  const token = JSON.parse(localStorage.getItem("userToken"));
-
-  if (sessionId && token) {
-    try {
-      await axios.post(
-        "/api/sessions/logout",
-        { sessionId },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-      console.log("✅ Logout session recorded successfully");
-    } catch (error) {
-      console.error("❌ Failed to record logout session:", error.response?.data || error.message);
-    }
-  } else {
-    console.warn("⚠️ Missing sessionId or token in localStorage.");
-  }
-
-  // ✅ Clear sessionId and user data
-  localStorage.removeItem("sessionId");
-  localStorage.removeItem("userToken");
-  localStorage.removeItem("userInfo");
-
-  navigate("/user/login");
-};
-
-
-
-  // Handle clicks outside of the dropdown
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -91,35 +76,32 @@ const handleLogout = async () => {
     };
 
     document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   return (
-    <div className="bg-white font-poppins text-gray-800 p-4 border-b border-gray-300 sticky top-0 z-50 flex justify-between items-center">
-      {/* Left side: Skillnaav logo */}
-      <div className="flex items-center lg:hidden md:hidden">
-        <img
-          src={logo}
-          alt="Skillnaav Logo"
-          className="h-10 object-contain"
-        />
-      </div>
-
-      <div className="relative ml-auto flex items-center space-x-4">
-        {/* Notification bell icon - now moved left of profile */}
-       <div className="relative cursor-pointer" onClick={() => handleSelectTab("notifications")}>
-  <FontAwesomeIcon icon={faBell} className="w-5 h-5 text-gray-700" />
-  {unreadCount > 0 && (
-    <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
-      {unreadCount}
-    </span>
-  )}
+    <div className="bg-white font-poppins text-gray-800 p-4 border-b border-gray-300 sticky top-0 z-50 flex justify-between items-center w-full">
+      {/* === Left section: Logo + Hamburger === */}
+      {/* Left: Mobile hamburger + logo */}
+<div className="flex items-center space-x-4 md:hidden">
+  <FontAwesomeIcon icon={faBars} className="text-xl cursor-pointer" onClick={onToggleSidebar} />
+  <img src={logo} alt="Skillnaav Logo" className="h-10 object-contain" />
 </div>
 
 
-        {/* Display profile image or fallback icon */}
+      {/* === Right section: Notification + Profile === */}
+      <div className="relative ml-auto flex items-center space-x-4">
+        {/* Notification */}
+        <div className="relative cursor-pointer" onClick={() => handleSelectTab("notifications")}>
+          <FontAwesomeIcon icon={faBell} className="w-5 h-5 text-gray-700" />
+          {unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+              {unreadCount}
+            </span>
+          )}
+        </div>
+
+        {/* Profile Image or Icon */}
         {userInfo.profileImage ? (
           <img
             src={userInfo.profileImage}
@@ -135,9 +117,9 @@ const handleLogout = async () => {
           />
         )}
 
-        {/* Display user's name */}
+        {/* User Name */}
         {userInfo.name && (
-          <span className="text-gray-800 text-sm">{userInfo.name}</span>
+          <span className="text-gray-800 text-sm font-medium hidden sm:block">{userInfo.name}</span>
         )}
 
         {/* Dropdown */}
@@ -147,9 +129,7 @@ const handleLogout = async () => {
             className="absolute right-0 mt-12 w-48 bg-white shadow-lg rounded-md py-2 border border-gray-300"
           >
             {userInfo.email && (
-              <div className="px-4 py-2 text-sm text-gray-800">
-                {userInfo.email}
-              </div>
+              <div className="px-4 py-2 text-sm text-gray-800">{userInfo.email}</div>
             )}
             <button
               onClick={handleLogout}
@@ -161,7 +141,6 @@ const handleLogout = async () => {
           </div>
         )}
       </div>
-
     </div>
   );
 };

@@ -14,7 +14,7 @@ const SchoolAdminLogin = () => {
     setCredentials({ ...credentials, [e.target.name]: e.target.value });
   };
 
- const handleLogin = async (e) => {
+const handleLogin = async (e) => {
   e.preventDefault();
   setErrorMessage("");
 
@@ -36,14 +36,15 @@ const SchoolAdminLogin = () => {
 
     if (response.ok) {
       if (!data.isApproved) {
-        // ❌ Show warning but don't log in or store token
         setErrorMessage("Your account is not yet approved by the platform administrator.");
         return;
       }
 
-      // ✅ Approved → proceed with login
+      // ✅ Store separate ID and token for session management
       localStorage.setItem("schoolAdminToken", data.token);
+      localStorage.setItem("schoolAdminId", data._id); // ✅ Required for fetching school-specific applications
       localStorage.setItem("schoolAdminProfile", JSON.stringify(data));
+
       navigate("/schooladmin/dashboard");
     } else {
       setErrorMessage(data.message || "Login failed. Please try again.");
@@ -55,6 +56,7 @@ const SchoolAdminLogin = () => {
     setLoading(false);
   }
 };
+
 
 
   return (

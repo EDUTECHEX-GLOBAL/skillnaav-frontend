@@ -8,19 +8,44 @@ import {
   FaIdCard,
 } from "react-icons/fa";
 
-const SchoolAdminSidebar = ({ selectedTab, setSelectedTab }) => {
+const SchoolAdminSidebar = ({
+  selectedTab,
+  setSelectedTab,
+  isOpen,
+  onClose,
+}) => {
   return (
-    <aside className="w-64 bg-white shadow-md flex flex-col justify-between h-full border-r font-poppins">
-      {/* Top Navigation */}
-      <div className="p-6">
-        <nav className="flex flex-col gap-2">
-          <SidebarItem
-            label="Dashboard"
-            icon={<FaHome />}
-            active={selectedTab === "dashboard"}
-            onClick={() => setSelectedTab("dashboard")}
-          />
-          <SidebarItem
+    <>
+      {/* Overlay for mobile */}
+      <div
+        className={`fixed inset-0 bg-black bg-opacity-50 z-40 transition-opacity md:hidden ${isOpen ? "block" : "hidden"}`}
+        onClick={onClose}
+      ></div>
+
+      {/* Sidebar */}
+      <aside
+        className={`
+          fixed z-50 inset-y-0 left-0 w-64 bg-white shadow-md border-r transform
+          transition-transform duration-300 ease-in-out
+          ${isOpen ? "translate-x-0" : "-translate-x-full"}
+          md:relative md:translate-x-0 md:flex
+        `}
+      >
+        <div className="flex flex-col justify-between h-full">
+          {/* Top Section */}
+          <div className="p-6">
+            <nav className="flex flex-col gap-2">
+              <SidebarItem
+                label="Dashboard"
+                icon={<FaHome />}
+                active={selectedTab === "dashboard"}
+                onClick={() => {
+                  setSelectedTab("dashboard");
+                  onClose(); // close on mobile
+                }}
+              />
+              {/* Add remaining items like Students, Upload Students, etc. */}
+               <SidebarItem
             label="Students"
             icon={<FaUserGraduate />}
             active={selectedTab === "students"}
@@ -51,33 +76,29 @@ const SchoolAdminSidebar = ({ selectedTab, setSelectedTab }) => {
             active={selectedTab === "profile"}
             onClick={() => setSelectedTab("profile")}
           />
+            </nav>
+          </div>
 
-        </nav>
-      </div>
-
-      {/* Bottom Actions */}
-      <div className="p-4 border-t text-sm">
-        <div className="text-blue-800 font-bold mb-2">UPGRADE TO PREMIUM</div>
-        <p className="text-gray-600 mb-3">
-          Your team has used <strong>80%</strong> of available space.
-        </p>
-        <button className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 text-sm">
-          Upgrade Plan
-        </button>
-        <button
-          onClick={() => {
-            localStorage.removeItem("schoolAdminToken");
-            window.location.href = "/schooladmin/login";
-          }}
-          className="flex items-center justify-center text-red-600 font-medium mt-4 hover:underline w-full"
-        >
-          <FaSignOutAlt className="mr-2" />
-          Logout
-        </button>
-      </div>
-    </aside>
+          {/* Bottom Section */}
+          <div className="p-4 border-t text-sm">
+            {/* Premium + Logout */}
+            <button
+              onClick={() => {
+                localStorage.removeItem("schoolAdminToken");
+                window.location.href = "/schooladmin/login";
+              }}
+              className="flex items-center justify-center text-red-600 font-medium mt-4 hover:underline w-full"
+            >
+              <FaSignOutAlt className="mr-2" />
+              Logout
+            </button>
+          </div>
+        </div>
+      </aside>
+    </>
   );
 };
+
 
 const SidebarItem = ({ label, icon, active, onClick }) => (
   <button

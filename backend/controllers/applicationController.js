@@ -33,7 +33,6 @@ const applyForInternship = async (req, res) => {
   }
 
   try {
-    // Check if student and internship exist
     const student = await Userwebapp.findById(studentId);
     const internship = await InternshipPosting.findById(internshipId);
 
@@ -41,7 +40,7 @@ const applyForInternship = async (req, res) => {
       return res.status(404).json({ message: "Student or Internship not found." });
     }
 
-    // Check if user is premium
+    // Enforce application limit for non-premium users
     if (!student.isPremium) {
       const applicationCount = await Application.countDocuments({ studentId });
 
@@ -53,17 +52,14 @@ const applyForInternship = async (req, res) => {
       }
     }
 
-    // Check if the student has already applied for this internship
     const existingApplication = await Application.findOne({ studentId, internshipId });
 
     if (existingApplication) {
       return res.status(400).json({ message: "You have already applied for this internship." });
     }
 
-    // Use resumeFile.location (S3 URL) instead of memory storage
-    const resumeUrl = resumeFile.location; 
+    const resumeUrl = resumeFile.location;
 
-    // Create a new application
     const newApplication = new Application({
       studentId,
       internshipId,
@@ -73,6 +69,8 @@ const applyForInternship = async (req, res) => {
       userName: student.name,
       userEmail: student.email,
       jobTitle: internship.jobTitle,
+      // ✅ This is the fix:
+      schoolAdmin: student.schoolAdmin || null,
     });
 
     await newApplication.save();
@@ -82,6 +80,7 @@ const applyForInternship = async (req, res) => {
       application: newApplication,
       limitReached: false,
     });
+
   } catch (error) {
     console.error("Error during application submission:", error.message);
     res.status(500).json({
@@ -90,6 +89,7 @@ const applyForInternship = async (req, res) => {
     });
   }
 };
+
 
 const getApplicationCount = async (req, res) => {
   try {
@@ -114,25 +114,36 @@ const getApplicationCount = async (req, res) => {
 // Controller to get all students who applied for a specific internship
 const getApplicationsForInternship = async (req, res) => {
   const { internshipId } = req.params;
+  const { schoolAdmin } = req.query;
 
   try {
-    // Validate internshipId
+    // Validate internship ID
     if (!mongoose.Types.ObjectId.isValid(internshipId)) {
       return res.status(400).json({ message: "Invalid internship ID." });
     }
 
-    // Fetch applications without populating the references
-    const applications = await Application.find({ internshipId });
+    // Validate schoolAdmin ID if provided
+    if (schoolAdmin && !mongoose.Types.ObjectId.isValid(schoolAdmin)) {
+      return res.status(400).json({ message: "Invalid schoolAdmin ID." });
+    }
 
-    // Check if applications exist
+    // Build query filter
+    const query = { internshipId };
+    if (schoolAdmin) {
+      query.schoolAdmin = schoolAdmin;
+    }
+
+    // Fetch applications
+    const applications = await Application.find(query).populate('studentId', 'name email profileImage');
+
     if (!applications || applications.length === 0) {
       return res.status(404).json({ message: "No applications found for this internship." });
     }
 
-    // Send success response with the applications data
     res.status(200).json({ applications });
+
   } catch (error) {
-    console.error("Error fetching applications:", error.message); // Log detailed error
+    console.error("Error fetching applications:", error.message);
     res.status(500).json({
       message: "Error fetching applications.",
       error: error.message,
