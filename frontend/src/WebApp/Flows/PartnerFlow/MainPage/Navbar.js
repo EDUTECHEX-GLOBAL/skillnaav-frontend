@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faUser, faSignOutAlt } from "@fortawesome/free-solid-svg-icons";
-import logo from "../../../../assets-webapp/Skillnaav-logo.png"; // Replace with your actual logo path
-import { useTabContext } from "./UserHomePageContext/HomePageContext"; // Adjust path as needed
+import { faUser, faSignOutAlt, faBars } from "@fortawesome/free-solid-svg-icons";
+import logo from "../../../../assets-webapp/Skillnaav-logo.png";
+import { useTabContext } from "./UserHomePageContext/HomePageContext";
 import { useNavigate } from "react-router-dom";
 
-const Navbar = () => {
+const Navbar = ({ onToggleSidebar }) => {
   const { fine } = useTabContext();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [userInfo, setUserInfo] = useState({ name: "", email: "" });
@@ -13,10 +13,9 @@ const Navbar = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Retrieve userInfo from localStorage and set it to state
     const storedUserInfo = JSON.parse(localStorage.getItem("userInfo"));
     if (storedUserInfo) {
-      setUserInfo(storedUserInfo); // Update the user info state
+      setUserInfo(storedUserInfo);
     }
   }, []);
 
@@ -25,13 +24,11 @@ const Navbar = () => {
   };
 
   const handleLogout = () => {
-    // Clear user information from localStorage
     localStorage.removeItem("userInfo");
-    // Redirect to partner login page
     navigate("/partner/login");
   };
 
-  // Handle clicks outside of the dropdown
+  // Close dropdown if clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -46,19 +43,23 @@ const Navbar = () => {
   }, []);
 
   return (
-    <div className="bg-white font-poppins text-gray-800 p-4 border-b border-gray-300 sticky top-0 z-50 flex justify-between items-center">
-      {/* Left side: Skillnaav logo */}
-      <div className="flex items-center lg:hidden md:hidden">
-             <img
-               src={logo}
-               alt="Skillnaav Logo"
-               className="h-10 object-contain"
-             />
-           </div>
+    <header className="bg-white font-poppins text-gray-800 p-4 border-b border-gray-300 sticky top-0 z-50 flex justify-between items-center">
+      {/* Left Section: Logo + Hamburger */}
+      <div className="flex items-center gap-3">
+        {/* Hamburger (visible on mobile) */}
+        <button
+          onClick={onToggleSidebar}
+          className="md:hidden text-gray-700 focus:outline-none"
+        >
+          <FontAwesomeIcon icon={faBars} className="text-xl" />
+        </button>
 
-      {/* Right side: User icon and dropdown */}
-      <div className="relative ml-auto flex items-center">
-        {/* Display user's name in the navbar */}
+        {/* Logo (always visible) */}
+        <img src={logo} alt="Skillnaav Logo" className="h-10 object-contain" />
+      </div>
+
+      {/* Right Section: User dropdown */}
+      <div className="relative flex items-center ml-auto">
         {userInfo.name && (
           <span className="mr-2 text-gray-800 text-sm">{userInfo.name}</span>
         )}
@@ -70,10 +71,10 @@ const Navbar = () => {
         {isDropdownOpen && (
           <div
             ref={dropdownRef}
-            className="absolute right-0 mt-2 w-48 bg-white shadow-lg rounded-md py-2 border border-gray-300"
+            className="absolute right-0 top-10 w-48 bg-white shadow-lg rounded-md py-2 border border-gray-300"
           >
             {userInfo.email && (
-              <div className="px-4 py-2 text-sm text-gray-800">
+              <div className="px-4 py-2 text-sm text-gray-800 border-b border-gray-200">
                 {userInfo.email}
               </div>
             )}
@@ -88,7 +89,7 @@ const Navbar = () => {
           </div>
         )}
       </div>
-    </div>
+    </header>
   );
 };
 

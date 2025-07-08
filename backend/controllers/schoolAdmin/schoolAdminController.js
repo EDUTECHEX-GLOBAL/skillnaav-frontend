@@ -1,0 +1,482 @@
+const asyncHandler = require("express-async-handler");
+const SchoolAdmin = require("../../models/webapp-models/schoolAdmin/SchoolAdminModel");
+const generateToken = require("../../utils/generateToken");
+// const notifyUser = require("../../utils/notifyUser");
+const jwt = require("jsonwebtoken"); // ✅ ADD THIS
+const csv = require("csv-parser");
+const bcrypt = require("bcryptjs");
+const { Parser } = require("json2csv");
+const Userwebapp = require("../../models/webapp-models/userModel");
+const { uploadFile } = require("../../utils/multer");
+const notifyUser = require("../../utils/notifyUser");
+const { Readable } = require("stream");
+const csvParser = require("csv-parser");
+
+
+
+// Register School Admin
+const registerSchoolAdmin = asyncHandler(async (req, res) => {
+  const {
+    schoolName,
+    email,
+    password,
+    affiliation,
+    address,
+    city,
+    province,
+    postalCode,
+    country,
+    website,
+    contactPerson,
+    contactEmail,
+    contactPhone,
+    bio,
+    schoolType,
+    schoolNumber,
+    languageOfInstruction,
+    verificationDoc, // if handled via S3 or multer, it’ll be set separately
+  } = req.body;
+
+  const existingAdmin = await SchoolAdmin.findOne({ email });
+  if (existingAdmin) {
+    res.status(400);
+    throw new Error("Admin already registered.");
+  }
+
+  const admin = await SchoolAdmin.create({
+    schoolName,
+    email,
+    password,
+    profile: {
+      affiliation,
+      address,
+      city,
+      province,
+      postalCode,
+      country,
+      website,
+      contactPerson,
+      contactEmail,
+      contactPhone,
+      bio,
+      schoolType,
+      schoolNumber,
+      languageOfInstruction,
+      verificationDoc,
+    },
+  });
+
+  if (admin) {
+    res.status(201).json({
+      _id: admin._id,
+      schoolName: admin.schoolName,
+      email: admin.email,
+      isApproved: admin.isApproved,
+    });
+  } else {
+    res.status(400);
+    throw new Error("Failed to register.");
+  }
+});
+
+
+// Login School Admin
+// controllers/schoolAdmin/schoolAdminController.js
+
+const loginSchoolAdmin = asyncHandler(async (req, res) => {
+  const { email, password } = req.body;
+  const school = await SchoolAdmin.findOne({ email });
+
+  if (!school) {
+    res.status(401);
+    throw new Error("Invalid email or password");
+  }
+
+  const isMatch = await school.matchPassword(password);
+  if (!isMatch) {
+    res.status(401);
+    throw new Error("Invalid email or password");
+  }
+
+  // Generate JWT token
+  const token = generateToken(school._id);
+
+  // Send full profile + token
+  res.status(200).json({
+    _id: school._id,
+    schoolName: school.schoolName,
+    affiliation: school.affiliation,
+    address: school.address,
+    city: school.city,
+    state: school.state,
+    postalCode: school.postalCode,
+    country: school.country,
+    website: school.website,
+    contactPerson: school.contactPerson,
+    contactEmail: school.contactEmail,
+    contactPhone: school.contactPhone,
+    bio: school.bio,
+    isApproved: school.isApproved,
+    creditsAvailable: school.creditsAvailable,
+    token,
+  });
+});
+
+
+const getAllSchoolAdmins = asyncHandler(async (req, res) => {
+  const admins = await SchoolAdmin.find({}, "-password"); // exclude password only
+
+  if (admins && admins.length > 0) {
+    res.status(200).json(admins);
+  } else {
+    res.status(404);
+    throw new Error("No school admins found.");
+  }
+});
+
+
+// Approve a school admin
+const approveSchoolAdmin = asyncHandler(async (req, res) => {
+  const { adminId } = req.params;
+
+  const admin = await SchoolAdmin.findById(adminId);
+  if (!admin) {
+    res.status(404);
+    throw new Error("School Admin not found.");
+  }
+
+  admin.isApproved = true;
+  await admin.save();
+
+  // Notify the school admin
+  await notifyUser(
+    admin.email,
+    "Your Skillnaav School Admin account has been approved!",
+    `<p>Congratulations! Your Skillnaav admin account for <strong>${admin.schoolName}</strong> has been approved by our team.</p>`
+  );
+
+  res.status(200).json({ message: "School Admin approved successfully." });
+});
+
+// Reject a school admin
+const rejectSchoolAdmin = asyncHandler(async (req, res) => {
+  const { adminId } = req.params;
+
+  const admin = await SchoolAdmin.findById(adminId);
+  if (!admin) {
+    res.status(404);
+    throw new Error("School Admin not found.");
+  }
+
+  admin.isApproved = false;
+  admin.status = "Rejected"; // Optional: add this to schema if needed
+  await admin.save();
+
+  // Notify the admin
+  await notifyUser(
+    admin.email,
+    "Your Skillnaav School Admin account has been rejected.",
+    `<p>We're sorry to inform you that your admin registration for <strong>${admin.schoolName}</strong> has been rejected. If you believe this is a mistake, please contact support.</p>`
+  );
+
+  res.status(200).json({ message: "School Admin rejected successfully." });
+});
+
+
+// controllers/schoolAdmin/schoolAdminController.js
+
+const getSchoolAdminProfile = asyncHandler(async (req, res) => {
+  const admin = req.schoolAdmin;
+
+  if (!admin) {
+    res.status(404);
+    throw new Error("School admin not found");
+  }
+
+  const profile = admin.profile || {};
+
+  res.status(200).json({
+    _id: admin._id,
+    schoolName: admin.schoolName,
+    email: admin.email,
+    isApproved: admin.isApproved,
+    creditsAvailable: admin.creditsAvailable,
+
+    // Profile details
+    affiliation: profile.affiliation || "",
+    address: profile.address || "",
+    city: profile.city || "",
+    province: profile.province || "",
+    postalCode: profile.postalCode || "",
+    country: profile.country || "",
+    website: profile.website || "",
+    contactPerson: profile.contactPerson || "",
+    contactEmail: profile.contactEmail || "",
+    contactPhone: profile.contactPhone || "",
+    bio: profile.bio || "",
+    schoolType: profile.schoolType || "",
+    schoolNumber: profile.schoolNumber || "",
+    languageOfInstruction: profile.languageOfInstruction || "",
+    verificationDoc: profile.verificationDoc || "",
+  });
+});
+
+
+const updateSchoolAdminProfile = asyncHandler(async (req, res) => {
+  const admin = await SchoolAdmin.findById(req.schoolAdmin._id);
+
+  if (!admin) {
+    res.status(404);
+    throw new Error("Admin not found");
+  }
+
+  // Update top-level fields
+  if (req.body.schoolName) admin.schoolName = req.body.schoolName;
+
+  // Ensure profile exists
+  if (!admin.profile) admin.profile = {};
+
+  // Full set of profile fields (including new ones)
+  const profileFields = [
+    "affiliation",
+    "address",
+    "city",
+    "province",
+    "postalCode",
+    "country",
+    "website",
+    "contactPerson",
+    "contactEmail",
+    "contactPhone",
+    "bio",
+    "schoolType",
+    "schoolNumber",
+    "languageOfInstruction",
+    "verificationDoc",
+  ];
+
+  profileFields.forEach((field) => {
+    if (req.body[field] !== undefined) {
+      admin.profile[field] = req.body[field];
+    }
+  });
+
+  const updated = await admin.save();
+  res.status(200).json({
+    message: "Profile updated successfully",
+    admin: {
+      _id: updated._id,
+      schoolName: updated.schoolName,
+      email: updated.email,
+      isApproved: updated.isApproved,
+      profile: updated.profile,
+    },
+  });
+});
+
+
+
+const uploadStudentsFromCSV = async (req, res) => {
+  console.log("📁 [controller] req.file:", req.file);
+  if (!req.file || !req.file.buffer) {
+    return res.status(400).json({ message: "CSV file is missing" });
+  }
+
+  const stream = Readable.from(req.file.buffer);
+  const rows = [];
+
+  stream
+    .pipe(csvParser())
+    .on("data", (row) => rows.push(row))
+    .on("end", async () => {
+      try {
+        const schoolAdmin = req.schoolAdmin;
+
+        // 1. ✅ Admin approval check
+        if (!schoolAdmin || !schoolAdmin.isApproved) {
+          return res.status(403).json({ message: "School admin not approved" });
+        }
+
+        // 2. ✅ Subscription check
+        if (!schoolAdmin.plan) {
+          return res.status(403).json({ message: "No active plan found. Please activate a subscription plan." });
+        }
+
+        // 3. ✅ Filter valid & non-duplicate rows
+        const validRows = [];
+        for (const row of rows) {
+          const name = row.name?.trim();
+          const email = row.email?.trim();
+          const universityName = row.universityName?.trim();
+          const educationLevel = row.educationLevel?.trim();
+          const fieldOfStudy = row.fieldOfStudy?.trim();
+          const desiredField = row.desiredField?.trim();
+
+          if (!name || !email || !universityName || !educationLevel || !fieldOfStudy || !desiredField) continue;
+
+          const exists = await Userwebapp.findOne({ email });
+          if (!exists) {
+            validRows.push({
+              name,
+              email,
+              universityName,
+              educationLevel,
+              fieldOfStudy,
+              desiredField
+            });
+          }
+        }
+
+        // 4. ✅ Check credits
+        if (schoolAdmin.creditsAvailable < validRows.length) {
+          return res.status(400).json({
+            message: `Insufficient credits. You have ${schoolAdmin.creditsAvailable}, need ${validRows.length}.`,
+          });
+        }
+
+        // 5. ✅ Create student accounts
+        const createdStudents = [];
+        for (const studentData of validRows) {
+          const plainPassword = Math.random().toString(36).slice(-8);
+
+          const student = new Userwebapp({
+            name: studentData.name,
+            email: studentData.email,
+            password: plainPassword,
+            universityName: studentData.universityName,
+            educationLevel: studentData.educationLevel,
+            fieldOfStudy: studentData.fieldOfStudy,
+            desiredField: studentData.desiredField,
+            dob: "Not Provided",
+            linkedin: "https://linkedin.com/in/placeholder",
+            profileImage: "default.png",
+            adminApproved: true,
+            isActive: true,
+            isPremium: false,
+            schoolAdmin: schoolAdmin._id,
+          });
+
+          await student.save();
+          createdStudents.push({
+            name: student.name,
+            email: student.email,
+            password: plainPassword,
+          });
+        }
+
+        // 6. ✅ Deduct credits
+        schoolAdmin.creditsAvailable -= createdStudents.length;
+        await schoolAdmin.save();
+
+        // 7. ✅ Generate CSV with credentials
+        const parser = new Parser({ fields: ["name", "email", "password"] });
+        const csvData = parser.parse(createdStudents);
+        const csvBuffer = Buffer.from(csvData, "utf-8");
+
+        // 8. ✅ Upload to S3
+        const fileName = `student-credentials/${Date.now()}-${Math.floor(Math.random() * 10000)}.csv`;
+        const fileUrl = await uploadFile({
+          Bucket: process.env.AWS_CSV_BUCKET,
+          Key: fileName,
+          Body: csvBuffer,
+          ContentType: "text/csv",
+        });
+
+        // 9. ✅ Email to admin
+        await notifyUser(
+          schoolAdmin.email,
+          "Student Credentials CSV – SkillNaav",
+          `Attached is the student credentials CSV for ${createdStudents.length} newly created students.`,
+          [
+            {
+              filename: "student-credentials.csv",
+              content: csvBuffer,
+              contentType: "text/csv",
+            },
+          ]
+        );
+
+        // 10. ✅ API Response
+        return res.status(200).json({
+          message: `${createdStudents.length} students created successfully.`,
+          fileUrl,
+          students: createdStudents,
+        });
+      } catch (err) {
+        console.error("❌ Server error:", err);
+        return res.status(500).json({ message: "Server error during processing." });
+      }
+    })
+    .on("error", (err) => {
+      console.error("❌ CSV parsing error:", err);
+      return res.status(500).json({ message: "CSV parsing failed." });
+    });
+};
+
+
+const activateFreeSubscription = asyncHandler(async (req, res) => {
+  const admin = req.schoolAdmin;
+  if (!admin) throw new Error("Not authorized");
+
+  // 🛑 Prevent duplicate credit assignment
+  if (admin.plan === "Free Plan") {
+    return res.status(200).json({
+      message: "🎉 You're already on the Free Plan",
+      creditsAvailable: admin.creditsAvailable,
+    });
+  }
+
+  // 🧠 Optional: Only assign credits if their current plan is inactive or undefined
+  admin.plan = "Free Plan";
+  admin.creditsAvailable = 50;
+  admin.subscriptionStatus = "active"; // optional consistency
+  await admin.save();
+
+  res.status(200).json({
+    message: "✅ Free Plan activated",
+    creditsAvailable: admin.creditsAvailable,
+  });
+});
+
+const getDashboardMetrics = asyncHandler(async (req, res) => {
+  const admin = req.schoolAdmin;
+
+  if (!admin) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  const generated = await Userwebapp.countDocuments({ schoolAdmin: admin._id });
+  const remaining = admin.creditsAvailable || 0;
+  const total = generated + remaining;
+
+  res.status(200).json({
+    totalCredits: total,
+    generated,
+    remaining,
+    plan: admin.plan,
+  });
+});
+
+const getStudentsBySchoolAdmin = asyncHandler(async (req, res) => {
+  const adminId = req.schoolAdmin._id;
+
+  const students = await Userwebapp.find({ schoolAdmin: adminId }).select("-password");
+
+  res.status(200).json(students);
+});
+
+
+module.exports = {
+  getAllSchoolAdmins,
+  approveSchoolAdmin,
+  rejectSchoolAdmin,
+  registerSchoolAdmin,
+  loginSchoolAdmin,
+  getSchoolAdminProfile,
+  updateSchoolAdminProfile,
+  uploadStudentsFromCSV,
+  activateFreeSubscription,
+  getDashboardMetrics,
+  getStudentsBySchoolAdmin,
+};
+

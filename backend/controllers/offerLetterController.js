@@ -7,40 +7,58 @@ const sendNotification = require('../utils/Notification');
 
 const sendOfferLetter = async (req, res) => {
   try {
-    const { student_id: studentId, name, email, position, startDate, internshipId } = req.body;
+    const {
+      student_id: studentId,
+      name,
+      email,
+      position,
+      startDate,
+      internshipId,
+      schoolAdminId,
+      company,
+      location,
+      duration,
+      internshipType,
+      compensationDetails,
+      jobDescription,
+      qualifications,
+      contactInfo,
+      noticePeriod
+    } = req.body;
 
-    const missing = ['student_id', 'name', 'email', 'position', 'startDate', 'internshipId']
-      .filter(field => !req.body[field]);
-    if (missing.length) {
+    const requiredFields = ['student_id', 'name', 'email', 'position', 'startDate', 'internshipId'];
+    const missing = requiredFields.filter(field => !req.body[field]);
+
+    if (missing.length > 0) {
       return res.status(400).json({ error: 'Missing required fields', missing });
     }
 
-    let studentObjId, internshipObjId, start;
+    let studentObjId, internshipObjId, normalizedStart;
     try {
       studentObjId = new mongoose.Types.ObjectId(studentId);
       internshipObjId = new mongoose.Types.ObjectId(internshipId);
-      start = new Date(startDate);
-      if (isNaN(start.getTime())) throw new Error('Invalid startDate');
+      normalizedStart = new Date(new Date(startDate).setHours(0, 0, 0, 0));
+      if (isNaN(normalizedStart.getTime())) throw new Error('Invalid startDate');
     } catch (e) {
       return res.status(400).json({ error: e.message });
     }
 
-   const pdfBuffer = await generateOfferPDFBuffer({
-  name,
-  email,
-  position,
-  startDate,
-  internshipId,
-  companyName: req.body.company,
-  location: req.body.location,
-  duration: req.body.duration,
-  internshipType: req.body.internshipType,
-  compensationDetails: req.body.compensationDetails,
-  jobDescription: req.body.jobDescription,
-  qualifications: req.body.qualifications,
-  contactInfo: req.body.contactInfo,
-  noticePeriod: req.body.noticePeriod,
-});
+    const pdfBuffer = await generateOfferPDFBuffer({
+      name,
+      email,
+      position,
+      startDate,
+      internshipId,
+      companyName: company,
+      location,
+      duration,
+      internshipType,
+      compensationDetails,
+      jobDescription,
+      qualifications,
+      contactInfo,
+      noticePeriod
+    });
 
     const fileName = `offer-${studentId}-${Date.now()}.pdf`;
     const s3Url = await uploadOfferLetterBuffer(pdfBuffer, fileName);
@@ -51,15 +69,18 @@ const sendOfferLetter = async (req, res) => {
       name,
       email,
       position,
-      startDate: start,
+      startDate: normalizedStart,
       sentDate: new Date(),
       status: 'Sent',
       s3Url,
-      qualifications: []
+      qualifications: qualifications || [],
+      schoolAdminId: schoolAdminId && mongoose.Types.ObjectId.isValid(schoolAdminId)
+        ? new mongoose.Types.ObjectId(schoolAdminId)
+        : null
     };
+
     const offerLetter = await OfferLetter.create(offerDoc);
 
-    // In-app notification
     sendNotification({
       studentId,
       title: 'Offer Letter Sent!',
@@ -67,7 +88,6 @@ const sendOfferLetter = async (req, res) => {
       link: s3Url
     }).catch(err => console.error('In-app notification failed:', err));
 
-    // Email notification
     notifyUser(
       email,
       'Your SkillNaav Offer Letter',
@@ -94,7 +114,7 @@ const sendOfferLetter = async (req, res) => {
 
 const getOfferLetterByStudent = async (req, res) => {
   try {
-    const studentId = req.params.studentId;
+    const { studentId } = req.params;
     if (!mongoose.Types.ObjectId.isValid(studentId)) {
       return res.status(400).json({ error: 'Invalid student ID' });
     }
@@ -114,6 +134,7 @@ const updateOfferStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
+
     if (!['Accepted', 'Rejected'].includes(status)) {
       return res.status(400).json({ error: 'Status must be Accepted or Rejected' });
     }
@@ -129,9 +150,24 @@ const updateOfferStatus = async (req, res) => {
   }
 };
 
-// 🔑 Make sure to export ALL handlers!
+const getOffersByInternship = async (req, res) => {
+  const { internshipId } = req.params;
+  const { schoolAdminId } = req.query;
+
+  const query = { internshipId: new mongoose.Types.ObjectId(internshipId) };
+
+  if (schoolAdminId && mongoose.Types.ObjectId.isValid(schoolAdminId)) {
+    query.schoolAdminId = new mongoose.Types.ObjectId(schoolAdminId);
+  }
+
+  const offers = await OfferLetter.find(query);
+  return res.status(200).json({ offers });
+};
+
+
 module.exports = {
   sendOfferLetter,
   getOfferLetterByStudent,
-  updateOfferStatus
+  updateOfferStatus,
+  getOffersByInternship
 };

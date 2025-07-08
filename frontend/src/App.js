@@ -38,6 +38,8 @@ import AdminProfilePicture from "./WebApp/Flows/AdminFlow/SignUpLogin/AdminProfi
 import AdminMainPage from "./WebApp/Flows/AdminFlow/MainPage/AdminMainPage";
 import TryforFree from "./WebApp/TryforFree";
 
+ import SchoolAdminFlow from "./WebApp/Flows/SchoolAdminFlow/SchoolAdminFlow";
+
 function App() {
   const { skillnaavData, reloadData } = useSelector((state) => state.root);
   const dispatch = useDispatch();
@@ -108,6 +110,9 @@ function App() {
           element={<AdminProfilePicture />}
         />
         <Route path="/admin-main-page" element={<AdminMainPage />} />
+
+        {/* School Admin Flow */}
+        <Route path="/schooladmin/*" element={<SchoolAdminFlow />} />
 
         {/* Try for free */}
         <Route path="/choose-role" element={<TryforFree />} />

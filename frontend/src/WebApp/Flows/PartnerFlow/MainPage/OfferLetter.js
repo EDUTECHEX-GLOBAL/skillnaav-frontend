@@ -63,28 +63,30 @@ const SendOfferLetter = ({ student, internshipId, onSuccess }) => {
       }
 
       const response = await axios.post(
-        "/api/offer-letters",
-        {
-          student_id: student.student_id,
-          name: student.name,
-          email: student.email,
-          position: offerDetails.position,
-          startDate: offerDetails.joiningDate,
-          internshipId: internshipId,
-          companyName: internship.companyName,
-          location: internship.location,
-          duration: internship.duration,
-          stipend: internship.compensationDetails,
-          jobDescription: internship.jobDescription,
-          qualifications: internship.qualifications,
-          contactInfo: internship.contactInfo
-        },
-        {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        }
-      );
+  "/api/offer-letters",
+  {
+    student_id: student.student_id,
+    name: student.name,
+    email: student.email,
+    position: offerDetails.position,
+    startDate: offerDetails.joiningDate,
+    internshipId: internshipId,
+    companyName: internship.companyName,
+    location: internship.location,
+    duration: internship.duration,
+    stipend: internship.compensationDetails,
+    jobDescription: internship.jobDescription,
+    qualifications: internship.qualifications,
+    contactInfo: internship.contactInfo,
+    schoolAdminId: localStorage.getItem("schoolAdminId") // ✅ FIXED
+  },
+  {
+    headers: {
+      'Authorization': `Bearer ${localStorage.getItem('token')}`
+    }
+  }
+);
+
 
       setSuccess(true);
       if (onSuccess) onSuccess(response.data);

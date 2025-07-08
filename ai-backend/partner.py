@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import asyncio
-from fastapi import FastAPI, Form, HTTPException, status
+from fastapi import FastAPI, Form, HTTPException, status, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pymongo import MongoClient
 import fitz  # PyMuPDF
@@ -17,6 +17,7 @@ from bson import ObjectId
 from sentence_transformers import SentenceTransformer, util
 import numpy as np
 import boto3
+from typing import Optional
 
 # === Globals ===
 def now():
@@ -98,12 +99,20 @@ async def process_resume(resume_url, job_embedding):
     application = await asyncio.get_event_loop().run_in_executor(
         None, lambda: applications_collection.find_one({"resumeUrl": resume_url})
     )
+
     name = application.get("userName") or application.get("name") or "N/A" if application else "N/A"
     email = application.get("userEmail") or application.get("email") or "N/A" if application else "N/A"
     applied_date = (application.get("appliedDate") or application.get("applied_date")
                     or application.get("appliedOn") or "N/A") if application else "N/A"
     student_id = (application.get("studentId") or application.get("student_id")
                   or application.get("studentID") or "N/A") if application else "N/A"
+    school_admin_id = application.get("schoolAdmin") if application else None
+
+    if not application:
+        print(f"[{now()}] No application found for resume: {resume_url}")
+
+    if not school_admin_id:
+        print(f"[{now()}] B2C candidate (no schoolAdmin): {resume_url}")
 
     file_stream = await asyncio.get_event_loop().run_in_executor(None, download_resume_from_s3, resume_url)
     if not file_stream:
@@ -130,7 +139,8 @@ async def process_resume(resume_url, job_embedding):
         "appliedDate": applied_date,
         "resumeUrl": resume_url,
         "similarity_score": similarity,
-        "text": text
+        "text": text,
+        "school_admin_id": school_admin_id  # ✅ May be None
     }
 
 @app.post("/partner/shortlist")
@@ -143,7 +153,7 @@ async def shortlist_candidates(
     try:
         internship_obj_id = ObjectId(internship_id)
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid internship_id: {e}")
+        raise HTTPException(status_code=400, detail=f"Invalid internship_id: {e}")
 
     try:
         job_skills_list = json.loads(job_skills)
@@ -156,10 +166,12 @@ async def shortlist_candidates(
     tasks = [process_resume(url, job_embedding) for url in resumes]
     results = await asyncio.gather(*tasks)
 
-    candidates = [c for c in results if c and c['similarity_score'] >= 0.3]  # Updated threshold
+    candidates = [c for c in results if c and c['similarity_score'] >= 0.3]
 
     for cand in candidates:
         cand['internship_id'] = internship_obj_id
+        if cand.get('school_admin_id') and isinstance(cand['school_admin_id'], str):
+            cand['school_admin_id'] = ObjectId(cand['school_admin_id'])
 
     candidates = sorted(candidates, key=lambda x: x['similarity_score'], reverse=True)
 
@@ -169,17 +181,25 @@ async def shortlist_candidates(
     return {"shortlisted_candidates": convert_object_ids(candidates)}
 
 @app.get("/partner/shortlisted/{internship_id}")
-async def get_shortlisted_candidates(internship_id: str):
+async def get_shortlisted_candidates(
+    internship_id: str,
+    school_admin_id: Optional[str] = Query(None, alias="schoolAdminId")
+):
     try:
         internship_obj_id = ObjectId(internship_id)
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid internship_id '{internship_id}': {e}")
-    try:
-        docs = list(shortlist_collection.find({"internship_id": internship_obj_id}))
-        return {"shortlisted_candidates": convert_object_ids(docs)}
-    except Exception as e:
-        print(f"[{now()}] Error retrieving shortlisted: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(status_code=400, detail=f"Invalid internship ID: {e}")
+
+    query = { "internship_id": internship_obj_id }
+
+    if school_admin_id:
+        try:
+            query["school_admin_id"] = ObjectId(school_admin_id)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Invalid schoolAdminId: {e}")
+
+    docs = list(shortlist_collection.find(query))
+    return {"shortlisted_candidates": convert_object_ids(docs)}
 
 @app.get("/partner/fetch-applications/{job_id}")
 async def fetch_applications(job_id: str):

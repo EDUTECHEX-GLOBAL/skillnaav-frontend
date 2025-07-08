@@ -6,6 +6,7 @@ import PartnerAccounts from "./PartnerAccounts";
 import Applications from "./Applications"; // New component for Applications
 import Bin from "./Bin";
 import Dashboard from "./Dashboard"; // Import the Dashboard component
+import SchoolAdminAccounts from "./SchoolAdminAccounts";
 
 const BodyContent = () => {
   const { selectedTab } = useTabContext();
@@ -22,6 +23,8 @@ const BodyContent = () => {
         return <PartnerManagement />;
       case "applications":
         return <Applications />;
+      case "school-accounts":
+        return <SchoolAdminAccounts />;
       case "bin":
         return <Bin />;
       default:

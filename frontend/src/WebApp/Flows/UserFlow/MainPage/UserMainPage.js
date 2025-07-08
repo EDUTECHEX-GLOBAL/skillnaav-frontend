@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { Skeleton, Modal, Button } from "antd"; // Import Modal and Button
-import { useNavigate } from "react-router-dom"; // Import useNavigate
+import { Skeleton, Modal } from "antd";
+import { useNavigate } from "react-router-dom";
 import Navbar from "./Navbar";
 import Sidebar from "./Sidebar";
 import BodyContent from "./BodyContent";
@@ -15,11 +15,12 @@ const UserMainPage = () => {
   const [loading, setLoading] = useState(true);
   const [isApproved, setIsApproved] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showUpgradePopup, setShowUpgradePopup] = useState(false);
-  const navigate = useNavigate(); // Initialize useNavigate
   const [showPricingModal, setShowPricingModal] = useState(false);
   const [showChatbot, setShowChatbot] = useState(false);
-  const [hasResponse, setHasResponse] = useState(false);
+
+  const navigate = useNavigate();
 
   useEffect(() => {
     const handleResize = () => {
@@ -35,9 +36,7 @@ const UserMainPage = () => {
         const token = JSON.parse(localStorage.getItem("userToken"));
         if (token) {
           const response = await axios.get("/api/users/profile", {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
+            headers: { Authorization: `Bearer ${token}` },
           });
           setUserInfo(response.data);
           setIsApproved(response.data.adminApproved);
@@ -48,6 +47,7 @@ const UserMainPage = () => {
         setLoading(false);
       }
     };
+
     fetchUserInfo();
   }, []);
 
@@ -55,27 +55,35 @@ const UserMainPage = () => {
     if (userInfo && !userInfo.isPremium) {
       const interval = setInterval(() => {
         setShowUpgradePopup(true);
-        setTimeout(() => setShowUpgradePopup(false), 10000); // Auto-close after 10 sec
-      }, 30000); // Show popup every 30 sec
-
+        setTimeout(() => setShowUpgradePopup(false), 10000);
+      }, 30000);
       return () => clearInterval(interval);
     }
   }, [userInfo]);
 
+  const handleToggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
+  const handleCloseSidebar = () => setIsSidebarOpen(false);
+
   return (
     <TabProvider>
-      <div className={`flex ${isMobile ? "flex-col" : "flex-row"} relative`}>
-        <Sidebar isMobile={isMobile} />
+      <div className={`flex min-h-screen font-poppins bg-gray-50 ${isMobile ? "flex-col" : ""}`}>
+        {/* Sidebar */}
+        <Sidebar
+          isMobile={isMobile}
+          isOpen={isSidebarOpen}
+          onClose={handleCloseSidebar}
+        />
 
-        <div className="flex-1 flex flex-col">
-          <Navbar />
+        {/* Main Content */}
+        <div className="flex-1 flex flex-col relative">
+          <Navbar onToggleSidebar={handleToggleSidebar} />
 
           {loading ? (
             <div className="p-4">
               <Skeleton active />
             </div>
           ) : (
-            <div className="relative flex-1">
+            <div className="relative flex-1 overflow-y-auto">
               <BodyContent />
 
               {!isApproved && (
@@ -83,12 +91,9 @@ const UserMainPage = () => {
                   <div className="absolute inset-0 bg-gray-500 opacity-50 z-10" />
                   <div className="absolute inset-0 flex items-center justify-center z-20">
                     <div className="bg-white p-4 rounded shadow-md text-center max-w-xs mx-auto">
-                      <h2 className="text-lg font-semibold">
-                        Account Not Approved
-                      </h2>
+                      <h2 className="text-lg font-semibold">Account Not Approved</h2>
                       <p className="text-sm">
-                        Your account is not approved by an admin yet. Some
-                        features may be restricted.
+                        Your account is not approved by an admin yet. Some features may be restricted.
                       </p>
                     </div>
                   </div>
@@ -99,13 +104,12 @@ const UserMainPage = () => {
         </div>
       </div>
 
-      {/* Pricing Modal */}
+      {/* Premium Pricing Modal */}
       {showPricingModal && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
           <div className="relative bg-white p-6 rounded-lg shadow-lg max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-            {/* Close Button */}
             <button
-              className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-full p-2 transition duration-200"
+              className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-full p-2"
               onClick={() => setShowPricingModal(false)}
               aria-label="Close modal"
             >
@@ -116,12 +120,13 @@ const UserMainPage = () => {
         </div>
       )}
 
-      {/* Premium Upgrade Modal */}
+      {/* Upgrade Prompt Modal */}
       <Modal
         open={showUpgradePopup}
         onCancel={() => setShowUpgradePopup(false)}
         footer={[
           <button
+            key="upgrade"
             className="bg-purple-500 text-white px-4 py-2 rounded-md hover:bg-purple-600"
             onClick={() => {
               setShowUpgradePopup(false);
@@ -129,7 +134,7 @@ const UserMainPage = () => {
             }}
           >
             Upgrade Now
-          </button>
+          </button>,
         ]}
       >
         <div className="text-center">
@@ -140,10 +145,10 @@ const UserMainPage = () => {
         </div>
       </Modal>
 
-      {/* Chat Bot */}
-      {showChatbot && (
+      {/* Chatbot Component */}
+      {showChatbot ? (
         <div className="fixed bottom-5 right-5 w-[360px] max-h-[80vh] z-50 shadow-xl rounded-lg bg-white border">
-          {/* Header Bar */}
+          {/* Header */}
           <div className="flex items-center justify-between bg-red-600 text-white p-3 rounded-t-lg">
             <span className="font-semibold">Career Assistance</span>
             <button
@@ -159,9 +164,7 @@ const UserMainPage = () => {
             <Chatbot />
           </div>
         </div>
-      )}
-
-      {!showChatbot && (
+      ) : (
         <div
           onClick={() => setShowChatbot(true)}
           className="fixed bottom-5 right-5 z-50 cursor-pointer flex items-center gap-2 bg-white border shadow-md rounded-full px-4 py-2 hover:shadow-lg"
@@ -176,7 +179,6 @@ const UserMainPage = () => {
           />
         </div>
       )}
-
     </TabProvider>
   );
 };
