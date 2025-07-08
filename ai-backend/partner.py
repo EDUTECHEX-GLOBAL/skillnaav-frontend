@@ -194,7 +194,7 @@ async def get_shortlisted_candidates(
 
     if school_admin_id:
         try:
-            query["school_admin_id"] = ObjectId(school_admin_id)
+            query["school_admin_id"] = { "$eq": ObjectId(school_admin_id) }
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Invalid schoolAdminId: {e}")
 
