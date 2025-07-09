@@ -40,6 +40,10 @@ print(f"[{now()}] Connected to MongoDB: {db.name}")
 shortlist_collection = db["shortlisted_candidates"]
 applications_collection = db["applications"]
 
+# Create indexes
+shortlist_collection.create_index([("internship_id", 1), ("school_admin_id", 1)])
+print(f"[{now()}] Created MongoDB indexes")
+
 # === FastAPI Setup ===
 app = FastAPI()
 app.add_middleware(
@@ -183,22 +187,25 @@ async def shortlist_candidates(
 @app.get("/partner/shortlisted/{internship_id}")
 async def get_shortlisted_candidates(
     internship_id: str,
-    school_admin_id: Optional[str] = Query(None, alias="schoolAdminId")
+    schoolAdminId: Optional[str] = Query(None)  # Changed parameter name to match frontend
 ):
     try:
         internship_obj_id = ObjectId(internship_id)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid internship ID: {e}")
 
-    query = { "internship_id": internship_obj_id }
+    query = {"internship_id": internship_obj_id}
 
-    if school_admin_id:
+    if schoolAdminId:  # Now using schoolAdminId consistently
         try:
-            query["school_admin_id"] = { "$eq": ObjectId(school_admin_id) }
+            query["school_admin_id"] = ObjectId(schoolAdminId)  # Matching field name in documents
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Invalid schoolAdminId: {e}")
 
+    print(f"[{now()}] Executing query: {query}")  # Debug logging
     docs = list(shortlist_collection.find(query))
+    print(f"[{now()}] Found {len(docs)} documents")
+    
     return {"shortlisted_candidates": convert_object_ids(docs)}
 
 @app.get("/partner/fetch-applications/{job_id}")

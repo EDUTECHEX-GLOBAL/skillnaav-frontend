@@ -56,9 +56,10 @@ const Internships = () => {
 
       if (status === 'Shortlisted') {
         const url = SCHOOL_ADMIN_ID
-          ? `${SHORTLIST_API_BASE_URL}/partner/shortlisted/${internshipId}?schoolAdminId=${SCHOOL_ADMIN_ID}`
-          : `${SHORTLIST_API_BASE_URL}/partner/shortlisted/${internshipId}`;
-
+  ? `${SHORTLIST_API_BASE_URL}/partner/shortlisted/${internshipId}?schoolAdminId=${SCHOOL_ADMIN_ID}`
+  : `${SHORTLIST_API_BASE_URL}/partner/shortlisted/${internshipId}`;
+console.log('Request URL:', url); 
+console.log('schoolAdminId:', SCHOOL_ADMIN_ID);
         response = await axios.get(url, {
           headers: { Authorization: `Bearer ${token}` },
         });

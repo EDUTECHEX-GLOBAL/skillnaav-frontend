@@ -6,7 +6,6 @@ export default function Chatbot() {
   const user = JSON.parse(localStorage.getItem("userInfo") || "{}") ?? {};
   const token = user?.token ?? "";
 
-  /* ---------- state ---------- */
   const [chatHistory, setChatHistory] = useState(() => {
     try {
       const saved = sessionStorage.getItem("careerChatHistory");
@@ -15,58 +14,93 @@ export default function Chatbot() {
       return [];
     }
   });
+
   const [userInput, setUserInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const [replyCount, setReplyCount] = useState(user?.careerChatUsage ?? 0);
+  const [isPremium, setIsPremium] = useState(
+    user?.isPremium && new Date(user.premiumExpiration) > new Date()
+  );
+
+  const FREE_LIMIT = 10;
   const messagesRef = useRef(null);
 
-  /* ---------- sendMessage ---------- */
-  const sendMessage = async () => {
-    if (!userInput.trim()) return;
-
-    const userMsg = { type: "user", text: userInput.trim() };
-    setChatHistory((prev) => [...prev, userMsg]);
-    setUserInput("");
-    setLoading(true);
-    setError("");
-
+  // Sync with latest backend user profile
+ useEffect(() => {
+  const fetchUsage = async () => {
     try {
-      const res = await fetch("/api/career-chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`, // ✅ Send token
-        },
-        body: JSON.stringify({ message: userMsg.text }),
+      const res = await fetch("/api/users/profile", {
+        headers: { Authorization: `Bearer ${token}` },
       });
-
-      if (!res.ok) throw new Error("Backend error");
-
-      const { reply } = await res.json();
-
-      // Check if backend returned a reply about usage limit
-      if (
-        reply.includes("⚠️ You’ve used all") ||
-        reply.includes("Upgrade to Premium")
-      ) {
-        setError(reply); // show message as error
-        setChatHistory((prev) => [
-          ...prev,
-          { type: "bot", text: reply },
-        ]);
-      } else {
-        const botMsg = { type: "bot", text: reply };
-        setChatHistory((prev) => [...prev, botMsg]);
-      }
-    } catch {
-      setError("❌ Could not connect to the AI chatbot. Please try again.");
-    } finally {
-      setLoading(false);
+      const data = await res.json();
+      setReplyCount(data.careerChatUsage ?? 0);
+      setIsPremium(data.isPremium && new Date(data.premiumExpiration) > new Date());
+    } catch (err) {
+      console.error("Failed to fetch user info:", err);
     }
   };
 
-  /* ---------- auto-scroll ---------- */
+  if (token) fetchUsage();
+}, [token]);
+
+
+  // Handle message sending
+ const sendMessage = async () => {
+  if (!userInput.trim()) return;
+
+  const userMsg = { type: "user", text: userInput.trim() };
+  setChatHistory((prev) => [...prev, userMsg]);
+  setUserInput("");
+  setLoading(true);
+  setError("");
+
+  try {
+    const res = await fetch("/api/career-chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ message: userMsg.text }),
+    });
+
+    if (!res.ok) throw new Error("Backend error");
+
+    const { reply } = await res.json();
+
+    // Add reply to chat
+    const botMsg = { type: "bot", text: reply };
+    setChatHistory((prev) => [...prev, botMsg]);
+
+    // ✅ Re-fetch usage if message indicates limit was hit or updated
+    const resProfile = await fetch("/api/users/profile", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const profile = await resProfile.json();
+
+    const freshCount = profile.careerChatUsage ?? 0;
+    const freshPremium = profile.isPremium && new Date(profile.premiumExpiration) > new Date();
+
+    setReplyCount(freshCount);
+    setIsPremium(freshPremium);
+
+    if (
+      reply.includes("⚠️ You’ve used all") ||
+      reply.includes("Upgrade to Premium")
+    ) {
+      setError(reply);
+    }
+  } catch {
+    setError("❌ Could not connect to the AI chatbot. Please try again.");
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+  // Auto-scroll on new message
   useEffect(() => {
     if (!chatHistory.length) return;
     const last = chatHistory[chatHistory.length - 1];
@@ -76,17 +110,14 @@ export default function Chatbot() {
     });
   }, [chatHistory]);
 
-  /* ---------- persist chat history ---------- */
+  // Persist chat history to session
   useEffect(() => {
     try {
-      sessionStorage.setItem(
-        "careerChatHistory",
-        JSON.stringify(chatHistory)
-      );
+      sessionStorage.setItem("careerChatHistory", JSON.stringify(chatHistory));
     } catch {}
   }, [chatHistory]);
 
-  /* ---------- clear on refresh ---------- */
+  // Clear session on refresh
   useEffect(() => {
     const clear = () => sessionStorage.removeItem("careerChatHistory");
     window.addEventListener("beforeunload", clear);
@@ -122,8 +153,18 @@ export default function Chatbot() {
         ))}
       </div>
 
-      {/* error */}
+      {/* error message */}
       {error && <div className="text-red-500 text-sm mb-1">{error}</div>}
+
+      {/* usage counter for freemium users */}
+{/* usage counter – show only before limit */}
+{!isPremium && replyCount < FREE_LIMIT && !error.includes("You’ve used all 10 free replies") && (
+  <p className="text-xs text-gray-500 mb-1">
+    Replies used: {replyCount}/{FREE_LIMIT}
+  </p>
+)}
+
+
 
       {/* input + send */}
       <div className="flex items-center">

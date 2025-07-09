@@ -8,7 +8,7 @@ const {
   listModes,
 } = require("../services/ragHelpers");
 
-const User = require("../models/webapp-models/userModel"); // ⬅️ Import User model
+const Userwebapp = require("../models/webapp-models/userModel"); // ⬅️ Import User model
 
 // Regex patterns
 const GREET_RX = /^(hi|hello|hey|howdy|good\s*(morning|afternoon|evening)|how\s*are\s*you)\b/i;
@@ -30,7 +30,8 @@ router.post("/career-chat", async (req, res) => {
     return res.status(401).json({ error: "Invalid token" });
   }
 
-  const user = await User.findById(userId);
+  const user = await Userwebapp.findById(userId);
+
   if (!user) return res.status(404).json({ error: "User not found" });
 
   const isPremium = user.isPremium && new Date(user.premiumExpiration) > new Date();
