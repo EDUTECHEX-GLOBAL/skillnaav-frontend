@@ -44,17 +44,7 @@ applications_collection = db["applications"]
 shortlist_collection.create_index([("internship_id", 1), ("school_admin_id", 1)])
 print(f"[{now()}] Created MongoDB indexes")
 
-# === FastAPI Setup ===
-app = FastAPI()
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://www.skillnaav.com", "https://skillnaav.com"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# === Resume Parsing ===
+# === Resume Processing Functions ===
 def download_resume_from_s3(resume_url: str):
     print(f"[{now()}] Downloading resume from: {resume_url}")
     try:
@@ -144,9 +134,20 @@ async def process_resume(resume_url, job_embedding):
         "resumeUrl": resume_url,
         "similarity_score": similarity,
         "text": text,
-        "school_admin_id": school_admin_id  # ✅ May be None
+        "school_admin_id": school_admin_id
     }
 
+# === FastAPI Setup ===
+app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "https://www.skillnaav.com", "https://skillnaav.com"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# === API Endpoints ===
 @app.post("/partner/shortlist")
 async def shortlist_candidates(
     internship_id: str = Form(...),
@@ -187,7 +188,7 @@ async def shortlist_candidates(
 @app.get("/partner/shortlisted/{internship_id}")
 async def get_shortlisted_candidates(
     internship_id: str,
-    schoolAdminId: Optional[str] = Query(None)  # Changed parameter name to match frontend
+    schoolAdminId: Optional[str] = Query(None)
 ):
     try:
         internship_obj_id = ObjectId(internship_id)
@@ -196,15 +197,15 @@ async def get_shortlisted_candidates(
 
     query = {"internship_id": internship_obj_id}
 
-    if schoolAdminId:  # Now using schoolAdminId consistently
+    if schoolAdminId:
         try:
-            query["school_admin_id"] = ObjectId(schoolAdminId)  # Matching field name in documents
+            query["school_admin_id"] = ObjectId(schoolAdminId)
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Invalid schoolAdminId: {e}")
 
-    print(f"[{now()}] Executing query: {query}")  # Debug logging
+    print(f"[{now()}] Executing query: {query}")
     docs = list(shortlist_collection.find(query))
-    print(f"[{now()}] Found {len(docs)} documents")
+    print(f"[{now()}] Found {len(docs)} documents matching criteria")
     
     return {"shortlisted_candidates": convert_object_ids(docs)}
 
