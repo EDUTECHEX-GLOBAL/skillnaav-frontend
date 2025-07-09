@@ -1,15 +1,10 @@
-// src/components/Chatbot.jsx
 import { useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 export default function Chatbot() {
-  /* ---------- user & limits ---------- */
-  const user =
-    JSON.parse(localStorage.getItem("userInfo") || "{}") ?? {};
-  const isPremium =
-    user.isPremium && new Date(user.premiumExpiration) > new Date();
-  const FREE_LIMIT = 10; // change if you raise the cap
+  const user = JSON.parse(localStorage.getItem("userInfo") || "{}") ?? {};
+  const token = user?.token ?? "";
 
   /* ---------- state ---------- */
   const [chatHistory, setChatHistory] = useState(() => {
@@ -24,23 +19,10 @@ export default function Chatbot() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  /* ---------- refs ---------- */
   const messagesRef = useRef(null);
 
   /* ---------- sendMessage ---------- */
   const sendMessage = async () => {
-    // stop non-premium users at FREE_LIMIT replies
-    if (
-      !isPremium &&
-      chatHistory.filter((m) => m.type === "bot").length >= FREE_LIMIT
-    ) {
-      setError(
-        `⚠️ You’ve used all ${FREE_LIMIT} free replies. ` +
-          `Upgrade to Premium for unlimited chat.`
-      );
-      return;
-    }
-
     if (!userInput.trim()) return;
 
     const userMsg = { type: "user", text: userInput.trim() };
@@ -52,14 +34,31 @@ export default function Chatbot() {
     try {
       const res = await fetch("/api/career-chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`, // ✅ Send token
+        },
         body: JSON.stringify({ message: userMsg.text }),
       });
+
       if (!res.ok) throw new Error("Backend error");
 
       const { reply } = await res.json();
-      const botMsg = { type: "bot", text: reply };
-      setChatHistory((prev) => [...prev, botMsg]);
+
+      // Check if backend returned a reply about usage limit
+      if (
+        reply.includes("⚠️ You’ve used all") ||
+        reply.includes("Upgrade to Premium")
+      ) {
+        setError(reply); // show message as error
+        setChatHistory((prev) => [
+          ...prev,
+          { type: "bot", text: reply },
+        ]);
+      } else {
+        const botMsg = { type: "bot", text: reply };
+        setChatHistory((prev) => [...prev, botMsg]);
+      }
     } catch {
       setError("❌ Could not connect to the AI chatbot. Please try again.");
     } finally {
@@ -72,7 +71,9 @@ export default function Chatbot() {
     if (!chatHistory.length) return;
     const last = chatHistory[chatHistory.length - 1];
     if (last.type !== "user") return;
-    messagesRef.current?.scrollTo({ top: messagesRef.current.scrollHeight });
+    messagesRef.current?.scrollTo({
+      top: messagesRef.current.scrollHeight,
+    });
   }, [chatHistory]);
 
   /* ---------- persist chat history ---------- */
@@ -92,7 +93,6 @@ export default function Chatbot() {
     return () => window.removeEventListener("beforeunload", clear);
   }, []);
 
-  /* ---------- UI ---------- */
   return (
     <>
       {/* messages */}
@@ -125,14 +125,6 @@ export default function Chatbot() {
       {/* error */}
       {error && <div className="text-red-500 text-sm mb-1">{error}</div>}
 
-      {/* usage counter for free users */}
-      {!isPremium && (
-        <p className="text-xs text-gray-500 mb-1">
-          Replies used&nbsp;
-          {chatHistory.filter((m) => m.type === "bot").length}/{FREE_LIMIT}
-        </p>
-      )}
-
       {/* input + send */}
       <div className="flex items-center">
         <input
@@ -146,13 +138,7 @@ export default function Chatbot() {
         <button
           onClick={sendMessage}
           className="h-10 bg-blue-600 text-white px-4 rounded-r disabled:opacity-50 flex-shrink-0"
-          disabled={
-            loading ||
-            !userInput.trim() ||
-            (!isPremium &&
-              chatHistory.filter((m) => m.type === "bot").length >=
-                FREE_LIMIT)
-          }
+          disabled={loading || !userInput.trim()}
         >
           {loading ? "…" : "Send"}
         </button>

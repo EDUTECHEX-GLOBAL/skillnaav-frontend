@@ -35,6 +35,10 @@ const userwebappSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "SchoolAdmin",
     },
+    careerChatUsage: {
+  type: Number,
+  default: 0
+},
   },
   { timestamps: true }
 );

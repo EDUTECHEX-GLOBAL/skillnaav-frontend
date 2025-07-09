@@ -3,7 +3,7 @@ name: Deploy to Server
 on:
   push:
     branches:
-      - feature/chatbot # Adjust the branch as necessary
+      - feature/uptodate # Adjust the branch as necessary
 
 jobs:
   deploy:
@@ -22,5 +22,5 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@www.skillnaav.com << 'EOF'
             cd /home/ubuntu/
-            ./deploy.sh feature/chatbot  # Pass the branch name directly
+            ./deploy.sh feature/uptodate  # Pass the branch name directly
           EOF

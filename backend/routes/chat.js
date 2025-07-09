@@ -1,53 +1,71 @@
-// backend/routes/chat.js
-const express      = require("express");
-const router       = express.Router();
-const askMistral   = require("../services/bedrockChat");
+const express = require("express");
+const router = express.Router();
+const jwt = require("jsonwebtoken"); // ⬅️ Needed to decode token
+const askMistral = require("../services/bedrockChat");
 const {
   listCompanies,
   listTypes,
   listModes,
 } = require("../services/ragHelpers");
 
-/* ---------- regex buckets ---------- */
-const GREET_RX =
-  /^(hi|hello|hey|howdy|good\s*(morning|afternoon|evening)|how\s*are\s*you)\b/i;
+const User = require("../models/webapp-models/userModel"); // ⬅️ Import User model
 
-const ALLOWED_RX =
-  /(skill\s*naav|internship|career|resume|cv|job|schedule|partner)/i;
+// Regex patterns
+const GREET_RX = /^(hi|hello|hey|howdy|good\s*(morning|afternoon|evening)|how\s*are\s*you)\b/i;
+const ALLOWED_RX = /(skill\s*naav|internship|career|resume|cv|job|schedule|partner)/i;
 
-/* ---------- POST  /api/career-chat ---------- */
+// POST /api/career-chat
 router.post("/career-chat", async (req, res) => {
   const { message = "" } = req.body;
+  const token = req.headers.authorization?.split(" ")[1];
 
-  /* 1️⃣  greetings – quick reply, no Bedrock call */
-  if (GREET_RX.test(message.trim())) {
+  // 1️⃣ Authenticate user via token
+  if (!token) return res.status(401).json({ error: "Unauthorized" });
+
+  let userId;
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET); // ⬅️ Use your JWT secret
+    userId = decoded.id;
+  } catch {
+    return res.status(401).json({ error: "Invalid token" });
+  }
+
+  const user = await User.findById(userId);
+  if (!user) return res.status(404).json({ error: "User not found" });
+
+  const isPremium = user.isPremium && new Date(user.premiumExpiration) > new Date();
+
+  // 2️⃣ Freemium limit check
+  if (!isPremium && (user.careerChatUsage ?? 0) >= 10) {
     return res.json({
-      reply:
-        "Hello! 👋 How can I help you?",
+      reply: `⚠️ You’ve used all 10 free replies. Upgrade to Premium for unlimited chat.`,
     });
   }
 
-  /* 2️⃣  reject clearly off-topic */
+  // 3️⃣ Greetings
+  if (GREET_RX.test(message.trim())) {
+    return res.json({
+      reply: "Hello! 👋 How can I help you?",
+    });
+  }
+
+  // 4️⃣ Off-topic
   if (!ALLOWED_RX.test(message)) {
     return res.json({
       reply: "I’m sorry, I can’t assist you with that.",
     });
   }
 
-  /* 3️⃣  Build dynamic context (companies / types / modes) */
+  // 5️⃣ Dynamic context (RAG)
   let ctx = "";
 
-  /* –– companies –– */
   if (/(which|what).*companies?.*internship|list.*companies/i.test(message)) {
     const companies = await listCompanies();
     if (companies.length) {
-      ctx += `\n\n**COMPANIES:**\n${companies
-        .map((c) => "• " + c)
-        .join("\n")}\n`;
+      ctx += `\n\n**COMPANIES:**\n${companies.map((c) => "• " + c).join("\n")}\n`;
     }
   }
 
-  /* –– types –– */
   if (/(which|what).*types?.*internship|paid|free|stipend/i.test(message)) {
     const types = await listTypes();
     if (types.length) {
@@ -55,7 +73,6 @@ router.post("/career-chat", async (req, res) => {
     }
   }
 
-  /* –– modes –– */
   if (/(online|offline|hybrid).*internship/i.test(message)) {
     const modes = await listModes();
     if (modes.length) {
@@ -65,15 +82,20 @@ router.post("/career-chat", async (req, res) => {
 
   const promptForAI = ctx ? `${ctx}\n\nUser: ${message}` : message;
 
-  /* 4️⃣  forward to Bedrock */
+  // 6️⃣ Forward to Bedrock
   try {
     const reply = await askMistral(promptForAI);
+
+    // 7️⃣ Update usage only for freemium users
+    if (!isPremium) {
+      user.careerChatUsage = (user.careerChatUsage ?? 0) + 1;
+      await user.save();
+    }
+
     return res.json({ reply });
   } catch (err) {
     console.error("Bedrock error:", err);
-    return res
-      .status(500)
-      .json({ error: "Something went wrong with the AI service." });
+    return res.status(500).json({ error: "Something went wrong with the AI service." });
   }
 });
 
