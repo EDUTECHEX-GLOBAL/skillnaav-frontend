@@ -18,6 +18,7 @@ from sentence_transformers import SentenceTransformer, util
 import numpy as np
 import boto3
 from typing import Optional
+from fastapi import Query
 
 # === Globals ===
 def now():
@@ -148,6 +149,8 @@ app.add_middleware(
 )
 
 # === API Endpoints ===
+# === API Endpoints ===
+
 @app.post("/partner/shortlist")
 async def shortlist_candidates(
     internship_id: str = Form(...),
@@ -175,8 +178,14 @@ async def shortlist_candidates(
 
     for cand in candidates:
         cand['internship_id'] = internship_obj_id
-        if cand.get('school_admin_id') and isinstance(cand['school_admin_id'], str):
-            cand['school_admin_id'] = ObjectId(cand['school_admin_id'])
+
+        if cand.get('school_admin_id'):
+            try:
+                cand['school_admin_id'] = ObjectId(cand['school_admin_id'])
+            except Exception:
+                cand['school_admin_id'] = None
+        else:
+            cand['school_admin_id'] = None  # explicitly mark B2C entries
 
     candidates = sorted(candidates, key=lambda x: x['similarity_score'], reverse=True)
 
@@ -184,6 +193,7 @@ async def shortlist_candidates(
         shortlist_collection.insert_many(candidates)
 
     return {"shortlisted_candidates": convert_object_ids(candidates)}
+
 
 @app.get("/partner/shortlisted/{internship_id}")
 async def get_shortlisted_candidates(
@@ -202,12 +212,15 @@ async def get_shortlisted_candidates(
             query["school_admin_id"] = ObjectId(schoolAdminId)
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Invalid schoolAdminId: {e}")
+    else:
+        query["school_admin_id"] = None  # fetch only B2C entries if not provided
 
     print(f"[{now()}] Executing query: {query}")
     docs = list(shortlist_collection.find(query))
     print(f"[{now()}] Found {len(docs)} documents matching criteria")
-    
+
     return {"shortlisted_candidates": convert_object_ids(docs)}
+
 
 @app.get("/partner/fetch-applications/{job_id}")
 async def fetch_applications(job_id: str):
