@@ -18,8 +18,7 @@ from urllib.parse import urlparse
 from pymongo import MongoClient
 from bson import ObjectId
 from sentence_transformers import SentenceTransformer, util
-from fastapi import Query, HTTPException
-from bson import ObjectId
+
 
 # === Utility ===
 def now():
@@ -205,27 +204,34 @@ async def get_shortlisted_by_admin(
     internship_id: str = Query(...),
     school_admin_id: str = Query(...)
 ):
+    from bson.errors import InvalidId
+
+    print(f"[{now()}] Received internship_id: {internship_id}")
+    print(f"[{now()}] Received school_admin_id: {school_admin_id}")
+
+    # Validate ObjectId
     try:
         internship_obj_id = ObjectId(internship_id)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid internship_id: {e}")
+    except InvalidId:
+        raise HTTPException(status_code=400, detail=f"Invalid internship_id: '{internship_id}' is not a valid ObjectId.")
 
     try:
         school_admin_obj_id = ObjectId(school_admin_id)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid school_admin_id: {e}")
+    except InvalidId:
+        raise HTTPException(status_code=400, detail=f"Invalid school_admin_id: '{school_admin_id}' is not a valid ObjectId.")
 
+    # Build and run query
     query = {
         "internship_id": internship_obj_id,
         "school_admin_id": school_admin_obj_id
     }
 
-    print(f"[{now()}] Executing /shortlisted/by-admin query: {query}")
+    print(f"[{now()}] Querying shortlisted candidates with: {query}")
     docs = list(shortlist_collection.find(query))
-    print(f"[{now()}] Found {len(docs)} docs")
+
+    print(f"[{now()}] Found {len(docs)} documents")
 
     return {"shortlisted_candidates": convert_object_ids(docs)}
-
 # ⬇️ THEN DEFINE THIS ONE
 @app.get("/partner/shortlisted/{internship_id}")
 async def get_shortlisted_candidates(
