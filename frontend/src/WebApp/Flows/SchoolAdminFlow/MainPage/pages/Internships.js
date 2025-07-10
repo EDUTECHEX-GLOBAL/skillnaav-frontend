@@ -37,38 +37,33 @@ const Internships = () => {
     fetchInternships();
   }, []);
 
-  const openModal = async (status, internshipId) => {
-    const token = localStorage.getItem('schoolAdminToken');
+ const openModal = async (status, internshipId) => {
+  const token = localStorage.getItem('schoolAdminToken');
+  const schoolAdminId = localStorage.getItem('schoolAdminId');
 
-    if (!token) {
-      alert('Session expired. Please log in again.');
-      return;
-    }
+  if (!token) {
+    alert('Session expired. Please log in again.');
+    return;
+  }
 
-    setIsOpen(true);
-    setModalStatus(status);
-    setSelectedInternshipId(internshipId);
-    setApplications([]);
-    setIsFetchingApplications(true);
+  setIsOpen(true);
+  setModalStatus(status);
+  setSelectedInternshipId(internshipId);
+  setApplications([]);
+  setIsFetchingApplications(true);
 
-    try {
-      let response;
+  try {
+    let response;
 
-      if (status === 'Shortlisted') {
-        if (!SCHOOL_ADMIN_ID) {
-          alert('Missing School Admin ID. Please login again.');
-          return;
-        }
-        console.log('→ internshipId:', internshipId);
-console.log('→ schoolAdminId:', SCHOOL_ADMIN_ID);
-
-
-        const url = `${SHORTLIST_API_BASE_URL}/partner/shortlisted/by-admin?internship_id=${internshipId}&school_admin_id=${SCHOOL_ADMIN_ID}`;
-        console.log('Shortlisted API URL:', url);
-
-        response = await axios.get(url, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+    if (status === 'Shortlisted') {
+      if (!schoolAdminId) {
+        alert('Missing School Admin ID. Please login again.');
+        return;
+      }
+      const url = `${SHORTLIST_API_BASE_URL}/partner/shortlisted/by-admin?internship_id=${internshipId}&school_admin_id=${schoolAdminId}`;
+      response = await axios.get(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
         const mappedShortlisted = response.data.shortlisted_candidates.map((c) => ({
           userName: c.name || 'N/A',
