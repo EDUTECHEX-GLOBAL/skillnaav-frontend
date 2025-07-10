@@ -230,3 +230,4 @@ async def fetch_applications(job_id: str):
     except Exception as e:
         print(f"[{now()}] Error fetching applications: {e}")
         return {"error": str(e)}
+# hdfhdh
