@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import {
-  FaMapMarkerAlt, FaCalendarAlt, FaDollarSign, FaLaptopHouse, FaHeart, 
+  FaMapMarkerAlt, FaCalendarAlt, FaDollarSign, FaLaptopHouse, FaHeart,
 } from 'react-icons/fa';
 import { BsClockHistory } from 'react-icons/bs';
 import {
@@ -55,11 +55,17 @@ const Internships = () => {
       let response;
 
       if (status === 'Shortlisted') {
-        const url = SCHOOL_ADMIN_ID
-  ? `${SHORTLIST_API_BASE_URL}/partner/shortlisted/${internshipId}?schoolAdminId=${SCHOOL_ADMIN_ID}`
-  : `${SHORTLIST_API_BASE_URL}/partner/shortlisted/${internshipId}`;
-console.log('Request URL:', url); 
-console.log('schoolAdminId:', SCHOOL_ADMIN_ID);
+        if (!SCHOOL_ADMIN_ID) {
+          alert('Missing School Admin ID. Please login again.');
+          return;
+        }
+        console.log('→ internshipId:', internshipId);
+console.log('→ schoolAdminId:', SCHOOL_ADMIN_ID);
+
+
+        const url = `${SHORTLIST_API_BASE_URL}/partner/shortlisted/by-admin?internship_id=${internshipId}&school_admin_id=${SCHOOL_ADMIN_ID}`;
+        console.log('Shortlisted API URL:', url);
+
         response = await axios.get(url, {
           headers: { Authorization: `Bearer ${token}` },
         });

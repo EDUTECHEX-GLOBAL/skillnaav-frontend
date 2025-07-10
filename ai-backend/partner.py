@@ -1,26 +1,27 @@
 from dotenv import load_dotenv
 load_dotenv()
 
-import asyncio
-from fastapi import FastAPI, Form, HTTPException, status, Query
-from fastapi.middleware.cors import CORSMiddleware
-from pymongo import MongoClient
-import fitz  # PyMuPDF
 import os
 import io
 import json
-import docx2txt
+import fitz
+import boto3
+import asyncio
 import tempfile
-from urllib.parse import urlparse
+import docx2txt
+
+from fastapi import FastAPI, Form, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
+from typing import Optional
 from datetime import datetime
+from urllib.parse import urlparse
+from pymongo import MongoClient
 from bson import ObjectId
 from sentence_transformers import SentenceTransformer, util
-import numpy as np
-import boto3
-from typing import Optional
-from fastapi import Query
+from fastapi import Query, HTTPException
+from bson import ObjectId
 
-# === Globals ===
+# === Utility ===
 def now():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -32,20 +33,26 @@ def convert_object_ids(obj):
     else:
         return obj
 
+def extract_school_admin_id(application):
+    for key in ["schoolAdmin", "school_admin_id", "schoolAdminId"]:
+        val = application.get(key)
+        if val:
+            return val
+    return None
+
+# === Setup ===
 print(f"[{now()}] Loading embedding model...")
 embedder = SentenceTransformer('all-MiniLM-L6-v2')
 
-# === MongoDB Setup ===
 db = MongoClient(os.getenv("MONGO_URI")).get_default_database()
 print(f"[{now()}] Connected to MongoDB: {db.name}")
 shortlist_collection = db["shortlisted_candidates"]
 applications_collection = db["applications"]
 
-# Create indexes
 shortlist_collection.create_index([("internship_id", 1), ("school_admin_id", 1)])
 print(f"[{now()}] Created MongoDB indexes")
 
-# === Resume Processing Functions ===
+# === Resume Utilities ===
 def download_resume_from_s3(resume_url: str):
     print(f"[{now()}] Downloading resume from: {resume_url}")
     try:
@@ -63,19 +70,20 @@ def download_resume_from_s3(resume_url: str):
         buf.seek(0)
         return buf
     except Exception as e:
-        print(f"[{now()}] S3 Download Error for {resume_url}: {e}")
+        print(f"[{now()}] S3 Download Error: {e}")
         return None
 
 def extract_text_from_pdf(pdf_file):
-    text = ""
     try:
         pdf_file.seek(0)
+        text = ""
         with fitz.open(stream=pdf_file.read(), filetype="pdf") as doc:
             for page in doc:
                 text += page.get_text("text")
+        return text
     except Exception as e:
         print(f"[{now()}] PDF Extract Error: {e}")
-    return text
+        return ""
 
 def extract_text_from_docx(docx_file):
     try:
@@ -90,21 +98,21 @@ def extract_text_from_docx(docx_file):
         print(f"[{now()}] DOCX Extract Error: {e}")
         return ""
 
+# === Core Resume Processing ===
 async def process_resume(resume_url, job_embedding):
     application = await asyncio.get_event_loop().run_in_executor(
         None, lambda: applications_collection.find_one({"resumeUrl": resume_url})
     )
 
-    name = application.get("userName") or application.get("name") or "N/A" if application else "N/A"
-    email = application.get("userEmail") or application.get("email") or "N/A" if application else "N/A"
-    applied_date = (application.get("appliedDate") or application.get("applied_date")
-                    or application.get("appliedOn") or "N/A") if application else "N/A"
-    student_id = (application.get("studentId") or application.get("student_id")
-                  or application.get("studentID") or "N/A") if application else "N/A"
-    school_admin_id = application.get("schoolAdmin") if application else None
-
     if not application:
         print(f"[{now()}] No application found for resume: {resume_url}")
+        return None
+
+    name = application.get("userName") or application.get("name")
+    email = application.get("userEmail") or application.get("email")
+    applied_date = application.get("appliedDate") or application.get("applied_date") or application.get("appliedOn")
+    student_id = application.get("studentId") or application.get("student_id") or application.get("studentID")
+    school_admin_id = extract_school_admin_id(application)
 
     if not school_admin_id:
         print(f"[{now()}] B2C candidate (no schoolAdmin): {resume_url}")
@@ -114,7 +122,7 @@ async def process_resume(resume_url, job_embedding):
         return None
 
     ext = os.path.splitext(urlparse(resume_url).path)[-1].lower()
-    print(f"[{now()}] Extracting resume for {resume_url} as {ext}")
+    print(f"[{now()}] Extracting resume as {ext}")
     if ext == ".pdf":
         text = await asyncio.get_event_loop().run_in_executor(None, extract_text_from_pdf, file_stream)
     elif ext == ".docx":
@@ -149,7 +157,6 @@ app.add_middleware(
 )
 
 # === API Endpoints ===
-# === API Endpoints ===
 
 @app.post("/partner/shortlist")
 async def shortlist_candidates(
@@ -168,24 +175,22 @@ async def shortlist_candidates(
     except Exception:
         job_skills_list = []
 
+    if not resumes:
+        raise HTTPException(status_code=400, detail="No resumes provided.")
+
     job_text = job_description + " " + " ".join(job_skills_list)
     job_embedding = embedder.encode(job_text, convert_to_tensor=True)
 
     tasks = [process_resume(url, job_embedding) for url in resumes]
     results = await asyncio.gather(*tasks)
-
     candidates = [c for c in results if c and c['similarity_score'] >= 0.3]
 
     for cand in candidates:
         cand['internship_id'] = internship_obj_id
-
-        if cand.get('school_admin_id'):
-            try:
-                cand['school_admin_id'] = ObjectId(cand['school_admin_id'])
-            except Exception:
-                cand['school_admin_id'] = None
-        else:
-            cand['school_admin_id'] = None  # explicitly mark B2C entries
+        try:
+            cand['school_admin_id'] = ObjectId(cand['school_admin_id']) if cand.get('school_admin_id') else None
+        except Exception:
+            cand['school_admin_id'] = None
 
     candidates = sorted(candidates, key=lambda x: x['similarity_score'], reverse=True)
 
@@ -194,7 +199,34 @@ async def shortlist_candidates(
 
     return {"shortlisted_candidates": convert_object_ids(candidates)}
 
+# 🔄 MOVE THIS ONE FIRST
+@app.get("/partner/shortlisted/by-admin")
+async def get_shortlisted_by_admin(
+    internship_id: str = Query(...),
+    school_admin_id: str = Query(...)
+):
+    try:
+        internship_obj_id = ObjectId(internship_id)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid internship_id: {e}")
 
+    try:
+        school_admin_obj_id = ObjectId(school_admin_id)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid school_admin_id: {e}")
+
+    query = {
+        "internship_id": internship_obj_id,
+        "school_admin_id": school_admin_obj_id
+    }
+
+    print(f"[{now()}] Executing /shortlisted/by-admin query: {query}")
+    docs = list(shortlist_collection.find(query))
+    print(f"[{now()}] Found {len(docs)} docs")
+
+    return {"shortlisted_candidates": convert_object_ids(docs)}
+
+# ⬇️ THEN DEFINE THIS ONE
 @app.get("/partner/shortlisted/{internship_id}")
 async def get_shortlisted_candidates(
     internship_id: str,
@@ -213,21 +245,19 @@ async def get_shortlisted_candidates(
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Invalid schoolAdminId: {e}")
     else:
-        query["school_admin_id"] = None  # fetch only B2C entries if not provided
+        query["school_admin_id"] = None
 
     print(f"[{now()}] Executing query: {query}")
     docs = list(shortlist_collection.find(query))
-    print(f"[{now()}] Found {len(docs)} documents matching criteria")
+    print(f"[{now()}] Found {len(docs)} documents")
 
     return {"shortlisted_candidates": convert_object_ids(docs)}
-
 
 @app.get("/partner/fetch-applications/{job_id}")
 async def fetch_applications(job_id: str):
     try:
-        apps = list(db["applications"].find({"job_id": job_id}, {"_id": 0}))
+        apps = list(applications_collection.find({"job_id": job_id}, {"_id": 0}))
         return {"applications": convert_object_ids(apps)}
     except Exception as e:
         print(f"[{now()}] Error fetching applications: {e}")
         return {"error": str(e)}
-# hdfhdh
