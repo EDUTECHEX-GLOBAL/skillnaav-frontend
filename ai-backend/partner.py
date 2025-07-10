@@ -10,15 +10,15 @@ import asyncio
 import tempfile
 import docx2txt
 
-from fastapi import FastAPI, Form, HTTPException, Query
+from fastapi import FastAPI, Form, HTTPException, Query, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
 from datetime import datetime
 from urllib.parse import urlparse
 from pymongo import MongoClient
 from bson import ObjectId
+from bson.errors import InvalidId
 from sentence_transformers import SentenceTransformer, util
-
 
 # === Utility ===
 def now():
@@ -145,8 +145,9 @@ async def process_resume(resume_url, job_embedding):
         "school_admin_id": school_admin_id
     }
 
-# === FastAPI Setup ===
+# === FastAPI App Init ===
 app = FastAPI()
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000", "https://www.skillnaav.com", "https://skillnaav.com"],
@@ -155,7 +156,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# === API Endpoints ===
+# === Optional Middleware for Global Logging ===
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    print(f"\n[{now()}] 🔄 Incoming request: {request.method} {request.url}")
+    response = await call_next(request)
+    print(f"[{now()}] 🔚 Response status: {response.status_code}")
+    return response
+
+# === Routes ===
 
 @app.post("/partner/shortlist")
 async def shortlist_candidates(
@@ -198,72 +207,82 @@ async def shortlist_candidates(
 
     return {"shortlisted_candidates": convert_object_ids(candidates)}
 
-# 🔄 MOVE THIS ONE FIRST
+# ✅ FIRST: Static route (correct order)
 @app.get("/partner/shortlisted/by-admin")
 async def get_shortlisted_by_admin(
     internship_id: str = Query(...),
     school_admin_id: str = Query(...)
 ):
-    from bson.errors import InvalidId
+    print(f"\n[{now()}] === /partner/shortlisted/by-admin Called ===")
+    print(f"[{now()}] Raw Query Params → internship_id: '{internship_id}', school_admin_id: '{school_admin_id}'")
 
-    print(f"[{now()}] Received internship_id: {internship_id}")
-    print(f"[{now()}] Received school_admin_id: {school_admin_id}")
+    print(f"[{now()}] Lengths → internship_id: {len(internship_id)}, school_admin_id: {len(school_admin_id)}")
+    print(f"[{now()}] Hex Check → internship_id: {internship_id.isalnum()}, school_admin_id: {school_admin_id.isalnum()}")
 
-    # Validate ObjectId
     try:
         internship_obj_id = ObjectId(internship_id)
     except InvalidId:
-        raise HTTPException(status_code=400, detail=f"Invalid internship_id: '{internship_id}' is not a valid ObjectId.")
+        print(f"[{now()}] ❌ Invalid internship_id: {internship_id}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid internship_id: '{internship_id}' is not a valid ObjectId."
+        )
 
     try:
         school_admin_obj_id = ObjectId(school_admin_id)
     except InvalidId:
-        raise HTTPException(status_code=400, detail=f"Invalid school_admin_id: '{school_admin_id}' is not a valid ObjectId.")
+        print(f"[{now()}] ❌ Invalid school_admin_id: {school_admin_id}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid school_admin_id: '{school_admin_id}' is not a valid ObjectId."
+        )
 
-    # Build and run query
     query = {
         "internship_id": internship_obj_id,
         "school_admin_id": school_admin_obj_id
     }
 
-    print(f"[{now()}] Querying shortlisted candidates with: {query}")
-    docs = list(shortlist_collection.find(query))
+    print(f"[{now()}] ✅ Final MongoDB Query: {query}")
+    try:
+        docs = list(shortlist_collection.find(query))
+        print(f"[{now()}] ✅ Found {len(docs)} shortlisted candidates.")
+        return {"shortlisted_candidates": convert_object_ids(docs)}
+    except Exception as e:
+        print(f"[{now()}] ❌ MongoDB query failed: {e}")
+        raise HTTPException(status_code=500, detail="Database error occurred.")
 
-    print(f"[{now()}] Found {len(docs)} documents")
-
-    return {"shortlisted_candidates": convert_object_ids(docs)}
-# ⬇️ THEN DEFINE THIS ONE
+# ✅ THEN: Dynamic route (must come after)
 @app.get("/partner/shortlisted/{internship_id}")
-async def get_shortlisted_candidates(
-    internship_id: str,
-    schoolAdminId: Optional[str] = Query(None)
-):
+async def get_shortlisted_candidates(internship_id: str):
+    print(f"\n[{now()}] === /partner/shortlisted/{internship_id} Called ===")
+
     try:
         internship_obj_id = ObjectId(internship_id)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid internship ID: {e}")
+        print(f"[{now()}] ❌ Invalid dynamic internship_id: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid internship_id '{internship_id}': {e}"
+        )
 
-    query = {"internship_id": internship_obj_id}
-
-    if schoolAdminId:
-        try:
-            query["school_admin_id"] = ObjectId(schoolAdminId)
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Invalid schoolAdminId: {e}")
-    else:
-        query["school_admin_id"] = None
-
-    print(f"[{now()}] Executing query: {query}")
-    docs = list(shortlist_collection.find(query))
-    print(f"[{now()}] Found {len(docs)} documents")
-
-    return {"shortlisted_candidates": convert_object_ids(docs)}
+    try:
+        docs = list(shortlist_collection.find({"internship_id": internship_obj_id}))
+        print(f"[{now()}] ✅ Found {len(docs)} documents")
+        return {"shortlisted_candidates": convert_object_ids(docs)}
+    except Exception as e:
+        print(f"[{now()}] ❌ Error retrieving shortlisted: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
 
 @app.get("/partner/fetch-applications/{job_id}")
 async def fetch_applications(job_id: str):
+    print(f"[{now()}] Fetching applications for job_id: {job_id}")
     try:
         apps = list(applications_collection.find({"job_id": job_id}, {"_id": 0}))
+        print(f"[{now()}] ✅ Found {len(apps)} applications")
         return {"applications": convert_object_ids(apps)}
     except Exception as e:
-        print(f"[{now()}] Error fetching applications: {e}")
+        print(f"[{now()}] ❌ Error fetching applications: {e}")
         return {"error": str(e)}

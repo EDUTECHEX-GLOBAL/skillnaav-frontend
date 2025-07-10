@@ -8,7 +8,6 @@ import {
   AiOutlineStar, AiOutlineLike, AiOutlineDislike,
 } from 'react-icons/ai';
 
-const SCHOOL_ADMIN_ID = localStorage.getItem('schoolAdminId');
 const SHORTLIST_API_BASE_URL = process.env.REACT_APP_SHORTLIST_API_BASE_URL;
 
 const Internships = () => {
@@ -23,11 +22,13 @@ const Internships = () => {
 
   useEffect(() => {
     const fetchInternships = async () => {
+      console.log('📦 Fetching approved internships...');
       try {
         const response = await axios.get('/api/interns/approved');
+        console.log('✅ Internships fetched:', response.data);
         setInternships(response.data);
       } catch (err) {
-        console.error('Failed to fetch internships:', err);
+        console.error('❌ Failed to fetch internships:', err);
         setError('Failed to load internships.');
       } finally {
         setLoading(false);
@@ -37,33 +38,43 @@ const Internships = () => {
     fetchInternships();
   }, []);
 
- const openModal = async (status, internshipId) => {
-  const token = localStorage.getItem('schoolAdminToken');
-  const schoolAdminId = localStorage.getItem('schoolAdminId');
+  const openModal = async (status, internshipId) => {
+    const token = localStorage.getItem('schoolAdminToken');
+    const schoolAdminId = localStorage.getItem('schoolAdminId');
 
-  if (!token) {
-    alert('Session expired. Please log in again.');
-    return;
-  }
+    console.log(`📍 Opening modal for status: ${status}, internshipId: ${internshipId}`);
+    console.log(`🧾 schoolAdminId from localStorage: ${schoolAdminId}`);
+    console.log(`🔐 Token present: ${!!token}`);
 
-  setIsOpen(true);
-  setModalStatus(status);
-  setSelectedInternshipId(internshipId);
-  setApplications([]);
-  setIsFetchingApplications(true);
+    if (!token) {
+      alert('Session expired. Please log in again.');
+      return;
+    }
 
-  try {
-    let response;
+    if (!internshipId || !schoolAdminId) {
+      console.error('❌ Missing internshipId or schoolAdminId');
+      alert('Missing required data. Please login again.');
+      return;
+    }
 
-    if (status === 'Shortlisted') {
-      if (!schoolAdminId) {
-        alert('Missing School Admin ID. Please login again.');
-        return;
-      }
-      const url = `${SHORTLIST_API_BASE_URL}/partner/shortlisted/by-admin?internship_id=${internshipId}&school_admin_id=${schoolAdminId}`;
-      response = await axios.get(url, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+    setIsOpen(true);
+    setModalStatus(status);
+    setSelectedInternshipId(internshipId);
+    setApplications([]);
+    setIsFetchingApplications(true);
+
+    try {
+      let response;
+
+      if (status === 'Shortlisted') {
+        const url = `${SHORTLIST_API_BASE_URL}/partner/shortlisted/by-admin?internship_id=${internshipId}&school_admin_id=${schoolAdminId}`;
+        console.log(`🚀 Fetching Shortlisted Candidates from: ${url}`);
+
+        response = await axios.get(url, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        console.log('✅ Shortlisted API response:', response.data);
 
         const mappedShortlisted = response.data.shortlisted_candidates.map((c) => ({
           userName: c.name || 'N/A',
@@ -75,10 +86,14 @@ const Internships = () => {
 
         setApplications(mappedShortlisted);
       } else if (status === 'Accepted' || status === 'Rejected') {
-        const offerUrl = `/api/offer-letters/internship/${internshipId}?schoolAdminId=${SCHOOL_ADMIN_ID}`;
+        const offerUrl = `/api/offer-letters/internship/${internshipId}?schoolAdminId=${schoolAdminId}`;
+        console.log(`🚀 Fetching Offer Letters from: ${offerUrl}`);
+
         response = await axios.get(offerUrl, {
           headers: { Authorization: `Bearer ${token}` },
         });
+
+        console.log('✅ Offer Letter API response:', response.data);
 
         const filtered = response.data.offers.filter((offer) => offer.status === status);
         const mapped = filtered.map((offer) => ({
@@ -92,16 +107,27 @@ const Internships = () => {
         setApplications(mapped);
       } else {
         // Default: Applied
-        response = await axios.get(
-          `/api/applications/internship/${internshipId}?schoolAdmin=${SCHOOL_ADMIN_ID}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        const appliedUrl = `/api/applications/internship/${internshipId}?schoolAdmin=${schoolAdminId}`;
+        console.log(`🚀 Fetching Applied Students from: ${appliedUrl}`);
+
+        response = await axios.get(appliedUrl, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        console.log('✅ Applied API response:', response.data);
 
         const filtered = response.data.applications.filter(app => app.status === status);
         setApplications(filtered);
       }
     } catch (err) {
-      console.error('Error fetching applications:', err);
+      console.error('❌ Error fetching applications:', err);
+      if (err.response) {
+        console.error('📡 Response error:', err.response.status, err.response.data);
+      } else if (err.request) {
+        console.error('📞 No response received from server:', err.request);
+      } else {
+        console.error('🧠 Error setting up request:', err.message);
+      }
       setApplications([]);
     } finally {
       setIsFetchingApplications(false);
