@@ -19,6 +19,7 @@ from pymongo import MongoClient
 from bson import ObjectId
 from bson.errors import InvalidId
 from sentence_transformers import SentenceTransformer, util
+from fastapi import Path
 
 # === Utility ===
 def now():
@@ -253,8 +254,9 @@ async def get_shortlisted_by_admin(
 
 # ✅ THEN: Dynamic route (must come after)
 @app.get("/partner/shortlisted/{internship_id}")
-async def get_shortlisted_candidates(internship_id: str):
-    print(f"\n[{now()}] === /partner/shortlisted/{internship_id} Called ===")
+async def get_shortlisted_candidates(
+    internship_id: str = Path(..., regex="^[a-fA-F0-9]{24}$")
+):
 
     try:
         internship_obj_id = ObjectId(internship_id)

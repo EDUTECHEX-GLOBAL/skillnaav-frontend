@@ -55,7 +55,7 @@ const UserLogin = () => {
   };
   
 
- const handleSubmit = async (values, { setSubmitting }) => {
+const handleSubmit = async (values, { setSubmitting }) => {
   setError("");
   setLoading(true);
   try {
@@ -71,19 +71,31 @@ const UserLogin = () => {
       throw new Error("Invalid response from server");
     }
 
+    // 🧹 Clear any existing localStorage
     localStorage.clear();
+
+    // 💾 Store auth data
     localStorage.setItem("userToken", JSON.stringify(data.token));
     localStorage.setItem("userInfo", JSON.stringify(data));
 
-    // 🔁 Start login session & store sessionId
-    const sessionRes = await axios.post("/api/sessions/login", {}, {
-      headers: {
-        Authorization: `Bearer ${data.token}`,
-      },
-    });
+    // ✅ Store schoolAdminId if present
+    if (data.schoolAdminId) {
+      localStorage.setItem("schoolAdminId", data.schoolAdminId);
+    }
+
+    // 🛠 Start login session
+    const sessionRes = await axios.post(
+      "/api/sessions/login",
+      {},
+      {
+        headers: {
+          Authorization: `Bearer ${data.token}`,
+        },
+      }
+    );
 
     if (sessionRes?.data?.sessionId) {
-      localStorage.setItem("sessionId", sessionRes.data.sessionId); // ✅ Store sessionId
+      localStorage.setItem("sessionId", sessionRes.data.sessionId);
     }
 
     setLoading(false);
@@ -95,6 +107,7 @@ const UserLogin = () => {
     setSubmitting(false);
   }
 };
+
 
 
   

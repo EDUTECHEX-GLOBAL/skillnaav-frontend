@@ -18,11 +18,16 @@ const ApplyCards = ({ job, onBack }) => {
   const [showResumePopup, setShowResumePopup] = useState(false);
   const [showSkillAnalysis, setShowSkillAnalysis] = useState(false); // State to control the SkillAnalysis popup
   const navigate = useNavigate();
+  const [schoolAdminId, setSchoolAdminId] = useState(null);
+
 
   useEffect(() => {
     const fetchApplicationData = async () => {
       const userInfo = JSON.parse(localStorage.getItem("userInfo"));
       const studentId = userInfo?._id;
+     const schoolAdminIdFromStorage = userInfo?.schoolAdminId || null;
+setSchoolAdminId(schoolAdminIdFromStorage);
+
       if (!studentId) return;
 
       try {
@@ -104,6 +109,9 @@ const ApplyCards = ({ job, onBack }) => {
     formData.append("studentId", studentId);
     formData.append("internshipId", job._id);
     formData.append("resume", resume);
+    if (schoolAdminId) {
+  formData.append("schoolAdminId", schoolAdminId);
+}
 
     console.log("Submitting application with formData:", {
       studentId,
