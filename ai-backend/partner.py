@@ -112,7 +112,8 @@ async def process_resume(resume_url, job_embedding):
     email = application.get("userEmail") or application.get("email")
     applied_date = application.get("appliedDate") or application.get("applied_date") or application.get("appliedOn")
     student_id = application.get("studentId") or application.get("student_id") or application.get("studentID")
-    school_admin_id = extract_school_admin_id(application)
+    school_admin_id = application.get("schoolAdmin") 
+    # extract_school_admin_id(application)
 
     if not school_admin_id:
         print(f"[{now()}] B2C candidate (no schoolAdmin): {resume_url}")
