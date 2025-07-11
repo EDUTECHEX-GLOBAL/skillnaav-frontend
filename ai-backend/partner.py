@@ -112,7 +112,7 @@ async def process_resume(resume_url, job_embedding):
     email = application.get("userEmail") or application.get("email")
     applied_date = application.get("appliedDate") or application.get("applied_date") or application.get("appliedOn")
     student_id = application.get("studentId") or application.get("student_id") or application.get("studentID")
-    school_admin_id = application.get("schoolAdmin") 
+    school_admin_id = application.get("schoolAdmin") or None
     # extract_school_admin_id(application)
 
     if not school_admin_id:
@@ -197,10 +197,9 @@ async def shortlist_candidates(
 
     for cand in candidates:
         cand['internship_id'] = internship_obj_id
-        try:
-            cand['school_admin_id'] = ObjectId(cand['school_admin_id']) if cand.get('school_admin_id') else None
-        except Exception:
-            cand['school_admin_id'] = None
+        if(cand["school_admin_id"] and ObjectId.is_valid(cand['school_admin_id'])):
+            cand['school_admin_id'] = ObjectId(cand['school_admin_id'])
+        
 
     candidates = sorted(candidates, key=lambda x: x['similarity_score'], reverse=True)
 
@@ -212,6 +211,7 @@ async def shortlist_candidates(
 # ✅ FIRST: Static route (correct order)
 @app.get("/partner/shortlisted/by-admin")
 async def get_shortlisted_by_admin(
+    *,
     internship_id: str = Query(...),
     school_admin_id: str = Query(...)
 ):
@@ -221,23 +221,21 @@ async def get_shortlisted_by_admin(
     print(f"[{now()}] Lengths → internship_id: {len(internship_id)}, school_admin_id: {len(school_admin_id)}")
     print(f"[{now()}] Hex Check → internship_id: {internship_id.isalnum()}, school_admin_id: {school_admin_id.isalnum()}")
 
-    try:
-        internship_obj_id = ObjectId(internship_id)
-    except InvalidId:
+    if not internship_id or not ObjectId.is_valid(internship_id):
         print(f"[{now()}] ❌ Invalid internship_id: {internship_id}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid internship_id: '{internship_id}' is not a valid ObjectId."
         )
-
-    try:
-        school_admin_obj_id = ObjectId(school_admin_id)
-    except InvalidId:
+    internship_obj_id = ObjectId(internship_id)
+    
+    if not school_admin_id or not ObjectId.is_valid(school_admin_id):
         print(f"[{now()}] ❌ Invalid school_admin_id: {school_admin_id}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid school_admin_id: '{school_admin_id}' is not a valid ObjectId."
         )
+    school_admin_obj_id = ObjectId(school_admin_id)
 
     query = {
         "internship_id": internship_obj_id,
