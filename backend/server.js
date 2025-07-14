@@ -23,7 +23,9 @@ connectDB(); // Establish MongoDB connection
 
 // ✅ Load your chatbot route after middleware is ready
 const chatRoute = require('./routes/chat');
+const chatbotRoute = require('./routes/chatbot');
 app.use('/api', chatRoute);
+app.use('/api/chatbot', chatbotRoute);
 
 app.use(
   cors({

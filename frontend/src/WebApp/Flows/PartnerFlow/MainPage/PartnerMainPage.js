@@ -27,6 +27,7 @@ import BodyContent from "./BodyContent"; // Main content component
 import { TabProvider } from "./UserHomePageContext/HomePageContext";
 import axios from "axios"; // Import axios
 import PartnerDashboard from "./PartnerDashboard"; // Import the PartnerDashboard component
+import Chatbot2 from "../../../../components/Chatbot2";
 
 const PartnerMainPage = () => {
   const [partnerInfo, setPartnerInfo] = useState(null);
@@ -97,6 +98,8 @@ const PartnerMainPage = () => {
               </div>
             </div>
           )}
+          {/* ✅ ADD IT HERE */}
+          <Chatbot2 />
         </div>
       )}
     </div>
