@@ -67,12 +67,17 @@ const Internships = () => {
       let response;
 
       if (status === 'Shortlisted') {
-        const url = `${SHORTLIST_API_BASE_URL}/partner/shortlisted/by-admin?internship_id=${internshipId}&school_admin_id=${schoolAdminId}`;
-        console.log(`🚀 Fetching Shortlisted Students from: ${url}`)  ;
+  if (!internshipId || !schoolAdminId) {
+    console.error('❌ Missing required IDs:', { internshipId, schoolAdminId });
+    return;
+  }
 
-        response = await axios.get(url, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+  const url = `${SHORTLIST_API_BASE_URL}/partner/shortlisted/by-admin?internship_id=${internshipId}&school_admin_id=${schoolAdminId}`;
+  console.log(`🚀 Fetching Shortlisted Students from: ${url}`);
+
+  response = await axios.get(url, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
 
         console.log('✅ Shortlisted API response:', response.data);
 
