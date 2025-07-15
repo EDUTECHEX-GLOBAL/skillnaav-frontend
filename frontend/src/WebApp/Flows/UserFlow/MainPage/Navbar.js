@@ -80,66 +80,73 @@ const Navbar = ({ onToggleSidebar }) => {
   }, []);
 
   return (
-    <div className="bg-white font-poppins text-gray-800 p-4 border-b border-gray-300 sticky top-0 z-50 flex justify-between items-center w-full">
-      {/* === Left section: Logo + Hamburger === */}
-      {/* Left: Mobile hamburger + logo */}
-<div className="flex items-center space-x-4 md:hidden">
-  <FontAwesomeIcon icon={faBars} className="text-xl cursor-pointer" onClick={onToggleSidebar} />
-  <img src={logo} alt="Skillnaav Logo" className="h-10 object-contain" />
-</div>
+    <div className="bg-white font-poppins text-gray-800 pr-4 pl-0 py-4 border-b border-gray-300 sticky top-0 z-50 w-full">
+      <div className="flex justify-between items-center">
+        {/* === Left section: Hamburger + Logo === */}
+        <div className="flex items-center space-x-4">
+          <button onClick={onToggleSidebar} className="md:hidden text-gray-700 focus:outline-none">
+            <FontAwesomeIcon icon={faBars} className="text-2xl" />
+          </button>
 
-
-      {/* === Right section: Notification + Profile === */}
-      <div className="relative ml-auto flex items-center space-x-4">
-        {/* Notification */}
-        <div className="relative cursor-pointer" onClick={() => handleSelectTab("notifications")}>
-          <FontAwesomeIcon icon={faBell} className="w-5 h-5 text-gray-700" />
-          {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
-              {unreadCount}
-            </span>
-          )}
+          <img
+            src={logo}
+            alt="Skillnaav Logo"
+            className="h-14 object-contain"
+          />
         </div>
 
-        {/* Profile Image or Icon */}
-        {userInfo.profileImage ? (
-          <img
-            src={userInfo.profileImage}
-            alt="User Profile"
-            className="w-8 h-8 rounded-full object-cover cursor-pointer"
-            onClick={handleUserClick}
-          />
-        ) : (
-          <FontAwesomeIcon
-            icon={faUser}
-            className="w-8 h-8 text-gray-800 cursor-pointer"
-            onClick={handleUserClick}
-          />
-        )}
-
-        {/* User Name */}
-        {userInfo.name && (
-          <span className="text-gray-800 text-sm font-medium hidden sm:block">{userInfo.name}</span>
-        )}
-
-        {/* Dropdown */}
-        {isDropdownOpen && (
-          <div
-            ref={dropdownRef}
-            className="absolute right-0 mt-12 w-48 bg-white shadow-lg rounded-md py-2 border border-gray-300"
-          >
-            {userInfo.email && (
-              <div className="px-4 py-2 text-sm text-gray-800">{userInfo.email}</div>
+        {/* === Right section: Notification + Profile === */}
+        <div className="relative flex items-center space-x-4">
+          {/* Notification */}
+          <div className="relative cursor-pointer" onClick={() => handleSelectTab("notifications")}>
+            <FontAwesomeIcon icon={faBell} className="w-5 h-5 text-gray-700" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+                {unreadCount}
+              </span>
             )}
-            <button
-              onClick={handleLogout}
-              className="w-full flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-100"
-            >
-              <FontAwesomeIcon icon={faSignOutAlt} className="mr-2" />
-              Logout
-            </button>
           </div>
-        )}
+
+          {/* Profile Image or Icon */}
+          {userInfo.profileImage ? (
+            <img
+              src={userInfo.profileImage}
+              alt="User Profile"
+              className="w-8 h-8 rounded-full object-cover cursor-pointer"
+              onClick={handleUserClick}
+            />
+          ) : (
+            <FontAwesomeIcon
+              icon={faUser}
+              className="w-8 h-8 text-gray-800 cursor-pointer"
+              onClick={handleUserClick}
+            />
+          )}
+
+          {/* User Name */}
+          {userInfo.name && (
+            <span className="text-gray-800 text-sm font-medium hidden sm:block">{userInfo.name}</span>
+          )}
+
+          {/* Dropdown */}
+          {isDropdownOpen && (
+            <div
+              ref={dropdownRef}
+              className="absolute right-0 mt-12 w-48 bg-white shadow-lg rounded-md py-2 border border-gray-300"
+            >
+              {userInfo.email && (
+                <div className="px-4 py-2 text-sm text-gray-800">{userInfo.email}</div>
+              )}
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-100"
+              >
+                <FontAwesomeIcon icon={faSignOutAlt} className="mr-2" />
+                Logout
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

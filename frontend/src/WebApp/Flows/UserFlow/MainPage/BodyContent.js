@@ -7,7 +7,7 @@ import Home from "./Home";
 import Filter from "./Filter"; // Import the Filter component
 import SavedJobs from "./SavedJobs";
 import Applications from "./Applications";
-import Support from "./Support";
+import Support from "../MainPage/support/Support";
 import Profile from "./Profile"; // Import the Profile component
 import PremiumPage from "./PremiumPage"; // Import the PremiumPage component
 import Notifications from "./Notifications"; // Import the Notifications component

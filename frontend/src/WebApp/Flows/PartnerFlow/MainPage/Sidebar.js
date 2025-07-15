@@ -84,10 +84,10 @@ const Sidebar = ({ isOpen, onClose }) => {
       )}
 
       {/* Sidebar */}
-      <div
+<div
   className={`
     fixed md:relative z-50 md:z-auto
-    inset-y-0 left-0
+    top-0 left-0
     w-64 h-screen bg-white shadow-lg font-poppins
     transform transition-transform duration-300 ease-in-out
     ${isOpen ? "translate-x-0" : "-translate-x-full"}
@@ -95,9 +95,11 @@ const Sidebar = ({ isOpen, onClose }) => {
     overflow-y-auto
   `}
   style={{
-    display: isOpen ? "block" : undefined,
+    marginLeft: 0,
+    paddingLeft: 0,
   }}
 >
+
   
         {/* Logo */}
         {/* <div className="sticky top-0 z-10 bg-white py-4 flex items-center justify-center border-b border-gray-200">

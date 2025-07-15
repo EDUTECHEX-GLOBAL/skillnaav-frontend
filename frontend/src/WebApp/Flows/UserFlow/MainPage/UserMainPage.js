@@ -66,43 +66,47 @@ const UserMainPage = () => {
 
   return (
     <TabProvider>
-      <div className={`flex min-h-screen font-poppins bg-gray-50 ${isMobile ? "flex-col" : ""}`}>
-        {/* Sidebar */}
-        <Sidebar
-          isMobile={isMobile}
-          isOpen={isSidebarOpen}
-          onClose={handleCloseSidebar}
-        />
+     <div className="min-h-screen font-poppins bg-gray-50">
+  {/* Navbar at the top */}
+  <Navbar onToggleSidebar={handleToggleSidebar} />
 
-        {/* Main Content */}
-        <div className="flex-1 flex flex-col relative">
-          <Navbar onToggleSidebar={handleToggleSidebar} />
+  <div className="flex">
+    {/* Sidebar below navbar */}
+    <Sidebar
+      isMobile={isMobile}
+      isOpen={isSidebarOpen}
+      onClose={handleCloseSidebar}
+    />
 
-          {loading ? (
-            <div className="p-4">
-              <Skeleton active />
-            </div>
-          ) : (
-            <div className="relative flex-1 overflow-y-auto">
-              <BodyContent />
+    {/* Page Content */}
+    <div className="flex-1 flex flex-col relative">
+      {loading ? (
+        <div className="p-4">
+          <Skeleton active />
+        </div>
+      ) : (
+        <div className="relative flex-1 overflow-y-auto">
+          <BodyContent />
 
-              {!isApproved && (
-                <>
-                  <div className="absolute inset-0 bg-gray-500 opacity-50 z-10" />
-                  <div className="absolute inset-0 flex items-center justify-center z-20">
-                    <div className="bg-white p-4 rounded shadow-md text-center max-w-xs mx-auto">
-                      <h2 className="text-lg font-semibold">Account Not Approved</h2>
-                      <p className="text-sm">
-                        Your account is not approved by an admin yet. Some features may be restricted.
-                      </p>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
+          {!isApproved && (
+            <>
+              <div className="absolute inset-0 bg-gray-500 opacity-50 z-10" />
+              <div className="absolute inset-0 flex items-center justify-center z-20">
+                <div className="bg-white p-4 rounded shadow-md text-center max-w-xs mx-auto">
+                  <h2 className="text-lg font-semibold">Account Not Approved</h2>
+                  <p className="text-sm">
+                    Your account is not approved by an admin yet. Some features may be restricted.
+                  </p>
+                </div>
+              </div>
+            </>
           )}
         </div>
-      </div>
+      )}
+    </div>
+  </div>
+</div>
+
 
       {/* Premium Pricing Modal */}
       {showPricingModal && (

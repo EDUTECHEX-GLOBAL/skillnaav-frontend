@@ -57,19 +57,21 @@ const Sidebar = ({ isMobile, isOpen, onClose }) => {
       )}
 
       {/* Sidebar */}
-      <div
-        className={`fixed md:sticky top-0
-    h-screen w-64 bg-white shadow-lg font-poppins
+    <div
+  className={`fixed md:sticky top-16
+    h-[calc(100vh-4rem)] w-64 bg-white shadow-lg font-poppins
     z-[100] md:z-10
     transform transition-transform duration-300 ease-in-out
     ${isMobile ? (isOpen ? "translate-x-0" : "-translate-x-full") : "translate-x-0"}
   `}
-      >
+>
+
 
         {/* Fixed logo (only for desktop) */}
-        <div className="hidden md:flex items-center justify-center h-20 border-b border-gray-200 sticky top-0 z-20 bg-white">
-          <img src={logo} alt="Skillnaav Logo" className="h-12 object-contain" />
-        </div>
+       {/* <div className="hidden md:flex items-center justify-center h-24 border-b border-gray-200 sticky top-0 z-20 bg-white">
+  <img src={logo} alt="Skillnaav Logo" className="h-16 object-contain max-w-[200px]" />
+</div> */}
+
 
         {/* Scrollable content with hidden scrollbar */}
         <div className="h-[calc(100%-5rem)] overflow-y-auto px-4 pt-4 pb-6 hide-scrollbar">

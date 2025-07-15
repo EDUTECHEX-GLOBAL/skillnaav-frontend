@@ -43,7 +43,8 @@ const Navbar = ({ onToggleSidebar }) => {
   }, []);
 
   return (
-    <header className="bg-white font-poppins text-gray-800 p-4 border-b border-gray-300 sticky top-0 z-50 flex justify-between items-center">
+   <header className="bg-white font-poppins text-gray-800 py-5 px-4 border-b border-gray-300 sticky top-0 z-50 flex justify-between items-center">
+
       {/* Left Section: Logo + Hamburger */}
       <div className="flex items-center gap-3">
         {/* Hamburger (visible on mobile) */}
@@ -55,7 +56,7 @@ const Navbar = ({ onToggleSidebar }) => {
         </button>
 
         {/* Logo (always visible) */}
-        <img src={logo} alt="Skillnaav Logo" className="h-10 object-contain" />
+        <img src={logo} alt="Skillnaav Logo" className="h-14 object-contain" />
       </div>
 
       {/* Right Section: User dropdown */}
