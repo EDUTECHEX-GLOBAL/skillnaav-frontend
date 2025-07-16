@@ -146,35 +146,38 @@ const googleCallback = async (req, res) => {
     }
 
     res.send(`
-      <html>
-        <head>
-          <title>Authentication Success</title>
-          <style>
-            body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
-            .success { color: #28a745; }
-            .info { color: #17a2b8; margin-top: 20px; }
-          </style>
-        </head>
-        <body>
-          <h1 class="success">Google account linked successfully!</h1>
-          <p>Email: ${email}</p>
-          <div class="info">
-            <p>✅ Calendar access has been granted</p>
-            <p>🔗 <a href="https://calendar.google.com" target="_blank">View your Google Calendar</a></p>
-            <p>⚠️ Check your browser console for test event creation status</p>
-          </div>
-          <p>Redirecting...</p>
-          <script>
-  const userInfo = {
-    email: "${email}",
-    token: "${tokens.id_token || ''}", // or another server-generated JWT if you use your own
-    isPremium: false // Optional default if not fetched yet
-  };
+  <html>
+    <head>
+      <title>Authentication Success</title>
+      <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+        .success { color: #28a745; }
+        .info { color: #17a2b8; margin-top: 20px; }
+      </style>
+    </head>
+    <body>
+      <h1 class="success">Google account linked successfully!</h1>
+      <p>Email: ${email}</p>
+      <div class="info">
+        <p>✅ Calendar access has been granted</p>
+        <p>🔗 <a href="https://calendar.google.com" target="_blank">View your Google Calendar</a></p>
+        <p>⚠️ Check your browser console for test event creation status</p>
+      </div>
+      <p>Redirecting...</p>
+      <script>
+        // 🌐 Mark Google auth state
+        localStorage.setItem('redirectTab', 'offer-letter');
+        localStorage.setItem('googleAuthSuccess', 'true');
 
-  localStorage.setItem('userInfo', JSON.stringify(userInfo));
-  localStorage.setItem('redirectTab', 'offer-letter');
-  window.location.href = "/user-main-page";
-</script>
+        // 🔁 Restore userToken if it exists in sessionStorage
+        const token = sessionStorage.getItem('userToken');
+        if (token && !localStorage.getItem('userToken')) {
+          localStorage.setItem('userToken', token);
+        }
+
+        // 🚀 Redirect
+        window.location.href = "/user-main-page";
+      </script>
     </body>
   </html>
 `);
@@ -379,7 +382,7 @@ Generated on: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
       useDefault: false,
       overrides: [
         { method: 'email', minutes: 1440 }, // 1 day before
-        { method: 'popup', minutes: 60 },
+        { method: 'popup', minutes: 60 }, 
         { method: 'popup', minutes: 15 },
         { method: 'popup', minutes: 1 }
       ]
@@ -419,7 +422,7 @@ Generated on: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
       useDefault: false,
       overrides: [
         { method: 'email', minutes: 1440 }, // 1 day before
-        { method: 'popup', minutes: 60 },
+        { method: 'popup', minutes: 60 }, 
         { method: 'popup', minutes: 15 },
         { method: 'popup', minutes: 1 }
       ]

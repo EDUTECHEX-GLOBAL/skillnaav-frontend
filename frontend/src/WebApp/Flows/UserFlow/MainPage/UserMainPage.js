@@ -30,26 +30,40 @@ const UserMainPage = () => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  useEffect(() => {
-    const fetchUserInfo = async () => {
-      try {
-        const token = JSON.parse(localStorage.getItem("userToken"));
+ useEffect(() => {
+  const fetchUserInfo = async () => {
+    try {
+      // 🛡️ Load token from localStorage or recover from sessionStorage
+      let token = localStorage.getItem("userToken");
+      if (!token) {
+        token = sessionStorage.getItem("userToken");
         if (token) {
-          const response = await axios.get("/api/users/profile", {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          setUserInfo(response.data);
-          setIsApproved(response.data.adminApproved);
+          localStorage.setItem("userToken", token); // restore to localStorage
         }
-      } catch (error) {
-        console.error("Failed to fetch user info:", error);
-      } finally {
-        setLoading(false);
       }
-    };
 
-    fetchUserInfo();
-  }, []);
+      if (token) {
+        const parsedToken = JSON.parse(token);
+        const response = await axios.get("/api/users/profile", {
+          headers: { Authorization: `Bearer ${parsedToken}` },
+        });
+        setUserInfo(response.data);
+        setIsApproved(response.data.adminApproved);
+      } else {
+        console.warn("⚠️ No user token found in storage");
+        navigate("/user/login"); // redirect to login if token missing
+      }
+    } catch (error) {
+      console.error("Failed to fetch user info:", error);
+      navigate("/user/login"); // fallback if token is invalid
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchUserInfo();
+}, []);
+
 
   useEffect(() => {
     if (userInfo && !userInfo.isPremium) {

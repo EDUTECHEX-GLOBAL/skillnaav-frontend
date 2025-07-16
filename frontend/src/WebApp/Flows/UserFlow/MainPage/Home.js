@@ -66,31 +66,22 @@ const Home = () => {
     }
 
     const fetchUserProfile = async () => {
-  try {
-    const userInfo = JSON.parse(localStorage.getItem("userInfo"));
-    const token = userInfo?.token;
-    if (!token) return console.error("No token found in userInfo");
+      try {
+        const userInfo = JSON.parse(localStorage.getItem("userInfo"));
+        const token = userInfo?.token;
+        if (!token) return console.error("No token found in userInfo");
 
-    // 1. Get user profile with token
-    const { data } = await axios.get("/api/users/profile", {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-    setIsPremium(data.isPremium);
+        const { data } = await axios.get("/api/users/profile", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setIsPremium(data.isPremium);
 
-    // 2. Get application count — must also include token
-    const { data: countData } = await axios.get(`/api/applications/count/${userInfo._id}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-    setApplicationCount(countData.count);
-
-  } catch (error) {
-    console.error("Error fetching user profile or application count:", error);
-  }
-};
+        const { data: countData } = await axios.get(`/api/applications/count/${userInfo._id}`);
+        setApplicationCount(countData.count);
+      } catch (error) {
+        console.error("Error fetching user profile or application count:", error);
+      }
+    };
 
     fetchJobData();
     fetchUserProfile();

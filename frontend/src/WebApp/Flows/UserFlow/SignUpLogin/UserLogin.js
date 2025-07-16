@@ -41,6 +41,7 @@ const UserLogin = () => {
       // Store token and user info in localStorage
       localStorage.setItem("userToken", JSON.stringify(token));
       localStorage.setItem("userInfo", JSON.stringify(user));
+      sessionStorage.setItem("userToken", JSON.stringify(token));
   
       console.log("Google user:", user);
   
