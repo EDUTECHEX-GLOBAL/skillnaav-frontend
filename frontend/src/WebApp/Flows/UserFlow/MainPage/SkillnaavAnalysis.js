@@ -4,7 +4,7 @@ import { FaPaperclip, FaPaperPlane, FaSpinner, FaTimes } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";      // ✅ React-Router v6
 
 const SKILLGAP_API_BASE_URL =
-  process.env.REACT_APP_SKILLGAP_API_BASE_URL || "http://localhost:8000";
+  process.env.REACT_APP_SKILLGAP_API_BASE_URL || "/ai";
 
 const SkillAnalysis = ({ job, onClose }) => {
   /* ───────── state & refs ───────── */
