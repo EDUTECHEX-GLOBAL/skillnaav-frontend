@@ -165,16 +165,19 @@ const googleCallback = async (req, res) => {
           </div>
           <p>Redirecting...</p>
           <script>
-          localStorage.setItem('redirectTab', 'offer-letter');
-          localStorage.setItem('userInfo', JSON.stringify({
-          email: "${email}",
-          token: "skillnaav-temp-token-${email}" // ideally replace with real token from backend
-          }));
-          window.location.href = "https://www.skillnaav.com/user-main-page";
-          </script>
-          </body>
-          </html>
-          `);
+  const userInfo = {
+    email: "${email}",
+    token: "${tokens.id_token || ''}", // or another server-generated JWT if you use your own
+    isPremium: false // Optional default if not fetched yet
+  };
+
+  localStorage.setItem('userInfo', JSON.stringify(userInfo));
+  localStorage.setItem('redirectTab', 'offer-letter');
+  window.location.href = "/user-main-page";
+</script>
+    </body>
+  </html>
+`);
 
   } catch (err) {
     console.error("Google callback error:", {

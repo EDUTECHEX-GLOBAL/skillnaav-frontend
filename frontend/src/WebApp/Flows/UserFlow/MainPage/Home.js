@@ -30,38 +30,35 @@ const Home = () => {
 
   // Fetch job data and user profile only once on mount
   useEffect(() => {
-  const fetchJobData = async () => {
-    const userInfo = JSON.parse(localStorage.getItem("userInfo") || "{}");
+    const fetchJobData = async () => {
+      try {
+        // Parse userInfo safely
+        const userInfo = JSON.parse(localStorage.getItem("userInfo")) || {};
+        const isPremiumUser = userInfo.isPremium ? "true" : "false"; // Ensure correct boolean check
 
-    if (!userInfo?.token) {
-      console.warn("No token found in userInfo");
-      navigate("/login"); // ⬅️ Optional: redirect to login page
-      return;
-    }
+        console.log("Fetching approved internships with isPremium:", isPremiumUser); // Debugging log
 
-    try {
-      const isPremiumUser = userInfo.isPremium ? "true" : "false";
-      console.log("Fetching approved internships with isPremium:", isPremiumUser);
+        const response = await axios.get(`/api/interns/approved?isPremium=${isPremiumUser}`);
 
-      const response = await axios.get(`/api/interns/approved?isPremium=${isPremiumUser}`);
+        if (response.status !== 200) {
+          throw new Error(`Failed to fetch internships: ${response.statusText}`);
+        }
 
-      if (response.status !== 200) {
-        throw new Error(`Failed to fetch internships: ${response.statusText}`);
+        const data = response.data;
+
+        if (!Array.isArray(data)) {
+          console.error("Unexpected response format:", data);
+          return;
+        }
+
+        console.log("Received approved internships:", data.map(i => ({ title: i.jobTitle, type: i.internshipType })));
+
+        setJobData(data);
+      } catch (error) {
+        console.error("Error fetching job data:", error.message);
       }
+    };
 
-      const data = response.data;
-
-      if (!Array.isArray(data)) {
-        console.error("Unexpected response format:", data);
-        return;
-      }
-
-      console.log("Received approved internships:", data.map(i => ({ title: i.jobTitle, type: i.internshipType })));
-      setJobData(data);
-    } catch (error) {
-      console.error("Error fetching job data:", error.message);
-    }
-  };
 
     const savedPosition = sessionStorage.getItem("scrollPosition");
     if (savedPosition) {
@@ -69,22 +66,31 @@ const Home = () => {
     }
 
     const fetchUserProfile = async () => {
-      try {
-        const userInfo = JSON.parse(localStorage.getItem("userInfo"));
-        const token = userInfo?.token;
-        if (!token) return console.error("No token found in userInfo");
+  try {
+    const userInfo = JSON.parse(localStorage.getItem("userInfo"));
+    const token = userInfo?.token;
+    if (!token) return console.error("No token found in userInfo");
 
-        const { data } = await axios.get("/api/users/profile", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setIsPremium(data.isPremium);
+    // 1. Get user profile with token
+    const { data } = await axios.get("/api/users/profile", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    setIsPremium(data.isPremium);
 
-        const { data: countData } = await axios.get(`/api/applications/count/${userInfo._id}`);
-        setApplicationCount(countData.count);
-      } catch (error) {
-        console.error("Error fetching user profile or application count:", error);
-      }
-    };
+    // 2. Get application count — must also include token
+    const { data: countData } = await axios.get(`/api/applications/count/${userInfo._id}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    setApplicationCount(countData.count);
+
+  } catch (error) {
+    console.error("Error fetching user profile or application count:", error);
+  }
+};
 
     fetchJobData();
     fetchUserProfile();
