@@ -166,7 +166,7 @@ const googleCallback = async (req, res) => {
           <p>Redirecting...</p>
           <script>
         localStorage.setItem('redirectTab', 'offer-letter');
-        window.location.href = "/user-main-page";
+        window.location.href = "https://www.skillnaav.com/user-main-page";
       </script>
     </body>
   </html>
