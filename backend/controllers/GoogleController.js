@@ -165,12 +165,16 @@ const googleCallback = async (req, res) => {
           </div>
           <p>Redirecting...</p>
           <script>
-        localStorage.setItem('redirectTab', 'offer-letter');
-        window.location.href = "https://www.skillnaav.com/user-main-page";
-      </script>
-    </body>
-  </html>
-`);
+          localStorage.setItem('redirectTab', 'offer-letter');
+          localStorage.setItem('userInfo', JSON.stringify({
+          email: "${email}",
+          token: "skillnaav-temp-token-${email}" // ideally replace with real token from backend
+          }));
+          window.location.href = "https://www.skillnaav.com/user-main-page";
+          </script>
+          </body>
+          </html>
+          `);
 
   } catch (err) {
     console.error("Google callback error:", {
@@ -372,7 +376,7 @@ Generated on: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
       useDefault: false,
       overrides: [
         { method: 'email', minutes: 1440 }, // 1 day before
-        { method: 'popup', minutes: 60 }, 
+        { method: 'popup', minutes: 60 },
         { method: 'popup', minutes: 15 },
         { method: 'popup', minutes: 1 }
       ]
@@ -412,7 +416,7 @@ Generated on: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
       useDefault: false,
       overrides: [
         { method: 'email', minutes: 1440 }, // 1 day before
-        { method: 'popup', minutes: 60 }, 
+        { method: 'popup', minutes: 60 },
         { method: 'popup', minutes: 15 },
         { method: 'popup', minutes: 1 }
       ]

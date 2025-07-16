@@ -30,35 +30,38 @@ const Home = () => {
 
   // Fetch job data and user profile only once on mount
   useEffect(() => {
-    const fetchJobData = async () => {
-      try {
-        // Parse userInfo safely
-        const userInfo = JSON.parse(localStorage.getItem("userInfo")) || {};
-        const isPremiumUser = userInfo.isPremium ? "true" : "false"; // Ensure correct boolean check
+  const fetchJobData = async () => {
+    const userInfo = JSON.parse(localStorage.getItem("userInfo") || "{}");
 
-        console.log("Fetching approved internships with isPremium:", isPremiumUser); // Debugging log
+    if (!userInfo?.token) {
+      console.warn("No token found in userInfo");
+      navigate("/login"); // ⬅️ Optional: redirect to login page
+      return;
+    }
 
-        const response = await axios.get(`/api/interns/approved?isPremium=${isPremiumUser}`);
+    try {
+      const isPremiumUser = userInfo.isPremium ? "true" : "false";
+      console.log("Fetching approved internships with isPremium:", isPremiumUser);
 
-        if (response.status !== 200) {
-          throw new Error(`Failed to fetch internships: ${response.statusText}`);
-        }
+      const response = await axios.get(`/api/interns/approved?isPremium=${isPremiumUser}`);
 
-        const data = response.data;
-
-        if (!Array.isArray(data)) {
-          console.error("Unexpected response format:", data);
-          return;
-        }
-
-        console.log("Received approved internships:", data.map(i => ({ title: i.jobTitle, type: i.internshipType })));
-
-        setJobData(data);
-      } catch (error) {
-        console.error("Error fetching job data:", error.message);
+      if (response.status !== 200) {
+        throw new Error(`Failed to fetch internships: ${response.statusText}`);
       }
-    };
 
+      const data = response.data;
+
+      if (!Array.isArray(data)) {
+        console.error("Unexpected response format:", data);
+        return;
+      }
+
+      console.log("Received approved internships:", data.map(i => ({ title: i.jobTitle, type: i.internshipType })));
+      setJobData(data);
+    } catch (error) {
+      console.error("Error fetching job data:", error.message);
+    }
+  };
 
     const savedPosition = sessionStorage.getItem("scrollPosition");
     if (savedPosition) {
