@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import axios from "axios";
+import Papa from "papaparse";
 
 const UploadStudents = () => {
   const [selectedFile, setSelectedFile] = useState(null);
@@ -11,28 +12,54 @@ const UploadStudents = () => {
   };
 
 const handleUpload = async () => {
-  if (!selectedFile) return setUploadStatus("Select a file first");
+  if (!selectedFile) return setUploadStatus("❗ Select a CSV file first.");
 
-  const formData = new FormData();
-  formData.append("csvFile", selectedFile);          // 🔑 must be "csvFile"
-  console.log("🛠 FormData entries:", [...formData.entries()]);
+  Papa.parse(selectedFile, {
+    header: true,
+    skipEmptyLines: true,
+    complete: async (results) => {
+      const requiredHeaders = [
+        "Full Name",
+        "Email Address",
+        "School Name",
+        "Grade",
+        "Stream/Curriculum",
+        "Field of Internship"
+      ];
 
-  try {
-    const res = await axios.post(
-      "/api/school-admin/upload-students",
-      formData,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,    
-          // DO NOT set Content-Type: browser will set multipart/form-data boundary
-        },
+      const uploadedHeaders = Object.keys(results.data[0] || {});
+      const isValid = requiredHeaders.every(header => uploadedHeaders.includes(header));
+
+      if (!isValid) {
+        setUploadStatus("❌ CSV format invalid. Expected columns: Full Name, Email Address, School Name, Grade, Stream/Curriculum, Field of Internship.");
+        return;
       }
-    );
-    setUploadStatus(res.data.message);
-  } catch (err) {
-    console.error("Upload error:", err.response?.data || err.message);
-    setUploadStatus("Upload failed");
-  }
+
+      const formData = new FormData();
+      formData.append("csvFile", selectedFile);
+      console.log("🛠 FormData entries:", [...formData.entries()]);
+
+      try {
+        const res = await axios.post(
+          "/api/school-admin/upload-students",
+          formData,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+        setUploadStatus(`✅ ${res.data.message}`);
+      } catch (err) {
+        console.error("Upload error:", err.response?.data || err.message);
+        setUploadStatus("❌ Upload failed. Check console for details.");
+      }
+    },
+    error: (err) => {
+      console.error("CSV parse error:", err);
+      setUploadStatus("❌ Failed to read the file.");
+    }
+  });
 };
 
   return (

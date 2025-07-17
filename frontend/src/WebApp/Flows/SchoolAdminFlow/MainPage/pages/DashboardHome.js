@@ -67,14 +67,15 @@ export default function Dashboard() {
       header: true,
       skipEmptyLines: true,
       complete: async (results) => {
-       const requiredHeaders = [
-  "name",
-  "email",
-  "universityName",
-  "educationLevel",
-  "fieldOfStudy",
-  "desiredField"
+     const requiredHeaders = [
+  "Full Name",
+  "Email Address",
+  "School Name",
+  "Grade",
+  "Stream/Curriculum",
+  "Field of Internship"
 ];
+
 
 
         const uploadedHeaders = Object.keys(results.data[0] || {});
@@ -83,7 +84,7 @@ export default function Dashboard() {
         );
 
         if (!isValid) {
-          setUploadStatus("❌ CSV format invalid. Please use the provided template.");
+          setUploadStatus("❌ CSV format invalid. Expected columns: Full Name, Email Address, School Name, Grade, Stream/Curriculum, Field of Internship.");
           return;
         }
 
