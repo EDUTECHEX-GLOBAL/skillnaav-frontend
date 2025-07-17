@@ -28,7 +28,7 @@ export default function Chatbot() {
   const messagesRef = useRef(null);
 
   // Sync with latest backend user profile
- useEffect(() => {
+useEffect(() => {
   const fetchUsage = async () => {
     try {
       const res = await fetch("/api/users/profile", {
@@ -46,8 +46,9 @@ export default function Chatbot() {
 }, [token]);
 
 
+
   // Handle message sending
- const sendMessage = async () => {
+const sendMessage = async () => {
   if (!userInput.trim()) return;
 
   const userMsg = { type: "user", text: userInput.trim() };
@@ -70,29 +71,21 @@ export default function Chatbot() {
 
     const { reply } = await res.json();
 
-    // Add reply to chat
+    // Add bot reply to chat
     const botMsg = { type: "bot", text: reply };
     setChatHistory((prev) => [...prev, botMsg]);
 
-    // ✅ Re-fetch usage if message indicates limit was hit or updated
+    // 🔁 Re-fetch usage silently in background
     const resProfile = await fetch("/api/users/profile", {
       headers: { Authorization: `Bearer ${token}` },
     });
     const profile = await resProfile.json();
 
-    const freshCount = profile.careerChatUsage ?? 0;
-    const freshPremium = profile.isPremium && new Date(profile.premiumExpiration) > new Date();
+    setReplyCount(profile.careerChatUsage ?? 0);
+    setIsPremium(profile.isPremium && new Date(profile.premiumExpiration) > new Date());
 
-    setReplyCount(freshCount);
-    setIsPremium(freshPremium);
-
-    if (
-      reply.includes("⚠️ You’ve used all") ||
-      reply.includes("Upgrade to Premium")
-    ) {
-      setError(reply);
-    }
-  } catch {
+  } catch (err) {
+    console.error("Chat error:", err);
     setError("❌ Could not connect to the AI chatbot. Please try again.");
   } finally {
     setLoading(false);
@@ -158,11 +151,11 @@ export default function Chatbot() {
 
       {/* usage counter for freemium users */}
 {/* usage counter – show only before limit */}
-{!isPremium && replyCount < FREE_LIMIT && !error.includes("You’ve used all 10 free replies") && (
+{/* {!isPremium && replyCount < FREE_LIMIT && !error.includes("You’ve used all 10 free replies") && (
   <p className="text-xs text-gray-500 mb-1">
     Replies used: {replyCount}/{FREE_LIMIT}
   </p>
-)}
+)} */}
 
 
 

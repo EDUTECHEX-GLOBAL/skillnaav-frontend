@@ -205,7 +205,17 @@ const SkillAnalysis = ({ job, onClose }) => {
         {
           sender: "ai",
           text: `📚 **Recommended Courses:**\n\n${
-            recommendations.courses?.join("\n\n") || "❌ No courses available"
+            recommendations.courses && Array.isArray(recommendations.courses) && recommendations.courses.length > 0
+              ? recommendations.courses
+                  .map((course) => {
+                    if (typeof course === 'object' && course !== null) {
+                      return `📚 **${course.title || 'Course Title Not Available'}**\n**Platform:** ${course.platform || 'N/A'}\n**Description:** ${course.description || 'No description available'}\n**Duration:** ${course.duration || 'N/A'}`;
+                    } else {
+                      return `📚 ${course}`;
+                    }
+                  })
+                  .join("\n\n")
+              : recommendations.message || "❌ No courses available"
           }`,
         },
         {

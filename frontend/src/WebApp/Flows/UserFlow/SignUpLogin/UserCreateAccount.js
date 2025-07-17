@@ -12,7 +12,13 @@ import axios from "axios";
 // Validation schema for Formik
 const validationSchema = Yup.object({
   name: Yup.string().required("Required"),
-  email: Yup.string().email("Invalid email address").required("Required"),
+ email: Yup.string()
+  .matches(
+    /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
+    "Invalid email format"
+  )
+  .required("Required"),
+
   password: Yup.string()
     .min(6, "Password must be at least 6 characters")
     .matches(/[A-Z]/, "Password must contain at least one uppercase letter")

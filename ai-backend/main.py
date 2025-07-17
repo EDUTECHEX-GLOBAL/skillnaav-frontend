@@ -62,37 +62,120 @@ def extract_text_from_docx(docx_file):
     doc = docx.Document(docx_file.file)
     return "\n".join([para.text for para in doc.paragraphs])
 
-# Predefined technical skills to improve extraction
+# Expanded predefined technical skills to improve extraction
 TECH_SKILLS = {
-    "python", "java", "javascript", "react", "node.js", "django", "flask", 
-    "c++", "c#", "sql", "postgresql", "mongodb", "html", "css", "aws", 
-    "azure", "docker", "kubernetes", "tensorflow", "pandas", "numpy", "git", 
-    "agile", "scrum", "jira", "rest api", "graphql", "machine learning",
-    "express.js", "expressjs", "react.js", "reactjs", "nodejs"
+    # Programming Languages
+    "python", "java", "javascript", "c++", "c#", "go", "rust", "swift", "kotlin", "scala",
+    "ruby", "php", "typescript", "r", "matlab", "perl", "shell", "bash",
+    
+    # Web Technologies
+    "html", "css", "react", "angular", "vue", "svelte", "node.js", "express.js", 
+    "django", "flask", "spring", "laravel", "rails", "asp.net", "jquery",
+    "bootstrap", "tailwind", "sass", "less", "webpack", "vite",
+    
+    # Databases
+    "sql", "mysql", "postgresql", "mongodb", "redis", "elasticsearch", "cassandra",
+    "oracle", "sqlite", "dynamodb", "neo4j", "influxdb",
+    
+    # Cloud & DevOps
+    "aws", "azure", "gcp", "docker", "kubernetes", "terraform", "ansible",
+    "jenkins", "gitlab", "github", "ci/cd", "nginx", "apache", "microservices",
+    
+    # Data Science & AI
+    "machine learning", "deep learning", "tensorflow", "pytorch", "keras", "pandas", 
+    "numpy", "scikit-learn", "matplotlib", "seaborn", "jupyter", "anaconda",
+    "spark", "hadoop", "kafka", "airflow", "mlflow",
+    
+    # Quantum Computing
+    "quantum computing", "quantum algorithms", "qubits", "circuit simulation",
+    "quantum gates", "quantum entanglement", "quantum superposition", "qiskit",
+    "cirq", "quantum annealing", "quantum cryptography",
+    
+    # Emerging Technologies
+    "blockchain", "ethereum", "solidity", "web3", "nft", "defi", "smart contracts",
+    "iot", "edge computing", "5g", "ar", "vr", "metaverse",
+    
+    # Tools & Methodologies
+    "git", "agile", "scrum", "kanban", "jira", "confluence", "slack", "teams",
+    "figma", "sketch", "photoshop", "illustrator", "unity", "unreal engine",
+    
+    # APIs & Protocols
+    "rest api", "graphql", "grpc", "websocket", "oauth", "jwt", "soap", "xml", "json",
+    
+    # Testing & Quality
+    "unit testing", "integration testing", "selenium", "cypress", "jest", "mocha",
+    "pytest", "junit", "tdd", "bdd", "code review",
+    
+    # Variations for common skills
+    "expressjs", "express.js", "react.js", "reactjs", "nodejs", "node.js",
+    "vue.js", "vuejs", "angular.js", "angularjs"
 }
 
-# Normalize skill names for comparison
+# Enhanced normalize skill names for better comparison
 def normalize_skill_name(skill):
-    skill = skill.lower().strip()
-    skill = re.sub(r"[^a-zA-Z0-9.#+]", "", skill)  # Remove special characters
+    """Normalize skill names for accurate comparison"""
+    if not skill:
+        return ""
     
-    # Handle common variations
-    if skill == "nodejs":
-        return "node.js"
-    if skill == "expressjs":
-        return "express.js"
-    if skill == "reactjs":
-        return "react.js"
-    return skill
+    # Convert to lowercase and strip whitespace
+    skill = skill.lower().strip()
+    
+    # Remove special characters but keep dots, plus signs, and numbers
+    skill = re.sub(r'[^\w\s.#+]', '', skill)
+    
+    # Replace multiple spaces with single space
+    skill = re.sub(r'\s+', ' ', skill)
+    
+    # Remove spaces around dots
+    skill = re.sub(r'\s*\.\s*', '.', skill)
+    
+    # Handle common variations and synonyms
+    skill_mappings = {
+        "nodejs": "node.js",
+        "node js": "node.js",
+        "expressjs": "express.js",
+        "express js": "express.js",
+        "reactjs": "react.js",
+        "react js": "react.js",
+        "vuejs": "vue.js",
+        "vue js": "vue.js",
+        "angularjs": "angular.js",
+        "angular js": "angular.js",
+        "c sharp": "c#",
+        "c plus plus": "c++",
+        "cpp": "c++",
+        "javascript": "javascript",
+        "js": "javascript",
+        "typescript": "typescript",
+        "ts": "typescript",
+        "artificial intelligence": "machine learning",
+        "ai": "machine learning",
+        "ml": "machine learning",
+        "deep learning": "deep learning",
+        "dl": "deep learning",
+        "quantum computing": "quantum computing",
+        "quantum algorithms": "quantum algorithms",
+        "circuit simulation": "circuit simulation",
+        "rest": "rest api",
+        "restful": "rest api",
+        "restful api": "rest api",
+        "continuous integration": "ci/cd",
+        "continuous deployment": "ci/cd",
+        "amazon web services": "aws",
+        "microsoft azure": "azure",
+        "google cloud": "gcp",
+        "google cloud platform": "gcp"
+    }
+    
+    return skill_mappings.get(skill, skill)
 
 # Invoke Amazon Bedrock model using provided payload and model parameters
 def invoke_bedrock(prompt_text):
     try:
-        # Format the prompt if needed (here we simply forward the text)
         body = {
             "prompt": prompt_text,
-            "max_gen_len": 2048,  # Change to 2048 if desired
-            "temperature": 0.5,
+            "max_gen_len": 2048,
+            "temperature": 0.3,  # Lower temperature for more consistent outputs
             "top_p": 0.9
         }
         response = bedrock_client.invoke_model(
@@ -108,163 +191,401 @@ def invoke_bedrock(prompt_text):
         logger.error(f"Full Traceback: {traceback.format_exc()}")
         return ""
 
-# Extract skills from the resume text
+# Enhanced skill extraction from resume text
 def extract_skills_from_resume(text):
+    """Extract skills from resume text using both regex and AI"""
     found_skills = set()
-    for skill in TECH_SKILLS:
-        if re.search(rf"\b{re.escape(skill)}\b", text, re.IGNORECASE):
-            found_skills.add(skill)
     
-    # Use Bedrock to extract additional skills
+    # First, extract skills using predefined list
+    for skill in TECH_SKILLS:
+        # Use word boundaries for better matching
+        pattern = rf"\b{re.escape(skill)}\b"
+        if re.search(pattern, text, re.IGNORECASE):
+            found_skills.add(normalize_skill_name(skill))
+    
+    # Use Bedrock to extract additional skills with improved prompt
     try:
         prompt = f"""
-Extract technical skills from the following resume text. 
-Focus on programming languages, frameworks, databases, tools, and methodologies.
+Extract technical skills from the following resume text. Return only the skills as a comma-separated list.
+Focus on:
+- Programming languages (Python, Java, JavaScript, etc.)
+- Frameworks and libraries (React, Django, TensorFlow, etc.)
+- Databases (MySQL, MongoDB, PostgreSQL, etc.)
+- Cloud platforms (AWS, Azure, GCP, etc.)
+- Tools and technologies (Docker, Kubernetes, Git, etc.)
+- Methodologies (Agile, Scrum, DevOps, etc.)
+- Emerging technologies (Quantum Computing, Blockchain, etc.)
+
 Resume Text:
 {text}
+
+Return format: skill1, skill2, skill3
 """
         response_text = invoke_bedrock(prompt)
-        extracted_skills = response_text.strip().split(", ")
-        for skill in extracted_skills:
-            normalized_skill = normalize_skill_name(skill)
-            if normalized_skill in TECH_SKILLS:
-                found_skills.add(normalized_skill)
+        if response_text:
+            # Parse the response more carefully
+            skills_line = response_text.strip().split('\n')[0]  # Take first line
+            extracted_skills = [skill.strip() for skill in skills_line.split(',')]
+            
+            for skill in extracted_skills:
+                if skill and len(skill) > 1:  # Avoid single characters
+                    normalized_skill = normalize_skill_name(skill)
+                    if normalized_skill:
+                        found_skills.add(normalized_skill)
+        
         logger.info("Additional skills extracted using Bedrock.")
     except Exception as e:
         logger.error(f"Bedrock Error (Extract Skills): {str(e)}")
         logger.error(f"Full Traceback: {traceback.format_exc()}")
     
-    logger.info(f"Found Skills: {found_skills}")
-    return list(found_skills)
+    # Convert to list and remove empty strings
+    final_skills = [skill for skill in found_skills if skill]
+    logger.info(f"Found Skills: {final_skills}")
+    return final_skills
 
-# Identify skill gaps
+# Identify skill gaps with enhanced normalization
 def identify_skill_gaps(user_skills, job_skills):
-    user_skills_normalized = set(map(normalize_skill_name, user_skills))
-    job_skills_normalized = set(map(normalize_skill_name, job_skills))
+    """Identify missing skills with improved normalization"""
+    user_skills_normalized = set()
+    job_skills_normalized = set()
+    
+    # Normalize user skills
+    for skill in user_skills:
+        normalized = normalize_skill_name(skill)
+        if normalized:
+            user_skills_normalized.add(normalized)
+    
+    # Normalize job skills
+    for skill in job_skills:
+        normalized = normalize_skill_name(skill)
+        if normalized:
+            job_skills_normalized.add(normalized)
+    
     logger.info(f"User Skills (Normalized): {user_skills_normalized}")
     logger.info(f"Job Skills (Normalized): {job_skills_normalized}")
-    return list(job_skills_normalized - user_skills_normalized)
+    
+    # Find gaps
+    skill_gaps = list(job_skills_normalized - user_skills_normalized)
+    logger.info(f"Skill Gaps Identified: {skill_gaps}")
+    
+    return skill_gaps
 
-# Readiness Score Calculation
+# Enhanced readiness score calculation
 def calculate_readiness_score(user_skills, job_skills):
+    """Calculate readiness score with improved matching"""
     if not job_skills:
-        return 0  
-    user_skills_normalized = set(map(normalize_skill_name, user_skills))
-    job_skills_normalized = set(map(normalize_skill_name, job_skills))
-    match_score = (len(user_skills_normalized & job_skills_normalized) / len(job_skills_normalized)) * 100
+        return 100  # If no job skills required, user is 100% ready
+    
+    user_skills_normalized = set()
+    job_skills_normalized = set()
+    
+    # Normalize user skills
+    for skill in user_skills:
+        normalized = normalize_skill_name(skill)
+        if normalized:
+            user_skills_normalized.add(normalized)
+    
+    # Normalize job skills
+    for skill in job_skills:
+        normalized = normalize_skill_name(skill)
+        if normalized:
+            job_skills_normalized.add(normalized)
+    
+    # Calculate intersection
+    matching_skills = user_skills_normalized & job_skills_normalized
+    
+    # Calculate score
+    if job_skills_normalized:
+        match_score = (len(matching_skills) / len(job_skills_normalized)) * 100
+    else:
+        match_score = 0
+    
+    logger.info(f"Matching Skills: {matching_skills}")
+    logger.info(f"Match Score: {match_score}")
+    
     return round(match_score, 2)
 
-# Generate AI-based Course Recommendations using Bedrock
+# Enhanced course recommendations with structured output
 def generate_course_recommendations(skill_gaps):
+    """Generate structured course recommendations with robust JSON parsing"""
     if not skill_gaps:
-        return {"message": "No skill gaps detected."}
-    
-    prompt = f"Suggest 3 high-quality online courses for learning: {', '.join(skill_gaps)}. Provide platform name (Coursera, Udemy, edX) and course title."
-    try:
-        time.sleep(1)
-        response_text = invoke_bedrock(prompt)
-        courses = response_text.strip().split("\n")
-        logger.info(f"Raw Bedrock Response (Courses): {response_text}")
-        return {"courses": courses}
-    except Exception as e:
-        logger.error(f"Bedrock Error (Course Recommendations): {str(e)}")
-        logger.error(f"Full Traceback: {traceback.format_exc()}")
-        return {
-            "error": "An unexpected error occurred.",
-            "suggestions": ["Coursera: https://www.coursera.org", "Udemy: https://www.udemy.com", "edX: https://www.edx.org"]
-        }
-
-# Generate AI-based Quiz Questions using Bedrock
-def generate_quizzes(skill_gaps):
-    if not skill_gaps:
-        return []
+        return {"message": "No skill gaps detected. You're ready for this role!"}
     
     prompt = f"""
-Create 3 multiple-choice quiz questions to test knowledge in: {', '.join(skill_gaps)}.
-Format as a JSON array where each object has the following fields:
-- 'question': The multiple-choice question text.
-- 'options': An array of strings, representing the answer options labeled A, B, C, and D.
-- 'answer': A string indicating the correct answer option (e.g., 'A', 'B', 'C', or 'D').
+Generate exactly 3 online course recommendations for these skills: {', '.join(skill_gaps)}
 
-Example:
+Return ONLY a valid JSON array. Do not include any other text, explanations, or markdown formatting.
+
 [
   {{
-    "question": "What is the capital of France?",
-    "options": ["A. Berlin", "B. Paris", "C. Madrid", "D. Rome"],
-    "answer": "B"
-  }},
-  {{
-    "question": "What is the value of pi?",
-    "options": ["A. 3.14", "B. 3.16", "C. 3.18", "D. 3.20"],
-    "answer": "A"
+    "platform": "Coursera",
+    "title": "Course Title Here",
+    "description": "Brief description here.",
+    "duration": "4 weeks"
   }}
 ]
 """
+    
+    try:
+        time.sleep(1)
+        response_text = invoke_bedrock(prompt)
+        logger.info(f"Raw Bedrock Response (Courses): {response_text}")
+        
+        # Step 1: Clean the response by removing markdown blocks
+        cleaned_text = response_text.strip()
+        
+        # Remove markdown code blocks using safe string splitting
+        backtick_marker = '`' * 3  # Creates ```
+        if backtick_marker in cleaned_text:
+            parts = cleaned_text.split(backtick_marker)
+            # Take content between first and second occurrence of ```
+            if len(parts) >= 3:
+                cleaned_text = parts[1]
+                # Remove any language identifier (like 'json')
+                if cleaned_text.startswith('json'):
+                    cleaned_text = cleaned_text[4:].strip()
+            else:
+                cleaned_text = parts[0] if parts else cleaned_text
+        
+        # Step 2: Extract JSON array more robustly
+        start_bracket = cleaned_text.find('[')
+        end_bracket = cleaned_text.rfind(']')
+        
+        if start_bracket != -1 and end_bracket != -1 and end_bracket > start_bracket:
+            json_text = cleaned_text[start_bracket:end_bracket + 1]
+            logger.info(f"Extracted JSON: {json_text}")
+            
+            try:
+                courses = json.loads(json_text)
+                
+                # Step 3: Validate and filter courses
+                valid_courses = []
+                valid_platforms = {"coursera", "udemy", "edx", "pluralsight", "linkedin learning"}
+                
+                for course in courses:
+                    if (isinstance(course, dict) and 
+                        all(key in course for key in ["platform", "title", "description", "duration"]) and
+                        course["platform"].lower() in valid_platforms):
+                        valid_courses.append(course)
+                
+                if valid_courses:
+                    logger.info(f"Successfully parsed {len(valid_courses)} valid courses")
+                    return {"courses": valid_courses}
+                    
+            except json.JSONDecodeError as e:
+                logger.error(f"JSON parsing failed: {e}")
+                logger.error(f"Attempted to parse: {json_text[:200]}...")
+        
+        # Step 4: Fallback to structured text parsing
+        logger.warning("JSON parsing failed, using fallback")
+        fallback_courses = [
+            {
+                "platform": "Coursera",
+                "title": f"Advanced {skill_gaps[0].title()} Course",
+                "description": f"Comprehensive course covering {skill_gaps[0]} fundamentals and advanced concepts.",
+                "duration": "4-6 weeks"
+            },
+            {
+                "platform": "Udemy",
+                "title": f"Complete {skill_gaps[0] if skill_gaps else 'Technical Skills'} Bootcamp",
+                "description": f"Hands-on practical course for mastering {skill_gaps[0] if skill_gaps else 'required skills'}.",
+                "duration": "10-15 hours"
+            },
+            {
+                "platform": "edX",
+                "title": f"Professional {skill_gaps[0].title() if skill_gaps else 'Development'} Certificate",
+                "description": f"Industry-recognized certification program for {skill_gaps[0] if skill_gaps else 'professional skills'}.",
+                "duration": "8-12 weeks"
+            }
+        ]
+        return {"courses": fallback_courses}
+        
+    except Exception as e:
+        logger.error(f"Course recommendation error: {e}")
+        logger.error(f"Full Traceback: {traceback.format_exc()}")
+        return {
+            "error": "Unable to generate recommendations",
+            "fallback": [
+                "Visit Coursera.org for comprehensive courses",
+                "Check Udemy.com for practical tutorials", 
+                "Browse edX.org for university-level content"
+            ]
+        }
+
+
+# Enhanced quiz generation with better validation
+def generate_quizzes(skill_gaps):
+    """Generate quiz questions with improved validation"""
+    if not skill_gaps:
+        return []
+    
+    # Limit to 3 skills for focused quizzes
+    selected_skills = skill_gaps[:3]
+    
+    prompt = f"""
+Create exactly 3 multiple-choice quiz questions to test knowledge in these skills: {', '.join(selected_skills)}
+
+Return a valid JSON array with 3 objects, each containing:
+- "question": Clear, specific question text
+- "options": Array of 4 strings labeled A, B, C, D
+- "answer": Correct answer letter (A, B, C, or D)
+- "skill": The specific skill being tested
+
+Example format:
+[
+  {{
+    "question": "What is a qubit in quantum computing?",
+    "options": ["A. A classical bit", "B. A quantum bit that can exist in superposition", "C. A type of quantum gate", "D. A quantum algorithm"],
+    "answer": "B",
+    "skill": "quantum computing"
+  }}
+]
+
+Make questions practical and relevant to real-world applications. Ensure JSON is properly formatted.
+"""
+    
     try:
         time.sleep(1)
         response_text = invoke_bedrock(prompt)
         logger.info(f"Raw Bedrock Response (Quiz): {response_text}")
+        
+        # Extract JSON from response
         json_match = re.search(r'\[.*\]', response_text, re.DOTALL)
         if json_match:
             json_text = json_match.group(0)
+            try:
+                quizzes = json.loads(json_text)
+                
+                # Validate quiz format
+                valid_quizzes = []
+                for quiz in quizzes:
+                    if (isinstance(quiz, dict) and 
+                        "question" in quiz and 
+                        "options" in quiz and 
+                        "answer" in quiz and 
+                        isinstance(quiz["options"], list) and 
+                        len(quiz["options"]) == 4 and 
+                        quiz["answer"] in ["A", "B", "C", "D"]):
+                        valid_quizzes.append(quiz)
+                
+                if valid_quizzes:
+                    logger.info(f"Generated {len(valid_quizzes)} valid quiz questions")
+                    return valid_quizzes
+                else:
+                    logger.warning("No valid quiz questions generated")
+                    return []
+                    
+            except json.JSONDecodeError as e:
+                logger.error(f"JSON Decode Error (Quiz): {str(e)}")
+                return {"error": "Invalid JSON format from quiz generation", "raw": response_text}
         else:
-            logger.error("JSON not found in Bedrock response.")
-            return {"error": "Could not find valid JSON in Bedrock response.", "raw": response_text}
-        try:
-            quizzes = json.loads(json_text)
-            logger.info(f"Parsed Quizzes: {quizzes}")
-            return quizzes
-        except json.JSONDecodeError as e:
-            logger.error(f"JSON Decode Error: {str(e)} | Raw Response: {response_text}")
-            return {"error": "Invalid JSON format from Bedrock API.", "raw": response_text}
+            logger.error("No JSON found in quiz response")
+            return {"error": "Could not find valid JSON in quiz response", "raw": response_text}
+            
     except Exception as e:
         logger.error(f"Bedrock Error (Generate Quizzes): {str(e)}")
         logger.error(f"Full Traceback: {traceback.format_exc()}")
-        return {"error": "An unexpected error occurred."}
+        return {"error": "An unexpected error occurred while generating quizzes"}
 
-# API: Upload Resume & Analyze Skills
+# Enhanced main API endpoint
 @app.post("/analyze-skills/")
 async def analyze_skills(
     file: UploadFile = File(...),
     job_description: str = Form(...),
     required_skills: str = Form(...)
 ):
+    """Analyze skills from resume and compare with job requirements"""
     try:
-        # Read file and extract text
+        # Validate file type
+        if not file.filename.endswith((".pdf", ".docx")):
+            raise HTTPException(
+                status_code=400, 
+                detail="Invalid file type. Only PDF and DOCX files are supported."
+            )
+        
+        # Extract text from file
         if file.filename.endswith(".pdf"):
             resume_text = extract_text_from_pdf(file)
-        elif file.filename.endswith(".docx"):
-            resume_text = extract_text_from_docx(file)
         else:
-            raise HTTPException(status_code=400, detail="Invalid file type. Only PDF and DOCX are supported.")
-
-        logger.info(f"Extracted Resume Text: {resume_text}")
+            resume_text = extract_text_from_docx(file)
+        
+        # Validate extracted text
+        if not resume_text or len(resume_text.strip()) < 50:
+            raise HTTPException(
+                status_code=400, 
+                detail="Unable to extract sufficient text from resume. Please check the file."
+            )
+        
+        logger.info(f"Extracted Resume Text Length: {len(resume_text)}")
+        
+        # Extract skills from resume
         user_skills = extract_skills_from_resume(resume_text)
-        logger.info(f"Extracted Skills: {user_skills}")
-
+        logger.info(f"Extracted User Skills: {user_skills}")
+        
         if not user_skills:
-            raise HTTPException(status_code=400, detail="No skills found in the resume.")
-
-        job_skills = [skill.strip() for skill in required_skills.split(",")]
+            raise HTTPException(
+                status_code=400, 
+                detail="No technical skills found in the resume. Please ensure your resume contains relevant technical skills."
+            )
+        
+        # Parse job skills
+        job_skills = [skill.strip() for skill in required_skills.split(",") if skill.strip()]
+        
+        if not job_skills:
+            raise HTTPException(
+                status_code=400, 
+                detail="No job skills provided. Please specify required skills."
+            )
+        
+        # Calculate metrics
         skill_gaps = identify_skill_gaps(user_skills, job_skills)
-        logger.info(f"Skill Gaps: {skill_gaps}")
         readiness_score = calculate_readiness_score(user_skills, job_skills)
+        
+        # Generate recommendations and quizzes
         recommendations = generate_course_recommendations(skill_gaps)
         quizzes = generate_quizzes(skill_gaps)
-
-        return {
+        
+        # Prepare response
+        response = {
             "readiness_score": readiness_score,
             "user_skills": user_skills,
             "job_skills": job_skills,
             "skill_gaps": skill_gaps,
             "recommendations": recommendations,
-            "quizzes": quizzes
+            "quizzes": quizzes,
+            "analysis_timestamp": now()
         }
+        
+        logger.info(f"Analysis completed. Readiness Score: {readiness_score}%")
+        return response
+        
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error: {str(e)}")
+        logger.error(f"Unexpected Error: {str(e)}")
         logger.error(f"Full Traceback: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500, 
+            detail=f"An unexpected error occurred during analysis: {str(e)}"
+        )
 
 @app.get("/")
 def read_root():
-    return {"message": "API is working!"}
+    """Health check endpoint"""
+    return {
+        "message": "SkillNaav API is running!",
+        "timestamp": now(),
+        "version": "2.0.0"
+    }
+
+@app.get("/health")
+def health_check():
+    """Detailed health check"""
+    return {
+        "status": "healthy",
+        "timestamp": now(),
+        "services": {
+            "bedrock": "connected",
+            "spacy": "loaded"
+        }
+    }

@@ -21,8 +21,8 @@ const BodyContent = () => {
         return <PartnerAccounts />;
       case "internship-posts":
         return <PartnerManagement />;
-      case "applications":
-        return <Applications />;
+      // case "applications":
+      //   return <Applications />;
       case "school-accounts":
         return <SchoolAdminAccounts />;
       case "bin":
