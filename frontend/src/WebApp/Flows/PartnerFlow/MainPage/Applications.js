@@ -335,8 +335,8 @@ const InternshipList = () => {
                 </p>
                 <p className="flex items-center mb-2">
                   <FontAwesomeIcon icon={faClock} className="mr-2" />{" "}
-                  {new Date(internship.startDate).toLocaleDateString()} –{" "}
-                  {internship.endDateOrDuration}
+                  {new Date(internship.startDate).toLocaleDateString()} – {new Date(internship.endDateOrDuration).toLocaleDateString()}
+
                 </p>
                 <p className="flex items-center mb-2">
                   <FontAwesomeIcon icon={faDollarSign} className="mr-2" />{" "}
