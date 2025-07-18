@@ -415,77 +415,56 @@ Return ONLY a valid JSON array. Do not include any other text, explanations, or 
 
 # Enhanced quiz generation with better validation
 def generate_quizzes(skill_gaps):
-    """Generate quiz questions with improved validation"""
     if not skill_gaps:
         return []
-    
-    # Limit to 3 skills for focused quizzes
+
     selected_skills = skill_gaps[:3]
-    
+
     prompt = f"""
-Create exactly 3 multiple-choice quiz questions to test knowledge in these skills: {', '.join(selected_skills)}
+Generate exactly 3 multiple-choice quiz questions for these skills: {', '.join(selected_skills)}.
 
-Return a valid JSON array with 3 objects, each containing:
-- "question": Clear, specific question text
-- "options": Array of 4 strings labeled A, B, C, D
-- "answer": Correct answer letter (A, B, C, or D)
-- "skill": The specific skill being tested
+Format like this:
+Question: ...
+Options:
+A. ...
+B. ...
+C. ...
+D. ...
+Answer: A
+Skill: ...
 
-Example format:
-[
-  {{
-    "question": "What is a qubit in quantum computing?",
-    "options": ["A. A classical bit", "B. A quantum bit that can exist in superposition", "C. A type of quantum gate", "D. A quantum algorithm"],
-    "answer": "B",
-    "skill": "quantum computing"
-  }}
-]
-
-Make questions practical and relevant to real-world applications. Ensure JSON is properly formatted.
+Do not use code blocks or JSON. Return plain text only.
 """
-    
+
     try:
         time.sleep(1)
         response_text = invoke_bedrock(prompt)
-        logger.info(f"Raw Bedrock Response (Quiz): {response_text}")
-        
-        # Extract JSON from response
-        json_match = re.search(r'\[.*\]', response_text, re.DOTALL)
-        if json_match:
-            json_text = json_match.group(0)
-            try:
-                quizzes = json.loads(json_text)
-                
-                # Validate quiz format
-                valid_quizzes = []
-                for quiz in quizzes:
-                    if (isinstance(quiz, dict) and 
-                        "question" in quiz and 
-                        "options" in quiz and 
-                        "answer" in quiz and 
-                        isinstance(quiz["options"], list) and 
-                        len(quiz["options"]) == 4 and 
-                        quiz["answer"] in ["A", "B", "C", "D"]):
-                        valid_quizzes.append(quiz)
-                
-                if valid_quizzes:
-                    logger.info(f"Generated {len(valid_quizzes)} valid quiz questions")
-                    return valid_quizzes
-                else:
-                    logger.warning("No valid quiz questions generated")
-                    return []
-                    
-            except json.JSONDecodeError as e:
-                logger.error(f"JSON Decode Error (Quiz): {str(e)}")
-                return {"error": "Invalid JSON format from quiz generation", "raw": response_text}
+        logger.info(f"Raw Bedrock Response (Plain Quiz): {response_text}")
+
+        # Split questions
+        pattern = r"Question:\s*(.*?)\nOptions:\s*(A\..*?)\nAnswer:\s*([A-D])\nSkill:\s*(.*?)\n?(?=Question:|$)"
+        matches = re.findall(pattern, response_text, re.DOTALL)
+
+        quizzes = []
+        for question, options_block, answer, skill in matches:
+            options = [opt.strip() for opt in options_block.strip().split('\n')]
+            quizzes.append({
+                "question": question.strip(),
+                "options": options,
+                "answer": answer.strip(),
+                "skill": skill.strip()
+            })
+
+        if quizzes:
+            logger.info(f"Parsed {len(quizzes)} quizzes from plain text.")
+            return quizzes
         else:
-            logger.error("No JSON found in quiz response")
-            return {"error": "Could not find valid JSON in quiz response", "raw": response_text}
-            
+            return {"error": "No quizzes found in plain text response", "raw": response_text}
+
     except Exception as e:
-        logger.error(f"Bedrock Error (Generate Quizzes): {str(e)}")
-        logger.error(f"Full Traceback: {traceback.format_exc()}")
-        return {"error": "An unexpected error occurred while generating quizzes"}
+        logger.error(f"Quiz parsing failed: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return {"error": "Error generating quizzes", "raw": ""}
 
 # Enhanced main API endpoint
 @app.post("/analyze-skills/")

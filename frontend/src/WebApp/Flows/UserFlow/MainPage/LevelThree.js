@@ -31,10 +31,10 @@ const LevelThree = ({ profileData, setCreateLevelThree, handleProfileData }) => 
 
         // Fetch questions
         const questionsResponse = await axios.get("/api/personality/questions");
-        const validQuestions = Array.isArray(questionsResponse?.data) 
-          ? questionsResponse.data 
+        const validQuestions = Array.isArray(questionsResponse?.data)
+          ? questionsResponse.data
           : [];
-        
+
         setAllQuestions(validQuestions.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
 
         // Fetch responses if user exists
@@ -43,11 +43,11 @@ const LevelThree = ({ profileData, setCreateLevelThree, handleProfileData }) => 
             const responsesResponse = await axios.get(
               `/api/personality/responses?userId=${profileData._id}`
             );
-            
-            const validResponses = Array.isArray(responsesResponse?.data) 
-              ? responsesResponse.data 
+
+            const validResponses = Array.isArray(responsesResponse?.data)
+              ? responsesResponse.data
               : [];
-            
+
             const answersMap = {};
             validResponses.forEach(item => {
               if (item?.questionId?._id) {
@@ -57,7 +57,7 @@ const LevelThree = ({ profileData, setCreateLevelThree, handleProfileData }) => 
                 };
               }
             });
-            
+
             setSelectedAnswers(answersMap);
             setSubmitted(validResponses.length > 0);
 
@@ -67,7 +67,7 @@ const LevelThree = ({ profileData, setCreateLevelThree, handleProfileData }) => 
                 const personalityRes = await axios.get(
                   `/api/personality/calculate?userId=${profileData._id}`
                 );
-                
+
                 // Transform backend response to ensure consistent format
                 const backendData = personalityRes?.data || {};
                 const transformedResults = {
@@ -75,7 +75,7 @@ const LevelThree = ({ profileData, setCreateLevelThree, handleProfileData }) => 
                   dominantTraits: backendData.personality?.split('') || backendData.dominantTraits || [],
                   scores: backendData.scores || {}
                 };
-                
+
                 setPersonalityResults(transformedResults);
               } catch (calcError) {
                 console.error("Calculation error:", calcError);
@@ -148,7 +148,7 @@ const LevelThree = ({ profileData, setCreateLevelThree, handleProfileData }) => 
     try {
       setSubmitLoading(true);
       setError(null);
-      
+
       // Prepare responses
       const responses = allQuestions.map(question => ({
         questionId: question._id,
@@ -173,9 +173,9 @@ const LevelThree = ({ profileData, setCreateLevelThree, handleProfileData }) => 
       const hollandCode = sortedTraits.slice(0, 3).join("");
 
       // Save to backend
-      await axios.post("/api/personality/responses/bulk", { 
-        responses, 
-        userId: profileData._id 
+      await axios.post("/api/personality/responses/bulk", {
+        responses,
+        userId: profileData._id
       });
 
       // Set results
@@ -220,8 +220,8 @@ const LevelThree = ({ profileData, setCreateLevelThree, handleProfileData }) => 
       )}
 
       {personalityResults ? (
-        <ResultsView 
-          results={personalityResults} 
+        <ResultsView
+          results={personalityResults}
           getTraitFullName={getTraitFullName}
           getTraitDescription={getTraitDescription}
         />
@@ -250,7 +250,7 @@ const ResultsView = ({ results, getTraitFullName, getTraitDescription }) => {
   return (
     <div className="mt-8 p-6 bg-white rounded-lg shadow">
       <h3 className="text-2xl font-bold text-center mb-6">
-        Your Holland Code: 
+        Your Holland Code:
         <span className="ml-2 px-4 py-2 bg-blue-600 text-white rounded">
           {results?.hollandCode || 'Unknown'}
         </span>
@@ -261,13 +261,12 @@ const ResultsView = ({ results, getTraitFullName, getTraitDescription }) => {
           {dominantTraits.map((trait, index) => (
             <div
               key={`${trait}-${index}`}
-              className={`p-4 border-l-4 ${
-                index === 0
+              className={`p-4 border-l-4 ${index === 0
                   ? "border-blue-500 bg-blue-50"
                   : index === 1
-                  ? "border-purple-500 bg-purple-50"
-                  : "border-green-500 bg-green-50"
-              }`}
+                    ? "border-purple-500 bg-purple-50"
+                    : "border-green-500 bg-green-50"
+                }`}
             >
               <h4 className="font-bold text-lg">
                 {getTraitFullName(trait)} ({trait})
@@ -342,21 +341,21 @@ const TestView = ({
           <h4 className="text-lg font-semibold mb-4">
             {question.question}
           </h4>
-          <div className="flex justify-center space-x-4">
-            {answerOptions.map(option => (
-              <div 
+          <div className="flex flex-wrap md:flex-nowrap justify-start gap-3 mt-2">
+            {answerOptions.map((option) => (
+              <div
                 key={option}
                 onClick={() => handleAnswerChange(question._id, option)}
-                className={`w-12 h-12 rounded-full flex items-center justify-center font-bold shadow-md mx-auto cursor-pointer transition ${
-                  selectedAnswers[question._id]?.response === answerMapping[option]
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-200 hover:bg-gray-300"
-                }`}
+                className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center font-semibold cursor-pointer transition duration-150 ${selectedAnswers[question._id]?.response === answerMapping[option]
+                    ? "bg-blue-600 text-white ring-2 ring-blue-400"
+                    : "bg-gray-100 hover:bg-gray-200 text-gray-800"
+                  }`}
               >
                 {option}
               </div>
             ))}
           </div>
+
         </div>
       ))}
     </div>
@@ -371,11 +370,10 @@ const TestView = ({
       <button
         onClick={handleSubmit}
         disabled={totalAnswered !== allQuestions.length || submitLoading}
-        className={`px-6 py-2 rounded-md font-semibold min-w-[180px] transition ${
-          totalAnswered !== allQuestions.length || submitLoading
+        className={`px-6 py-2 rounded-md font-semibold min-w-[180px] transition ${totalAnswered !== allQuestions.length || submitLoading
             ? "bg-gray-300 cursor-not-allowed"
             : "bg-blue-600 text-white hover:bg-blue-700"
-        }`}
+          }`}
       >
         {submitLoading ? (
           <div className="flex justify-center">
