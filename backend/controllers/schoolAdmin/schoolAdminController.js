@@ -286,7 +286,7 @@ const uploadStudentsFromCSV = async (req, res) => {
   const rows = [];
 
   stream
-    .pipe(csvParser())
+    .pipe(csvParser({ mapHeaders: ({ header }) => header.trim() }))
     .on("data", (row) => rows.push(row))
     .on("end", async () => {
       try {
@@ -302,14 +302,17 @@ const uploadStudentsFromCSV = async (req, res) => {
 
         const validRows = [];
         for (const row of rows) {
-          const name = row["Full Name"] ? row["Full Name"].trim() : "";
-          const email = row["Email Address"] ? row["Email Address"].trim() : "";
-          const universityName = row["School Name"] ? row["School Name"].trim() : "";
-          const educationLevel = row["Grade"] ? row["Grade"].trim() : "";
-          const fieldOfStudy = row["Stream/Curriculum"] ? row["Stream/Curriculum"].trim() : "";
-          const desiredField = row["Field of Internship"] ? row["Field of Internship"].trim() : "";
+          const name = row["Full Name"]?.trim() || "";
+          const email = row["Email Address"]?.trim() || "";
+          const universityName = row["School Name"]?.trim() || "";
+          const educationLevel = row["Grade"]?.trim() || "";
+          const fieldOfStudy = row["Stream/Curriculum"]?.trim() || "";
+          const desiredField = row["Field of Internship"]?.trim() || "";
 
-          if (!name || !email || !universityName || !educationLevel || !fieldOfStudy || !desiredField) continue;
+          if (!name || !email || !universityName || !educationLevel || !fieldOfStudy || !desiredField) {
+            console.warn("⚠️ Skipping incomplete row:", row);
+            continue;
+          }
 
           const exists = await Userwebapp.findOne({ email });
           if (!exists) {
@@ -319,11 +322,12 @@ const uploadStudentsFromCSV = async (req, res) => {
               universityName,
               educationLevel,
               fieldOfStudy,
-              desiredField
+              desiredField,
             });
           }
         }
 
+        console.log(`🧾 Valid students to create: ${validRows.length}`);
         if (schoolAdmin.creditsAvailable < validRows.length) {
           return res.status(400).json({
             message: `Insufficient credits. You have ${schoolAdmin.creditsAvailable}, need ${validRows.length}.`,
@@ -331,6 +335,8 @@ const uploadStudentsFromCSV = async (req, res) => {
         }
 
         const createdStudents = [];
+        const emailPromises = [];
+
         for (const studentData of validRows) {
           const plainPassword = Math.random().toString(36).slice(-8);
 
@@ -352,26 +358,46 @@ const uploadStudentsFromCSV = async (req, res) => {
           });
 
           await student.save();
+
+          // Add to results
           createdStudents.push({
             name: student.name,
             email: student.email,
             password: plainPassword,
           });
+
+          // Queue email
+          emailPromises.push(
+            notifyUser(
+              student.email,
+              "Welcome to SkillNaav – Your Login Credentials",
+              `<p>Hello ${student.name},</p>
+              <p>Welcome to SkillNaav! Here are your login credentials:</p>
+              <ul>
+                <li><strong>Email:</strong> ${student.email}</li>
+                <li><strong>Password:</strong> ${plainPassword}</li>
+              </ul>
+              <p>You can log in at <a href="https://www.skillnaav.com/user/login">https://www.skillnaav.com/user/login</a>.</p>
+              <p>We recommend changing your password after the first login.</p>`
+            )
+          );
         }
 
+        await Promise.all(emailPromises);
+
+        // Deduct credits
         schoolAdmin.creditsAvailable -= createdStudents.length;
         await schoolAdmin.save();
 
+        // Generate credentials CSV
         let fileUrl = null;
         let csvBuffer = null;
-
         try {
           const parser = new Parser({ fields: ["name", "email", "password"] });
           const csvData = parser.parse(createdStudents);
           csvBuffer = Buffer.from(csvData, "utf-8");
 
           const fileName = `student-credentials/${Date.now()}-${Math.floor(Math.random() * 10000)}.csv`;
-
           const bucketName = process.env.AWS_CSV_BUCKET;
           if (!bucketName) throw new Error("AWS_CSV_BUCKET is not set in environment");
 
@@ -387,6 +413,7 @@ const uploadStudentsFromCSV = async (req, res) => {
           console.error("⚠️ S3 Upload failed:", err.message || err);
         }
 
+        // Email admin with CSV
         try {
           await notifyUser(
             schoolAdmin.email,
@@ -403,17 +430,17 @@ const uploadStudentsFromCSV = async (req, res) => {
               : []
           );
         } catch (err) {
-          console.error("❌ Failed to send email:", err.message || err);
+          console.error("❌ Failed to send email to admin:", err.message || err);
         }
 
         return res.status(200).json({
           message: `${createdStudents.length} students created successfully.`,
+          skipped: rows.length - validRows.length,
           fileUrl,
           students: createdStudents,
         });
-
       } catch (err) {
-        console.error("❌ Server error:", err);
+        console.error("❌ Server error during CSV upload:", err);
         return res.status(500).json({ message: "Server error during processing." });
       }
     })
