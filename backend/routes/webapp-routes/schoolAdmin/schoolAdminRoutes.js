@@ -14,6 +14,8 @@ const {
      getDashboardMetrics,
   getStudentsBySchoolAdmin,
   toggleStudentAccess,
+  forgotPasswordSchoolAdmin,
+  resetPasswordSchoolAdmin,
 } = require("../../../controllers/schoolAdmin/schoolAdminController");
 const { protectSchool } = require("../../../middlewares/protectSchool");
 const { csvUpload } = require("../../../utils/multer");
@@ -36,6 +38,8 @@ router.post("/activate-free", protectSchool, activateFreeSubscription);
 router.get("/dashboard-metrics", protectSchool, getDashboardMetrics);
 router.get("/students", protectSchool, getStudentsBySchoolAdmin);
 router.patch('/students/:id/access', protectSchool, toggleStudentAccess);
+router.post("/forgot-password", forgotPasswordSchoolAdmin);
+router.post("/reset-password/:token", resetPasswordSchoolAdmin);
 
 
 

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FiEye, FiEyeOff } from "react-icons/fi";
 import classroomImg from "../../../../assets-webapp/school-dashboard.png";
+import SchoolAdminForgotPassword from "./SchoolAdminForgotPassword";
 
 const SchoolAdminLogin = () => {
   const [credentials, setCredentials] = useState({ email: "", password: "" });
@@ -9,6 +10,7 @@ const SchoolAdminLogin = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const navigate = useNavigate();
+  const [showForgotModal, setShowForgotModal] = useState(false);
 
   const handleChange = (e) => {
     setCredentials({ ...credentials, [e.target.name]: e.target.value });
@@ -59,8 +61,8 @@ const handleLogin = async (e) => {
 
 
 
-  return (
-    <div className="min-h-screen flex font-poppins">
+ return (
+    <div className="min-h-screen flex font-poppins relative">
       {/* Left Image */}
       <div className="w-1/2 hidden md:flex items-center justify-center bg-gray-100">
         <img src={classroomImg} alt="Classroom" className="h-full w-full object-cover" />
@@ -91,7 +93,6 @@ const handleLogin = async (e) => {
             required
           />
 
-          {/* Password with eye toggle */}
           <div className="relative mb-6">
             <input
               type={showPassword ? "text" : "password"}
@@ -102,11 +103,18 @@ const handleLogin = async (e) => {
               required
             />
             <div
-              className="absolute top-1/2 right-3 transform -translate-x-1/2 cursor-pointer text-gray-500 "
+              className="absolute top-1/2 right-3 transform -translate-x-1/2 cursor-pointer text-gray-500"
               onClick={() => setShowPassword(!showPassword)}
             >
               {showPassword ? <FiEyeOff size={20} /> : <FiEye size={20} />}
             </div>
+          </div>
+
+          {/* Forgot Password link */}
+          <div className="text-right text-sm text-blue-600 mb-4 cursor-pointer hover:underline">
+            <button type="button" onClick={() => setShowForgotModal(true)}>
+              Forgot password?
+            </button>
           </div>
 
           <button
@@ -129,6 +137,11 @@ const handleLogin = async (e) => {
           </div>
         </form>
       </div>
+
+      {/* Forgot Password Modal */}
+      {showForgotModal && (
+        <SchoolAdminForgotPassword onClose={() => setShowForgotModal(false)} />
+      )}
     </div>
   );
 };

@@ -147,7 +147,7 @@ const UserManagement = () => {
           onChange={e => setSearchQuery(e.target.value)}
           className="px-12 py-2 border rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
-        <AiOutlineSearch size={20} className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-600" />
+        <AiOutlineSearch size={20} className="absolute left-4 top-3/4 transform -translate-y-1/2 text-gray-600" />
         {searchQuery && (
           <AiOutlineClose
             size={20}

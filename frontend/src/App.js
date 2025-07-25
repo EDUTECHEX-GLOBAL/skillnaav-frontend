@@ -39,6 +39,8 @@ import AdminMainPage from "./WebApp/Flows/AdminFlow/MainPage/AdminMainPage";
 import TryforFree from "./WebApp/TryforFree";
 
  import SchoolAdminFlow from "./WebApp/Flows/SchoolAdminFlow/SchoolAdminFlow";
+ import SchoolAdminResetPassword from "./WebApp/Flows/SchoolAdminFlow/SignUpLogin/SchoolAdminResetPassword";
+ import SchoolAdminForgotPassword from "./WebApp/Flows/SchoolAdminFlow/SignUpLogin/SchoolAdminForgotPassword";
 
 function App() {
   const { skillnaavData, reloadData } = useSelector((state) => state.root);
@@ -113,6 +115,8 @@ function App() {
 
         {/* School Admin Flow */}
         <Route path="/schooladmin/*" element={<SchoolAdminFlow />} />
+        <Route path="/schooladmin/reset-password/:token" element={<SchoolAdminResetPassword />} />
+        <Route path="/schooladmin/forgot-password" element={<SchoolAdminForgotPassword />} />
 
         {/* Try for free */}
         <Route path="/choose-role" element={<TryforFree />} />

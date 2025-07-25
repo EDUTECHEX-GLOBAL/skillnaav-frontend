@@ -1,19 +1,27 @@
-import React from "react";
+// AdminMainPage.js
+import React, { useState } from "react";
 import Navbar from "./Navbar";
 import Sidebar from "./Sidebar";
 import BodyContent from "./BodyContent";
 import { TabProvider } from "./UserHomePageContext/HomePageContext";
 
 const AdminMainPage = () => {
+  const [isSidebarOpen, setSidebarOpen] = useState(false);
+  const toggleSidebar = () => setSidebarOpen((v) => !v);
+
   return (
     <TabProvider>
-      <div className="flex flex-col lg:flex-row">
-        {/* Sidebar */}
-        <Sidebar />
+      {/* full-screen flex container, no page scroll */}
+      <div className="flex h-screen overflow-hidden">
+        {/* fixed sidebar */}
+        <Sidebar
+          isSidebarOpen={isSidebarOpen}
+          setSidebarOpen={setSidebarOpen}
+        />
 
-        {/* Main Content */}
-        <div className="flex-1 flex flex-col">
-          <Navbar />
+        {/* main area: navbar + scrollable content */}
+        <div className="flex-1 flex flex-col overflow-y-auto">
+          <Navbar toggleSidebar={toggleSidebar} />
           <BodyContent />
         </div>
       </div>

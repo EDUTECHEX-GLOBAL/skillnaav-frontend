@@ -1,40 +1,30 @@
+// BodyContent.js
 import React from "react";
 import { useTabContext } from "./UserHomePageContext/HomePageContext";
+import Dashboard from "./Dashboard";
 import UserManagement from "./UserManagement";
-import PartnerManagement from "./InternshipsPosted";
 import PartnerAccounts from "./PartnerAccounts";
-import Applications from "./Applications"; // New component for Applications
-import Bin from "./Bin";
-import Dashboard from "./Dashboard"; // Import the Dashboard component
+import InternshipsPosted from "./InternshipsPosted";
 import SchoolAdminAccounts from "./SchoolAdminAccounts";
+import Bin from "./Bin";
 
 const BodyContent = () => {
   const { selectedTab } = useTabContext();
 
-  const renderContent = () => {
-    switch (selectedTab) {
-      case "home":
-        return <Dashboard />;
-      case "user-management":
-        return <UserManagement />;
-      case "partner-accounts":
-        return <PartnerAccounts />;
-      case "internship-posts":
-        return <PartnerManagement />;
-      // case "applications":
-      //   return <Applications />;
-      case "school-accounts":
-        return <SchoolAdminAccounts />;
-      case "bin":
-        return <Bin />;
-      default:
-        return <div className="text-center mt-4">Select a Tab</div>;
-    }
+  const mapTabToComponent = {
+    home: <Dashboard />,
+    "user-management": <UserManagement />,
+    "partner-accounts": <PartnerAccounts />,
+    "internship-posts": <InternshipsPosted />,
+    "school-accounts": <SchoolAdminAccounts />,
+    bin: <Bin />,
   };
 
   return (
-    <div className="flex-1 font-poppins p-6 bg-gray-50">
-      {renderContent()}
+    <div className="flex-1 p-6 bg-gray-50">
+      {mapTabToComponent[selectedTab] || (
+        <div className="text-center text-gray-500 mt-10">Select a tab</div>
+      )}
     </div>
   );
 };

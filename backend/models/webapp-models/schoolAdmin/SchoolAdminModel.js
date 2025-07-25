@@ -87,6 +87,9 @@ const schoolAdminSchema = new mongoose.Schema(
       enum: ["inactive", "active"],
       default: "inactive",
     },
+    resetPasswordToken: { type: String },
+resetPasswordExpires: { type: Date },
+
 
     profile: {
       affiliation: { type: String },

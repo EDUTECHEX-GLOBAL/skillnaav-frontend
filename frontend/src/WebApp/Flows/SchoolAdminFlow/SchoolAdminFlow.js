@@ -4,6 +4,8 @@ import SchoolAdminRegister from "./SignUpLogin/SchoolAdminRegister";
 import SchoolAdminLogin from "./SignUpLogin/SchoolAdminLogin";
 import SchoolAdminProfileForm from "./SignUpLogin/SchoolAdminProfileForm";
 import SchoolAdminDashboardLayout from "./MainPage/SchoolAdminDashboard";
+import SchoolAdminResetPassword from "./SignUpLogin/SchoolAdminResetPassword";
+import SchoolAdminForgotPassword from "./SignUpLogin/SchoolAdminForgotPassword";
 
 // Pages inside the dashboard
 import DashboardHome from "./MainPage/pages/DashboardHome";
@@ -18,6 +20,8 @@ const SchoolAdminFlow = () => {
       <Route path="/register" element={<SchoolAdminRegister />} />
       <Route path="/login" element={<SchoolAdminLogin />} />
       <Route path="/profile" element={<SchoolAdminProfileForm />} />
+      <Route path="/reset-password/:token" element={<SchoolAdminResetPassword />} />
+      <Route path="/forgot-password" element={<SchoolAdminForgotPassword />} />
 
       {/* Dashboard Layout & Pages */}
       <Route path="/dashboard" element={<SchoolAdminDashboardLayout />}>

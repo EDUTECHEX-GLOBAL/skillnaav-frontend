@@ -4,132 +4,116 @@ import {
   faHome,
   faUsers,
   faClipboardList,
+  faChevronDown,
+  faUniversity,
   faChartBar,
   faCogs,
-  faSignOutAlt,
-  faChevronDown,
   faTrash,
-  faBars,
-  faFileAlt, // New icon for Applications
-  faUniversity,
+  faSignOutAlt,
+  faBuilding,
+  faBriefcase,
 } from "@fortawesome/free-solid-svg-icons";
-import logo from "../../../../assets-webapp/Skillnaav-logo.png"; // Replace with your actual logo path
-import { useTabContext } from "./UserHomePageContext/HomePageContext"; // Adjust path as needed
+import logo from "../../../../assets-webapp/Skillnaav-logo.png";
+import { useTabContext } from "./UserHomePageContext/HomePageContext";
 import { useNavigate } from "react-router-dom";
 
-const Sidebar = () => {
-  const [selectedTab, setSelectedTab] = useState("home");
-  const [isPartnerManagementOpen, setPartnerManagementOpen] = useState(false);
-  const [isOpen, setIsOpen] = useState(false); // For sidebar toggle (hamburger menu)
+const navItems = [
+  { key: "home", icon: faHome, label: "Dashboard" },
+  { key: "user-management", icon: faUsers, label: "User Management" },
+  { key: "school-accounts", icon: faUniversity, label: "School Admin Accounts" },
+  { key: "analytics", icon: faChartBar, label: "Analytics" },
+  { key: "settings", icon: faCogs, label: "Settings" },
+  { key: "bin", icon: faTrash, label: "Bin" },
+];
+
+const Sidebar = ({ isSidebarOpen, setSidebarOpen }) => {
+  const [tab, setTab] = useState("home");
+  const [partnerOpen, setPartnerOpen] = useState(false);
   const { handleSelectTab } = useTabContext();
-  const navigate = useNavigate();
+  const nav = useNavigate();
 
-  const handleTabClick = (tab) => {
-    if (tab === "logout") {
+  const clickTab = (key) => {
+    if (key === "logout") {
       localStorage.removeItem("userInfo");
-      navigate("/admin/login");
+      nav("/admin/login");
     } else {
-      setSelectedTab(tab);
-      handleSelectTab(tab);
-      setIsOpen(false); // Close sidebar on tab click (for mobile)
+      setTab(key);
+      handleSelectTab(key);
     }
-  };
-
-  const toggleMenu = () => {
-    setIsOpen(!isOpen); // Toggle sidebar visibility for mobile/tablets
+    setSidebarOpen(false);
   };
 
   return (
-    <div>
-      {/* Hamburger Icon for Mobile & iPad */}
-      <div className="lg:hidden flex justify-between items-center p-4 z-20">
-        <FontAwesomeIcon
-          icon={faBars}
-          className="text-xl text-gray-700 cursor-pointer"
-          onClick={toggleMenu}
-        />
-        <img src={logo} alt="Skillnaav Logo" className="h-12 object-contain" />
+    <aside
+      className={`fixed inset-y-0 left-0 z-30 w-64 bg-white shadow-lg transform transition-transform duration-300
+        ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}  
+        lg:translate-x-0 lg:static lg:shadow-none`}
+    >
+      {/* Fixed Logo */}
+      <div className="flex justify-center items-center h-20 border-b sticky top-0 bg-white z-10">
+        <img src={logo} alt="Logo" className="h-14" />
       </div>
 
-      {/* Sidebar */}
-      <div
-        className={`lg:w-64 w-full h-screen bg-white flex flex-col justify-between pl-6 pr-6 font-poppins shadow-lg fixed top-0 left-0 z-10 overflow-y-auto scrollbar-hide transform transition-transform duration-300 ${isOpen
-            ? "translate-x-0" // Sidebar visible for mobile/tablets
-            : "translate-x-[-100%]" // Sidebar hidden for mobile/tablets
-          } lg:translate-x-0`} // Always visible on desktop
-      >
-        {/* Logo Section */}
-        <div className="sticky top-0 z-10 bg-white py-4 flex items-center justify-center lg:block">
-          <img src={logo} alt="Skillnaav Logo" className="h-16 object-contain" />
-        </div>
-
-        {/* Navigation Links */}
+      {/* Scrollable content (with hidden scrollbar) */}
+      <div className="flex flex-col h-[calc(100%-5rem)] p-4 overflow-y-auto scrollbar-hide">
         <nav className="flex-1">
-          <ul className="space-y-2">
-            <li>
-              <button
-                onClick={() => handleTabClick("home")}
-                className={`flex items-center p-3 rounded-lg w-full text-left font-medium ${selectedTab === "home"
-                    ? "bg-blue-100 text-blue-600"
-                    : "text-gray-700 hover:bg-gray-200"
+          <ul className="space-y-3">
+            {navItems.slice(0, 2).map(({ key, icon, label }) => (
+              <li key={key}>
+                <button
+                  onClick={() => clickTab(key)}
+                  className={`flex items-center w-full p-2 rounded-lg text-left font-medium ${
+                    tab === key
+                      ? "bg-blue-100 text-blue-600"
+                      : "text-gray-700 hover:bg-gray-100"
                   }`}
-              >
-                <FontAwesomeIcon icon={faHome} className="w-5 h-5 mr-3" />
-                <span>Dashboard</span>
-              </button>
-            </li>
-            <li>
-              <button
-                onClick={() => handleTabClick("user-management")}
-                className={`flex items-center p-3 rounded-lg w-full text-left font-medium ${selectedTab === "user-management"
-                    ? "bg-blue-100 text-blue-600"
-                    : "text-gray-700 hover:bg-gray-200"
-                  }`}
-              >
-                <FontAwesomeIcon icon={faUsers} className="w-5 h-5 mr-3" />
-                <span>User Management</span>
-              </button>
-            </li>
+                >
+                  <FontAwesomeIcon icon={icon} className="w-5 h-5 mr-3" />
+                  {label}
+                </button>
+              </li>
+            ))}
 
-            {/* Partner Management with Nested Items */}
+            {/* Partner Management Section */}
             <li>
               <button
-                onClick={() => setPartnerManagementOpen(!isPartnerManagementOpen)}
-                className="flex items-center justify-between p-3 rounded-lg w-full text-left font-medium text-gray-700 hover:bg-gray-200"
+                onClick={() => setPartnerOpen((v) => !v)}
+                className="flex items-center justify-between w-full p-2 rounded-lg text-gray-700 hover:bg-gray-100"
               >
                 <span className="flex items-center">
                   <FontAwesomeIcon icon={faClipboardList} className="w-5 h-5 mr-3" />
-                  Partner Management
+                  <p className="font-medium">Partner Management</p>
                 </span>
                 <FontAwesomeIcon
                   icon={faChevronDown}
-                  className={`w-4 h-4 transform ${isPartnerManagementOpen ? "rotate-180" : ""
-                    }`}
+                  className={`${partnerOpen ? "rotate-180" : ""} transform`}
                 />
               </button>
-
-              {/* Nested Partner Management Links */}
-              {isPartnerManagementOpen && (
-                <ul className="ml-6 mt-2 space-y-2">
+              {partnerOpen && (
+                <ul className="ml-6 mt-1 space-y-2">
                   <li>
                     <button
-                      onClick={() => handleTabClick("partner-accounts")}
-                      className={`flex items-center p-2 rounded-lg w-full text-left font-medium ${selectedTab === "partner-accounts"
+                      onClick={() => clickTab("partner-accounts")}
+                      className={`flex items-center w-full p-2 rounded-lg font-medium ${
+                        tab === "partner-accounts"
                           ? "bg-blue-100 text-blue-600"
-                          : "text-gray-700 hover:bg-gray-200"
-                        }`}
+                          : "text-gray-700 hover:bg-gray-100"
+                      }`}
                     >
+                      <FontAwesomeIcon icon={faBuilding} className="w-4 h-4 mr-2" />
                       Partner Accounts
                     </button>
                   </li>
                   <li>
                     <button
-                      onClick={() => handleTabClick("internship-posts")}
-                      className={`flex items-center p-2 rounded-lg w-full text-left font-medium ${selectedTab === "internship-posts"
+                      onClick={() => clickTab("internship-posts")}
+                      className={`flex items-center w-full p-2 rounded-lg font-medium ${
+                        tab === "internship-posts"
                           ? "bg-blue-100 text-blue-600"
-                          : "text-gray-700 hover:bg-gray-200"
-                        }`}
+                          : "text-gray-700 hover:bg-gray-100"
+                      }`}
                     >
+                      <FontAwesomeIcon icon={faBriefcase} className="w-4 h-4 mr-2" />
                       Internship Posts
                     </button>
                   </li>
@@ -137,103 +121,35 @@ const Sidebar = () => {
               )}
             </li>
 
-          <li>
-  <button
-    onClick={() => handleTabClick("school-accounts")}
-    className={`flex items-center p-3 rounded-lg w-full text-left font-medium ${selectedTab === "school-accounts"
-        ? "bg-blue-100 text-blue-600"
-        : "text-gray-700 hover:bg-gray-200"
-      }`}
-  >
-    <FontAwesomeIcon icon={faUniversity} className="w-5 h-5 mr-3" />
-    <span>School Admin Accounts</span>
-  </button>
-</li>
-
-
-
-            {/* New Applications Item */}
-            {/* <li>
-              <button
-                onClick={() => handleTabClick("applications")}
-                className={`flex items-center p-3 rounded-lg w-full text-left font-medium ${selectedTab === "applications"
-                    ? "bg-blue-100 text-blue-600"
-                    : "text-gray-700 hover:bg-gray-200"
+            {/* Remaining nav items */}
+            {navItems.slice(2).map(({ key, icon, label }) => (
+              <li key={key}>
+                <button
+                  onClick={() => clickTab(key)}
+                  className={`flex items-center w-full p-2 rounded-lg text-left font-medium ${
+                    tab === key
+                      ? "bg-blue-100 text-blue-600"
+                      : "text-gray-700 hover:bg-gray-100"
                   }`}
-              >
-                <FontAwesomeIcon icon={faFileAlt} className="w-5 h-5 mr-3" />
-                <span>Applications</span>
-              </button>
-            </li> */}
-
-            <li>
-              <button
-                onClick={() => handleTabClick("analytics")}
-                className={`flex items-center p-3 rounded-lg w-full text-left font-medium ${selectedTab === "analytics"
-                    ? "bg-blue-100 text-blue-600"
-                    : "text-gray-700 hover:bg-gray-200"
-                  }`}
-              >
-                <FontAwesomeIcon icon={faChartBar} className="w-5 h-5 mr-3" />
-                <span>Analytics</span>
-              </button>
-            </li>
-            <li>
-              <button
-                onClick={() => handleTabClick("settings")}
-                className={`flex items-center p-3 rounded-lg w-full text-left font-medium ${selectedTab === "settings"
-                    ? "bg-blue-100 text-blue-600"
-                    : "text-gray-700 hover:bg-gray-200"
-                  }`}
-              >
-                <FontAwesomeIcon icon={faCogs} className="w-5 h-5 mr-3" />
-                <span>Settings</span>
-              </button>
-            </li>
-
-            {/* Bin Section */}
-            <li>
-              <button
-                onClick={() => handleTabClick("bin")}
-                className={`flex items-center p-3 rounded-lg w-full text-left font-medium ${selectedTab === "bin"
-                    ? "bg-blue-100 text-blue-600"
-                    : "text-gray-700 hover:bg-gray-200"
-                  }`}
-              >
-                <FontAwesomeIcon icon={faTrash} className="w-5 h-5 mr-3" />
-                <span>Bin</span>
-              </button>
-            </li>
+                >
+                  <FontAwesomeIcon icon={icon} className="w-5 h-5 mr-3" />
+                  {label}
+                </button>
+              </li>
+            ))}
           </ul>
         </nav>
 
-        {/* Logout Section */}
-        <div className="mt-6">
-          <ul className="space-y-2">
-            <li>
-              <button
-                onClick={() => handleTabClick("logout")}
-                className={`flex items-center p-3 rounded-lg w-full text-left font-medium ${selectedTab === "logout"
-                    ? "bg-red-100 text-red-600"
-                    : "text-red-600 hover:bg-red-100"
-                  }`}
-              >
-                <FontAwesomeIcon icon={faSignOutAlt} className="w-5 h-5 mr-3" />
-                <span>Logout</span>
-              </button>
-            </li>
-          </ul>
-        </div>
+        {/* Logout */}
+        <button
+          onClick={() => clickTab("logout")}
+          className="mt-4 flex items-center w-full p-2 rounded-lg text-red-600 hover:bg-red-100 font-medium"
+        >
+          <FontAwesomeIcon icon={faSignOutAlt} className="w-5 h-5 mr-3" />
+          Logout
+        </button>
       </div>
-
-      {/* Main content to adjust when sidebar is open */}
-      <div
-        className={`transition-all duration-300 ${isOpen ? "ml-64" : "ml-0"
-          } lg:ml-64`} // Ensure content has a left margin equal to the sidebar width on desktop
-      >
-        {/* The rest of the content */}
-      </div>
-    </div>
+    </aside>
   );
 };
 

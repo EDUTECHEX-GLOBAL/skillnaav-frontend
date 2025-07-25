@@ -11,6 +11,7 @@ const { uploadFile } = require("../../utils/multer");
 const notifyUser = require("../../utils/notifyUser");
 const { Readable } = require("stream");
 const csvParser = require("csv-parser");
+const crypto = require("crypto");
 
 
 
@@ -535,6 +536,68 @@ const toggleStudentAccess = asyncHandler(async (req, res) => {
   });
 });
 
+// Forgot Password for School Admin
+const forgotPasswordSchoolAdmin = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  const admin = await SchoolAdmin.findOne({ email });
+
+  if (!admin) {
+    res.status(404);
+    throw new Error("No admin found with that email.");
+  }
+
+  const resetToken = crypto.randomBytes(32).toString("hex");
+  const hashedToken = crypto.createHash("sha256").update(resetToken).digest("hex");
+
+  admin.resetPasswordToken = hashedToken;
+  admin.resetPasswordExpires = Date.now() + 60 * 60 * 1000; // 1 hour
+  await admin.save();
+
+  const frontendURL = process.env.CLIENT_URL || "http://localhost:3000";
+  const resetLink = `${frontendURL}/schooladmin/reset-password/${resetToken}`;
+
+  const htmlMsg = `
+    <p>Click the link below to reset your SkillNaav password:</p>
+    <a href="${resetLink}" target="_blank">${resetLink}</a>
+    <p>This link is valid for 1 hour.</p>
+  `;
+
+  await notifyUser(
+    admin.email,
+    "SkillNaav School Admin Password Reset",
+    htmlMsg
+  );
+
+  res.status(200).json({ message: "Password reset link sent to your email." });
+});
+
+
+// Reset Password for School Admin
+const resetPasswordSchoolAdmin = asyncHandler(async (req, res) => {
+  const { token } = req.params;
+  const { password } = req.body;
+
+  const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+
+  const admin = await SchoolAdmin.findOne({
+    resetPasswordToken: hashedToken,
+    resetPasswordExpires: { $gt: Date.now() },
+  });
+
+  if (!admin) {
+    res.status(400);
+    throw new Error("Invalid or expired reset token.");
+  }
+
+  admin.password = password;
+  admin.resetPasswordToken = undefined;
+  admin.resetPasswordExpires = undefined;
+
+  await admin.save();
+
+  res.status(200).json({ message: "Password has been reset successfully." });
+});
+
 
 
 module.exports = {
@@ -550,5 +613,7 @@ module.exports = {
   getDashboardMetrics,
   getStudentsBySchoolAdmin,
   toggleStudentAccess,
+  forgotPasswordSchoolAdmin,
+  resetPasswordSchoolAdmin,
 };
 
