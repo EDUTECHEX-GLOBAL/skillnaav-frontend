@@ -9,7 +9,7 @@ const plans = [
   {
     title: "Free Plan",
     price: "$0",
-    period: "/ Month",
+    period: "",
     credits: "50 Student Credits",
     features: ["Basic Dashboard Access", "Limited Email Support"],
     button: "Get Started",
@@ -20,7 +20,7 @@ const plans = [
   {
     title: "Standard Plan",
     price: "$10",
-    period: "/ Month",
+    period: "",
     credits: "500 Student Credits",
     features: ["Full Dashboard Access", "Priority Email Support"],
     button: "Choose Standard Plan",
@@ -178,7 +178,7 @@ const SubscriptionPlans = () => {
                             value: "10.00",
                             currency_code: "USD",
                           },
-                          description: "Standard Plan Subscription",
+                          description: "One-time purchase – 500 Student Credits",
                         },
                       ],
                     });

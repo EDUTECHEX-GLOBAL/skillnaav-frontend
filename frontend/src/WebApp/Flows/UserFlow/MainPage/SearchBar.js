@@ -16,6 +16,7 @@ import FilterListIcon from "@mui/icons-material/FilterList";
 import ClearIcon from "@mui/icons-material/Clear";
 import { Skeleton } from "antd"; // Import Skeleton from Ant Design
 import Card from "./Card";
+import ApplyCards from "./ApplyCards";
 
 const FilterDialog = ({ open, onClose, onApply }) => {
   const [filters, setFilters] = useState([]);
@@ -60,6 +61,7 @@ const SearchBar = () => {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedJob, setSelectedJob] = useState(null); // ✅ new state for selected job
 
   const handleSearch = (event) => {
     setSearchTerm(event.target.value);
@@ -69,46 +71,38 @@ const SearchBar = () => {
     setSearchTerm("");
   };
 
-  const handleFilterClick = () => {
-    setIsFilterOpen(true);
-  };
-
-  const closeFilterDialog = () => {
-    setIsFilterOpen(false);
-  };
-
+  const handleFilterClick = () => setIsFilterOpen(true);
+  const closeFilterDialog = () => setIsFilterOpen(false);
   const applyFilters = (filters) => {
     setAppliedFilters(filters);
     closeFilterDialog();
   };
-
   const removeFilter = (filterIndex) => {
-    setAppliedFilters(
-      appliedFilters.filter((_, index) => index !== filterIndex)
-    );
+    setAppliedFilters(appliedFilters.filter((_, index) => index !== filterIndex));
   };
 
-  // Simulate loading of data with setTimeout
   useEffect(() => {
     const timer = setTimeout(() => {
-      setLoading(false); // Simulating data fetching delay
+      setLoading(false);
     }, 2000);
 
     return () => clearTimeout(timer);
   }, []);
 
+  // ✅ Render ApplyCards view if a job is selected
+  if (selectedJob) {
+    return (
+      <ApplyCards
+        job={selectedJob}
+        onBack={() => setSelectedJob(null)}
+      />
+    );
+  }
+
   return (
     <Box sx={{ padding: 2, fontFamily: "Poppins, sans-serif" }}>
-      {/* Search Bar */}
-      <Box
-        sx={{
-          display: "flex",
-          border: "none",
-          boxShadow: "none",
-          alignItems: "center",
-          mb: 2,
-        }}
-      >
+      {/* Search bar UI */}
+      <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
         <TextField
           fullWidth
           placeholder="Search for internships and jobs"
@@ -136,14 +130,6 @@ const SearchBar = () => {
             },
             "& .MuiInputBase-input": {
               padding: "10px 14px",
-            },
-            "& .MuiInputBase-root:hover": {
-              border: "none",
-              boxShadow: "none",
-            },
-            "& .MuiInputBase-root.Mui-focused": {
-              border: "none",
-              boxShadow: "none",
             },
           }}
         />
@@ -177,14 +163,13 @@ const SearchBar = () => {
       {/* Cards or Skeletons */}
       <Box>
         {loading ? (
-          // Skeleton loading effect from Ant Design
           <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 2 }}>
             <Skeleton active paragraph={{ rows: 3 }} />
             <Skeleton active paragraph={{ rows: 3 }} />
             <Skeleton active paragraph={{ rows: 3 }} />
           </Box>
         ) : (
-          <Card searchTerm={searchTerm} />
+          <Card searchTerm={searchTerm} onViewDetails={(job) => setSelectedJob(job)} />
         )}
       </Box>
 

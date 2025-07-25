@@ -226,35 +226,62 @@ const MiniStat = ({ icon, label, bg, onClick }) => (
 
 const StatusModal = ({ status, students, loading, onClose }) => (
   <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-    <div className="bg-white rounded-lg w-full max-w-3xl p-6 relative">
-      <h3 className="text-lg font-semibold mb-4">{`No. of Students ${status}`}</h3>
-      <button onClick={onClose} className="absolute top-2 right-4 text-xl font-bold text-gray-600 hover:text-red-600">×</button>
-      <div className="overflow-x-auto">
+    <div className="bg-white rounded-xl w-full max-w-4xl h-[80vh] p-6 relative flex flex-col shadow-xl">
+      {/* Close Button */}
+      <button
+        onClick={onClose}
+        className="absolute top-3 right-4 text-gray-500 hover:text-red-500 text-2xl font-bold"
+      >
+        &times;
+      </button>
+
+      {/* Title */}
+      <h2 className="text-xl font-semibold mb-4 text-gray-800">
+        Students {status} ({students.length})
+      </h2>
+
+      {/* Table Section */}
+      <div className="overflow-y-auto border rounded-lg flex-grow">
         {loading ? (
-          <p className="text-center text-gray-500 py-4">Loading...</p>
+          <div className="flex justify-center items-center h-full py-10">
+            <div className="animate-spin rounded-full h-10 w-10 border-t-4 border-b-4 border-pink-500" />
+          </div>
         ) : students.length === 0 ? (
-          <p className="text-center text-gray-500 py-4">No students found in this category.</p>
+          <p className="text-center text-gray-500 py-10">No students found in this category.</p>
         ) : (
-          <table className="w-full text-sm border-collapse">
-            <thead className="bg-pink-100">
+          <table className="w-full text-sm text-gray-700 border-collapse">
+            <thead className="bg-pink-100 sticky top-0 z-10">
               <tr>
-                <th className="text-left px-4 py-2 border">Name</th>
-                <th className="text-left px-4 py-2 border">Email</th>
-                <th className="text-left px-4 py-2 border">Applied Date</th>
-                <th className="text-left px-4 py-2 border">Resume</th>
-                <th className="text-left px-4 py-2 border">Status</th>
+                <th className="text-left px-4 py-3 border-b font-medium">Name</th>
+                <th className="text-left px-4 py-3 border-b font-medium">Email</th>
+                <th className="text-left px-4 py-3 border-b font-medium">Applied Date</th>
+                <th className="text-left px-4 py-3 border-b font-medium">Resume</th>
+                <th className="text-left px-4 py-3 border-b font-medium">Status</th>
               </tr>
             </thead>
             <tbody>
               {students.map((s, i) => (
-                <tr key={i} className="bg-white hover:bg-gray-100">
-                  <td className="px-4 py-2 border">{s.userName}</td>
-                  <td className="px-4 py-2 border">{s.userEmail}</td>
-                  <td className="px-4 py-2 border">{new Date(s.appliedDate).toLocaleDateString()}</td>
-                  <td className="px-4 py-2 border text-blue-600 underline">
-                    <a href={s.resumeUrl} target="_blank" rel="noopener noreferrer">View Resume</a>
+                <tr key={i} className="hover:bg-gray-50 transition">
+                  <td className="px-4 py-2 border-b">{s.userName}</td>
+                  <td className="px-4 py-2 border-b">{s.userEmail}</td>
+                  <td className="px-4 py-2 border-b">
+                    {s.appliedDate ? new Date(s.appliedDate).toLocaleDateString() : "—"}
                   </td>
-                  <td className="px-4 py-2 border">{s.status}</td>
+                  <td className="px-4 py-2 border-b">
+                    {s.resumeUrl ? (
+                      <a
+                        href={s.resumeUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline"
+                      >
+                        View Resume
+                      </a>
+                    ) : (
+                      "N/A"
+                    )}
+                  </td>
+                  <td className="px-4 py-2 border-b capitalize">{s.status}</td>
                 </tr>
               ))}
             </tbody>
@@ -264,6 +291,7 @@ const StatusModal = ({ status, students, loading, onClose }) => (
     </div>
   </div>
 );
+
 
 const formatPostedDate = (dateStr) => {
   if (!dateStr) return '';

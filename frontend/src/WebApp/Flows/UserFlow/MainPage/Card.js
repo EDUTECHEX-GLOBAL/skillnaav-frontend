@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { FaMapMarkerAlt, FaClock, FaDollarSign, FaHeart } from "react-icons/fa";
 import axios from "axios";
 
-const JobCard = ({ searchTerm }) => {
+const JobCard = ({ searchTerm, onViewDetails }) => {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -10,8 +10,8 @@ const JobCard = ({ searchTerm }) => {
   useEffect(() => {
     const fetchJobs = async () => {
       try {
-        const response = await axios.get("/api/interns"); // Fetching job data
-        setJobs(response.data); // Set jobs to the state
+        const response = await axios.get("/api/interns");
+        setJobs(response.data);
         setLoading(false);
       } catch (err) {
         console.error("Error fetching jobs:", err);
@@ -23,27 +23,20 @@ const JobCard = ({ searchTerm }) => {
     fetchJobs();
   }, []);
 
-  // Filter job data based on searchTerm and adminApproved
   const filteredJobs = jobs
-    .filter((job) => job.adminApproved) // Filter for adminApproved true
+    .filter((job) => job.adminApproved)
     .filter((job) =>
       job.jobTitle.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-  if (loading) {
-    return <p>Loading jobs...</p>;
-  }
-
-  if (error) {
-    return <p>{error}</p>;
-  }
+  if (loading) return <p>Loading jobs...</p>;
+  if (error) return <p>{error}</p>;
 
   const calculatePostedTime = (date) => {
     const postedDate = new Date(date);
     const currentDate = new Date();
     const differenceInTime = currentDate - postedDate;
     const differenceInDays = Math.floor(differenceInTime / (1000 * 60 * 60 * 24));
-
     if (differenceInDays === 0) return "Today";
     if (differenceInDays === 1) return "Yesterday";
     return `${differenceInDays}d ago`;
@@ -57,9 +50,8 @@ const JobCard = ({ searchTerm }) => {
             key={index}
             className="w-full max-w-sm p-4 border rounded-lg shadow-md relative"
           >
-            {/* Internship Type Badge and Heart Icon on Top Right */}
+            {/* Badge and Heart */}
             <div className="absolute top-2 right-2 flex items-center gap-2">
-              
               {job.internshipType === "STIPEND" && (
                 <span className="text-xs font-semibold text-green-700 bg-blue-200 px-2 py-1 rounded-full">
                   STIPEND
@@ -80,6 +72,7 @@ const JobCard = ({ searchTerm }) => {
               </button>
             </div>
 
+            {/* Job Info */}
             <div className="flex items-start gap-4">
               <img
                 src={job.imgUrl}
@@ -92,9 +85,9 @@ const JobCard = ({ searchTerm }) => {
                   {job.companyName} • {calculatePostedTime(job.createdAt)}
                 </p>
               </div>
-             
             </div>
 
+            {/* Details */}
             <div className="mt-4">
               <p className="flex items-center text-sm text-gray-500">
                 <FaMapMarkerAlt className="mr-2" />
@@ -112,11 +105,11 @@ const JobCard = ({ searchTerm }) => {
                     ? "Unpaid / Free"
                     : job.internshipType === "PAID"
                       ? `Student Pays: ${job.compensationDetails?.amount} ${job.compensationDetails?.currency}`
-                      : "N/A"
-                }
+                      : "N/A"}
               </p>
             </div>
 
+            {/* Qualifications */}
             <div className="flex gap-2 mt-4 flex-wrap">
               {job.qualifications.map((qualification, index) => (
                 <span key={index} className="text-sm bg-gray-200 text-gray-800 py-1 px-3 rounded-full">
@@ -125,10 +118,14 @@ const JobCard = ({ searchTerm }) => {
               ))}
             </div>
 
+            {/* View Details */}
             <div className="mt-4">
-              <a href="#" className="text-purple-600 text-sm font-medium">
+              <button
+                onClick={() => onViewDetails(job)} // ✅ triggers ApplyCards view
+                className="text-purple-600 text-sm font-medium"
+              >
                 View details
-              </a>
+              </button>
             </div>
           </div>
         ))

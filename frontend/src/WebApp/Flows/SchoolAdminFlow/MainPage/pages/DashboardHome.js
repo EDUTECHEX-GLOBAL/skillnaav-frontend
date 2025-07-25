@@ -9,6 +9,8 @@ import { BsFileEarmarkCheck, BsClipboardData } from "react-icons/bs";
 import { motion } from "framer-motion";
 import axios from "axios";
 import Papa from "papaparse";
+import { FiUploadCloud } from "react-icons/fi";
+
 
 const chartData = [
   { name: "Jan", value: 30 },
@@ -164,32 +166,51 @@ export default function Dashboard() {
             </div>
 
             {stat.type === "upload" ? (
-              <div className="mt-2">
-                <input
-                  type="file"
-                  accept=".csv"
-                  onChange={handleCSVChange}
-                  className="text-sm text-gray-800 file:mr-3 file:py-2 file:px-4 file:rounded-full
-                             file:border-0 file:text-sm file:font-semibold
-                             file:bg-white file:text-indigo-700 hover:file:bg-indigo-100"
-                />
-                <button
-                  onClick={handleUpload}
-                  className="mt-3 w-full bg-white text-indigo-700 font-semibold py-2 px-4 rounded hover:bg-indigo-100 transition"
-                >
-                  Upload
-                </button>
-                <a
-                  href="/student_template.csv"
-                  download
-                  className="mt-3 block w-full text-center bg-white text-indigo-700 font-semibold py-2 px-4 rounded hover:bg-indigo-100 transition"
-                >
-                  Download Template
-                </a>
-                {uploadStatus && (
-                  <p className="mt-3 text-xs text-white">{uploadStatus}</p>
-                )}
-              </div>
+              <div className="space-y-2">
+  {/* Styled file upload button */}
+<div className="flex flex-col gap-2">
+  {/* Icon-only Upload Button */}
+  <div className="flex items-center gap-2">
+    <label className="relative cursor-pointer bg-white text-indigo-700 p-2 rounded-full hover:bg-indigo-100 transition">
+      <FiUploadCloud size={24} />
+      <input
+        type="file"
+        accept=".csv"
+        onChange={handleCSVChange}
+        className="absolute left-0 top-0 w-full h-full opacity-0 cursor-pointer"
+      />
+    </label>
+    <span className="text-sm text-white truncate">
+      {selectedFile ? selectedFile.name : "No file chosen"}
+    </span>
+  </div>
+
+  {/* Upload Button */}
+  <button
+    onClick={handleUpload}
+    className="w-full bg-white text-indigo-700 font-semibold py-2 px-4 rounded hover:bg-indigo-100 transition"
+  >
+    Upload
+  </button>
+
+  {/* Download Template Link */}
+  <a
+    href="/student_template.csv"
+    download
+    className="block w-full text-center bg-white text-indigo-700 font-semibold py-2 px-4 rounded hover:bg-indigo-100 transition"
+  >
+    Download Template
+  </a>
+
+  {/* Upload status */}
+  {uploadStatus && (
+    <p className="text-xs text-white mt-2">{uploadStatus}</p>
+  )}
+</div>
+
+
+</div>
+
             ) : (
               <div className={`text-4xl font-bold ${stat.textColor}`}>
                 {stat.value}

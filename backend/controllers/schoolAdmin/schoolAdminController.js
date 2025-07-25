@@ -504,6 +504,38 @@ const getStudentsBySchoolAdmin = asyncHandler(async (req, res) => {
   res.status(200).json(students);
 });
 
+// controllers/schoolAdmin/schoolAdminController.js
+
+const toggleStudentAccess = asyncHandler(async (req, res) => {
+  const { id } = req.params; // student ID
+  const { isActive } = req.body;
+
+  const student = await Userwebapp.findByIdAndUpdate(
+    id,
+    { isActive },
+    { new: true }
+  );
+
+  if (!student) {
+    res.status(404);
+    throw new Error("Student not found.");
+  }
+
+  const statusText = isActive ? "restored" : "restricted";
+  const emailSubject = `Your SkillNaav account has been ${statusText}`;
+  const emailMessage = isActive
+    ? `Your access to SkillNaav has been restored by your school administrator. You may now log in again.`
+    : `Your access to SkillNaav has been restricted by your school administrator. You are currently blocked from logging in. Please contact your school for details.`;
+
+  await notifyUser(student.email, emailSubject, emailMessage);
+
+  res.status(200).json({
+    message: `Student access ${statusText} and notification sent.`,
+    student,
+  });
+});
+
+
 
 module.exports = {
   getAllSchoolAdmins,
@@ -517,5 +549,6 @@ module.exports = {
   activateFreeSubscription,
   getDashboardMetrics,
   getStudentsBySchoolAdmin,
+  toggleStudentAccess,
 };
 

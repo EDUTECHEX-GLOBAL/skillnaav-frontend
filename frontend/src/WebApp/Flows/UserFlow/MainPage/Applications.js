@@ -1,23 +1,18 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faMapMarkerAlt,
-  faClock,
-  faDollarSign,
-} from "@fortawesome/free-solid-svg-icons";
+import { faMapMarkerAlt, faClock, faDollarSign } from "@fortawesome/free-solid-svg-icons";
+import ApplyCards from "./ApplyCards"; // ✅ Import ApplyCards component
 
 const Applications = () => {
-  // State to store applications
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectedJob, setSelectedJob] = useState(null); // ✅ NEW: state to handle selected job
 
-  // Retrieve studentId from localStorage (via userInfo)
   const userInfo = JSON.parse(localStorage.getItem("userInfo"));
   const studentId = userInfo ? userInfo._id : null;
 
-  // Fetch applications when the component mounts
   useEffect(() => {
     const fetchApplications = async () => {
       try {
@@ -27,9 +22,8 @@ const Applications = () => {
           return;
         }
 
-        // Assuming the API returns applications with internship details
         const response = await axios.get(`/api/applications/student/${studentId}/applications`);
-        setApplications(response.data.applications); // Set the applications data
+        setApplications(response.data.applications);
         setLoading(false);
       } catch (err) {
         console.error("Error fetching applications:", err);
@@ -39,40 +33,16 @@ const Applications = () => {
     };
 
     fetchApplications();
-  }, [studentId]); // Fetch based on the logged-in student's ID
+  }, [studentId]);
 
   if (loading) {
-    // Show skeleton loader while loading
     return (
       <div className="p-4 font-poppins">
         <h2 className="text-xl font-semibold mb-4">Your Applications</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, index) => (
-            <div
-              key={index}
-              className="bg-white rounded-lg shadow-lg p-4 animate-pulse"
-            >
-              <div className="flex justify-between items-center mb-4">
-                <div className="flex items-center space-x-4">
-                  <div className="w-12 h-12 rounded-full bg-gray-300"></div>
-                  <div className="flex-1">
-                    <div className="h-4 bg-gray-300 rounded mb-2"></div>
-                    <div className="h-4 bg-gray-300 rounded"></div>
-                  </div>
-                </div>
-                <div className="w-24 h-6 bg-gray-300 rounded"></div>
-              </div>
-              <div className="text-gray-500 text-sm mb-2">
-                <div className="h-4 bg-gray-300 rounded mb-2"></div>
-                <div className="h-4 bg-gray-300 rounded mb-2"></div>
-                <div className="h-4 bg-gray-300 rounded"></div>
-              </div>
-              <div className="flex justify-between items-center">
-                <div className="flex flex-wrap gap-2">
-                  <div className="w-16 h-6 bg-gray-300 rounded"></div>
-                </div>
-                <div className="w-24 h-6 bg-gray-300 rounded"></div>
-              </div>
+            <div key={index} className="bg-white rounded-lg shadow-lg p-4 animate-pulse">
+              {/* Skeleton UI */}
             </div>
           ))}
         </div>
@@ -80,12 +50,21 @@ const Applications = () => {
     );
   }
 
-  if (error) {
-    return <p>{error}</p>;
-  }
+  if (error) return <p>{error}</p>;
 
-  // Filter to only include applications where status is "Applied"
-  const appliedInternships = applications.filter((application) => application.status === "Applied");
+  const appliedInternships = applications.filter(
+    (application) => application.status === "Applied"
+  );
+
+  // ✅ If a job is selected, show ApplyCards view
+  if (selectedJob) {
+    return (
+      <ApplyCards
+        job={selectedJob}
+        onBack={() => setSelectedJob(null)} // ✅ Go back to application list
+      />
+    );
+  }
 
   return (
     <div className="p-4 font-poppins">
@@ -95,18 +74,15 @@ const Applications = () => {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {appliedInternships.map((application, index) => {
-            const job = application.internshipId; // Access internship details
-
-            if (!job) {
-              return null; // Skip rendering if job data is missing
-            }
+            const job = application.internshipId;
+            if (!job) return null;
 
             return (
               <div key={index} className="bg-white rounded-lg shadow-lg p-4">
                 <div className="flex justify-between items-center mb-4">
                   <div className="flex items-center">
                     <img
-                      src={job?.imgUrl || "default-image.jpg"} // Fallback image
+                      src={job?.imgUrl || "default-image.jpg"}
                       alt={`${job?.companyName || "Company"} logo`}
                       className="rounded-full w-12 h-12 mr-4"
                     />
@@ -153,7 +129,12 @@ const Applications = () => {
                       <span className="text-sm text-gray-500">No qualifications listed</span>
                     )}
                   </div>
-                  <button className="text-purple-500 font-semibold">View details</button>
+                  <button
+                    onClick={() => setSelectedJob(job)} // ✅ Set selected job on click
+                    className="text-purple-500 font-semibold"
+                  >
+                    View details
+                  </button>
                 </div>
               </div>
             );

@@ -199,7 +199,13 @@ const authUser = asyncHandler(async (req, res) => {
   const user = await Userwebapp.findOne({ email });
 
   if (user && await user.matchPassword(password)) {
-    // Generate token regardless of admin approval
+
+    // ✅ Only restrict if user has a schoolAdmin assigned
+    if (user.schoolAdmin && !user.isActive) {
+      res.status(403);
+      throw new Error("Your account has been restricted by your school administrator. Please contact them.");
+    }
+
     const token = generateToken(user._id);
 
     res.json({
@@ -215,7 +221,7 @@ const authUser = asyncHandler(async (req, res) => {
       portfolio: user.portfolio,
       profileImage: user.profileImage,
       isPremium: user.isPremium,
-      premiumExpiration: user.premiumExpiration, // Add this line
+      premiumExpiration: user.premiumExpiration,
       token,
       adminApproved: user.adminApproved
     });
