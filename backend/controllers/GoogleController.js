@@ -361,6 +361,7 @@ const createTestEvent = async (email) => {
 };
 
 // Enhanced function to add schedule to Google Calendar
+
 // ✅ Function for Online Events
 function buildOnlineEvent({ slot, dateStr, startDateTime, endDateTime, internshipTitle, finalEventLink }) {
   return {

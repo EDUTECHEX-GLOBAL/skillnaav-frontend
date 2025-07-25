@@ -67,6 +67,9 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
   const [schedule, setSchedule] = useState(null);
   const [loadingSchedule, setLoadingSchedule] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState(null);
+  const [selectedSummary, setSelectedSummary] = useState(null);
+
 
   // ─── 1) Fetch internship details ───────────────────────────────────
   useEffect(() => {
@@ -157,195 +160,185 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
       );
     }
 
-    if (!schedule) {
-      return (
-        <div className="mt-4 p-4 bg-blue-50 rounded-xl text-center text-blue-600">
-          <p>Your schedule will be shared by the company soon.</p>
-        </div>
-      );
-    }
-
-    const getInstructorName = (instr) => {
-      if (!instr) return "";
-      return typeof instr === "string" ? instr : instr.name || "";
-    };
-
     return (
-      <div className="mt-4 space-y-6">
-        {/* ── Top‐Level Summary Cards ──────────────────────────────── */}
-        <div className="grid grid-cols-3 gap-4">
-          <div className="bg-gray-50 border border-gray-200 rounded-md p-3">
-            <p className="text-xs text-gray-500">Start Date</p>
-            <p className="mt-1 font-medium text-gray-800">
-              {format(parseISO(schedule.startDate), "MMM d, yyyy")}
-            </p>
+      <div>
+        <div className="mt-4">
+          {/* ── FIXED Summary Cards ──────────────────────────────── */}
+          <div className="sticky top-0 z-10 bg-white pt-2 pb-4">
+            <div className="grid grid-cols-3 gap-4 text-center">
+              <div className="bg-gray-50 border border-gray-200 rounded-md p-3 flex flex-col items-center justify-center">
+                <p className="text-xs text-gray-500">Start Date</p>
+                <p className="mt-1 font-medium text-gray-800">
+                  {format(parseISO(schedule.startDate), "MMM d, yyyy")}
+                </p>
+              </div>
+              <div className="bg-gray-50 border border-gray-200 rounded-md p-3 flex flex-col items-center justify-center">
+                <p className="text-xs text-gray-500">End Date</p>
+                <p className="mt-1 font-medium text-gray-800">
+                  {format(parseISO(schedule.endDate), "MMM d, yyyy")}
+                </p>
+              </div>
+              <div className="bg-gray-50 border border-gray-200 rounded-md p-3 flex flex-col items-center justify-center">
+                <p className="text-xs text-gray-500">Work Hours</p>
+                <p className="mt-1 font-medium text-gray-800">{schedule.workHours}</p>
+              </div>
+            </div>
           </div>
-          <div className="bg-gray-50 border border-gray-200 rounded-md p-3">
-            <p className="text-xs text-gray-500">End Date</p>
-            <p className="mt-1 font-medium text-gray-800">
-              {format(parseISO(schedule.endDate), "MMM d, yyyy")}
-            </p>
-          </div>
-          <div className="bg-gray-50 border border-gray-200 rounded-md p-3">
-            <p className="text-xs text-gray-500">Work Hours</p>
-            <p className="mt-1 font-medium text-gray-800">
-              {schedule.workHours}
-            </p>
-          </div>
-        </div>
 
-        {/* ── Per‐Session Table ─────────────────────────────────────── */}
-        <div className="overflow-x-auto">
-          <table className="min-w-full bg-white rounded-lg">
-            <thead className="bg-indigo-50 border-b border-indigo-200">
-              <tr>
-                <th className="px-4 py-2 text-xs font-medium text-gray-600">Date</th>
-                <th className="px-4 py-2 text-xs font-medium text-gray-600">Day</th>
-                <th className="px-4 py-2 text-xs font-medium text-gray-600">Time</th>
-                <th className="px-4 py-2 text-xs font-medium text-gray-600">Instructor</th>
-                <th className="px-4 py-2 text-xs font-medium text-gray-600">Summary</th>
-                <th className="px-4 py-2 text-xs font-medium text-gray-600">Meeting Link</th>
-                <th className="px-4 py-2 text-xs font-medium text-gray-600">Type</th>
-              </tr>
-            </thead>
+          {/* ── SCROLLABLE Session Table ─────────────────────────── */}
+          <div className="mt-4 max-h-[65vh] overflow-auto relative hide-scrollbar">
+            <table className="min-w-full bg-white rounded-lg">
+              <thead className="bg-indigo-50 border-b border-indigo-200 sticky top-0 z-10">
+                <tr>
+                  <th className="px-4 py-2 text-xs font-medium text-gray-600 text-center">Date</th>
+                  <th className="px-4 py-2 text-xs font-medium text-gray-600 text-center">Day</th>
+                  <th className="px-4 py-2 text-xs font-medium text-gray-600 text-center">Time</th>
+                  <th className="px-4 py-2 text-xs font-medium text-gray-600 text-center">Summary</th>
+                  <th className="px-4 py-2 text-xs font-medium text-gray-600 text-center">Section Link</th>
+                  <th className="px-4 py-2 text-xs font-medium text-gray-600 text-center">Type</th>
+                </tr>
+              </thead>
+              <tbody>
+                {schedule.timetable.map((session, idx) => {
+                  const summaryText = session.sectionSummary || "-";
+                  const isOnline = session.type === "online";
+                  const isOffline = session.type === "offline";
 
-            <tbody>
-              {schedule.timetable.map((session, idx) => {
-                const instructorName = getInstructorName(session.instructor);
-                const summaryText = session.sectionSummary || "-";
-                const isOnline = session.type === "online";
-                const isOffline = session.type === "offline";
+                  const startDateTime = parseDateTime(session.date, session.startTime || "");
+                  const endDateTime = parseDateTime(session.date, session.endTime || "");
+                  const canBuildCalendar = isValid(startDateTime) && isValid(endDateTime);
 
-                // ── Parse start/end into JS Date objects ────────────
-                const startDateTime = parseDateTime(session.date, session.startTime || "");
-                const endDateTime = parseDateTime(session.date, session.endTime || "");
-                const canBuildCalendar =
-                  isValid(startDateTime) && isValid(endDateTime);
+                  let gcalUrl = "";
+                  if (canBuildCalendar) {
+                    const title = `Internship Session: ${session.sectionSummary || "Session"}`;
+                    const locationForGc =
+                      isOnline && session.eventLink
+                        ? normalizeUrl(session.eventLink)
+                        : session.location?.address
+                          ? `${session.location.name}, ${session.location.address}`
+                          : "";
 
-                let gcalUrl = "";
-                if (canBuildCalendar) {
-                  const title = `Internship Session: ${session.sectionSummary || "Session"}`;
-                  const locationForGc =
-                    isOnline && session.eventLink
-                      ? normalizeUrl(session.eventLink)
-                      : session.location?.address
-                        ? `${session.location.name}, ${session.location.address}`
-                        : "";
-                  const description = `
-Instructor: ${instructorName}
-Summary: ${summaryText}
-Type: ${session.type}
+                    const description = `
+                    Summary: ${summaryText}
+                    Type: ${session.type}
                   `.trim();
 
-                  gcalUrl = buildGoogleCalendarUrl({
-                    title,
-                    startDate: startDateTime,
-                    endDate: endDateTime,
-                    location: locationForGc,
-                    description,
-                  });
-                }
+                    gcalUrl = buildGoogleCalendarUrl({
+                      title,
+                      startDate: startDateTime,
+                      endDate: endDateTime,
+                      location: locationForGc,
+                      description,
+                    });
+                  }
 
-                return (
-                  <tr
-                    key={idx}
-                    className={idx % 2 === 0 ? "bg-gray-50" : "bg-white"}
-                  >
-                    <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
-                      {format(parseISO(session.date), "dd MMM yyyy")}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
-                      {format(parseISO(session.date), "EEE")}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
-                      {session.startTime} - {session.endTime}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
-                      {instructorName || "—"}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-700 max-w-xs">
-                      {summaryText}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
-                      {isOnline ? (
-                        session.eventLink ? (
-                          <a
-                            href={normalizeUrl(session.eventLink)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center text-indigo-600 hover:text-indigo-800 text-xs font-medium"
-                          >
-                            <FontAwesomeIcon icon={faLink} className="mr-1" />
-                            Join Meeting
-                          </a>
-                        ) : (
-                          <span className="text-gray-400 text-xs">Link Pending</span>
-                        )
-                      ) : isOffline ? (
-                        session.location?.address ? (
-                          <p className="inline-flex items-center">
-                            <FontAwesomeIcon
-                              icon={faMapMarkerAlt}
-                              className="mr-1 text-gray-600"
-                            />
-                            <span className="text-gray-700 text-sm">
-                              {session.location.name}, {session.location.address}
-                            </span>
-                          </p>
-                        ) : (
-                          <span className="text-gray-400 text-xs">Location TBA</span>
-                        )
-                      ) : (
-                        // Hybrid
-                        <>
-                          {session.eventLink && (
+                  return (
+                    <tr
+                      key={idx}
+                      className={idx % 2 === 0 ? "bg-gray-50" : "bg-white"}
+                    >
+                      <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap text-center">
+                        {format(parseISO(session.date), "dd MMM yyyy")}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap text-center">
+                        {format(parseISO(session.date), "EEE")}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap text-center">
+                        {session.startTime} - {session.endTime}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-indigo-600 hover:text-indigo-800 whitespace-nowrap text-center">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSelectedSummary({
+                              sectionSummary: summaryText,
+                              instructor: session.instructor || ""
+                            })
+                          }
+                          className="text-indigo-600 hover:underline text-xs font-medium"
+                        >
+                          View Summary
+                        </button>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap text-center">
+                        {isOnline ? (
+                          session.eventLink ? (
                             <a
                               href={normalizeUrl(session.eventLink)}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center text-indigo-600 hover:text-indigo-800 text-xs font-medium mr-2"
+                              className="inline-flex items-center text-indigo-600 hover:text-indigo-800 text-xs font-medium"
                             >
                               <FontAwesomeIcon icon={faLink} className="mr-1" />
                               Join Meeting
                             </a>
-                          )}
-                          {session.location?.address && (
-                            <p className="inline-flex items-center">
-                              <FontAwesomeIcon
-                                icon={faMapMarkerAlt}
-                                className="mr-1 text-gray-600"
-                              />
-                              <span className="text-gray-700 text-sm">
-                                {session.location.name}
-                              </span>
-                            </p>
-                          )}
-                          {!session.eventLink && !session.location?.address && (
-                            <span className="text-gray-400 text-xs">TBA</span>
-                          )}
-                        </>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-sm whitespace-nowrap">
-                      <span
-                        className={`
+                          ) : (
+                            <span className="text-gray-400 text-xs">Link Pending</span>
+                          )
+                        ) : isOffline ? (
+                          session.location?.address ? (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedLocation(session.location)}
+                              className="inline-flex items-center text-indigo-600 hover:text-indigo-800 text-xs font-medium"
+                            >
+                              <FontAwesomeIcon icon={faMapMarkerAlt} className="mr-1" />
+                              Location
+                            </button>
+                          ) : (
+                            <span className="text-gray-400 text-xs">Location TBA</span>
+                          )
+                        ) : (
+                          <>
+                            {session.eventLink && (
+                              <a
+                                href={normalizeUrl(session.eventLink)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center text-indigo-600 hover:text-indigo-800 text-xs font-medium mr-2"
+                              >
+                                <FontAwesomeIcon icon={faLink} className="mr-1" />
+                                Join Meeting
+                              </a>
+                            )}
+                            {session.location?.address && (
+                              <p className="inline-flex items-center">
+                                <FontAwesomeIcon
+                                  icon={faMapMarkerAlt}
+                                  className="mr-1 text-gray-600"
+                                />
+                                <span className="text-gray-700 text-sm">
+                                  {session.location.name}
+                                </span>
+                              </p>
+                            )}
+                            {!session.eventLink && !session.location?.address && (
+                              <span className="text-gray-400 text-xs">TBA</span>
+                            )}
+                          </>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm whitespace-nowrap text-center">
+                        <span
+                          className={`
                           inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full capitalize
                           ${isOnline
-                            ? "bg-blue-100 text-blue-700"
-                            : isOffline
-                              ? "bg-green-100 text-green-700"
-                              : "bg-purple-100 text-purple-700"
-                          }
+                              ? "bg-blue-100 text-blue-700"
+                              : isOffline
+                                ? "bg-green-100 text-green-700"
+                                : "bg-purple-100 text-purple-700"
+                            }
                         `}
-                      >
-                        {session.type}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                        >
+                          {session.type}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     );
@@ -398,8 +391,8 @@ Type: ${session.type}
               <button
                 onClick={confirmRespond}
                 className={`px-4 py-2 rounded-lg text-white transition ${responseType === "Accepted"
-                    ? "bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600"
-                    : "bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600"
+                  ? "bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600"
+                  : "bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600"
                   }`}
               >
                 Yes, {responseType}
@@ -434,10 +427,10 @@ Type: ${session.type}
         </div>
         <span
           className={`text-xs font-medium px-3 py-1 rounded-full ${offer.status === "Accepted"
-              ? "bg-green-100 text-green-700"
-              : offer.status === "Rejected"
-                ? "bg-red-100 text-red-700"
-                : "bg-blue-100 text-blue-700"
+            ? "bg-green-100 text-green-700"
+            : offer.status === "Rejected"
+              ? "bg-red-100 text-red-700"
+              : "bg-blue-100 text-blue-700"
             }`}
         >
           {offer.status}
@@ -488,35 +481,33 @@ Type: ${session.type}
 
       {/* VIEW SCHEDULE BUTTON */}
       {/* VIEW SCHEDULE & LINK CALENDAR BUTTONS */}
-{offer.status.toLowerCase() === "accepted" && (
-  <div className="mt-4 space-y-2">
-    <button
-      onClick={() => setShowScheduleModal(true)}
-      className="flex items-center text-indigo-600 hover:text-indigo-800 text-sm font-medium"
-    >
-      <FontAwesomeIcon
-        icon={faCalendarAlt}
-        className="mr-1 text-indigo-500"
-      />
-      View Schedule
-    </button>
+      {offer.status.toLowerCase() === "accepted" && (
+        <div className="mt-4 space-y-2">
+          <button
+            onClick={() => setShowScheduleModal(true)}
+            className="flex items-center text-indigo-600 hover:text-indigo-800 text-sm font-medium"
+          >
+            <FontAwesomeIcon
+              icon={faCalendarAlt}
+              className="mr-1 text-indigo-500"
+            />
+            View Schedule
+          </button>
 
-    {/* ✅ LINK GOOGLE CALENDAR */}
-   <a
-  href="/api/google/auth"
-  className="inline-block bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition"
->
-  Link Google Calendar
-</a>
+          {/* ✅ LINK GOOGLE CALENDAR */}
+          <a
+            href="/api/google/auth"
+            className="inline-block bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition"
+          >
+            Link Google Calendar
+          </a>
 
-  </div>
-)}
+        </div>
+      )}
 
-
-      {/* SCHEDULE MODAL */}
       {showScheduleModal && (
         <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto relative p-6">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl relative p-6">
             <button
               onClick={() => setShowScheduleModal(false)}
               className="absolute top-3 right-3 text-gray-500 hover:text-gray-700 text-2xl"
@@ -530,7 +521,83 @@ Type: ${session.type}
               />
               Internship Schedule
             </h2>
+
+            {/* Schedule Table */}
             {renderSchedule()}
+
+            {/* LOCATION MODAL */}
+            {selectedLocation && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+                <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-md relative">
+                  <button
+                    onClick={() => setSelectedLocation(null)}
+                    className="absolute top-3 right-3 text-gray-500 hover:text-gray-700 text-xl"
+                  >
+                    &times;
+                  </button>
+
+                  <h3 className="text-lg font-semibold text-gray-800 mb-6 flex items-center">
+                    <FontAwesomeIcon icon={faMapMarkerAlt} className="mr-2 text-indigo-600" />
+                    Location Details
+                  </h3>
+
+                  <div className="text-sm text-gray-700 space-y-6">
+                    <p>
+                      <strong className="text-gray-700">Location Name:</strong>{" "}
+                      {selectedLocation.name || "—"}
+                    </p>
+                    <p>
+                      <strong className="text-gray-700">Address:</strong>{" "}
+                      {selectedLocation.address || "—"}
+                    </p>
+                    <p>
+                      <strong className="text-gray-700">Map Link:</strong>{" "}
+                      {selectedLocation.mapLink ? (
+                        <a
+                          href={normalizeUrl(selectedLocation.mapLink)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-indigo-600 hover:underline"
+                        >
+                          View on Map
+                        </a>
+                      ) : (
+                        "—"
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ✅ SUMMARY MODAL → PLACE HERE */}
+            {selectedSummary && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+                <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-md relative">
+                  <button
+                    onClick={() => setSelectedSummary(null)}
+                    className="absolute top-3 right-3 text-gray-500 hover:text-gray-700 text-xl"
+                  >
+                    &times;
+                  </button>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-6 flex items-center">
+                    <FontAwesomeIcon icon={faClock} className="mr-2 text-indigo-600" />
+                    Summary
+                  </h3>
+                  <div className="text-sm text-gray-700 space-y-6">
+                    <p>
+                      <strong className="text-gray-700">Section Summary:</strong>{" "}
+                      {selectedSummary.sectionSummary || "—"}
+                    </p>
+                    <p>
+                      <strong className="text-gray-700">Instructor Name:</strong>{" "}
+                      {selectedSummary.instructor || "—"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
           </div>
         </div>
       )}

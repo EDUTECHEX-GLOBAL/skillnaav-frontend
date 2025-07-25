@@ -25,7 +25,8 @@ const renderLocationFields = (prefix, location, handleChange) => (
   <div className="mt-4">
     <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center">
       <FiMapPin className="mr-2 text-indigo-600" />
-      Location Details
+      <span className="mr-1">Location Details</span>
+      <span className="text-sm text-gray-400 font-normal">(Optional)</span>
     </h4>
     <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
       <div>
@@ -159,9 +160,8 @@ const ScheduleForm = ({ internshipId, onClose }) => {
 
   const handleFormChange = e => {
     const { name, value } = e.target;
-    if (name.startsWith('location.')) {
-      // defaultLocation fields
-      const field = name.split('.')[1];
+    if (name.startsWith('location') && name.split('.').length === 2) {
+      const [, field] = name.split('.');
       setForm(f => ({
         ...f,
         defaultLocation: {
@@ -169,7 +169,8 @@ const ScheduleForm = ({ internshipId, onClose }) => {
           [field]: value
         }
       }));
-    } else {
+    }
+    else {
       setForm(f => ({ ...f, [name]: value }));
     }
   };
@@ -218,7 +219,10 @@ const ScheduleForm = ({ internshipId, onClose }) => {
         const excelEntry = excelData[key.trim()] || {};
 
         const entryType = excelEntry.type || defaultType;
-        const useExcelData = defaultType === 'hybrid' || entryType === defaultType;
+        const useExcelData = Object.keys(excelEntry).length > 0;
+
+        const resolvedType =
+          defaultType === 'hybrid' ? (entryType === 'online' || entryType === 'offline' ? entryType : 'online') : defaultType;
 
         days.push({
           date: d.toISOString().split('T')[0],
@@ -229,17 +233,17 @@ const ScheduleForm = ({ internshipId, onClose }) => {
           sectionSummary: useExcelData ? excelEntry.summary || '' : '',
           instructor: useExcelData ? excelEntry.instructor || '' : '',
           assignment: null,
-          type: defaultType === 'hybrid' ? (entryType || 'online') : defaultType,
+          type: resolvedType,
           eventLink:
-            (entryType === 'online' && useExcelData)
-              ? (excelEntry.link || defaultEventLink)
+            resolvedType === 'online'
+              ? (useExcelData ? excelEntry.link || form.defaultEventLink : form.defaultEventLink)
               : '',
           location:
-            (entryType === 'offline' && useExcelData)
+            resolvedType === 'offline'
               ? {
-                name: excelEntry.locationName || defaultLocation.name,
-                address: excelEntry.address || defaultLocation.address,
-                mapLink: excelEntry.mapLink || defaultLocation.mapLink
+                name: useExcelData ? (excelEntry.locationName || form.defaultLocation.name) : form.defaultLocation.name,
+                address: useExcelData ? (excelEntry.address || form.defaultLocation.address) : form.defaultLocation.address,
+                mapLink: useExcelData ? (excelEntry.mapLink || form.defaultLocation.mapLink) : form.defaultLocation.mapLink
               }
               : {
                 name: '',
@@ -248,7 +252,6 @@ const ScheduleForm = ({ internshipId, onClose }) => {
               },
           events: []
         });
-
         dayCounter++;
       }
     }
@@ -269,8 +272,21 @@ const ScheduleForm = ({ internshipId, onClose }) => {
     setTimetable(tt => {
       const copy = [...tt];
       copy[idx][field] = val;
+
+      // Reset fields when type changes
+      if (field === 'type') {
+        if (val === 'online') {
+          copy[idx].location = { name: '', address: '', mapLink: '' };
+          copy[idx].eventLink = form.defaultEventLink || '';
+        } else if (val === 'offline') {
+          copy[idx].eventLink = '';
+          copy[idx].location = form.defaultLocation || { name: '', address: '', mapLink: '' };
+        }
+      }
+
       return copy;
     });
+
 
   const changeLocationField = (idx, field, val) =>
     setTimetable(tt => {
@@ -455,7 +471,7 @@ const ScheduleForm = ({ internshipId, onClose }) => {
                   name="workHours"
                   value={form.workHours}
                   onChange={handleFormChange}
-                  placeholder="e.g., 9 AM - 5 PM"
+                  placeholder="e.g., 09:00 - 17:00"
                   className="block w-full px-4 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   required
                 />
@@ -534,7 +550,8 @@ const ScheduleForm = ({ internshipId, onClose }) => {
                     {/* Default Meeting Link Section with original font style and icon heading */}
                     <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center">
                       <FiLink className="mr-2 text-indigo-600" />
-                      Default Meeting Link
+                      <span className="mr-1">Default Meeting Link</span>
+                      <span className="text-sm text-gray-400 font-normal">(Optional)</span>
                     </h4>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
@@ -548,6 +565,17 @@ const ScheduleForm = ({ internshipId, onClose }) => {
                         placeholder="https://meet.example.com/your-link"
                         className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                       />
+                    </div>
+
+                    {/* DOWNLOAD TEMPLATE BUTTON FOR ONLINE*/}
+                    <div className="pt-2">
+                      <a
+                        href="/Online%20Internship%20Schedule%20Template.xlsx"
+                        download
+                        className="inline-block px-5 py-2 bg-blue-100 text-blue-700 text-sm font-semibold rounded-lg hover:bg-blue-200 transition"
+                      >
+                        Download Online Internship Schedule Template
+                      </a>
                     </div>
                   </div>
                 )}
@@ -597,12 +625,24 @@ const ScheduleForm = ({ internshipId, onClose }) => {
 
                     {/* Location Details */}
                     {renderLocationFields('location', form.defaultLocation, handleFormChange)}
+
+                    {/* DOWNLOAD TEMPLATE BUTTON FOR OFFLINE */}
+                    <div className="pt-2">
+                      <a
+                        href="/Offline%20Internship%20Schedule%20Template.xlsx"
+                        download
+                        className="inline-block px-5 py-2 bg-blue-100 text-blue-700 text-sm font-semibold rounded-lg hover:bg-blue-200 transition"
+                      >
+                        Download Offline Internship Schedule Template
+                      </a>
+                    </div>
                   </div>
                 )}
 
                 {/* Section Timings – only for hybrid */}
                 {form.defaultType === 'hybrid' && (
                   <div className="bg-white mt-6 p-5 rounded-xl border border-gray-300 space-y-6">
+                    {/* Section Timings */}
                     <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center">
                       <FiClock className="mr-2 text-indigo-600" />
                       Section Timings
@@ -641,8 +681,42 @@ const ScheduleForm = ({ internshipId, onClose }) => {
                         </div>
                       </div>
                     </div>
+
+                    {/* Default Meeting Link – Optional */}
+                    <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center">
+                      <FiLink className="mr-2 text-indigo-600" />
+                      Default Meeting Link <span className="ml-2 text-sm text-gray-400 font-normal">(Optional)</span>
+                    </h4>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                        <FiLink />
+                      </div>
+                      <input
+                        type="url"
+                        name="defaultEventLink"
+                        value={form.defaultEventLink}
+                        onChange={handleFormChange}
+                        placeholder="https://meet.example.com/your-link"
+                        className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      />
+                    </div>
+
+                    {/* Default Location Details – Optional */}
+                    {renderLocationFields('location', form.defaultLocation, handleFormChange)}
+
+                    {/* Download Template */}
+                    <div className="pt-2">
+                      <a
+                        href="/Hybrid%20Internship%20Schedule%20Template.xlsx"
+                        download
+                        className="inline-block px-5 py-2 bg-blue-100 text-blue-700 text-sm font-semibold rounded-lg hover:bg-blue-200 transition"
+                      >
+                        Download Hybrid Internship Schedule Template
+                      </a>
+                    </div>
                   </div>
                 )}
+
               </div>
 
               {/* Weekday Selection + Excel Upload */}
@@ -788,44 +862,40 @@ const ScheduleForm = ({ internshipId, onClose }) => {
                                 className="text-sm rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
                               />
                             </div>
-                            {(() => {
-                              const isHybrid = new Set(timetable.map(d => d.type)).size > 1;
-                              return isHybrid ? (
-                                <select
-                                  value={day.type}
-                                  onChange={e => changeField(idx, 'type', e.target.value)}
-                                  className="text-sm mt-5 rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
-                                >
+                            {form.defaultType === 'hybrid' ? (
+                              <select
+                                value={day.type}
+                                onChange={e => changeField(idx, 'type', e.target.value)}
+                                className="text-sm mt-5 rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
+                              >
+                                <option value="online">online</option>
+                                <option value="offline">offline</option>
+                              </select>
+                            ) : (
+                              <span className="text-sm text-gray-700 capitalize font-medium">{day.type}</span>
+                            )}
 
-                                  {['online', 'offline'].map(type => (
-                                    <option key={type} value={type}>
-                                      {type}
-                                    </option>
-                                  ))}
-                                </select>
-                              ) : (
-                                <span className="text-sm text-gray-700 capitalize font-medium">{day.type}</span>
-                              );
-                            })()}
                           </div>
                         )}
                       </div>
 
                       {day.selected && (
                         <div className="mt-4 ml-14 space-y-4">
-                          {(day.type === 'online' || day.type === 'hybrid') && (
-                            <div className="relative">
-                              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                                <FiLink size={14} />
-                              </div>
+                          {/* Show only if the selected type is online */}
+                          {day.type === 'online' && (
+                            <>
+                              <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center">
+                                <FiLink className="mr-2 text-indigo-600" />
+                                Default Meeting Link
+                              </h4>
                               <input
                                 type="text"
                                 value={day.eventLink}
                                 onChange={e => changeField(idx, 'eventLink', e.target.value)}
                                 placeholder="Meeting link"
-                                className="block w-full pl-10 pr-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                                className="block w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
                               />
-                            </div>
+                            </>
                           )}
 
                           {/* Section Summary Input */}
@@ -871,11 +941,47 @@ const ScheduleForm = ({ internshipId, onClose }) => {
                             />
                           </div>
 
-                          {(day.type === 'offline' || day.type === 'hybrid') &&
-                            renderLocationFields(`location-${idx}`, day.location, e => {
-                              const field = e.target.name.split('.')[1];
-                              changeLocationField(idx, field, e.target.value);
-                            })}
+                          {/* Show location fields only if type is offline */}
+                          {day.type === 'offline' && (
+                            <div className="mt-4">
+                              <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center">
+                                <FiMapPin className="mr-2 text-indigo-600" />
+                                Location Details
+                              </h4>
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-1">Location Name</label>
+                                  <input
+                                    type="text"
+                                    value={day.location.name || ''}
+                                    onChange={e => changeLocationField(idx, 'name', e.target.value)}
+                                    placeholder="Building / Room Name"
+                                    className="block w-full pl-3 pr-3 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                                  <input
+                                    type="text"
+                                    value={day.location.address || ''}
+                                    onChange={e => changeLocationField(idx, 'address', e.target.value)}
+                                    placeholder="Full Address"
+                                    className="block w-full pl-3 pr-3 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-1">Map Link</label>
+                                  <input
+                                    type="url"
+                                    value={day.location.mapLink || ''}
+                                    onChange={e => changeLocationField(idx, 'mapLink', e.target.value)}
+                                    placeholder="https://maps.example.com/your-location"
+                                    className="block w-full pl-3 pr-3 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
