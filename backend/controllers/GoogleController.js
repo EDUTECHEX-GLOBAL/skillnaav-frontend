@@ -148,7 +148,7 @@ const googleCallback = async (req, res) => {
     res.send(`
   <html>
     <head>
-      <title>Authentication Success</title>
+      <title>Google Sync Successful</title>
       <style>
         body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
         .success { color: #28a745; }
@@ -156,27 +156,28 @@ const googleCallback = async (req, res) => {
       </style>
     </head>
     <body>
-      <h1 class="success">Google account linked successfully!</h1>
+      <h1 class="success">✅ Google Calendar Sync Successful!</h1>
       <p>Email: ${email}</p>
       <div class="info">
-        <p>✅ Calendar access has been granted</p>
-        <p>🔗 <a href="https://calendar.google.com" target="_blank">View your Google Calendar</a></p>
-        <p>⚠️ Check your browser console for test event creation status</p>
+        <p>📅 Internship schedule has been synced to your calendar.</p>
+        <p>🔗 <a href="https://calendar.google.com" target="_blank">Open Google Calendar</a></p>
       </div>
-      <p>Redirecting...</p>
-      <script>
-        // 🌐 Mark Google auth state
-        localStorage.setItem('redirectTab', 'offer-letter');
-        localStorage.setItem('googleAuthSuccess', 'true');
+      <p>Redirecting to your dashboard...</p>
 
-        // 🔁 Restore userToken if it exists in sessionStorage
+      <script>
+        // ✅ Restore session safely
         const token = sessionStorage.getItem('userToken');
-        if (token && !localStorage.getItem('userToken')) {
+        if (token) {
           localStorage.setItem('userToken', token);
         }
 
-        // 🚀 Redirect
-        window.location.href = "/user-main-page";
+        // ✅ Mark Google auth success
+        localStorage.setItem('googleAuthSuccess', 'true');
+
+        // ✅ Redirect to user dashboard after 2 seconds
+        setTimeout(() => {
+          window.location.href = "/user-main-page";
+        }, 2000);
       </script>
     </body>
   </html>

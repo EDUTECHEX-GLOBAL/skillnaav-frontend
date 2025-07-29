@@ -119,16 +119,17 @@ const getOfferLetterByStudent = async (req, res) => {
       return res.status(400).json({ error: 'Invalid student ID' });
     }
 
-    const offer = await OfferLetter.findOne({ studentId });
-    if (!offer) {
-      return res.status(404).json({ error: 'No offer letter found for this student' });
+    const offers = await OfferLetter.find({ studentId }); // ✅ Fetch all offers
+    if (!offers.length) {
+      return res.status(404).json({ error: 'No offer letters found for this student' });
     }
 
-    return res.status(200).json(offer);
+    return res.status(200).json(offers); // ✅ Return array of offers
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
 };
+
 
 const updateOfferStatus = async (req, res) => {
   try {

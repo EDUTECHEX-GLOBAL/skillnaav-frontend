@@ -1,5 +1,5 @@
 // OfferLetterCard.jsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import axios from "axios";
 import {
   faMapMarkerAlt,
@@ -14,6 +14,7 @@ import {
   format,
   parseISO,
   isValid,
+  isToday,
 } from "date-fns";
 
 // ─── Google Calendar URL Helper ─────────────────────────────────────────
@@ -69,6 +70,8 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [selectedSummary, setSelectedSummary] = useState(null);
+  const scrollContainerRef = useRef(null);
+const rowRefs = useRef({});
 
 
   // ─── 1) Fetch internship details ───────────────────────────────────
@@ -118,6 +121,26 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
 
     fetchSchedule();
   }, [job, offer.status]);
+
+  useEffect(() => {
+  if (showScheduleModal && schedule?.timetable?.length > 0) {
+    const todaySession = schedule.timetable.find((session) =>
+      isToday(parseISO(session.date))
+    );
+
+    if (todaySession) {
+      const refKey = `${todaySession.date}-${todaySession.startTime}`;
+      const todayRef = rowRefs.current[refKey];
+      if (todayRef?.current && scrollContainerRef.current) {
+        // Smooth scroll to today's row
+        scrollContainerRef.current.scrollTo({
+          top: todayRef.current.offsetTop - 20, // Optional offset
+          behavior: "smooth",
+        });
+      }
+    }
+  }
+}, [showScheduleModal, schedule]);
 
   const handleRespond = (type) => {
     setResponseType(type);
@@ -186,7 +209,10 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
           </div>
 
           {/* ── SCROLLABLE Session Table ─────────────────────────── */}
-          <div className="mt-4 max-h-[65vh] overflow-auto relative hide-scrollbar">
+          <div
+  ref={scrollContainerRef}
+  className="mt-4 max-h-[65vh] overflow-auto relative hide-scrollbar"
+>
             <table className="min-w-full bg-white rounded-lg">
               <thead className="bg-indigo-50 border-b border-indigo-200 sticky top-0 z-10">
                 <tr>
@@ -200,6 +226,13 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
               </thead>
               <tbody>
                 {schedule.timetable.map((session, idx) => {
+  const sessionDate = parseISO(session.date);
+  const isTodaySession = isValid(sessionDate) && isToday(sessionDate);
+  const rowRefKey = `${session.date}-${session.startTime}`;
+
+  if (isTodaySession) {
+    rowRefs.current[rowRefKey] = React.createRef();
+  }
                   const summaryText = session.sectionSummary || "-";
                   const isOnline = session.type === "online";
                   const isOffline = session.type === "offline";
@@ -234,9 +267,10 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
 
                   return (
                     <tr
-                      key={idx}
-                      className={idx % 2 === 0 ? "bg-gray-50" : "bg-white"}
-                    >
+  key={idx}
+  ref={isTodaySession ? rowRefs.current[rowRefKey] : null}
+  className={idx % 2 === 0 ? "bg-gray-50" : "bg-white"}
+>
                       <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap text-center">
                         {format(parseISO(session.date), "dd MMM yyyy")}
                       </td>
@@ -497,7 +531,7 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
           {/* ✅ LINK GOOGLE CALENDAR */}
           <a
             href="/api/google/auth"
-            className="inline-block bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition"
+            className="inline-block bg-blue-  600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition"
           >
             Link Google Calendar
           </a>
