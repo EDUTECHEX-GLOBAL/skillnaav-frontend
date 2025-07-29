@@ -147,39 +147,57 @@ const googleCallback = async (req, res) => {
 
     res.send(`
   <html>
-    <head>
-      <title>Authentication Success</title>
-      <style>
-        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
-        .success { color: #28a745; }
-        .info { color: #17a2b8; margin-top: 20px; }
-      </style>
-    </head>
-    <body>
-      <h1 class="success">Google account linked successfully!</h1>
-      <p>Email: ${email}</p>
-      <div class="info">
-        <p>✅ Calendar access has been granted</p>
-        <p>🔗 <a href="https://calendar.google.com" target="_blank">View your Google Calendar</a></p>
-        <p>⚠️ Check your browser console for test event creation status</p>
-      </div>
-      <p>Redirecting...</p>
-      <script>
-        // 🌐 Mark Google auth state
-        localStorage.setItem('redirectTab', 'offer-letter');
-        localStorage.setItem('googleAuthSuccess', 'true');
+  <head>
+    <title>Google Sync Successful</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        text-align: center;
+        padding: 50px;
+      }
+      .success {
+        color: #28a745;
+      }
+      .info {
+        color: #17a2b8;
+        margin-top: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1 class="success">✅ Google Calendar Sync Successful!</h1>
+    <p>Email: ${email}</p>
+    <div class="info">
+      <p>📅 Internship schedule has been synced to your calendar.</p>
+      <p>🔗 <a href="https://calendar.google.com" target="_blank">Open Google Calendar</a></p>
+    </div>
+    <p>Redirecting to your dashboard...</p>
 
-        // 🔁 Restore userToken if it exists in sessionStorage
+    <script>
+      // Force restore user session token from sessionStorage
+      try {
         const token = sessionStorage.getItem('userToken');
-        if (token && !localStorage.getItem('userToken')) {
+        if (token) {
           localStorage.setItem('userToken', token);
+          console.log('✅ User token restored to localStorage.');
+        } else {
+          console.warn('⚠️ No user token found in sessionStorage.');
         }
 
-        // 🚀 Redirect
+        // Mark Google sync success
+        localStorage.setItem('googleAuthSuccess', 'true');
+
+        // Redirect after brief delay
+        setTimeout(() => {
+          window.location.href = "/user-main-page";
+        }, 1500);
+      } catch (e) {
+        console.error("Error restoring session token:", e);
         window.location.href = "/user-main-page";
-      </script>
-    </body>
-  </html>
+      }
+    </script>
+  </body>
+</html>
 `);
 
   } catch (err) {
@@ -361,6 +379,7 @@ const createTestEvent = async (email) => {
 };
 
 // Enhanced function to add schedule to Google Calendar
+
 // ✅ Function for Online Events
 function buildOnlineEvent({ slot, dateStr, startDateTime, endDateTime, internshipTitle, finalEventLink }) {
   return {
@@ -571,8 +590,20 @@ const addScheduleToGoogleCalendar = async ({ studentEmail, timetable, internship
 
         // Create proper datetime strings for IST timezone
         const startDateTime = createISTDateTime(dateStr, slot.startTime);
-        const endDateTime = createISTDateTime(dateStr, slot.endTime);
+        let endDateTime;
 
+const [startHour, startMin] = slot.startTime.split(":").map(Number);
+const [endHour, endMin] = slot.endTime.split(":").map(Number);
+
+if (endHour < startHour || (endHour === startHour && endMin <= startMin)) {
+  // End time is next day
+  const endDateObj = new Date(dateStr);
+  endDateObj.setDate(endDateObj.getDate() + 1);
+  const endDateStr = endDateObj.toISOString().split("T")[0];
+  endDateTime = createISTDateTime(endDateStr, slot.endTime);
+} else {
+  endDateTime = createISTDateTime(dateStr, slot.endTime);
+}
 
         console.log('⏰ Created datetime strings:', {
           start: startDateTime,
