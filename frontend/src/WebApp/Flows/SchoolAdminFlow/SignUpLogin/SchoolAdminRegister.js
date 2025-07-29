@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaEye, FaEyeSlash } from "react-icons/fa";
-import registrationImg from "../../../../assets-webapp/school-reg.png"; // Update this path
+import axios from "axios";
+import registrationImg from "../../../../assets-webapp/school-reg.png";
 
 const SchoolAdminRegister = () => {
   const [formData, setFormData] = useState({
@@ -13,6 +14,12 @@ const SchoolAdminRegister = () => {
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otp, setOtp] = useState("");
+  const [otpVerified, setOtpVerified] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
   const navigate = useNavigate();
 
@@ -20,18 +27,69 @@ const SchoolAdminRegister = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
- const handleSubmit = (e) => {
-  e.preventDefault();
+  const sendOtp = async () => {
+    const { email, password, confirmPassword } = formData;
 
-  if (formData.password !== formData.confirmPassword) {
-    alert("Passwords do not match.");
-    return;
-  }
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setErrorMessage("Please enter a valid email.");
+      return;
+    }
 
-  // Navigate with form data
-  navigate("/schooladmin/profile", { state: formData });
-};
+    if (!password || !confirmPassword) {
+      setErrorMessage("Please enter and confirm your password first.");
+      return;
+    }
 
+    if (password !== confirmPassword) {
+      setErrorMessage("Passwords do not match.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setErrorMessage("");
+      setSuccessMessage("");
+
+      const response = await axios.post("/api/school-admin/send-verification-code", { email });
+
+      if (response.data.message) {
+        setOtpSent(true);
+        setSuccessMessage("OTP sent to email.");
+      }
+    } catch (error) {
+      setErrorMessage(error.response?.data?.message || "Failed to send OTP. Try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const verifyOtp = async () => {
+    try {
+      setLoading(true);
+      setErrorMessage("");
+      setSuccessMessage("");
+
+      const response = await axios.post("/api/school-admin/verify-otp", {
+        email: formData.email,
+        otp: otp.trim(),
+      });
+
+      if (response.data.success) {
+        setOtpVerified(true);
+        setSuccessMessage("Email verified successfully!");
+        navigate("/schooladmin/profile", { state: formData });
+      }
+    } catch (error) {
+      setErrorMessage(error.response?.data?.message || "OTP verification failed.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    // Registration is completed only after OTP verification
+  };
 
   return (
     <div className="min-h-screen flex font-poppins bg-gray-100">
@@ -54,12 +112,24 @@ const SchoolAdminRegister = () => {
             School Admin Registration
           </h2>
 
+          {/* Success / Error Messages */}
+          {successMessage && (
+            <div className="mb-4 p-3 bg-green-100 text-green-800 rounded text-sm">
+              {successMessage}
+            </div>
+          )}
+          {errorMessage && (
+            <div className="mb-4 p-3 bg-red-100 text-red-800 rounded text-sm">
+              {errorMessage}
+            </div>
+          )}
+
           {/* School Name */}
           <input
             type="text"
             name="schoolName"
             placeholder="School / University Name"
-            className="w-full mb-4 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="w-full mb-4 p-3 border border-gray-300 rounded-md"
             onChange={handleChange}
             required
           />
@@ -69,9 +139,10 @@ const SchoolAdminRegister = () => {
             type="email"
             name="email"
             placeholder="Email"
-            className="w-full mb-4 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="w-full mb-4 p-3 border border-gray-300 rounded-md"
             onChange={handleChange}
             required
+            disabled={otpSent || otpVerified}
           />
 
           {/* Password */}
@@ -80,16 +151,16 @@ const SchoolAdminRegister = () => {
               type={showPassword ? "text" : "password"}
               name="password"
               placeholder="Password"
-              className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="w-full p-3 border border-gray-300 rounded-md"
               onChange={handleChange}
               required
             />
             <button
               type="button"
-              className="absolute top-1/2 right-4 transform -translate-x-1/2 text-gray-500"
+              className="absolute top-1/2 right-4 transform -translate-y-1/2 text-gray-500"
               onClick={() => setShowPassword(!showPassword)}
             >
-              {showPassword ? <FaEyeSlash size={20} /> : <FaEye  size={20}/>}
+              {showPassword ? <FaEyeSlash size={20} /> : <FaEye size={20} />}
             </button>
           </div>
 
@@ -99,26 +170,52 @@ const SchoolAdminRegister = () => {
               type={showConfirm ? "text" : "password"}
               name="confirmPassword"
               placeholder="Confirm Password"
-              className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="w-full p-3 border border-gray-300 rounded-md"
               onChange={handleChange}
               required
             />
             <button
               type="button"
-              className="absolute top-1/2 right-4 transform -translate-x-1/2 text-gray-500"
+              className="absolute top-1/2 right-4 transform -translate-y-1/2 text-gray-500"
               onClick={() => setShowConfirm(!showConfirm)}
             >
-              {showConfirm ? <FaEyeSlash size={20} /> : <FaEye size={20}/>}
+              {showConfirm ? <FaEyeSlash size={20} /> : <FaEye size={20} />}
             </button>
           </div>
 
-          {/* Submit Button */}
-          <button
-            type="submit"
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-md font-semibold transition"
-          >
-            Register
-          </button>
+          {/* Send OTP Button */}
+          {!otpVerified && (
+            <button
+              type="button"
+              className="w-full bg-blue-500 text-white py-2 rounded-md mb-4 hover:bg-blue-600"
+              onClick={sendOtp}
+              disabled={loading || otpSent}
+            >
+              {loading ? "Sending OTP..." : otpSent ? "OTP Sent" : "Send OTP"}
+            </button>
+          )}
+
+          {/* OTP Input */}
+          {otpSent && !otpVerified && (
+            <>
+              <input
+                type="text"
+                name="otp"
+                placeholder="Enter OTP"
+                className="w-full mb-4 p-3 border border-gray-300 rounded-md"
+                value={otp}
+                onChange={(e) => setOtp(e.target.value)}
+              />
+              <button
+                type="button"
+                className="w-full bg-green-500 text-white py-2 rounded-md mb-4 hover:bg-green-600"
+                onClick={verifyOtp}
+                disabled={loading}
+              >
+                {loading ? "Verifying..." : "Verify OTP"}
+              </button>
+            </>
+          )}
 
           {/* Sign In Redirect */}
           <div className="text-center mt-4 text-sm text-gray-600">

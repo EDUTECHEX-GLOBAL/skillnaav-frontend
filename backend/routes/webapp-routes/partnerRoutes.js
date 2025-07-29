@@ -11,6 +11,8 @@ const {
   requestPasswordReset,
   verifyOTPAndResetPassword,
   getPartnerProfile, 
+  sendPartnerVerificationCode,
+  verifyPartnerOTP,
 } = require("../../controllers/partnerController");
 const { authenticate } = require("../../middlewares/authMiddleware");
 
@@ -32,6 +34,10 @@ router.post("/check-email", checkEmailExists);
 router.post('/request-password-reset', requestPasswordReset); // Request password reset with OTP
 router.post('/verify-otp-reset-password', verifyOTPAndResetPassword); // Verify OTP and reset password
 router.get("/profile", authenticate, getPartnerProfile);
+
+router.post("/send-verification-code", sendPartnerVerificationCode);
+router.post("/verify-otp", verifyPartnerOTP);
+
 
 
 

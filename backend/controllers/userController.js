@@ -3,6 +3,7 @@ const Userwebapp = require("../models/webapp-models/userModel");
 const generateToken = require("../utils/generateToken");
 const notifyUser = require("../utils/notifyUser"); // Import the notifyUser function
 const { profilePicUpload } = require('../utils/multer'); // Import the profilePicUpload middleware
+const EmailVerification = require("../models/webapp-models/EmailVerificationModel");
 
 // In your controller file (e.g., userController.js)
 const getUserProfile = asyncHandler(async (req, res) => {
@@ -375,6 +376,59 @@ const getPremiumStatus = asyncHandler(async (req, res) => {
   }
 });
 
+// Send verification code for signup
+const sendSignupVerificationCode = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    res.status(400);
+    throw new Error("Invalid email format.");
+  }
+
+  const userExists = await Userwebapp.findOne({ email });
+  if (userExists) {
+    res.status(400);
+    throw new Error("Email already registered.");
+  }
+
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const otpExpiration = Date.now() + 10 * 60 * 1000;
+
+  await EmailVerification.findOneAndUpdate(
+    { email },
+    { otp, otpExpiration },
+    { upsert: true, new: true }
+  );
+
+  await notifyUser(
+    email,
+    "SkillNaav Email Verification Code",
+    `<p>Your verification code is: <b>${otp}</b>. It is valid for 10 minutes.</p>`
+  );
+
+  res.status(200).json({ message: "Verification code sent to email." });
+});
+
+
+// Verify the signup OTP
+const verifySignupOTP = asyncHandler(async (req, res) => {
+  const { email, otp } = req.body;
+
+  const record = await EmailVerification.findOne({ email });
+
+  if (!record || record.otp !== otp || Date.now() > record.otpExpiration) {
+    res.status(400);
+    throw new Error("Invalid or expired verification code.");
+  }
+
+  // Optional: delete record after verification
+  await EmailVerification.deleteOne({ email });
+
+  res.status(200).json({ success: true, message: "Email verified successfully." });
+});
+
+
 module.exports = { 
    registerUser, 
    authUser, 
@@ -387,4 +441,6 @@ module.exports = {
    verifyOTPAndResetPassword,
    getUserProfile,
    getPremiumStatus,
+   sendSignupVerificationCode,
+   verifySignupOTP,
 };

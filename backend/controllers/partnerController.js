@@ -4,6 +4,8 @@ const generateToken = require("../utils/generateToken");
 const notifyUser = require("../utils/notifyUser");
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
+const PartnerEmailVerification = require("../models/webapp-models/partnerVerificationModel");
+
 // Get partner profile
 const getPartnerProfile = asyncHandler(async (req, res) => {
     // Check if req.user exists
@@ -265,6 +267,60 @@ const rejectPartner = asyncHandler(async (req, res) => {
     res.status(200).json({ message: "Partner rejected successfully." });
 });
 
+// Send OTP for partner signup
+const sendPartnerVerificationCode = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    res.status(400);
+    throw new Error("Invalid email address.");
+  }
+
+  const existing = await Partnerwebapp.findOne({ email });
+  if (existing) {
+    res.status(400);
+    throw new Error("Email already registered.");
+  }
+
+  const otp = generateOTP();
+  const otpExpiration = Date.now() + 10 * 60 * 1000;
+
+  // Store OTP in separate verification model
+  await PartnerEmailVerification.findOneAndUpdate(
+    { email },
+    { otp, otpExpiration },
+    { upsert: true, new: true }
+  );
+
+  await notifyUser(
+    email,
+    "SkillNaav Partner Email Verification Code",
+    `<p>Your OTP is <strong>${otp}</strong>. It is valid for 10 minutes.</p>`
+  );
+
+  res.status(200).json({ message: "Verification code sent to email." });
+});
+// Verify OTP
+
+const verifyPartnerOTP = asyncHandler(async (req, res) => {
+  const { email, otp } = req.body;
+
+  const record = await PartnerEmailVerification.findOne({ email });
+
+  if (!record || record.otp !== otp || Date.now() > record.otpExpiration) {
+    res.status(400);
+    throw new Error("Invalid or expired OTP.");
+  }
+
+  // Delete the record after verification
+  await PartnerEmailVerification.deleteOne({ email });
+
+  res.status(200).json({ success: true, message: "OTP verified" });
+});
+
+
+
+
 // Exporting functions for use in routes.
 module.exports = {
     registerPartner,
@@ -277,4 +333,6 @@ module.exports = {
     requestPasswordReset,
     verifyOTPAndResetPassword, // Exporting verifyOTPAndResetPassword function 
     getPartnerProfile,
+    sendPartnerVerificationCode,
+    verifyPartnerOTP, // Exporting verifyPartnerOTP function
 };

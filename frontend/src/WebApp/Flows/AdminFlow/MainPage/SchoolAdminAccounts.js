@@ -141,7 +141,7 @@ const handleApprove = async () => {
             <tr key={admin._id} className="text-sm border-t hover:bg-gray-50">
               <td className="px-4 py-3">{indexOfFirst + idx + 1}</td>
               <td className="px-4 py-3 font-medium">{admin.schoolName}</td>
-              <td className="px-4 py-3">{admin.contactEmail}</td>
+              <td className="px-4 py-3">{admin.email}</td>
               <td className="px-4 py-3">
                 <span className={`px-2 py-1 rounded-full text-xs font-semibold ${admin.status === 'Approved' ? 'bg-green-100 text-green-600' : admin.status === 'Rejected' ? 'bg-red-100 text-red-600' : 'bg-yellow-100 text-yellow-600'}`}>
                   {admin.status}

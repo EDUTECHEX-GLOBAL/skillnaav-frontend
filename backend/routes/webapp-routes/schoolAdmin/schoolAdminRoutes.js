@@ -16,6 +16,8 @@ const {
   toggleStudentAccess,
   forgotPasswordSchoolAdmin,
   resetPasswordSchoolAdmin,
+  sendSchoolAdminVerificationCode,
+  verifySchoolAdminOTP,
 } = require("../../../controllers/schoolAdmin/schoolAdminController");
 const { protectSchool } = require("../../../middlewares/protectSchool");
 const { csvUpload } = require("../../../utils/multer");
@@ -40,6 +42,8 @@ router.get("/students", protectSchool, getStudentsBySchoolAdmin);
 router.patch('/students/:id/access', protectSchool, toggleStudentAccess);
 router.post("/forgot-password", forgotPasswordSchoolAdmin);
 router.post("/reset-password/:token", resetPasswordSchoolAdmin);
+router.post("/send-verification-code", sendSchoolAdminVerificationCode);
+router.post("/verify-otp", verifySchoolAdminOTP);
 
 
 

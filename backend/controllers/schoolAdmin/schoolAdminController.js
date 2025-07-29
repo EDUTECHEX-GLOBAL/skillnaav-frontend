@@ -7,6 +7,7 @@ const csv = require("csv-parser");
 const bcrypt = require("bcryptjs");
 const { Parser } = require("json2csv");
 const Userwebapp = require("../../models/webapp-models/userModel");
+const SchoolAdminOTPVerification = require("../../models/webapp-models/schoolAdmin/SchoolAdminOTPVerification");
 const { uploadFile } = require("../../utils/multer");
 const notifyUser = require("../../utils/notifyUser");
 const { Readable } = require("stream");
@@ -14,6 +15,8 @@ const csvParser = require("csv-parser");
 const crypto = require("crypto");
 
 
+// Utility to generate OTP
+const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
 
 // Register School Admin
 const registerSchoolAdmin = asyncHandler(async (req, res) => {
@@ -598,6 +601,55 @@ const resetPasswordSchoolAdmin = asyncHandler(async (req, res) => {
   res.status(200).json({ message: "Password has been reset successfully." });
 });
 
+// ✅ Send OTP to email
+const sendSchoolAdminVerificationCode = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    res.status(400);
+    throw new Error("Invalid email address.");
+  }
+
+  const existing = await SchoolAdmin.findOne({ email });
+  if (existing) {
+    res.status(400);
+    throw new Error("Email already registered.");
+  }
+
+  const otp = generateOTP();
+  const otpExpiration = Date.now() + 10 * 60 * 1000;
+
+  await SchoolAdminOTPVerification.findOneAndUpdate(
+    { email },
+    { otp, otpExpiration },
+    { upsert: true, new: true }
+  );
+
+  await notifyUser(
+    email,
+    "SkillNaav School Admin OTP Verification",
+    `<p>Your OTP is <strong>${otp}</strong>. It is valid for 10 minutes.</p>`
+  );
+
+  res.status(200).json({ message: "Verification code sent to email." });
+});
+
+// ✅ Verify OTP
+const verifySchoolAdminOTP = asyncHandler(async (req, res) => {
+  const { email, otp } = req.body;
+
+  const record = await SchoolAdminOTPVerification.findOne({ email });
+
+  if (!record || record.otp !== otp || Date.now() > record.otpExpiration) {
+    res.status(400);
+    throw new Error("Invalid or expired OTP.");
+  }
+
+  // Optionally clear it
+  await SchoolAdminOTPVerification.deleteOne({ email });
+
+  res.status(200).json({ success: true, message: "OTP verified" });
+});
 
 
 module.exports = {
@@ -615,5 +667,7 @@ module.exports = {
   toggleStudentAccess,
   forgotPasswordSchoolAdmin,
   resetPasswordSchoolAdmin,
+  sendSchoolAdminVerificationCode,
+  verifySchoolAdminOTP,
 };
 

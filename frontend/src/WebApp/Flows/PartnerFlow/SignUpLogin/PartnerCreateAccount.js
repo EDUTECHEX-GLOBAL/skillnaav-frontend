@@ -5,17 +5,17 @@ import { useNavigate } from "react-router-dom";
 import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/solid";
 import { Link } from "react-router-dom";
 import partner2Image from "../../../../assets-webapp/partner2_img.jpg";
-import axios from 'axios';
-// Validation schema for Formik
+import axios from "axios";
+
 const validationSchema = Yup.object({
   name: Yup.string().required("Required"),
   email: Yup.string().email("Invalid email address").required("Required"),
   password: Yup.string()
     .min(6, "Password must be at least 6 characters")
-    .matches(/[A-Z]/, "Password must contain at least one uppercase letter")
-    .matches(/[a-z]/, "Password must contain at least one lowercase letter")
-    .matches(/[0-9]/, "Password must contain at least one number")
-    .matches(/[!@#$%^&*-_=+]/, "Password must contain at least one special character")
+    .matches(/[A-Z]/, "Must contain an uppercase letter")
+    .matches(/[a-z]/, "Must contain a lowercase letter")
+    .matches(/[0-9]/, "Must contain a number")
+    .matches(/[!@#$%^&*-_=+]/, "Must contain a special character")
     .required("Required"),
   confirmPassword: Yup.string()
     .oneOf([Yup.ref("password"), null], "Passwords must match")
@@ -24,37 +24,54 @@ const validationSchema = Yup.object({
 
 const PartnerCreateAccount = () => {
   const navigate = useNavigate();
+  const [step, setStep] = useState(1);
+  const [email, setEmail] = useState("");
+  const [otp, setOtp] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [formData, setFormData] = useState(null);
 
-  // Function to handle form submission
-  const handleSubmit = async (values, { setSubmitting }) => {
+  const sendOtpToEmail = async (values, setSubmitting) => {
     try {
-      // Check if the email is already registered
-      const response = await axios.post('/api/partners/check-email', { email: values.email.trim() });
-  
-      if (response.data.exists) {
-        // If the email exists, set an error message
+      const check = await axios.post("/api/partners/check-email", {
+        email: values.email.trim(),
+      });
+
+      if (check.data.exists) {
         setErrorMessage("Partner already registered.");
         setSubmitting(false);
-        return; // Stop further execution
+        return;
       }
-  
-      // Proceed with registration if email is not registered
-      console.log("User Data Submitted:", values); // Log user data to console
-  
-      
-  
-      // Store the form data in localStorage
-      localStorage.setItem("userInfo", JSON.stringify(values));
-  
-      // Navigate to the profile picture page
-      navigate("/partner-profile-picture", { state: { userData: values } });
+
+      await axios.post("/api/partners/send-verification-code", {
+        email: values.email.trim(),
+      });
+
+      setEmail(values.email.trim());
+      setFormData(values);
+      setStep(2);
     } catch (error) {
-      setErrorMessage("Partner already registered");
+      setErrorMessage(error.response?.data?.message || "Failed to send OTP.");
+    } finally {
+      setSubmitting(false);
     }
-    setSubmitting(false);
+  };
+
+  const verifyOtpAndProceed = async () => {
+    try {
+      const verify = await axios.post("/api/partners/verify-otp", {
+        email,
+        otp,
+      });
+
+      if (verify.data.success) {
+        localStorage.setItem("userInfo", JSON.stringify(formData));
+        navigate("/partner-profile-picture", { state: { userData: formData } });
+      }
+    } catch (error) {
+      setErrorMessage("Invalid or expired OTP.");
+    }
   };
 
   return (
@@ -79,108 +96,130 @@ const PartnerCreateAccount = () => {
             </div>
           )}
 
-          <Formik
-            initialValues={{
-              name: "",
-              email: "",
-              password: "",
-              confirmPassword: "",
-            }}
-            validationSchema={validationSchema}
-            onSubmit={handleSubmit}
-          >
-            {({ isSubmitting }) => (
-              <Form>
-                <div className="mb-4">
-                  <Field
-                    type="text"
-                    name="name"
-                    placeholder="Full Name"
-                    className="w-full p-3 border border-gray-300 rounded-lg"
-                  />
-                  <ErrorMessage
-                    name="name"
-                    component="div"
-                    className="text-red-500 text-sm mt-1"
-                  />
-                </div>
+          {step === 1 ? (
+            <Formik
+              initialValues={{
+                name: "",
+                email: "",
+                password: "",
+                confirmPassword: "",
+              }}
+              validationSchema={validationSchema}
+              onSubmit={(values, { setSubmitting }) =>
+                sendOtpToEmail(values, setSubmitting)
+              }
+            >
+              {({ isSubmitting }) => (
+                <Form>
+                  <div className="mb-4">
+                    <Field
+                      type="text"
+                      name="name"
+                      placeholder="Full Name"
+                      className="w-full p-3 border border-gray-300 rounded-lg"
+                    />
+                    <ErrorMessage
+                      name="name"
+                      component="div"
+                      className="text-red-500 text-sm mt-1"
+                    />
+                  </div>
 
-                <div className="mb-4">
-                  <Field
-                    type="email"
-                    name="email"
-                    placeholder="Email"
-                    className="w-full p-3 border border-gray-300 rounded-lg"
-                  />
-                  <ErrorMessage
-                    name="email"
-                    component="div"
-                    className="text-red-500 text-sm mt-1"
-                  />
-                </div>
+                  <div className="mb-4">
+                    <Field
+                      type="email"
+                      name="email"
+                      placeholder="Email"
+                      className="w-full p-3 border border-gray-300 rounded-lg"
+                    />
+                    <ErrorMessage
+                      name="email"
+                      component="div"
+                      className="text-red-500 text-sm mt-1"
+                    />
+                  </div>
 
-                <div className="mb-4 relative">
-                  <Field
-                    type={showPassword ? "text" : "password"}
-                    name="password"
-                    placeholder="Password"
-                    className="w-full p-3 border border-gray-300 rounded-lg"
-                  />
+                  <div className="mb-4 relative">
+                    <Field
+                      type={showPassword ? "text" : "password"}
+                      name="password"
+                      placeholder="Password"
+                      className="w-full p-3 border border-gray-300 rounded-lg"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-3"
+                    >
+                      {showPassword ? (
+                        <EyeIcon className="h-5 w-5 mt-4 text-gray-500" />
+                      ) : (
+                        <EyeSlashIcon className="h-5 w-5 mt-4 text-gray-500" />
+                      )}
+                    </button>
+                    <ErrorMessage
+                      name="password"
+                      component="div"
+                      className="text-red-500 text-sm mt-1"
+                    />
+                  </div>
+
+                  <div className="mb-4 relative">
+                    <Field
+                      type={showConfirmPassword ? "text" : "password"}
+                      name="confirmPassword"
+                      placeholder="Confirm Password"
+                      className="w-full p-3 border border-gray-300 rounded-lg"
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setShowConfirmPassword(!showConfirmPassword)
+                      }
+                      className="absolute right-3 top-3"
+                    >
+                      {showConfirmPassword ? (
+                        <EyeIcon className="h-5 w-5 mt-4 text-gray-500" />
+                      ) : (
+                        <EyeSlashIcon className="h-5 w-5 mt-4 text-gray-500" />
+                      )}
+                    </button>
+                    <ErrorMessage
+                      name="confirmPassword"
+                      component="div"
+                      className="text-red-500 text-sm mt-1"
+                    />
+                  </div>
+
                   <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-3"
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="w-full bg-teal-500 text-white p-4 rounded-lg hover:bg-teal-600 transition-colors duration-300 shadow-md"
                   >
-                    {showPassword ? (
-                      <EyeIcon className="h-5 w-5 mt-4 text-gray-500" />
-                    ) : (
-                      <EyeSlashIcon className="h-5 w-5 mt-4 text-gray-500" />
-                    )}
+                    Send Verification Code
                   </button>
-
-                  <ErrorMessage
-                    name="password"
-                    component="div"
-                    className="text-red-500 text-sm mt-1"
-                  />
-                </div>
-
-                <div className="mb-4 relative">
-                  <Field
-                    type={showConfirmPassword ? "text" : "password"}
-                    name="confirmPassword"
-                    placeholder="Confirm Password"
-                    className="w-full p-3 border border-gray-300 rounded-lg"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-3 top-3"
-                  >
-                    {showConfirmPassword ? (
-                      <EyeIcon className="h-5 w-5 mt-4 text-gray-500" />
-                    ) : (
-                      <EyeSlashIcon className="h-5 w-5 mt-4 text-gray-500" />
-                    )}
-                  </button>
-
-                  <ErrorMessage
-                    name="confirmPassword"
-                    component="div"
-                    className="text-red-500 text-sm mt-1"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full bg-teal-500 text-white p-4 rounded-lg hover:bg-teal-600 transition-colors duration-300 shadow-md"
-                >
-                  Register
-                </button>
-              </Form>
-            )}
-          </Formik>
+                </Form>
+              )}
+            </Formik>
+          ) : (
+            <div>
+              <div className="mb-4">
+                <input
+                  type="text"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value)}
+                  placeholder="Enter OTP"
+                  className="w-full p-3 border border-gray-300 rounded-lg"
+                />
+              </div>
+              <button
+                onClick={verifyOtpAndProceed}
+                className="w-full bg-teal-500 text-white p-4 rounded-lg hover:bg-teal-600 transition-colors duration-300 shadow-md"
+              >
+                Verify OTP & Continue
+              </button>
+            </div>
+          )}
 
           <div className="flex items-center my-4">
             <hr className="w-full border-t border-gray-300" />

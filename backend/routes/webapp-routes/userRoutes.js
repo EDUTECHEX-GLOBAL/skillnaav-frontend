@@ -16,6 +16,8 @@ const {
   verifyOTPAndResetPassword,
   getUserProfile,
   getPremiumStatus,
+  sendSignupVerificationCode,
+  verifySignupOTP,
 } = require("../../controllers/userController");
 
 // UPDATED: import authenticate instead of protect
@@ -46,4 +48,10 @@ router.get("/users",  getAllUsers);
 router.patch("/approve/:userId",  approveUser);
 router.patch("/reject/:userId", rejectUser);
 
+
+// Send OTP
+router.post("/send-verification-code", sendSignupVerificationCode);
+
+// Verify OTP
+router.post("/verify-code", verifySignupOTP);
 module.exports = router;
