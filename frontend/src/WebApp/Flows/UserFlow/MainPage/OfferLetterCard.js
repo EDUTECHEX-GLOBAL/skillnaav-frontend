@@ -538,7 +538,7 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
 
           {/* ✅ LINK GOOGLE CALENDAR */}
           <a
-            href="http://localhost:5000/api/google/auth"
+            href="/api/google/auth"
             className="inline-block bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition"
           >
             Link Google Calendar
