@@ -1,3 +1,4 @@
+// GoogleController.js
 require('dotenv').config();
 const { google } = require('googleapis');
 const TokenModel = require('../models/webapp-models/TokenModel');
@@ -188,12 +189,12 @@ const googleCallback = async (req, res) => {
         localStorage.setItem('googleAuthSuccess', 'true');
 
         // Redirect after brief delay
-        setTimeout(() => {
-          window.location.href = "/user-main-page";
+        setTimeout(() => {  
+          window.location.href = "http://localhost:3000/user-main-page";
         }, 1500);
       } catch (e) {
         console.error("Error restoring session token:", e);
-        window.location.href = "/user-main-page";
+        window.location.href = "http://localhost:3000/user-main-page";
       }
     </script>
   </body>
@@ -383,7 +384,7 @@ const createTestEvent = async (email) => {
 // ✅ Function for Online Events
 function buildOnlineEvent({ slot, dateStr, startDateTime, endDateTime, internshipTitle, finalEventLink }) {
   return {
-    summary: `${slot.sectionSummary || 'Session'} Section by ${slot.instructor || 'Instructor'}`,
+    summary: `Online Section by ${slot.instructor || 'Instructor'}`,
     description: `Topic: ${slot.sectionSummary || 'Internship session'}
     
 👨‍🏫 Instructor Name: ${slot.instructor || 'Not assigned'}
@@ -401,7 +402,7 @@ Generated on: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
       useDefault: false,
       overrides: [
         { method: 'email', minutes: 1440 }, // 1 day before
-        { method: 'popup', minutes: 60 }, 
+        { method: 'popup', minutes: 60 },
         { method: 'popup', minutes: 15 },
         { method: 'popup', minutes: 1 }
       ]
@@ -421,7 +422,7 @@ Generated on: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
 // ✅ Function for Offline Events
 function buildOfflineEvent({ slot, dateStr, startDateTime, endDateTime, internshipTitle }) {
   return {
-    summary: `${slot.sectionSummary || 'Session'} Section by ${slot.instructor || 'Instructor'}`,
+    summary: `Offline Section by ${slot.instructor || 'Instructor'}`,
     description: `Topic: ${slot.sectionSummary || 'Internship session'}
 
 👨‍🏫 Instructor Name: ${slot.instructor || 'Not assigned'}
@@ -441,7 +442,7 @@ Generated on: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
       useDefault: false,
       overrides: [
         { method: 'email', minutes: 1440 }, // 1 day before
-        { method: 'popup', minutes: 60 }, 
+        { method: 'popup', minutes: 60 },
         { method: 'popup', minutes: 15 },
         { method: 'popup', minutes: 1 }
       ]
@@ -592,18 +593,18 @@ const addScheduleToGoogleCalendar = async ({ studentEmail, timetable, internship
         const startDateTime = createISTDateTime(dateStr, slot.startTime);
         let endDateTime;
 
-const [startHour, startMin] = slot.startTime.split(":").map(Number);
-const [endHour, endMin] = slot.endTime.split(":").map(Number);
+        const [startHour, startMin] = slot.startTime.split(":").map(Number);
+        const [endHour, endMin] = slot.endTime.split(":").map(Number);
 
-if (endHour < startHour || (endHour === startHour && endMin <= startMin)) {
-  // End time is next day
-  const endDateObj = new Date(dateStr);
-  endDateObj.setDate(endDateObj.getDate() + 1);
-  const endDateStr = endDateObj.toISOString().split("T")[0];
-  endDateTime = createISTDateTime(endDateStr, slot.endTime);
-} else {
-  endDateTime = createISTDateTime(dateStr, slot.endTime);
-}
+        if (endHour < startHour || (endHour === startHour && endMin <= startMin)) {
+          // End time is next day
+          const endDateObj = new Date(dateStr);
+          endDateObj.setDate(endDateObj.getDate() + 1);
+          const endDateStr = endDateObj.toISOString().split("T")[0];
+          endDateTime = createISTDateTime(endDateStr, slot.endTime);
+        } else {
+          endDateTime = createISTDateTime(dateStr, slot.endTime);
+        }
 
         console.log('⏰ Created datetime strings:', {
           start: startDateTime,

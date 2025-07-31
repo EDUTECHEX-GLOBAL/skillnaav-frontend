@@ -71,7 +71,7 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [selectedSummary, setSelectedSummary] = useState(null);
   const scrollContainerRef = useRef(null);
-const rowRefs = useRef({});
+  const rowRefs = useRef({});
 
 
   // ─── 1) Fetch internship details ───────────────────────────────────
@@ -123,24 +123,24 @@ const rowRefs = useRef({});
   }, [job, offer.status]);
 
   useEffect(() => {
-  if (showScheduleModal && schedule?.timetable?.length > 0) {
-    const todaySession = schedule.timetable.find((session) =>
-      isToday(parseISO(session.date))
-    );
+    if (showScheduleModal && schedule?.timetable?.length > 0) {
+      const todaySession = schedule.timetable.find((session) =>
+        isToday(parseISO(session.date))
+      );
 
-    if (todaySession) {
-      const refKey = `${todaySession.date}-${todaySession.startTime}`;
-      const todayRef = rowRefs.current[refKey];
-      if (todayRef?.current && scrollContainerRef.current) {
-        // Smooth scroll to today's row
-        scrollContainerRef.current.scrollTo({
-          top: todayRef.current.offsetTop - 20, // Optional offset
-          behavior: "smooth",
-        });
+      if (todaySession) {
+        const refKey = `${todaySession.date}-${todaySession.startTime}`;
+        const todayRef = rowRefs.current[refKey];
+        if (todayRef?.current && scrollContainerRef.current) {
+          // Smooth scroll to today's row
+          scrollContainerRef.current.scrollTo({
+            top: todayRef.current.offsetTop - 20, // Optional offset
+            behavior: "smooth",
+          });
+        }
       }
     }
-  }
-}, [showScheduleModal, schedule]);
+  }, [showScheduleModal, schedule]);
 
   const handleRespond = (type) => {
     setResponseType(type);
@@ -188,31 +188,33 @@ const rowRefs = useRef({});
         <div className="mt-4">
           {/* ── FIXED Summary Cards ──────────────────────────────── */}
           <div className="sticky top-0 z-10 bg-white pt-2 pb-4">
-            <div className="grid grid-cols-3 gap-4 text-center">
-              <div className="bg-gray-50 border border-gray-200 rounded-md p-3 flex flex-col items-center justify-center">
-                <p className="text-xs text-gray-500">Start Date</p>
-                <p className="mt-1 font-medium text-gray-800">
-                  {format(parseISO(schedule.startDate), "MMM d, yyyy")}
-                </p>
+            {schedule?.startDate && schedule?.endDate && schedule?.workHours && (
+              <div className="grid grid-cols-3 gap-4 text-center">
+                <div className="bg-gray-50 border border-gray-200 rounded-md p-3 flex flex-col items-center justify-center">
+                  <p className="text-xs text-gray-500">Start Date</p>
+                  <p className="mt-1 font-medium text-gray-800">
+                    {format(parseISO(schedule.startDate), "MMM d, yyyy")}
+                  </p>
+                </div>
+                <div className="bg-gray-50 border border-gray-200 rounded-md p-3 flex flex-col items-center justify-center">
+                  <p className="text-xs text-gray-500">End Date</p>
+                  <p className="mt-1 font-medium text-gray-800">
+                    {format(parseISO(schedule.endDate), "MMM d, yyyy")}
+                  </p>
+                </div>
+                <div className="bg-gray-50 border border-gray-200 rounded-md p-3 flex flex-col items-center justify-center">
+                  <p className="text-xs text-gray-500">Work Hours</p>
+                  <p className="mt-1 font-medium text-gray-800">{schedule.workHours}</p>
+                </div>
               </div>
-              <div className="bg-gray-50 border border-gray-200 rounded-md p-3 flex flex-col items-center justify-center">
-                <p className="text-xs text-gray-500">End Date</p>
-                <p className="mt-1 font-medium text-gray-800">
-                  {format(parseISO(schedule.endDate), "MMM d, yyyy")}
-                </p>
-              </div>
-              <div className="bg-gray-50 border border-gray-200 rounded-md p-3 flex flex-col items-center justify-center">
-                <p className="text-xs text-gray-500">Work Hours</p>
-                <p className="mt-1 font-medium text-gray-800">{schedule.workHours}</p>
-              </div>
-            </div>
+            )}
           </div>
 
           {/* ── SCROLLABLE Session Table ─────────────────────────── */}
           <div
-  ref={scrollContainerRef}
-  className="mt-4 max-h-[65vh] overflow-auto relative hide-scrollbar"
->
+            ref={scrollContainerRef}
+            className="mt-4 max-h-[65vh] overflow-auto relative hide-scrollbar"
+          >
             <table className="min-w-full bg-white rounded-lg">
               <thead className="bg-indigo-50 border-b border-indigo-200 sticky top-0 z-10">
                 <tr>
@@ -225,151 +227,157 @@ const rowRefs = useRef({});
                 </tr>
               </thead>
               <tbody>
-                {schedule.timetable.map((session, idx) => {
-  const sessionDate = parseISO(session.date);
-  const isTodaySession = isValid(sessionDate) && isToday(sessionDate);
-  const rowRefKey = `${session.date}-${session.startTime}`;
+                {Array.isArray(schedule?.timetable) && schedule.timetable.length > 0 ? (
+                  schedule.timetable.map((session, idx) => {
+                    const sessionDate = parseISO(session.date);
+                    const isTodaySession = isValid(sessionDate) && isToday(sessionDate);
+                    const rowRefKey = `${session.date}-${session.startTime}`;
 
-  if (isTodaySession) {
-    rowRefs.current[rowRefKey] = React.createRef();
-  }
-                  const summaryText = session.sectionSummary || "-";
-                  const isOnline = session.type === "online";
-                  const isOffline = session.type === "offline";
+                    if (isTodaySession) {
+                      rowRefs.current[rowRefKey] = React.createRef();
+                    }
 
-                  const startDateTime = parseDateTime(session.date, session.startTime || "");
-                  const endDateTime = parseDateTime(session.date, session.endTime || "");
-                  const canBuildCalendar = isValid(startDateTime) && isValid(endDateTime);
+                    const summaryText = session.sectionSummary || "-";
+                    const isOnline = session.type === "online";
+                    const isOffline = session.type === "offline";
 
-                  let gcalUrl = "";
-                  if (canBuildCalendar) {
-                    const title = `Internship Session: ${session.sectionSummary || "Session"}`;
-                    const locationForGc =
-                      isOnline && session.eventLink
-                        ? normalizeUrl(session.eventLink)
-                        : session.location?.address
-                          ? `${session.location.name}, ${session.location.address}`
-                          : "";
+                    const startDateTime = parseDateTime(session.date, session.startTime || "");
+                    const endDateTime = parseDateTime(session.date, session.endTime || "");
+                    const canBuildCalendar = isValid(startDateTime) && isValid(endDateTime);
 
-                    const description = `
-                    Summary: ${summaryText}
-                    Type: ${session.type}
-                  `.trim();
+                    let gcalUrl = "";
+                    if (canBuildCalendar) {
+                      const title = `Internship Session: ${session.sectionSummary || "Session"}`;
+                      const locationForGc =
+                        isOnline && session.eventLink
+                          ? normalizeUrl(session.eventLink)
+                          : session.location?.address
+                            ? `${session.location.name}, ${session.location.address}`
+                            : "";
 
-                    gcalUrl = buildGoogleCalendarUrl({
-                      title,
-                      startDate: startDateTime,
-                      endDate: endDateTime,
-                      location: locationForGc,
-                      description,
-                    });
-                  }
+                      const description = `
+          Summary: ${summaryText}
+          Type: ${session.type}
+        `.trim();
 
-                  return (
-                    <tr
-  key={idx}
-  ref={isTodaySession ? rowRefs.current[rowRefKey] : null}
-  className={idx % 2 === 0 ? "bg-gray-50" : "bg-white"}
->
-                      <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap text-center">
-                        {format(parseISO(session.date), "dd MMM yyyy")}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap text-center">
-                        {format(parseISO(session.date), "EEE")}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap text-center">
-                        {session.startTime} - {session.endTime}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-indigo-600 hover:text-indigo-800 whitespace-nowrap text-center">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setSelectedSummary({
-                              sectionSummary: summaryText,
-                              instructor: session.instructor || ""
-                            })
-                          }
-                          className="text-indigo-600 hover:underline text-xs font-medium"
-                        >
-                          View Summary
-                        </button>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap text-center">
-                        {isOnline ? (
-                          session.eventLink ? (
-                            <a
-                              href={normalizeUrl(session.eventLink)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center text-indigo-600 hover:text-indigo-800 text-xs font-medium"
-                            >
-                              <FontAwesomeIcon icon={faLink} className="mr-1" />
-                              Join Meeting
-                            </a>
-                          ) : (
-                            <span className="text-gray-400 text-xs">Link Pending</span>
-                          )
-                        ) : isOffline ? (
-                          session.location?.address ? (
-                            <button
-                              type="button"
-                              onClick={() => setSelectedLocation(session.location)}
-                              className="inline-flex items-center text-indigo-600 hover:text-indigo-800 text-xs font-medium"
-                            >
-                              <FontAwesomeIcon icon={faMapMarkerAlt} className="mr-1" />
-                              Location
-                            </button>
-                          ) : (
-                            <span className="text-gray-400 text-xs">Location TBA</span>
-                          )
-                        ) : (
-                          <>
-                            {session.eventLink && (
+                      gcalUrl = buildGoogleCalendarUrl({
+                        title,
+                        startDate: startDateTime,
+                        endDate: endDateTime,
+                        location: locationForGc,
+                        description,
+                      });
+                    }
+
+                    return (
+                      <tr
+                        key={idx}
+                        ref={isTodaySession ? rowRefs.current[rowRefKey] : null}
+                        className={idx % 2 === 0 ? "bg-gray-50" : "bg-white"}
+                      >
+                        <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap text-center">
+                          {format(parseISO(session.date), "dd MMM yyyy")}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap text-center">
+                          {format(parseISO(session.date), "EEE")}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap text-center">
+                          {session.startTime} - {session.endTime}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-indigo-600 hover:text-indigo-800 whitespace-nowrap text-center">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSelectedSummary({
+                                sectionSummary: summaryText,
+                                instructor: session.instructor || ""
+                              })
+                            }
+                            className="text-indigo-600 hover:underline text-xs font-medium"
+                          >
+                            View Summary
+                          </button>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap text-center">
+                          {isOnline ? (
+                            session.eventLink ? (
                               <a
                                 href={normalizeUrl(session.eventLink)}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center text-indigo-600 hover:text-indigo-800 text-xs font-medium mr-2"
+                                className="inline-flex items-center text-indigo-600 hover:text-indigo-800 text-xs font-medium"
                               >
                                 <FontAwesomeIcon icon={faLink} className="mr-1" />
                                 Join Meeting
                               </a>
-                            )}
-                            {session.location?.address && (
-                              <p className="inline-flex items-center">
-                                <FontAwesomeIcon
-                                  icon={faMapMarkerAlt}
-                                  className="mr-1 text-gray-600"
-                                />
-                                <span className="text-gray-700 text-sm">
-                                  {session.location.name}
-                                </span>
-                              </p>
-                            )}
-                            {!session.eventLink && !session.location?.address && (
-                              <span className="text-gray-400 text-xs">TBA</span>
-                            )}
-                          </>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-sm whitespace-nowrap text-center">
-                        <span
-                          className={`
-                          inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full capitalize
-                          ${isOnline
-                              ? "bg-blue-100 text-blue-700"
-                              : isOffline
-                                ? "bg-green-100 text-green-700"
-                                : "bg-purple-100 text-purple-700"
-                            }
-                        `}
-                        >
-                          {session.type}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
+                            ) : (
+                              <span className="text-gray-400 text-xs">Link Pending</span>
+                            )
+                          ) : isOffline ? (
+                            session.location?.address ? (
+                              <button
+                                type="button"
+                                onClick={() => setSelectedLocation(session.location)}
+                                className="inline-flex items-center text-indigo-600 hover:text-indigo-800 text-xs font-medium"
+                              >
+                                <FontAwesomeIcon icon={faMapMarkerAlt} className="mr-1" />
+                                Location
+                              </button>
+                            ) : (
+                              <span className="text-gray-400 text-xs">Location TBA</span>
+                            )
+                          ) : (
+                            <>
+                              {session.eventLink && (
+                                <a
+                                  href={normalizeUrl(session.eventLink)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center text-indigo-600 hover:text-indigo-800 text-xs font-medium mr-2"
+                                >
+                                  <FontAwesomeIcon icon={faLink} className="mr-1" />
+                                  Join Meeting
+                                </a>
+                              )}
+                              {session.location?.address && (
+                                <p className="inline-flex items-center">
+                                  <FontAwesomeIcon icon={faMapMarkerAlt} className="mr-1 text-gray-600" />
+                                  <span className="text-gray-700 text-sm">
+                                    {session.location.name}
+                                  </span>
+                                </p>
+                              )}
+                              {!session.eventLink && !session.location?.address && (
+                                <span className="text-gray-400 text-xs">TBA</span>
+                              )}
+                            </>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-sm whitespace-nowrap text-center">
+                          <span
+                            className={`
+                inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full capitalize
+                ${isOnline
+                                ? "bg-blue-100 text-blue-700"
+                                : isOffline
+                                  ? "bg-green-100 text-green-700"
+                                  : "bg-purple-100 text-purple-700"
+                              }
+              `}
+                          >
+                            {session.type}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <tr>
+                    <td colSpan="6" className="text-center text-sm text-gray-500 py-4">
+                      Internship schedule coming soon.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -530,7 +538,7 @@ const rowRefs = useRef({});
 
           {/* ✅ LINK GOOGLE CALENDAR */}
           <a
-            href="/api/google/auth"
+            href="http://localhost:5000/api/google/auth"
             className="inline-block bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition"
           >
             Link Google Calendar
