@@ -35,6 +35,7 @@ const getUserProfile = asyncHandler(async (req, res) => {
     gradePercentage: user.gradePercentage,
     profileImage: user.profileImage,  // Include the profile image in the response
     isPremium: user.isPremium,
+    planType: user.planType, // Include the plan type
     premiumExpiration: user.premiumExpiration,
   });
 });
@@ -222,6 +223,7 @@ const authUser = asyncHandler(async (req, res) => {
       portfolio: user.portfolio,
       profileImage: user.profileImage,
       isPremium: user.isPremium,
+      planType: user.planType,  
       premiumExpiration: user.premiumExpiration,
       token,
       adminApproved: user.adminApproved
@@ -260,6 +262,7 @@ const updateUserProfile = asyncHandler(async (req, res) => {
   user.gradePercentage = req.body.gradePercentage || user.gradePercentage;
   user.isPremium = req.body.isPremium || user.isPremium;
   // Add profile image if provided
+  
   user.profileImage = req.body.profileImage || user.profileImage;
 
   if (req.body.password) {
@@ -285,6 +288,7 @@ const updateUserProfile = asyncHandler(async (req, res) => {
     city: updatedUser.city,
     postalCode: updatedUser.postalCode,
     currentGrade: updatedUser.currentGrade,
+    planType: updatedUser.planType,
     gradePercentage: updatedUser.gradePercentage,
     profileImage: updatedUser.profileImage,  // Include the updated profile image in the response
     token: generateToken(updatedUser._id), // Regenerate token

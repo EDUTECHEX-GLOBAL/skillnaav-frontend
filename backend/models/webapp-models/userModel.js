@@ -28,6 +28,12 @@ const userwebappSchema = new mongoose.Schema(
     adminApproved: { type: Boolean, default: false },
     isActive: { type: Boolean, default: false },
     isPremium: { type: Boolean, default: false },
+    planType: {
+  type: String,
+  enum: ["Free", "Premium Basic", "Premium Plus"],
+  default: "Free"
+},
+
     premiumExpiration: { type: Date, default: null },
 
     // ✅ New field to track creator

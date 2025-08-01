@@ -291,6 +291,48 @@ const PostAJob = () => {
     }
   };
 
+  const autofillTestData = () => {
+  const testJob = 
+  {
+  jobTitle: "Business Development Intern",
+  companyName: "VentureBoost",
+  country: "India",
+  city: "Pune",
+  jobType: "Internship",
+  jobDescription:
+    "Identify sales leads, pitch services to new clients, and assist in marketing campaigns.",
+  startDate: "2025-08-05",
+  endDateOrDuration: "3 months",
+  duration: "3 months",
+  internshipType: "FREE",
+  compensationDetails: {
+    type: "FREE",
+    amount: 0,
+    currency: "",
+    frequency: "",
+  },
+  mode: "Offline",
+  qualifications: ["Communication", "CRM tools", "Marketing basics"],
+  contactInfo: {
+    name: "Amit Verma",
+    email: "amit@ventureboost.in",
+    phone: "+91 98220 44556",
+  },
+  imgUrl: "https://example.com/img-bizdev.jpg",
+  studentApplied: false,
+  adminApproved: false,
+}
+
+
+
+
+  setFormData(testJob);
+  setPreviewUrl(testJob.imgUrl);
+  setCountrySuggestions([]);
+  setCitySuggestions([]);
+};
+
+
   return (
     <div className="max-w-4xl font-poppins mx-auto p-6 bg-white rounded-lg shadow-lg mt-8">
       <h2 className="text-2xl font-semibold text-gray-800 mb-4">
@@ -608,6 +650,14 @@ const PostAJob = () => {
             {successMessage}
           </div>
         )}
+        <button
+  type="button"
+  onClick={autofillTestData}
+  className="w-full py-2 mb-4 bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:outline-none focus:ring focus:ring-blue-400"
+>
+  Auto-Fill Test Data
+</button>
+
 
       </form>
     </div>
