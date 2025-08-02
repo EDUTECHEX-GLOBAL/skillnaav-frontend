@@ -13,6 +13,7 @@ const {
   getPartnerProfile, 
   sendPartnerVerificationCode,
   verifyPartnerOTP,
+  updatePartnerPlan, // Importing updatePartnerPlan function
 } = require("../../controllers/partnerController");
 const { authenticate } = require("../../middlewares/authMiddleware");
 
@@ -37,6 +38,7 @@ router.get("/profile", authenticate, getPartnerProfile);
 
 router.post("/send-verification-code", sendPartnerVerificationCode);
 router.post("/verify-otp", verifyPartnerOTP);
+router.put("/subscribe", updatePartnerPlan);
 
 
 

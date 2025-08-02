@@ -45,6 +45,32 @@ const PostAJob = () => {
   const [uploading, setUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [successMessage, setSuccessMessage] = useState("");
+  const [userType, setUserType] = useState("");
+  const [partnerInternships, setPartnerInternships] = useState([]);
+  const [freemiumAlert, setFreemiumAlert] = useState("");
+
+
+
+
+
+ useEffect(() => {
+  const userInfo = JSON.parse(localStorage.getItem("userInfo"));
+  if (userInfo) {
+    setUserType(userInfo.planType); // e.g., "Freemium"
+  }
+
+  const partnerId = localStorage.getItem("partnerId");
+  if (partnerId) {
+    axios
+      .get(`/api/interns/partner/${partnerId}`)
+      .then((res) => {
+        setPartnerInternships(res.data || []);
+      })
+      .catch((err) => {
+        console.error("Failed to fetch partner internships:", err);
+      });
+  }
+}, []);
 
 
   useEffect(() => {
@@ -226,39 +252,53 @@ const PostAJob = () => {
     setPreviewUrl(null);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+const handleSubmit = async (e) => {
+  e.preventDefault();
 
-    const partnerId = localStorage.getItem("partnerId");
-    if (!partnerId) {
-      console.error("No partner ID found in localStorage.");
+  const partnerId = localStorage.getItem("partnerId");
+  if (!partnerId) {
+    console.error("No partner ID found in localStorage.");
+    return;
+  }
+
+  // ✅ Restrict Freemium Partners
+  if (userType === "Freemium") {
+    const activeCount = partnerInternships.filter(
+      (post) => post.deleted === false
+    ).length;
+
+    if (activeCount >= 2) {
+      setFreemiumAlert("Freemium partners can post only up to 2 active internships.");
+      setTimeout(() => setFreemiumAlert(""), 4000);
       return;
     }
 
-    const completeFormData = {
-      ...formData,
-      location: `${formData.city}, ${formData.country}`,
-      partnerId: partnerId,
-    };
-
-    console.log("Complete form data being sent:", completeFormData);
-
-    try {
-      const response = await axios.post("/api/interns", completeFormData);
-      console.log("Internship posted successfully:", response.data);
-      saveJob(response.data);
-      setSuccessMessage("Internship posted successfully!");
-      resetForm();
-
-      // Hide success message after 3 seconds
-      setTimeout(() => setSuccessMessage(""), 3000);
-    } catch (error) {
-      console.error(
-        "Error posting internship:",
-        error.response?.data || error.message
-      );
+    if (formData.internshipType === "PAID") {
+      setFreemiumAlert("Freemium partners cannot post Paid internships.");
+      setTimeout(() => setFreemiumAlert(""), 4000);
+      return;
     }
+  }
+
+  const completeFormData = {
+    ...formData,
+    location: `${formData.city}, ${formData.country}`,
+    partnerId: partnerId,
   };
+
+  try {
+    const response = await axios.post("/api/interns", completeFormData);
+    console.log("Internship posted successfully:", response.data);
+    saveJob(response.data);
+    setSuccessMessage("Internship posted successfully!");
+    resetForm();
+
+    setTimeout(() => setSuccessMessage(""), 3000);
+  } catch (error) {
+    console.error("Error posting internship:", error.response?.data || error.message);
+  }
+};
+
 
 
    const handleFileUpload = async (event) => {
@@ -293,35 +333,36 @@ const PostAJob = () => {
 
   const autofillTestData = () => {
   const testJob = 
-  {
-  jobTitle: "Business Development Intern",
-  companyName: "VentureBoost",
+{
+  jobTitle: "Marketing Intern",
+  companyName: "BrandWize Solutions",
   country: "India",
-  city: "Pune",
+  city: "Bangalore",
   jobType: "Internship",
   jobDescription:
-    "Identify sales leads, pitch services to new clients, and assist in marketing campaigns.",
-  startDate: "2025-08-05",
-  endDateOrDuration: "3 months",
+    "Assist in executing digital marketing campaigns, performing competitor research, and creating content for social media platforms.",
+  startDate: "2025-08-10",
+  endDateOrDuration: "2025-11-10",
   duration: "3 months",
-  internshipType: "FREE",
+  internshipType: "STIPEND",
   compensationDetails: {
-    type: "FREE",
-    amount: 0,
-    currency: "",
-    frequency: "",
+    type: "STIPEND",
+    amount: 5000,
+    currency: "INR",
+    frequency: "MONTHLY",
   },
-  mode: "Offline",
-  qualifications: ["Communication", "CRM tools", "Marketing basics"],
+  mode: "Online",
+  qualifications: ["Digital Marketing", "SEO", "Content Writing", "Social Media"],
   contactInfo: {
-    name: "Amit Verma",
-    email: "amit@ventureboost.in",
-    phone: "+91 98220 44556",
+    name: "Neha Mehta",
+    email: "neha@brandwize.co.in",
+    phone: "+91 98112 34567",
   },
-  imgUrl: "https://example.com/img-bizdev.jpg",
+  imgUrl: "https://example.com/img-marketing.jpg",
   studentApplied: false,
-  adminApproved: false,
+  adminApproved: false
 }
+
 
 
 
@@ -570,16 +611,17 @@ const PostAJob = () => {
             Internship Type
           </label>
           <select
-            name="internshipType"
-            value={formData.internshipType}
-            onChange={handleChange}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring focus:ring-teal-500"
-            required
-          >
-            <option value="FREE">Free</option>
-            <option value="STIPEND">Stipend</option>
-            <option value="PAID">Paid</option>
-          </select>
+  name="internshipType"
+  value={formData.internshipType}
+  onChange={handleChange}
+  className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring focus:ring-teal-500"
+  required
+>
+  <option value="FREE">Free</option>
+  <option value="STIPEND">Stipend</option>
+  <option value="PAID" disabled={userType === "Freemium"}>Paid</option>
+</select>
+
         </div>
 
         {formData.internshipType !== "FREE" && (
@@ -646,10 +688,18 @@ const PostAJob = () => {
           </button>
         </div>
         {successMessage && (
-          <div className="fixed top-10 right-10 bg-green-500 text-white py-3 px-6 rounded-lg shadow-lg transition-all duration-300">
-            {successMessage}
-          </div>
-        )}
+  <div className="fixed top-20 right-10 z-[9999] bg-green-500 text-white py-3 px-6 rounded-lg shadow-lg transition-all duration-300">
+    {successMessage}
+  </div>
+)}
+
+       {freemiumAlert && (
+  <div className="fixed top-28 right-10 z-[9999] bg-red-500 text-white py-3 px-6 rounded-lg shadow-lg transition-all duration-300">
+    {freemiumAlert}
+  </div>
+)}
+
+
         <button
   type="button"
   onClick={autofillTestData}

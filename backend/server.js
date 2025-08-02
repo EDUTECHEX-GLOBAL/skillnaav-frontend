@@ -55,6 +55,8 @@ const googleRoutes = require("./routes/webapp-routes/googleRoutes");
 const offerLetterRoutes = require("./routes/webapp-routes/offerLetterRoutes");
 const scheduleRoutes = require("./routes/webapp-routes/scheduleRoutes");
 const uploadRoutes = require("./routes/uploadRoutes");
+//partner payment routes
+const partnerPaymentRoutes = require("./routes/webapp-routes/partnerPaymentRoutes");
 
 // NEW: Import Offer Routes
 const schoolAdminRoutes = require("./routes/webapp-routes/schoolAdmin/schoolAdminRoutes");
@@ -90,6 +92,9 @@ app.use("/api/google", googleRoutes);
 app.use('/api/offer-letters', offerLetterRoutes);
 app.use("/api/notifications", NotificationRoutes);
 app.use("/api/schedule", scheduleRoutes);
+
+// NEW: Add Partner Payment Routes
+app.use("/api/partner/payments", partnerPaymentRoutes);
 
 // NEW: Add School Admin Routes
 app.use("/api/school-admin", schoolAdminRoutes);
