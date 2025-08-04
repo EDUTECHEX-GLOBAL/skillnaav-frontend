@@ -1,6 +1,7 @@
 // OfferLetterCard.jsx
 import React, { useEffect, useState, useRef } from "react";
 import axios from "axios";
+import { toast } from 'react-toastify';
 import {
   faMapMarkerAlt,
   faLink,
@@ -70,6 +71,7 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [selectedSummary, setSelectedSummary] = useState(null);
+  const [loading, setLoading] = useState(false); // ✅ THIS LINE
   const scrollContainerRef = useRef(null);
   const rowRefs = useRef({});
 
@@ -168,6 +170,28 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
     }
   };
 
+  const handleUpdateSchedule = async () => {
+    try {
+      setLoading(true);
+      const userInfo = JSON.parse(localStorage.getItem('userInfo')); // assumes user email stored
+      const res = await axios.post('/api/google/update-schedule', {
+        internshipId: offer.internshipId,
+        studentEmail: userInfo.email,
+      });
+
+      if (res.data.success) {
+        toast.success('✅ Schedule updated in Google Calendar');
+      } else {
+        toast.error(res.data.message || 'Failed to update schedule');
+      }
+    } catch (err) {
+      console.error("Update schedule failed:", err);
+      toast.error("Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // ─── 3) Render the schedule with table + per‐row Google Calendar links ─
   const renderSchedule = () => {
     if (loadingSchedule) {
@@ -203,7 +227,7 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
                   </p>
                 </div>
                 <div className="bg-gray-50 border border-gray-200 rounded-md p-3 flex flex-col items-center justify-center">
-                  <p className="text-xs text-gray-500">Work Hours</p>
+                  <p className="text-xs text-gray-500">Working Hours</p>
                   <p className="mt-1 font-medium text-gray-800">{schedule.workHours}</p>
                 </div>
               </div>
@@ -525,6 +549,7 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
       {/* VIEW SCHEDULE & LINK CALENDAR BUTTONS */}
       {offer.status.toLowerCase() === "accepted" && (
         <div className="mt-4 space-y-2">
+          {/* VIEW SCHEDULE */}
           <button
             onClick={() => setShowScheduleModal(true)}
             className="flex items-center text-indigo-600 hover:text-indigo-800 text-sm font-medium"
@@ -536,7 +561,7 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
             View Schedule
           </button>
 
-          {/* ✅ LINK GOOGLE CALENDAR */}
+          {/* LINK GOOGLE CALENDAR */}
           <a
             href="/api/google/auth"
             className="inline-block bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition"
@@ -544,6 +569,14 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
             Link Google Calendar
           </a>
 
+          {/* ✅ UPDATE SCHEDULE BUTTON */}
+          <button
+            onClick={handleUpdateSchedule}
+            className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition"
+            disabled={loading}
+          >
+            {loading ? 'Updating...' : 'Update Schedule'}
+          </button>
         </div>
       )}
 

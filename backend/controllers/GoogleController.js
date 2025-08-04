@@ -876,11 +876,74 @@ const checkAuthStatus = async (studentEmail) => {
   }
 };
 
+// POST /api/google/update-schedule
+const updateScheduleInGoogleCalendar = async (req, res) => {
+  try {
+    const { internshipId, studentEmail } = req.body;
+
+    // Fetch tokens
+    const studentToken = await TokenModel.findOne({ email: studentEmail });
+    if (!studentToken?.tokens) {
+      return res.status(401).json({ success: false, message: "Student not authenticated with Google" });
+    }
+
+    // Auth setup
+    const oAuth2Client = new google.auth.OAuth2(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI);
+    oAuth2Client.setCredentials(studentToken.tokens);
+
+    const calendar = google.calendar({ version: 'v3', auth: oAuth2Client });
+
+    // Find latest schedule
+    const scheduleDoc = await InternshipScheduleModel.findOne({ internshipId });
+
+    if (!scheduleDoc || !Array.isArray(scheduleDoc.timetable)) {
+      return res.status(404).json({ success: false, message: "No schedule found" });
+    }
+
+    const timetable = scheduleDoc.timetable;
+
+    // 1. Delete previously created events if they have event IDs
+    for (const slot of timetable) {
+      if (slot.eventId) {
+        try {
+          await calendar.events.delete({ calendarId: 'primary', eventId: slot.eventId });
+        } catch (e) {
+          console.warn("Failed to delete previous event:", e.message);
+        }
+      }
+    }
+
+    // 2. Recreate schedule
+    const result = await addScheduleToGoogleCalendar({
+      studentEmail,
+      timetable,
+      internshipTitle: scheduleDoc.internshipTitle || 'Internship Schedule',
+      defaultEventLink: scheduleDoc.defaultEventLink
+    });
+
+    // 3. Save new event IDs
+    for (let i = 0; i < timetable.length; i++) {
+      if (result.createdEvents[i]?.eventId) {
+        scheduleDoc.timetable[i].eventId = result.createdEvents[i].eventId;
+      }
+    }
+
+    await scheduleDoc.save();
+
+    return res.json({ success: true, result });
+
+  } catch (error) {
+    console.error("Error updating schedule in calendar:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   googleAuth,
   googleCallback,
   addScheduleToGoogleCalendar,
   debugCalendarCreation,
   checkAuthStatus,
-  createTestEvent
+  createTestEvent,
+  updateScheduleInGoogleCalendar
 };

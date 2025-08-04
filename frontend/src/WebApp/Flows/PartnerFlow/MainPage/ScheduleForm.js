@@ -72,17 +72,15 @@ const ScheduleForm = ({ internshipId, onClose }) => {
     startDate: '',
     endDate: '',
     workHours: '',
-    defaultStartTime: '',
-    defaultEndTime: '',
-    defaultEventLink: '',
-    defaultLocation: {
-      name: '',
-      address: '',
-      mapLink: ''
-    },
-    defaultType: '',
+    defaultStartTimes: { online: '', offline: '', hybrid: '' },
+    defaultEndTimes: { online: '', offline: '', hybrid: '' },
+    defaultType: '', // online / offline / hybrid
     selectedDays: allWeekdays.slice(),
-    newDate: ''
+    newDate: '',
+    onlineEventLink: '',
+    offlineLocation: { name: '', address: '', mapLink: '' },
+    hybridEventLink: '',
+    hybridLocation: { name: '', address: '', mapLink: '' }
   });
 
   const [error, setError] = useState(null);
@@ -160,17 +158,29 @@ const ScheduleForm = ({ internshipId, onClose }) => {
 
   const handleFormChange = e => {
     const { name, value } = e.target;
-    if (name.startsWith('location') && name.split('.').length === 2) {
-      const [, field] = name.split('.');
+
+    // Handle nested default times (e.g., defaultStartTimes.online)
+    if (name.startsWith('defaultStartTimes.') || name.startsWith('defaultEndTimes.')) {
+      const [parent, type] = name.split('.');
       setForm(f => ({
         ...f,
-        defaultLocation: {
-          ...f.defaultLocation,
-          [field]: value
+        [parent]: {
+          ...f[parent],
+          [type]: value
         }
       }));
     }
-    else {
+    // Location fields
+    else if (name.startsWith('offlineLocation.') || name.startsWith('hybridLocation.')) {
+      const [prefix, field] = name.split('.');
+      setForm(f => ({
+        ...f,
+        [prefix]: {
+          ...f[prefix],
+          [field]: value
+        }
+      }));
+    } else {
       setForm(f => ({ ...f, [name]: value }));
     }
   };
@@ -186,43 +196,60 @@ const ScheduleForm = ({ internshipId, onClose }) => {
     const {
       startDate,
       endDate,
-      defaultStartTime,
-      defaultEndTime,
-      defaultEventLink,
       defaultType,
-      defaultLocation,
-      selectedDays
+      selectedDays,
+      workHours
     } = form;
+
+    const defaultStartTime = form.defaultStartTimes[defaultType];
+    const defaultEndTime = form.defaultEndTimes[defaultType];
+
+    const eventLink =
+      defaultType === 'online'
+        ? form.onlineEventLink
+        : defaultType === 'hybrid'
+          ? form.hybridEventLink
+          : '';
+
+    const location =
+      defaultType === 'offline'
+        ? form.offlineLocation
+        : defaultType === 'hybrid'
+          ? form.hybridLocation
+          : { name: '', address: '', mapLink: '' };
 
     if (!startDate || !endDate) {
       return setError('Fill both start date and end date');
     }
+
+    if (!workHours || workHours.trim() === '') {
+      return setError('Fill work hours before generating schedule');
+    }
+
     if (!defaultStartTime || !defaultEndTime) {
       return setError('Fill default start time and default end time');
     }
-    if (defaultType === 'online' && !defaultEventLink) {
-      return setError('Fill default meeting link for online internships');
-    }
+
     if (!selectedDays.length) {
       return setError('Select at least one day');
-    }
-    if (defaultType === 'offline' && !defaultLocation.address) {
-      return setError('Location address is required for offline internships');
     }
 
     const days = [];
     let dayCounter = 1;
+
     for (let d = new Date(startDate); d <= new Date(endDate); d.setDate(d.getDate() + 1)) {
       const dayName = d.toLocaleString('en-us', { weekday: 'long' });
+
       if (selectedDays.includes(dayName)) {
         const key = `Day - ${dayCounter}`;
         const excelEntry = excelData[key.trim()] || {};
-
-        const entryType = excelEntry.type || defaultType;
         const useExcelData = Object.keys(excelEntry).length > 0;
+        const entryType = excelEntry.type || defaultType;
 
         const resolvedType =
-          defaultType === 'hybrid' ? (entryType === 'online' || entryType === 'offline' ? entryType : 'online') : defaultType;
+          defaultType === 'hybrid'
+            ? (entryType === 'online' || entryType === 'offline' ? entryType : 'online')
+            : defaultType;
 
         days.push({
           date: d.toISOString().split('T')[0],
@@ -234,24 +261,19 @@ const ScheduleForm = ({ internshipId, onClose }) => {
           instructor: useExcelData ? excelEntry.instructor || '' : '',
           assignment: null,
           type: resolvedType,
-          eventLink:
-            resolvedType === 'online'
-              ? (useExcelData ? excelEntry.link || form.defaultEventLink : form.defaultEventLink)
-              : '',
-          location:
-            resolvedType === 'offline'
-              ? {
-                name: useExcelData ? (excelEntry.locationName || form.defaultLocation.name) : form.defaultLocation.name,
-                address: useExcelData ? (excelEntry.address || form.defaultLocation.address) : form.defaultLocation.address,
-                mapLink: useExcelData ? (excelEntry.mapLink || form.defaultLocation.mapLink) : form.defaultLocation.mapLink
-              }
-              : {
-                name: '',
-                address: '',
-                mapLink: ''
-              },
+          eventLink: resolvedType === 'online'
+            ? (useExcelData ? excelEntry.link || eventLink : eventLink)
+            : '',
+          location: resolvedType === 'offline'
+            ? {
+              name: useExcelData ? (excelEntry.locationName || location.name) : location.name,
+              address: useExcelData ? (excelEntry.address || location.address) : location.address,
+              mapLink: useExcelData ? (excelEntry.mapLink || location.mapLink) : location.mapLink
+            }
+            : { name: '', address: '', mapLink: '' },
           events: []
         });
+
         dayCounter++;
       }
     }
@@ -301,14 +323,27 @@ const ScheduleForm = ({ internshipId, onClose }) => {
   const addNewDay = () => {
     const {
       newDate,
-      defaultStartTime,
-      defaultEndTime,
-      defaultEventLink,
       defaultType,
-      defaultLocation,
       startDate,
       endDate
     } = form;
+
+    const defaultStartTime = form.defaultStartTimes[defaultType];
+    const defaultEndTime = form.defaultEndTimes[defaultType];
+
+    const defaultEventLink =
+      defaultType === 'online'
+        ? form.onlineEventLink
+        : defaultType === 'hybrid'
+          ? form.hybridEventLink
+          : null;
+
+    const defaultLocation =
+      defaultType === 'offline'
+        ? form.offlineLocation
+        : defaultType === 'hybrid'
+          ? form.hybridLocation
+          : { name: '', address: '', mapLink: '' };
 
     if (!newDate) {
       return setError('Pick a date');
@@ -355,10 +390,21 @@ const ScheduleForm = ({ internshipId, onClose }) => {
         startDate: form.startDate,
         endDate: form.endDate,
         workHours: form.workHours,
-        defaultStartTime: form.defaultStartTime,
-        defaultEndTime: form.defaultEndTime,
-        defaultEventLink: form.defaultEventLink,
-        defaultLocation: form.defaultType === 'online' ? null : form.defaultLocation,
+        defaultStartTime: form.defaultStartTimes[form.defaultType],
+        defaultEndTime: form.defaultEndTimes[form.defaultType],
+        defaultEventLink:
+          form.defaultType === 'online'
+            ? form.onlineEventLink
+            : form.defaultType === 'hybrid'
+              ? form.hybridEventLink
+              : null,
+
+        defaultLocation:
+          form.defaultType === 'offline'
+            ? form.offlineLocation
+            : form.defaultType === 'hybrid'
+              ? form.hybridLocation
+              : null,
         defaultType: form.defaultType,
         selectedDays: form.selectedDays,
         timetable: timetable
@@ -521,8 +567,8 @@ const ScheduleForm = ({ internshipId, onClose }) => {
                           </div>
                           <input
                             type="time"
-                            name="defaultStartTime"
-                            value={form.defaultStartTime}
+                            name="defaultStartTimes.online"
+                            value={form.defaultStartTimes.online}
                             onChange={handleFormChange}
                             className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                             required
@@ -537,8 +583,8 @@ const ScheduleForm = ({ internshipId, onClose }) => {
                           </div>
                           <input
                             type="time"
-                            name="defaultEndTime"
-                            value={form.defaultEndTime}
+                            name="defaultEndTimes.online"
+                            value={form.defaultEndTimes.online}
                             onChange={handleFormChange}
                             className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                             required
@@ -559,8 +605,8 @@ const ScheduleForm = ({ internshipId, onClose }) => {
                       </div>
                       <input
                         type="url"
-                        name="defaultEventLink"
-                        value={form.defaultEventLink}
+                        name="onlineEventLink"
+                        value={form.onlineEventLink}
                         onChange={handleFormChange}
                         placeholder="https://meet.example.com/your-link"
                         className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
@@ -597,8 +643,8 @@ const ScheduleForm = ({ internshipId, onClose }) => {
                           </div>
                           <input
                             type="time"
-                            name="defaultStartTime"
-                            value={form.defaultStartTime}
+                            name="defaultStartTimes.offline"
+                            value={form.defaultStartTimes.offline}
                             onChange={handleFormChange}
                             className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                             required
@@ -613,8 +659,8 @@ const ScheduleForm = ({ internshipId, onClose }) => {
                           </div>
                           <input
                             type="time"
-                            name="defaultEndTime"
-                            value={form.defaultEndTime}
+                            name="defaultEndTimes.offline"
+                            value={form.defaultEndTimes.offline}
                             onChange={handleFormChange}
                             className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                             required
@@ -624,7 +670,7 @@ const ScheduleForm = ({ internshipId, onClose }) => {
                     </div>
 
                     {/* Location Details */}
-                    {renderLocationFields('location', form.defaultLocation, handleFormChange)}
+                    {renderLocationFields('offlineLocation', form.offlineLocation, handleFormChange)}
 
                     {/* DOWNLOAD TEMPLATE BUTTON FOR OFFLINE */}
                     <div className="pt-2">
@@ -656,8 +702,8 @@ const ScheduleForm = ({ internshipId, onClose }) => {
                           </div>
                           <input
                             type="time"
-                            name="defaultStartTime"
-                            value={form.defaultStartTime}
+                            name="defaultStartTimes.hybrid"
+                            value={form.defaultStartTimes.hybrid}
                             onChange={handleFormChange}
                             className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                             required
@@ -672,8 +718,8 @@ const ScheduleForm = ({ internshipId, onClose }) => {
                           </div>
                           <input
                             type="time"
-                            name="defaultEndTime"
-                            value={form.defaultEndTime}
+                            name="defaultEndTimes.hybrid"
+                            value={form.defaultEndTimes.hybrid}
                             onChange={handleFormChange}
                             className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                             required
@@ -693,8 +739,8 @@ const ScheduleForm = ({ internshipId, onClose }) => {
                       </div>
                       <input
                         type="url"
-                        name="defaultEventLink"
-                        value={form.defaultEventLink}
+                        name="hybridEventLink"
+                        value={form.hybridEventLink}
                         onChange={handleFormChange}
                         placeholder="https://meet.example.com/your-link"
                         className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
@@ -702,7 +748,7 @@ const ScheduleForm = ({ internshipId, onClose }) => {
                     </div>
 
                     {/* Default Location Details – Optional */}
-                    {renderLocationFields('location', form.defaultLocation, handleFormChange)}
+                    {renderLocationFields('hybridLocation', form.hybridLocation, handleFormChange)}
 
                     {/* Download Template */}
                     <div className="pt-2">
