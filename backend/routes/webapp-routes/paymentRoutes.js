@@ -47,6 +47,7 @@ router.post("/paypal/order", async (req, res) => {
 });
 
 // Verify and capture payment
+// Verify and capture payment
 router.post("/paypal/verify", async (req, res) => {
   const { orderID, userId, planType, amount, email, duration } = req.body;
   if (!orderID || !userId || !planType || !amount || !email || !duration) {
@@ -84,9 +85,14 @@ router.post("/paypal/verify", async (req, res) => {
 
     const updatedUser = await User.findByIdAndUpdate(
       userId,
-      { isPremium: true, premiumExpiration },
+      {
+        isPremium: true,
+        planType, // ✅ added here
+        premiumExpiration,
+      },
       { new: true }
     );
+
     if (!updatedUser) {
       return res.status(404).json({ success: false, message: "User not found" });
     }
@@ -108,6 +114,7 @@ router.post("/paypal/verify", async (req, res) => {
     });
   }
 });
+
 
 module.exports = router;
 

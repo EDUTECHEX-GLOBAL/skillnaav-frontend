@@ -6,6 +6,7 @@ import Profile from "./Profile";
 import Support from "./Support";
 import YourJobPosts from "./YourJobPosts";
 import PostAJob from "./PostAJob";
+import PartnerPremiumPage from "./PartnerPremiumPage"; // Import the PartnerPremiumPage component
 
 const BodyContent = () => {
   const { selectedTab } = useTabContext();
@@ -31,6 +32,9 @@ const BodyContent = () => {
     case "support":
       content = <Support />;
       break;
+      case "upgrade":
+  content = <PartnerPremiumPage />;
+  break;
     case "logout":
       content = <div>You have been logged out. Please log in again.</div>;
       break;

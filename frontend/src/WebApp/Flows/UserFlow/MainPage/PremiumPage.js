@@ -3,7 +3,7 @@ import axios from "axios";
 import { useSelector } from "react-redux";
 import Check from "../../../../assets/check.svg";
 
-function Pricing() {
+function PremiumPage() {
   const { skillnaavData } = useSelector((state) => state.root);
   const [alert, setAlert] = useState({ show: false, message: "", type: "" });
   const [isPremium, setIsPremium] = useState(
@@ -53,12 +53,7 @@ function Pricing() {
 
     const containerId = `paypal-button-container-${selectedPlanIndex}`;
     const container = document.getElementById(containerId);
-
-    if (!container) {
-      console.error(`No container found for PayPal button: ${containerId}`);
-      return;
-    }
-
+    if (!container) return;
     container.innerHTML = "";
 
     window.paypal
@@ -74,7 +69,7 @@ function Pricing() {
             });
             return orderRes.data.id;
           } catch (err) {
-            console.error("Failed to create order:", err);
+            console.error("Create order failed:", err);
             showAlert("Unable to create PayPal order.", "error");
           }
         },
@@ -90,16 +85,23 @@ function Pricing() {
             });
 
             if (verifyRes.data.success) {
-              showAlert("Payment verified successfully!", "success");
-              paymentData.userInfo.isPremium = true;
-              localStorage.setItem("userInfo", JSON.stringify(paymentData.userInfo));
-              setIsPremium(true);
-              setSelectedPlanIndex(null);
-            } else {
+  showAlert("Payment verified successfully!", "success");
+
+  // Save planType too
+  paymentData.userInfo.isPremium = true;
+  paymentData.userInfo.planType = verifyRes.data.user.planType;
+  paymentData.userInfo.premiumExpiration = verifyRes.data.user.premiumExpiration;
+
+  localStorage.setItem("userInfo", JSON.stringify(paymentData.userInfo));
+
+  setIsPremium(true);
+  setSelectedPlanIndex(null);
+}
+ else {
               showAlert("Payment verification failed.", "error");
             }
           } catch (err) {
-            console.error("Error verifying payment:", err);
+            console.error("Verify failed:", err);
             showAlert("Payment verification error.", "error");
           }
         },
@@ -118,20 +120,69 @@ function Pricing() {
 
   const handlePayment = (amountString, planType, duration, index) => {
     if (!sdkReady) {
-      showAlert("PayPal is still loading. Try again in a moment.", "error");
+      showAlert("PayPal is still loading. Try again shortly.", "error");
       return;
     }
 
     const userInfo = JSON.parse(localStorage.getItem("userInfo"));
     const amount = parseFloat(amountString.replace(/[^0-9.]/g, ""));
-
     setSelectedPlanIndex(index);
     setPaymentData({ amount, planType, duration, userInfo });
   };
 
-  if (!skillnaavData) return <div>Loading…</div>;
-  const { pricing, pricingcard } = skillnaavData;
-  if (!pricing?.length || !pricingcard?.length) return <div>No pricing data available.</div>;
+  const pricingcard = [
+    {
+      plantype: "Free",
+      plantypesubhead: "Basic access to explore internships",
+      price: "$0",
+      duration: 1,
+      pricebtn: "Start Free",
+      pricepoint1: "Apply to 5 internships",
+      pricepoint2: "Save 3 internships",
+      pricepoint3: "Basic AI suggestions",
+    },
+    {
+      plantype: "Premium Basic",
+      plantypesubhead: "Tools for active internship seekers",
+      price: "$2.99",
+      duration: 1,
+      pricebtn: "Subscribe",
+      pricepoint1: "Apply up to 25 internships",
+      pricepoint2: "Resume builder + career assistant",
+      pricepoint3: "Monthly mentorship + interview tips",
+    },
+    {
+      plantype: "Premium Plus",
+      plantypesubhead: "Everything you need to succeed",
+      price: "$6.99",
+      duration: 1,
+      pricebtn: "Subscribe",
+      pricepoint1: "Unlimited applications & saves",
+      pricepoint2: "Mock AI interviews & resume AI",
+      pricepoint3: "Mentorship + full AI insights",
+    },
+  ];
+
+  const colorStyles = [
+    {
+      bg: "bg-teal-100",
+      text: "text-teal-700",
+      subtext: "text-teal-900",
+      hoverBg: "hover:bg-teal-200",
+    },
+    {
+      bg: "bg-purple-100",
+      text: "text-purple-700",
+      subtext: "text-purple-900",
+      hoverBg: "hover:bg-purple-200",
+    },
+    {
+      bg: "bg-orange-100",
+      text: "text-orange-700",
+      subtext: "text-orange-900",
+      hoverBg: "hover:bg-orange-200",
+    },
+  ];
 
   return (
     <div id="pricing" className="py-12 my-12 pb-12 lg:py-16 relative">
@@ -149,104 +200,58 @@ function Pricing() {
       )}
 
       <h1 className="text-center font-medium text-2xl lg:text-4xl text-gray-900 mb-6">
-        {pricing[0].priceheading}
+        Choose Your Plan
       </h1>
 
-      <div className="flex flex-col gap-6 lg:flex-row">
+      <div className="flex flex-col gap-6 lg:flex-row flex-wrap justify-center">
         {pricingcard.map((card, index) => {
-          const colorClasses = {
-            teal: {
-              bg: "bg-teal-100",
-              text: "text-teal-700",
-              subtext: "text-teal-900",
-              hoverBg: "hover:bg-teal-200",
-            },
-            purple: {
-              bg: "bg-purple-100",
-              text: "text-purple-700",
-              subtext: "text-purple-900",
-              hoverBg: "hover:bg-purple-200",
-            },
-            orange: {
-              bg: "bg-orange-100",
-              text: "text-orange-700",
-              subtext: "text-orange-900",
-              hoverBg: "hover:bg-orange-200",
-            },
-          };
-          const colorClass = Object.values(colorClasses)[index % 3];
+          const color = colorStyles[index % colorStyles.length];
 
           return (
             <div
               key={index}
-              className={`w-full ${colorClass.bg} p-6 flex flex-col justify-between shadow-lg rounded-lg`}
+              className={`w-full max-w-md ${color.bg} p-6 flex flex-col justify-between shadow-lg rounded-lg`}
               style={{ marginTop: "20px" }}
             >
               <div>
-                <h3 className={`font-medium ${colorClass.text} text-xl lg:text-2xl`}>
+                <h3 className={`font-medium ${color.text} text-xl lg:text-2xl`}>
                   {card.plantype}
                 </h3>
-                <p className={`pt-3 ${colorClass.subtext} lg:text-lg`}>
+                <p className={`pt-3 ${color.subtext} lg:text-lg`}>
                   {card.plantypesubhead}
                 </p>
-                <h2 className={`pt-4 text-2xl font-medium ${colorClass.text} lg:text-3xl`}>
-                  {card.plantype === "Institutional (B2B)" ? (
-                    <span className="text-orange-700">Contact Us</span>
-                  ) : (
-                    card.price
-                  )}
+                <h2 className={`pt-4 text-2xl font-medium ${color.text} lg:text-3xl`}>
+                  {card.price}
                 </h2>
-                <p className={`pt-2 ${colorClass.subtext} lg:text-lg`}>
+                <p className={`pt-2 ${color.subtext} lg:text-lg`}>
                   Duration: {card.duration} month
                 </p>
-                <ul className={`flex flex-col gap-2 pt-4 ${colorClass.subtext}`}>
-                  <li className="flex items-center gap-2">
-                    <img src={Check} alt="included" width={16} height={16} />
-                    {card.pricepoint1}
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <img src={Check} alt="included" width={16} height={16} />
-                    {card.pricepoint2}
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <img src={Check} alt="included" width={16} height={16} />
-                    {card.pricepoint3}
-                  </li>
+                <ul className={`flex flex-col gap-2 pt-4 ${color.subtext}`}>
+                  {[card.pricepoint1, card.pricepoint2, card.pricepoint3].map(
+                    (point, i) =>
+                      point && (
+                        <li key={i} className="flex items-center gap-2">
+                          <img src={Check} alt="included" width={16} height={16} />
+                          {point}
+                        </li>
+                      )
+                  )}
                 </ul>
               </div>
 
-              {card.plantype === "Institutional (B2B)" ? (
-                <a href="#contacts">
-                  <div
-                    className={`mt-4 bg-white py-3 text-center ${colorClass.text} font-medium rounded ${colorClass.hoverBg} transition`}
-                  >
-                    Contact Us
-                  </div>
-                </a>
-              ) : card.plantype === "Free Trial" ? (
-                <a href="#discover">
-                  <div
-                    className={`mt-4 bg-white py-3 text-center ${colorClass.text} font-medium rounded ${colorClass.hoverBg} transition`}
-                  >
-                    Start Free Trial
-                  </div>
-                </a>
-              ) : (
-                <>
-                  <button
-                    onClick={() =>
-                      handlePayment(card.price, card.plantype, card.duration, index)
-                    }
-                    className={`mt-4 bg-white py-3 text-center ${colorClass.text} font-medium rounded ${colorClass.hoverBg} transition`}
-                    disabled={isPremium}
-                  >
-                    {isPremium ? "Subscribed" : card.pricebtn}
-                  </button>
+             <button
+  onClick={() => handlePayment(card.price, card.plantype, card.duration, index)}
+  className={`mt-4 bg-white py-3 text-center ${color.text} font-medium rounded ${color.hoverBg} transition`}
+  disabled={card.plantype === JSON.parse(localStorage.getItem("userInfo"))?.planType}
+>
+  {card.plantype === JSON.parse(localStorage.getItem("userInfo"))?.planType
+    ? "Subscribed"
+    : card.pricebtn}
+</button>
 
-                  {selectedPlanIndex === index && (
-                    <div id={`paypal-button-container-${index}`} className="mt-4"></div>
-                  )}
-                </>
+
+              {selectedPlanIndex === index && (
+                <div id={`paypal-button-container-${index}`} className="mt-4"></div>
               )}
             </div>
           );
@@ -256,4 +261,4 @@ function Pricing() {
   );
 }
 
-export default Pricing;
+export default PremiumPage;

@@ -1,31 +1,37 @@
 import React, { useState, useRef, useEffect } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faUser, faSignOutAlt, faBell, faBars } from "@fortawesome/free-solid-svg-icons";
+import {
+  faUser,
+  faSignOutAlt,
+  faBell,
+  faBars,
+  faCrown,
+} from "@fortawesome/free-solid-svg-icons";
 import logo from "../../../../assets-webapp/Skillnaav-logo.png";
 import { useTabContext } from "./UserHomePageContext/HomePageContext";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
 const Navbar = ({ onToggleSidebar }) => {
-  const { selectedTab, handleSelectTab } = useTabContext();
+  const { handleSelectTab } = useTabContext();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
   const [userInfo, setUserInfo] = useState({ name: "", email: "", profileImage: "" });
-  const [notifications, setNotifications] = useState([]);
+  const [planType, setPlanType] = useState("Free");
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     const storedUserInfo = JSON.parse(localStorage.getItem("userInfo"));
     if (storedUserInfo) {
       setUserInfo(storedUserInfo);
-      const studentId = storedUserInfo._id;
+      setPlanType(storedUserInfo.planType || "Free");
 
+      const studentId = storedUserInfo._id;
       const fetchNotifications = async () => {
         try {
           const { data } = await axios.get(`/api/notifications/${studentId}`);
           if (data.success) {
-            setNotifications(data.notifications);
             const unread = data.notifications.filter((n) => !n.isRead).length;
             setUnreadCount(unread);
           }
@@ -33,7 +39,6 @@ const Navbar = ({ onToggleSidebar }) => {
           console.error("Failed to fetch notifications:", err);
         }
       };
-
       fetchNotifications();
     }
   }, []);
@@ -56,15 +61,12 @@ const Navbar = ({ onToggleSidebar }) => {
             },
           }
         );
-        console.log("✅ Logout session recorded successfully");
       } catch (error) {
-        console.error("❌ Failed to record logout session:", error.response?.data || error.message);
+        console.error("Logout session error:", error.response?.data || error.message);
       }
     }
 
-    localStorage.removeItem("sessionId");
-    localStorage.removeItem("userToken");
-    localStorage.removeItem("userInfo");
+    localStorage.clear();
     navigate("/user/login");
   };
 
@@ -79,69 +81,83 @@ const Navbar = ({ onToggleSidebar }) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  return (
-    <div className="bg-white font-poppins text-gray-800 pr-4 pl-0 py-4 border-b border-gray-300 sticky top-0 z-50 w-full">
-      <div className="flex justify-between items-center">
-        {/* === Left section: Hamburger + Logo === */}
-        <div className="flex items-center space-x-4">
-          <button onClick={onToggleSidebar} className="md:hidden text-gray-700 focus:outline-none">
-            <FontAwesomeIcon icon={faBars} className="text-2xl" />
-          </button>
+  const planStyles = {
+    "Premium Plus": "bg-gradient-to-r from-orange-400 to-orange-600 text-white",
+    "Premium Basic": "bg-gradient-to-r from-purple-500 to-purple-700 text-white",
+    Free: "bg-gray-200 text-gray-700",
+  };
 
-          <img
-            src={logo}
-            alt="Skillnaav Logo"
-            className="h-14 object-contain"
-          />
+  return (
+    <div className="bg-white font-poppins border-b border-gray-200 sticky top-0 z-50 w-full">
+      <div className="flex items-center justify-between px-4 sm:px-6 py-4">
+        {/* Left: Logo & Toggle */}
+        <div className="flex items-center space-x-4">
+          <button onClick={onToggleSidebar} className="text-gray-700 md:hidden focus:outline-none">
+            <FontAwesomeIcon icon={faBars} className="text-xl" />
+          </button>
+          <img src={logo} alt="Skillnaav Logo" className="h-12" />
         </div>
 
-        {/* === Right section: Notification + Profile === */}
-        <div className="relative flex items-center space-x-4">
-          {/* Notification */}
-          <div className="relative cursor-pointer" onClick={() => handleSelectTab("notifications")}>
-            <FontAwesomeIcon icon={faBell} className="w-5 h-5 text-gray-700" />
+        {/* Right: Notification, Profile, Plan */}
+        <div className="relative flex items-center space-x-5">
+          {/* Notification Icon */}
+          <div
+            className="relative cursor-pointer group"
+            onClick={() => handleSelectTab("notifications")}
+          >
+            <FontAwesomeIcon icon={faBell} className="w-5 h-5 text-gray-700 hover:text-purple-600 transition" />
             {unreadCount > 0 && (
               <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
                 {unreadCount}
               </span>
             )}
+            <span className="absolute top-6 -left-3 text-xs bg-black text-white px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition">
+              Notifications
+            </span>
           </div>
 
-          {/* Profile Image or Icon */}
-          {userInfo.profileImage ? (
-            <img
-              src={userInfo.profileImage}
-              alt="User Profile"
-              className="w-8 h-8 rounded-full object-cover cursor-pointer"
-              onClick={handleUserClick}
-            />
-          ) : (
-            <FontAwesomeIcon
-              icon={faUser}
-              className="w-8 h-8 text-gray-800 cursor-pointer"
-              onClick={handleUserClick}
-            />
-          )}
+          {/* Profile Image */}
+          <div
+            className="relative"
+            onClick={handleUserClick}
+          >
+            {userInfo.profileImage ? (
+              <img
+                src={userInfo.profileImage}
+                alt="Profile"
+                className="w-9 h-9 rounded-full object-cover cursor-pointer shadow-md border-2 border-purple-300 hover:scale-105 transition-transform"
+              />
+            ) : (
+              <FontAwesomeIcon
+                icon={faUser}
+                className="w-8 h-8 text-gray-800 cursor-pointer"
+              />
+            )}
+          </div>
 
-          {/* User Name */}
-          {userInfo.name && (
-            <span className="text-gray-800 text-sm font-medium hidden sm:block">{userInfo.name}</span>
-          )}
+          {/* Name & Plan */}
+          <div className="hidden sm:flex flex-col items-start">
+            <span className="text-gray-800 text-sm font-semibold">{userInfo.name}</span>
+            <span className={`text-xs font-semibold rounded-full px-2 py-0.5 mt-1 flex items-center gap-1 ${planStyles[planType]}`}>
+              <FontAwesomeIcon icon={faCrown} className="text-[10px]" />
+              {planType}
+            </span>
+          </div>
 
           {/* Dropdown */}
           {isDropdownOpen && (
             <div
               ref={dropdownRef}
-              className="absolute right-0 mt-12 w-48 bg-white shadow-lg rounded-md py-2 border border-gray-300"
+              className="absolute right-0 top-16 mt-2 w-56 bg-white shadow-xl rounded-lg border border-gray-200 z-50"
             >
-              {userInfo.email && (
-                <div className="px-4 py-2 text-sm text-gray-800">{userInfo.email}</div>
-              )}
+              <div className="px-4 py-3 border-b text-sm text-gray-700 font-medium">
+                {userInfo.email}
+              </div>
               <button
                 onClick={handleLogout}
-                className="w-full flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-100"
+                className="w-full flex items-center gap-2 px-4 py-3 text-sm text-red-600 hover:bg-red-100 transition"
               >
-                <FontAwesomeIcon icon={faSignOutAlt} className="mr-2" />
+                <FontAwesomeIcon icon={faSignOutAlt} />
                 Logout
               </button>
             </div>

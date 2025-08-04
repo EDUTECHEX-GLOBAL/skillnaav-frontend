@@ -5,6 +5,7 @@ const router = express.Router();
 const mongoose = require("mongoose");
 const Application = require("../../models/webapp-models/applicationModel.js"); // Adjust path if needed
 const SavedJob = require("../../models/webapp-models/SavedJobModel.js"); // Adjust path if needed
+const Partner = require("../../models/webapp-models/partnerModel.js"); // Adjust path if needed
 
 
 // GET all internship postings (excluding deleted)
@@ -78,7 +79,7 @@ router.get("/approved", async (req, res) => {
 // POST create a new internship posting
 router.post("/", async (req, res) => {
   try {
-    const { 
+    const {
       jobTitle,
       companyName,
       location,
@@ -87,31 +88,62 @@ router.post("/", async (req, res) => {
       endDateOrDuration,
       duration,
       internshipType,
-      // pull both possible names out
       internshipMode,
       mode,
       qualifications,
       contactInfo,
       imgUrl,
       partnerId,
-      compensationDetails
+      compensationDetails,
     } = req.body;
 
-    // decide final mode, preferring mode -> internshipMode -> default
+    // 🔍 Step 1: Fetch Partner Info
+    const partner = await Partner.findById(partnerId);
+    if (!partner) {
+      return res.status(404).json({ message: "Partner not found" });
+    }
+
+    // 🔒 Step 2: Enforce Freemium Partner Restrictions
+    if (partner.planType === "Freemium") {
+      // Only allow FREE or STIPEND internships
+      if (internshipType === "PAID") {
+        return res.status(403).json({
+          message: "Freemium partners cannot post paid internships.",
+        });
+      }
+
+      // Limit to 2 active (not soft-deleted) internship posts
+      const activePosts = await InternshipPosting.countDocuments({
+        partnerId,
+        deleted: false,
+      });
+
+      if (activePosts >= 2) {
+        return res.status(403).json({
+          message: "Freemium partners can post up to 2 internships only.",
+        });
+      }
+    }
+
+    // ✅ Step 3: Finalize Internship Mode
     const finalMode = (mode || internshipMode || "ONLINE").toUpperCase();
 
-    // Build compensation details based on internshipType
+    // ✅ Step 4: Prepare compensationDetails
     let finalCompensationDetails = { type: internshipType };
     if (internshipType === "PAID" || internshipType === "STIPEND") {
-      finalCompensationDetails.amount    = compensationDetails?.amount    ?? 0;
-      finalCompensationDetails.currency  = compensationDetails?.currency  ?? "USD";
-      finalCompensationDetails.frequency = compensationDetails?.frequency ?? "MONTHLY";
+      finalCompensationDetails.amount =
+        compensationDetails?.amount ?? 0;
+      finalCompensationDetails.currency =
+        compensationDetails?.currency ?? "USD";
+      finalCompensationDetails.frequency =
+        compensationDetails?.frequency ?? "MONTHLY";
     } else {
-      finalCompensationDetails.amount    = 0;
-      finalCompensationDetails.currency  = null;
+      finalCompensationDetails.amount = 0;
+      finalCompensationDetails.currency = null;
       finalCompensationDetails.frequency = null;
     }
 
+    // ✅ Step 5: Create and save internship
     const newInternship = new InternshipPosting({
       jobTitle,
       companyName,
@@ -121,7 +153,7 @@ router.post("/", async (req, res) => {
       endDateOrDuration,
       duration,
       internshipType,
-      internshipMode: finalMode,       // <-- use the finalMode here
+      internshipMode: finalMode,
       compensationDetails: finalCompensationDetails,
       qualifications,
       contactInfo,
@@ -130,16 +162,17 @@ router.post("/", async (req, res) => {
       adminApproved: false,
       adminReviewed: false,
       partnerId,
-      deleted: false
+      deleted: false,
     });
 
     const createdInternship = await newInternship.save();
+
     res.status(201).json(createdInternship);
   } catch (error) {
     console.error("Error creating internship post:", error);
     res.status(400).json({
       message: "Error: Unable to create internship post",
-      error: error.message
+      error: error.message,
     });
   }
 });
@@ -288,15 +321,13 @@ router.get("/partner/:partnerId", async (req, res) => {
     const { partnerId } = req.params;
     const internships = await InternshipPosting.find({ partnerId });
 
-    if (internships.length > 0) {
-      res.json(internships);
-    } else {
-      res.status(404).json({ message: "No internships found for this partner ID" });
-    }
+    // Always respond with 200 and the list (even if it's empty)
+    res.status(200).json(internships);
   } catch (error) {
     res.status(500).json({ message: "Server Error" });
   }
 });
+
 
 // PUT update an internship posting by ID
 router.put("/:id", async (req, res) => {

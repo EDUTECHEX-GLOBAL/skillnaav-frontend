@@ -24,6 +24,9 @@ const getPartnerProfile = asyncHandler(async (req, res) => {
             universityName: partner.universityName,
             institutionId: partner.institutionId,
             adminApproved: partner.adminApproved,
+            isPremium: partner.isPremium, // ✅
+  planType: partner.planType,   // ✅
+  premiumExpiration: partner.premiumExpiration ,// ✅
             active: partner.active,
         });
     } else {
@@ -169,6 +172,9 @@ const authPartner = asyncHandler(async (req, res) => {
             universityName: partner.universityName,
             institutionId: partner.institutionId,
             token, // Generate token here
+            isPremium: partner.isPremium, // ✅
+  planType: partner.planType,   // ✅
+  premiumExpiration: partner.premiumExpiration, // ✅
             adminApproved: partner.adminApproved, // Include admin approval status
             active: partner.active // Include active status
         });
@@ -203,14 +209,17 @@ const updatePartnerProfile = asyncHandler(async (req, res) => {
     }
 
     const updatedPartner = await partner.save();
-    res.json({
-        _id: updatedPartner._id,
-        name: updatedPartner.name,
-        email: updatedPartner.email,
-        universityName: updatedPartner.universityName,
-        institutionId: updatedPartner.institutionId,
-        token: generateToken(updatedPartner._id), // Regenerate token.
-    });
+     res.json({
+    _id: updatedPartner._id,
+    name: updatedPartner.name,
+    email: updatedPartner.email,
+    universityName: updatedPartner.universityName,
+    institutionId: updatedPartner.institutionId,
+    adminApproved: updatedPartner.adminApproved,
+    isPremium: updatedPartner.isPremium,
+    planType: updatedPartner.planType,
+    token: generateToken(updatedPartner._id),
+  });
 });
 
 // Get all partners
@@ -318,6 +327,45 @@ const verifyPartnerOTP = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, message: "OTP verified" });
 });
 
+// Update Partner Subscription Plan
+const updatePartnerPlan = asyncHandler(async (req, res) => {
+  const { planType, durationInDays } = req.body;
+
+  const partner = await Partnerwebapp.findById(req.user._id);
+  if (!partner) {
+    res.status(404);
+    throw new Error("Partner not found.");
+  }
+
+  const validPlans = ["Freemium", "Premium Basic", "Premium Plus"];
+  if (!validPlans.includes(planType)) {
+    res.status(400);
+    throw new Error("Invalid plan type.");
+  }
+
+  const now = new Date();
+
+  if (planType === "Freemium") {
+    partner.planType = "Freemium";
+    partner.isPremium = false;
+    partner.premiumExpiration = null;
+  } else {
+    partner.planType = planType;
+    partner.isPremium = true;
+    partner.premiumExpiration = new Date(now.getTime() + durationInDays * 24 * 60 * 60 * 1000);
+  }
+
+  const updated = await partner.save();
+
+  res.status(200).json({
+    message: `Plan updated to ${planType}`,
+    planType: updated.planType,
+    isPremium: updated.isPremium,
+    premiumExpiration: updated.premiumExpiration,
+  });
+});
+
+
 
 
 
@@ -335,4 +383,5 @@ module.exports = {
     getPartnerProfile,
     sendPartnerVerificationCode,
     verifyPartnerOTP, // Exporting verifyPartnerOTP function
+    updatePartnerPlan, // Exporting updatePartnerPlan function
 };

@@ -12,7 +12,19 @@ import { format } from "date-fns";
 
 
 const MAX_FREE_APPLICATIONS = 5;
-const MAX_SAVED_JOBS = 3;
+
+const getSavedLimitByPlan = (planType) => {
+  switch (planType) {
+    case "Premium Plus":
+      return Infinity; // Unlimited
+    case "Premium Basic":
+      return 25;
+    case "Freemium":
+    default:
+      return 3;
+  }
+};
+
 
 const Home = () => {
   const { savedJobs, saveJob, removeJob } = useTabContext();
@@ -23,6 +35,8 @@ const Home = () => {
   const [showSavedJobPopup, setShowSavedJobPopup] = useState(false);
   const [isPremium, setIsPremium] = useState(false);
   const [showPricingModal, setShowPricingModal] = useState(false);
+  const [planType, setPlanType] = useState("Freemium");
+
 
 
 
@@ -75,6 +89,8 @@ const Home = () => {
           headers: { Authorization: `Bearer ${token}` },
         });
         setIsPremium(data.isPremium);
+        setPlanType(data.planType || "Freemium");
+
 
         const { data: countData } = await axios.get(`/api/applications/count/${userInfo._id}`);
         setApplicationCount(countData.count);
@@ -129,27 +145,36 @@ const Home = () => {
 
 
   // Toggle Save Job Logic (check saved job limit)
-  const toggleSaveJob = async (job) => {
-    try {
-      if (!isPremium && savedJobs.length >= MAX_SAVED_JOBS) {
-        setShowSavedJobPopup(true); // Show saved job limit popup
-        return;
-      }
-
-      const jobExists = savedJobs.some((savedJob) => {
-        const jobToCheck = savedJob.savedJob || savedJob;
-        return jobToCheck.jobId?._id === job._id || jobToCheck._id === job._id;
-      });
-
-      if (jobExists) {
-        await removeJob(job._id);
-      } else {
-        await saveJob(job);
-      }
-    } catch (error) {
-      console.error("Error toggling job save:", error);
+const toggleSaveJob = async (job) => {
+  try {
+    // Wait until planType is correctly fetched (avoids false limit)
+    if (isPremium && planType === "Freemium") {
+      console.log("⏳ Waiting for planType to load...");
+      return;
     }
-  };
+
+    const savedLimit = getSavedLimitByPlan(planType);
+    if (savedJobs.length >= savedLimit && savedLimit !== Infinity) {
+      setShowSavedJobPopup(true);
+      return;
+    }
+
+    const jobExists = savedJobs.some((savedJob) => {
+      const jobToCheck = savedJob.savedJob || savedJob;
+      return jobToCheck.jobId?._id === job._id || jobToCheck._id === job._id;
+    });
+
+    if (jobExists) {
+      await removeJob(job._id);
+    } else {
+      await saveJob(job);
+    }
+  } catch (error) {
+    console.error("Error toggling job save:", error);
+  }
+};
+
+
 
   // Calculate posted time (to avoid repeated render)
   const calculatePostedTime = (date) => {
@@ -333,9 +358,11 @@ const Home = () => {
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
           <div className="bg-white p-6 rounded-lg shadow-lg max-w-sm text-center">
             <h2 className="text-xl font-semibold text-gray-800">Saved Jobs Limit Reached</h2>
-            <p className="text-gray-600 mt-2">
-              You have reached the maximum of {MAX_SAVED_JOBS} saved jobs.
-            </p>
+           <p className="text-gray-600 mt-2">
+  You have reached the maximum of{" "}
+  {getSavedLimitByPlan(planType) === Infinity ? "unlimited" : getSavedLimitByPlan(planType)} saved jobs.
+</p>
+
             <div className="flex justify-between mt-4">
               <button
                 className="bg-gray-400 text-white px-4 py-2 rounded-md hover:bg-gray-500"
@@ -361,3 +388,4 @@ const Home = () => {
 };
 
 export default Home;
+//userplans

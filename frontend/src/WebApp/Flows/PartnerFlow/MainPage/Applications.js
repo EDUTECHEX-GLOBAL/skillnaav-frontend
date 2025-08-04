@@ -8,6 +8,8 @@ import {
   faEye,
   faStar,
   faDownload,
+  faLock,
+  faCrown,
 } from "@fortawesome/free-solid-svg-icons";
 import Modal from "./Modal";
 import ScheduleForm from "./ScheduleForm";
@@ -19,6 +21,7 @@ const InternshipList = () => {
   const [internships, setInternships] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [partnerData, setPartnerData] = useState(null);
 
   const [applications, setApplications] = useState({});
   const [loadingApplications, setLoadingApplications] = useState({});
@@ -42,21 +45,54 @@ const InternshipList = () => {
   const partnerId = localStorage.getItem("partnerId");
 
   useEffect(() => {
-    const fetchInternships = async () => {
-      try {
-        setLoading(true);
-        if (!partnerId) throw new Error("Partner ID not found");
-        const { data } = await axios.get(`/api/interns/partner/${partnerId}`);
-        setInternships(data);
-        setError(null);
-      } catch (err) {
-        setError(err.message || "Failed to load internships");
-      } finally {
-        setLoading(false);
+  const fetchPartnerData = async () => {
+    try {
+      const response = await axios.get(`/api/partners/profile`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      setPartnerData(response.data);
+
+      // Fetch internships using the authenticated partner's ID
+      if (response.data?._id) {
+        fetchInternships(response.data._id);
+      } else {
+        throw new Error("Partner ID not found in profile");
       }
-    };
-    fetchInternships();
-  }, [partnerId]);
+    } catch (err) {
+      console.error("Failed to fetch partner data:", err);
+      setError("Unable to load partner profile");
+      setLoading(false);
+    }
+  };
+
+  const fetchInternships = async (partnerId) => {
+    try {
+      setLoading(true);
+      const { data } = await axios.get(`/api/interns/partner/${partnerId}`);
+      setInternships(data);
+      setError(null);
+    } catch (err) {
+      setError(err.message || "Failed to load internships");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchPartnerData();
+}, []);
+
+
+const hasPremiumAccess = () => {
+  const plan = partnerData?.planType?.trim().toLowerCase();
+  return partnerData?.isPremium && (plan === "premium basic" || plan === "premium plus");
+};
+
+const hasFullPremiumAccess = () => {
+  const plan = partnerData?.planType?.trim().toLowerCase();
+  return partnerData?.isPremium && plan === "premium plus";
+};
 
   const calculateDaysAgo = (date) => {
     const posted = new Date(date);
@@ -70,23 +106,34 @@ const InternshipList = () => {
   };
 
   const fetchApplications = async (internshipId) => {
-    try {
-      setLoadingApplications(prev => ({ ...prev, [internshipId]: true }));
-      const { data } = await axios.get(`/api/applications/internship/${internshipId}`);
-      setApplications(prev => ({
-        ...prev,
-        [internshipId]: Array.isArray(data.applications) ? data.applications : [],
-      }));
-    } catch (err) {
-      console.warn("Could not fetch applications:", err.message);
-      setApplications(prev => ({ ...prev, [internshipId]: [] }));
-    } finally {
-      setLoadingApplications(prev => ({ ...prev, [internshipId]: false }));
-      setModalData({ open: true, internshipId, type: "applications", loading: false });
-    }
-  };
+  if (!hasPremiumAccess()) {
+    alert(`Please upgrade to Premium Basic or higher to view applications`);
+    return;
+  }
+
+  try {
+    setLoadingApplications(prev => ({ ...prev, [internshipId]: true }));
+    const { data } = await axios.get(`/api/applications/internship/${internshipId}`);
+    setApplications(prev => ({
+      ...prev,
+      [internshipId]: Array.isArray(data.applications) ? data.applications : [],
+    }));
+  } catch (err) {
+    console.warn("Could not fetch applications:", err.message);
+    setApplications(prev => ({ ...prev, [internshipId]: [] }));
+  } finally {
+    setLoadingApplications(prev => ({ ...prev, [internshipId]: false }));
+    setModalData({ open: true, internshipId, type: "applications", loading: false });
+  }
+};
+
 
   const handleShortlist = async (id, description, skills) => {
+    if (!hasPremiumAccess()) {
+      alert(`Please upgrade to Premium Basic or higher to shortlist candidates`);
+      return;
+    }
+
     try {
       setModalData({ open: true, internshipId: id, type: "shortlisted", loading: true });
       const resumeUrls = (applications[id] || []).map((s) => s.resumeUrl);
@@ -116,6 +163,11 @@ const InternshipList = () => {
   };
 
   const showShortlisted = async (internshipId) => {
+    if (!hasPremiumAccess()) {
+      alert(`Please upgrade to Premium Basic or higher to view shortlisted candidates`);
+      return;
+    }
+
     try {
       setModalData({ open: true, internshipId, type: "shortlisted", loading: true });
       const { data } = await axios.get(
@@ -168,59 +220,78 @@ const InternshipList = () => {
   };
 
   const handleSendOfferLetter = async () => {
-  if (!templateId || !joiningDate) return alert("Template and joining date required");
+    if (!templateId || !joiningDate) return alert("Template and joining date required");
 
-  try {
-    setSendingOffer(true);
+    try {
+      setSendingOffer(true);
 
-    const internship = internships.find(i => i._id === selectedStudent.internship_id);
-    const schoolAdminId = localStorage.getItem("schoolAdminId");
+      const internship = internships.find(i => i._id === selectedStudent.internship_id);
+      const schoolAdminId = localStorage.getItem("schoolAdminId");
 
-    await axios.post(`/api/offer-letters`, {
-      student_id: selectedStudent._id,
-      internshipId: internship._id,
-      templateId,
-      name: selectedStudent.name,
-      email: selectedStudent.email,
-      position: internship.jobTitle,
-      company: internship.companyName,
-      location: internship.location,
-      duration: internship.endDateOrDuration,
-      startDate: joiningDate,
-      internshipType: internship.internshipType,
-      compensationDetails: internship.compensationDetails,
-      jobDescription: internship.jobDescription,
-      qualifications: internship.qualifications,
-      contactInfo: {
-        name: "HR Manager",
-        email: "hr@company.com",
-        phone: "9876543210",
-      },
-      noticePeriod: "2 weeks",
-      schoolAdminId: schoolAdminId || null // ✅ Attach here
-    }, {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
-    });
+      await axios.post(`/api/offer-letters`, {
+        student_id: selectedStudent._id,
+        internshipId: internship._id,
+        templateId,
+        name: selectedStudent.name,
+        email: selectedStudent.email,
+        position: internship.jobTitle,
+        company: internship.companyName,
+        location: internship.location,
+        duration: internship.endDateOrDuration,
+        startDate: joiningDate,
+        internshipType: internship.internshipType,
+        compensationDetails: internship.compensationDetails,
+        jobDescription: internship.jobDescription,
+        qualifications: internship.qualifications,
+        contactInfo: {
+          name: "HR Manager",
+          email: "hr@company.com",
+          phone: "9876543210",
+        },
+        noticePeriod: "2 weeks",
+        schoolAdminId: schoolAdminId || null
+      }, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
 
-    alert("Offer sent successfully!");
-    setSelectedStudent(null);
-  } catch (err) {
-    alert(err.response?.data?.error || err.message);
-  } finally {
-    setSendingOffer(false);
-  }
-};
-
+      alert("Offer sent successfully!");
+      setSelectedStudent(null);
+    } catch (err) {
+      alert(err.response?.data?.error || err.message);
+    } finally {
+      setSendingOffer(false);
+    }
+  };
 
   const handleSchedule = (internshipId) => {
+    if (!hasFullPremiumAccess()) {
+      alert(`Please upgrade to Premium Plus to schedule interviews`);
+      return;
+    }
     setSelectedInternshipForSchedule(internshipId);
     setScheduleFormOpen(true);
   };
 
   const closeModal = () =>
     setModalData({ open: false, internshipId: null, type: null, loading: false });
+
+  const showPremiumLock = (featureName, requiredPlan = "Premium Basic") => (
+    <div className="relative group">
+      <button 
+        className="flex items-center gap-2 px-5 py-2 bg-gray-400 text-white font-semibold rounded-lg shadow-lg cursor-not-allowed"
+        disabled
+      >
+        <FontAwesomeIcon icon={faLock} /> {featureName}
+      </button>
+      <div className="absolute z-10 hidden group-hover:block bg-gray-800 text-white text-xs rounded py-1 px-2 bottom-full mb-2 whitespace-nowrap">
+        {requiredPlan === "Premium Basic" 
+          ? "Upgrade to Premium Basic to access this feature"
+          : "Upgrade to Premium Plus to access this feature"}
+      </div>
+    </div>
+  );
 
   if (loading)
     return <div className="text-center text-lg text-gray-700">Loading internships...</div>;
@@ -239,7 +310,6 @@ const InternshipList = () => {
 
   return (
     <div className="font-poppins max-w-7xl mx-auto p-6 bg-white shadow-lg rounded-lg">
-      {/* Offer-letter overlay */}
       {selectedStudent && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-xl w-[400px]">
@@ -291,16 +361,41 @@ const InternshipList = () => {
         </div>
       )}
 
-      {/* Header */}
-      <h2 className="text-3xl font-semibold text-gray-900 mb-6">
-        Internships Posted by Partner
-      </h2>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-3xl font-semibold text-gray-900">
+          Internships Posted by Partner
+        </h2>
+        {partnerData && (
+          <div className={`px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 ${
+            partnerData.isPremium 
+              ? partnerData.planType === "Premium Plus"
+                ? "bg-purple-100 text-purple-800"
+                : "bg-blue-100 text-blue-800"
+              : "bg-gray-100 text-gray-800"
+          }`}>
+            {partnerData.isPremium && (
+              <FontAwesomeIcon icon={faCrown} className={
+                partnerData.planType === "Premium Plus" ? "text-purple-500" : "text-blue-500"
+              } />
+            )}
+            {partnerData.planType === "Freemium" && "Free Partner"}
+            {partnerData.planType === "Premium Basic" && "Premium Basic"}
+            {partnerData.planType === "Premium Plus" && "Premium Plus"}
+            {partnerData.premiumExpiration && partnerData.isPremium && (
+              <span className="text-xs ml-2">
+                (Expires: {new Date(partnerData.premiumExpiration).toLocaleDateString()})
+              </span>
+            )}
+          </div>
+        )}
+      </div>
 
-      {/* Internship Cards */}
-      {internships.length === 0 ? (
-        <p>No internships posted yet.</p>
-      ) : (
-        internships.map((internship) => {
+    {internships.length === 0 ? (
+  <div className="text-center text-gray-500 text-lg mt-10">
+    🚫 No internships posted yet. Post one to see candidates here.
+  </div>
+) : (
+  internships.map((internship) =>  {
           const compensationText =
             internship.internshipType === "STIPEND"
               ? `${internship.compensationDetails?.amount} ${internship.compensationDetails?.currency} per ${internship.compensationDetails?.frequency?.toLowerCase()}`
@@ -336,7 +431,6 @@ const InternshipList = () => {
                 <p className="flex items-center mb-2">
                   <FontAwesomeIcon icon={faClock} className="mr-2" />{" "}
                   {new Date(internship.startDate).toLocaleDateString()} – {new Date(internship.endDateOrDuration).toLocaleDateString()}
-
                 </p>
                 <p className="flex items-center mb-2">
                   <FontAwesomeIcon icon={faDollarSign} className="mr-2" />{" "}
@@ -353,83 +447,96 @@ const InternshipList = () => {
                     : internship.qualifications?.match(/[A-Z]?[a-z]+/g)?.join(", ") || "Not provided"}
                 </p>
               </div>
+              
               <div className="flex flex-wrap gap-4 mt-4">
-                {/* View Applications */}
-                <button
-                  onClick={() => fetchApplications(internship._id)}
-                  disabled={loadingApplications[internship._id]}
-                  className={`flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:from-blue-600 hover:to-indigo-700 transform hover:scale-105 transition duration-200 ${
-                    loadingApplications[internship._id] ? "opacity-50 cursor-not-allowed" : ""
-                  }`}
-                >
-                  <FontAwesomeIcon icon={faEye} /> View Applications
-                </button>
+  {/* View Applications - Available for Premium Basic and Premium Plus */}
+  {hasPremiumAccess() ? (
+    <button
+      onClick={() => fetchApplications(internship._id)}
+      disabled={loadingApplications[internship._id]}
+      className={`flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:from-blue-600 hover:to-indigo-700 transform hover:scale-105 transition duration-200 ${
+        loadingApplications[internship._id] ? "opacity-50 cursor-not-allowed" : ""
+      }`}
+    >
+      <FontAwesomeIcon icon={faEye} /> View Applications
+    </button>
+  ) : (
+    showPremiumLock("View Applications", "Premium Basic")
+  )}
 
-                {/* Shortlist */}
-                <button
-                  onClick={() =>
-                    handleShortlist(
-                      internship._id,
-                      internship.jobDescription,
-                      internship.qualifications || []
-                    )
-                  }
-                  className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-green-400 to-teal-500 text-white font-semibold rounded-lg shadow-lg hover:from-green-500 hover:to-teal-600 transform hover:scale-105 transition duration-200"
-                >
-                  <FontAwesomeIcon icon={faStar} /> Shortlist
-                </button>
+                {/* Shortlist - Available for Premium Basic and Premium Plus */}
+                {hasPremiumAccess() || hasFullPremiumAccess() ? (
+                  <button
+                    onClick={() =>
+                      handleShortlist(
+                        internship._id,
+                        internship.jobDescription,
+                        internship.qualifications || []
+                      )
+                    }
+                    className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-green-400 to-teal-500 text-white font-semibold rounded-lg shadow-lg hover:from-green-500 hover:to-teal-600 transform hover:scale-105 transition duration-200"
+                  >
+                    <FontAwesomeIcon icon={faStar} /> Shortlist
+                  </button>
+                ) : (
+                  showPremiumLock("Shortlist", "Premium Basic")
+                )}
 
-                {/* Shortlisted Resumes */}
-                <button
-                  onClick={() => showShortlisted(internship._id)}
-                  className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:from-purple-600 hover:to-indigo-700 transform hover:scale-105 transition duration-200"
-                >
-                  <FontAwesomeIcon icon={faDownload} /> Shortlisted Resumes
-                </button>
+                {/* Shortlisted Resumes - Available for Premium Basic and Premium Plus */}
+                {hasPremiumAccess() || hasFullPremiumAccess() ? (
+                  <button
+                    onClick={() => showShortlisted(internship._id)}
+                    className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:from-purple-600 hover:to-indigo-700 transform hover:scale-105 transition duration-200"
+                  >
+                    <FontAwesomeIcon icon={faDownload} /> Shortlisted Resumes
+                  </button>
+                ) : (
+                  showPremiumLock("Shortlisted Resumes", "Premium Basic")
+                )}
 
-                {/* Schedule */}
-                <button
-                  onClick={() => handleSchedule(internship._id)}
-                  className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-white font-semibold rounded-lg shadow-lg hover:from-yellow-500 hover:to-orange-600 transform hover:scale-105 transition duration-200"
-                >
-                  <FontAwesomeIcon icon={faClock} /> Schedule
-                </button>
+                {/* Schedule - Only for Premium Plus */}
+                {hasFullPremiumAccess() ? (
+                  <button
+                    onClick={() => handleSchedule(internship._id)}
+                    className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-white font-semibold rounded-lg shadow-lg hover:from-yellow-500 hover:to-orange-600 transform hover:scale-105 transition duration-200"
+                  >
+                    <FontAwesomeIcon icon={faClock} /> Schedule
+                  </button>
+                ) : (
+                  showPremiumLock("Schedule", "Premium Plus")
+                )}
               </div>
             </div>
           );
         })
       )}
 
-  {/* Applications / Shortlisted Modal */}
-  <Modal
+      <Modal
         isOpen={modalData.open}
         onClose={closeModal}
         title={modalData.type === "applications" ? "Applications" : "Shortlisted Candidates"}
         isLoading={modalData.loading}
       >
-       {modalData.type === "applications" && !modalData.loading && (
-  (applications[modalData.internshipId] || []).length === 0
-    ? <p className="p-6 text-center text-gray-600">No applications yet.</p>
-    : <ApplicationsTable
-        applications={applications[modalData.internshipId]}
-        onStatusUpdate={() => {}}
-      />
-)}
+        {modalData.type === "applications" && !modalData.loading && (
+          (applications[modalData.internshipId] || []).length === 0
+            ? <p className="p-6 text-center text-gray-600">No applications yet.</p>
+            : <ApplicationsTable
+                applications={applications[modalData.internshipId]}
+                onStatusUpdate={updateApplicationStatus}
+              />
+        )}
 
-{modalData.type === "shortlisted" && !modalData.loading && (
-  (shortlistedCandidates[modalData.internshipId] || []).length === 0
-    ? <p className="p-6 text-center text-gray-600">No candidates shortlisted yet.</p>
-    : <ShortlistedTable
-        candidates={shortlistedCandidates[modalData.internshipId]}
-        internshipId={modalData.internshipId}
-        onSendOffer={() => {}}
-        onScheduleClick={() => handleSchedule(modalData.internshipId)}
-      />
-)}
-
+        {modalData.type === "shortlisted" && !modalData.loading && (
+          (shortlistedCandidates[modalData.internshipId] || []).length === 0
+            ? <p className="p-6 text-center text-gray-600">No candidates shortlisted yet.</p>
+            : <ShortlistedTable
+                candidates={shortlistedCandidates[modalData.internshipId]}
+                internshipId={modalData.internshipId}
+                onSendOffer={handleSendOffer}
+              />
+        )}
       </Modal>
 
-      {/* Schedule Form Modal */}
       <Modal
         isOpen={scheduleFormOpen}
         onClose={() => setScheduleFormOpen(false)}
