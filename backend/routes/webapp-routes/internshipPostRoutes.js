@@ -321,15 +321,13 @@ router.get("/partner/:partnerId", async (req, res) => {
     const { partnerId } = req.params;
     const internships = await InternshipPosting.find({ partnerId });
 
-    if (internships.length > 0) {
-      res.json(internships);
-    } else {
-      res.status(404).json({ message: "No internships found for this partner ID" });
-    }
+    // Always respond with 200 and the list (even if it's empty)
+    res.status(200).json(internships);
   } catch (error) {
     res.status(500).json({ message: "Server Error" });
   }
 });
+
 
 // PUT update an internship posting by ID
 router.put("/:id", async (req, res) => {
