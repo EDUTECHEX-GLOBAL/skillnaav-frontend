@@ -1,5 +1,6 @@
 // src/components/ScheduleForm.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { parseISO, isBefore, isToday } from 'date-fns';
 import {
   FiCalendar,
   FiClock,
@@ -10,6 +11,11 @@ import {
 } from 'react-icons/fi';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
+
+const isPastDate = (dateString) => {
+  const date = parseISO(dateString);
+  return isBefore(date, new Date()) && !isToday(date);
+};
 
 const allWeekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const internshipTypes = ['online', 'offline', 'hybrid'];
@@ -88,6 +94,9 @@ const ScheduleForm = ({ internshipId, onClose }) => {
   const [previewed, setPreviewed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [excelData, setExcelData] = useState({});
+  const previewContainerRef = useRef(null);
+  const todayRef = useRef(null);
+  const previewScrollRef = useRef(null);
 
   useEffect(() => {
     axios
@@ -283,6 +292,30 @@ const ScheduleForm = ({ internshipId, onClose }) => {
     setError(null);
   };
 
+  useEffect(() => {
+    if (!previewed || !todayRef.current || !previewScrollRef.current) return;
+
+    const scrollToToday = () => {
+      const container = previewScrollRef.current;
+      const todayElement = todayRef.current;
+
+      const containerRect = container.getBoundingClientRect();
+      const todayRect = todayElement.getBoundingClientRect();
+
+      const scrollOffset = todayRect.top - containerRect.top + container.scrollTop - 12;
+      // You can adjust -12 to -20 or more if you want space above
+
+      container.scrollTo({
+        top: scrollOffset,
+        behavior: 'smooth',
+      });
+    };
+
+    const timeout = setTimeout(scrollToToday, 250);
+
+    return () => clearTimeout(timeout);
+  }, [previewed, timetable]);
+
   const toggleDay = idx =>
     setTimetable(tt => {
       const copy = [...tt];
@@ -434,7 +467,7 @@ const ScheduleForm = ({ internshipId, onClose }) => {
         className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden"
       >
         {/* Header */}
-        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-6 text-white">
+        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-3 text-white">
           <div className="flex justify-between items-center">
             <div>
               <h2 className="text-2xl font-bold">Schedule Configuration</h2>
@@ -849,189 +882,215 @@ const ScheduleForm = ({ internshipId, onClose }) => {
               {/* Schedule Preview */}
               <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
                 <h3 className="text-lg font-semibold text-gray-800 mb-4">Schedule Preview</h3>
-                <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
-                  {timetable.map((day, idx) => (
-                    <div
-                      key={day.date}
-                      className={`p-4 rounded-lg transition-all ${day.selected
-                        ? 'bg-white border border-indigo-100 shadow-sm'
-                        : 'bg-gray-100 border border-gray-200'
-                        }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-4">
-                          <input
-                            type="checkbox"
-                            checked={day.selected}
-                            onChange={() => toggleDay(idx)}
-                            className="h-5 w-5 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
-                          />
-                          <div>
-                            <p className="font-medium text-gray-900">
-                              {new Date(day.date).toLocaleDateString('en-US', {
-                                weekday: 'long'
-                              })}
-                            </p>
-                            <p className="text-sm text-gray-500">
-                              {new Date(day.date).toLocaleDateString('en-US', {
-                                month: 'short',
-                                day: 'numeric'
-                              })}
-                            </p>
-                            <span
-                              className={`inline-block mt-1 px-2 py-0.5 text-xs rounded-full ${day.type === 'online'
-                                ? 'bg-blue-100 text-blue-800'
-                                : day.type === 'offline'
-                                  ? 'bg-green-100 text-green-800'
-                                  : 'bg-purple-100 text-purple-800'
-                                }`}
-                            >
-                              {day.type}
-                            </span>
-                          </div>
-                        </div>
+                <div
+                  ref={previewScrollRef}
+                  className="space-y-3 max-h-96 overflow-y-auto pr-2"
+                >
+                  {timetable.map((day, idx) => {
+                    const isPast = isPastDate(day.date);
 
-                        {day.selected && (
+                    return (
+                      <div
+                        key={day.date}
+                        ref={isToday(new Date(`${day.date}T00:00:00`)) ? todayRef : null}
+                        className={`p-4 rounded-lg transition-all ${day.selected
+                          ? isPast
+                            ? 'bg-gray-100 border border-gray-200 opacity-80'
+                            : 'bg-white border border-indigo-100 shadow-sm'
+                          : 'bg-gray-100 border border-gray-200'
+                          }`}
+                      >
+                        {/* HEADER Row: Checkbox, Day, Type Dropdown */}
+                        <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-4">
-                            <div className="flex items-center space-x-2">
-                              <input
-                                type="time"
-                                value={day.startTime}
-                                onChange={e => changeField(idx, 'startTime', e.target.value)}
-                                className="text-sm rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
-                              />
-                              <span className="text-gray-400 mt-5">-</span>
-                              <input
-                                type="time"
-                                value={day.endTime}
-                                onChange={e => changeField(idx, 'endTime', e.target.value)}
-                                className="text-sm rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
-                              />
+                            <input
+                              type="checkbox"
+                              checked={day.selected}
+                              disabled={isPast}
+                              onChange={() => !isPast && toggleDay(idx)}
+                              className="h-5 w-5 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
+                            />
+                            <div>
+                              <p className="font-medium text-gray-900">
+                                {new Date(day.date).toLocaleDateString('en-US', { weekday: 'long' })}
+                              </p>
+                              <p className="text-sm text-gray-500">
+                                {new Date(day.date).toLocaleDateString('en-US', {
+                                  month: 'short',
+                                  day: 'numeric'
+                                })}
+                              </p>
+                              <span
+                                className={`inline-block mt-1 px-2 py-0.5 text-xs rounded-full ${day.type === 'online'
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : day.type === 'offline'
+                                    ? 'bg-green-100 text-green-800'
+                                    : 'bg-purple-100 text-purple-800'
+                                  }`}
+                              >
+                                {day.type}
+                              </span>
                             </div>
-                            {form.defaultType === 'hybrid' ? (
+                          </div>
+
+                          {!isPast && day.selected && (
+                            <div className="flex items-center space-x-4">
+                              <div className="flex items-center space-x-2">
+                                <input
+                                  type="time"
+                                  value={day.startTime}
+                                  onChange={(e) => changeField(idx, 'startTime', e.target.value)}
+                                  className="text-sm rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
+                                />
+                                <span className="text-gray-400 mt-5">-</span>
+                                <input
+                                  type="time"
+                                  value={day.endTime}
+                                  onChange={(e) => changeField(idx, 'endTime', e.target.value)}
+                                  className="text-sm rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
+                                />
+                              </div>
                               <select
                                 value={day.type}
-                                onChange={e => changeField(idx, 'type', e.target.value)}
-                                className="text-sm mt-5 rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
+                                onChange={(e) => changeField(idx, 'type', e.target.value)}
+                                className="text-sm mt-5 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 px-2 py-[6px]"
                               >
                                 <option value="online">online</option>
                                 <option value="offline">offline</option>
                               </select>
-                            ) : (
-                              <span className="text-sm text-gray-700 capitalize font-medium">{day.type}</span>
-                            )}
-
-                          </div>
-                        )}
-                      </div>
-
-                      {day.selected && (
-                        <div className="mt-4 ml-14 space-y-4">
-                          {/* Show only if the selected type is online */}
-                          {day.type === 'online' && (
-                            <>
-                              <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center">
-                                <FiLink className="mr-2 text-indigo-600" />
-                                Default Meeting Link
-                              </h4>
-                              <input
-                                type="text"
-                                value={day.eventLink}
-                                onChange={e => changeField(idx, 'eventLink', e.target.value)}
-                                placeholder="Meeting link"
-                                className="block w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                              />
-                            </>
-                          )}
-
-                          {/* Section Summary Input */}
-                          <div>
-                            <label className="text-md font-semibold text-gray-700 mb-3 flex items-center">
-                              Section Summary
-                            </label>
-                            <textarea
-                              value={day.sectionSummary || ''}
-                              onChange={e => changeField(idx, 'sectionSummary', e.target.value)}
-                              placeholder="Write a brief section summary here..."
-                              rows={2}
-                              className="block w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                            />
-                          </div>
-
-                          {/* Instructor Input */}
-                          <div>
-                            <label className="text-md font-semibold text-gray-700 mb-3 flex items-center">
-                              Instructor Name
-                            </label>
-                            <textarea
-                              value={day.instructor || ''}
-                              onChange={e => changeField(idx, 'instructor', e.target.value)}
-                              placeholder="Enter instructor name(s)..."
-                              rows={1}
-                              className="block w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                            />
-                          </div>
-
-                          {/* Assignment File Upload */}
-                          <div className="mt-4">
-                            <label className="text-md font-semibold text-gray-700 mb-3 flex items-center">
-                              Assignment
-                            </label>
-                            <input
-                              type="file"
-                              onChange={e => {
-                                const file = e.target.files[0];
-                                changeField(idx, 'assignment', file);
-                              }}
-                              className="block w-full text-sm text-gray-700 bg-white border border-gray-300 rounded-lg p-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-                            />
-                          </div>
-
-                          {/* Show location fields only if type is offline */}
-                          {day.type === 'offline' && (
-                            <div className="mt-4">
-                              <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center">
-                                <FiMapPin className="mr-2 text-indigo-600" />
-                                Location Details
-                              </h4>
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                                <div>
-                                  <label className="block text-sm font-medium text-gray-700 mb-1">Location Name</label>
-                                  <input
-                                    type="text"
-                                    value={day.location.name || ''}
-                                    onChange={e => changeLocationField(idx, 'name', e.target.value)}
-                                    placeholder="Building / Room Name"
-                                    className="block w-full pl-3 pr-3 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
-                                  <input
-                                    type="text"
-                                    value={day.location.address || ''}
-                                    onChange={e => changeLocationField(idx, 'address', e.target.value)}
-                                    placeholder="Full Address"
-                                    className="block w-full pl-3 pr-3 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-sm font-medium text-gray-700 mb-1">Map Link</label>
-                                  <input
-                                    type="url"
-                                    value={day.location.mapLink || ''}
-                                    onChange={e => changeLocationField(idx, 'mapLink', e.target.value)}
-                                    placeholder="https://maps.example.com/your-location"
-                                    className="block w-full pl-3 pr-3 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                  />
-                                </div>
-                              </div>
                             </div>
                           )}
                         </div>
-                      )}
-                    </div>
-                  ))}
+
+                        {/* Editable Details Section */}
+                        {day.selected && (
+                          <div className="mt-4 ml-14 space-y-4">
+                            {/* Online Meeting Link */}
+                            {day.type === 'online' && (
+                              <div>
+                                <h4 className="text-md font-semibold text-gray-700 mb-1 flex items-center">
+                                  <FiLink className="mr-2 text-indigo-600" />
+                                  Meeting Link
+                                </h4>
+                                <input
+                                  type="text"
+                                  value={day.eventLink}
+                                  onChange={(e) => changeField(idx, 'eventLink', e.target.value)}
+                                  placeholder="Meeting link"
+                                  className="block w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                                  readOnly={isPast}
+                                />
+                              </div>
+                            )}
+
+                            {/* Section Summary */}
+                            <div>
+                              <label className="text-md font-semibold text-gray-700 mb-1 flex items-center">
+                                Section Summary
+                              </label>
+                              <textarea
+                                value={day.sectionSummary || ''}
+                                onChange={(e) => changeField(idx, 'sectionSummary', e.target.value)}
+                                placeholder="Write a brief section summary here..."
+                                rows={2}
+                                className="block w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                                readOnly={isPast}
+                              />
+                            </div>
+
+                            {/* Instructor */}
+                            <div>
+                              <label className="text-md font-semibold text-gray-700 mb-1 flex items-center">
+                                Instructor Name
+                              </label>
+                              <textarea
+                                value={day.instructor || ''}
+                                onChange={(e) => changeField(idx, 'instructor', e.target.value)}
+                                placeholder="Enter instructor name(s)..."
+                                rows={1}
+                                className="block w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                                readOnly={isPast}
+                              />
+                            </div>
+
+                            {/* Assignment Upload */}
+                            {!isPast && (
+                              <div>
+                                <label className="text-md font-semibold text-gray-700 mb-1 flex items-center">
+                                  Assignment
+                                </label>
+                                <input
+                                  type="file"
+                                  onChange={(e) => {
+                                    const file = e.target.files[0];
+                                    changeField(idx, 'assignment', file);
+                                  }}
+                                  className="block w-full text-sm text-gray-700 bg-white border border-gray-300 rounded-lg p-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                                />
+                              </div>
+                            )}
+
+                            {/* Location for Offline */}
+                            {day.type === 'offline' && (
+                              <div className="mt-4">
+                                <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center">
+                                  <FiMapPin className="mr-2 text-indigo-600" />
+                                  Location Details
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                      Location Name
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={day.location.name || ''}
+                                      onChange={(e) =>
+                                        changeLocationField(idx, 'name', e.target.value)
+                                      }
+                                      placeholder="Building / Room Name"
+                                      className="block w-full pl-3 pr-3 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                      readOnly={isPast}
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                      Address
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={day.location.address || ''}
+                                      onChange={(e) =>
+                                        changeLocationField(idx, 'address', e.target.value)
+                                      }
+                                      placeholder="Full Address"
+                                      className="block w-full pl-3 pr-3 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                      readOnly={isPast}
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                      Map Link
+                                    </label>
+                                    <input
+                                      type="url"
+                                      value={day.location.mapLink || ''}
+                                      onChange={(e) =>
+                                        changeLocationField(idx, 'mapLink', e.target.value)
+                                      }
+                                      placeholder="https://maps.example.com/your-location"
+                                      className="block w-full pl-3 pr-3 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                      readOnly={isPast}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 

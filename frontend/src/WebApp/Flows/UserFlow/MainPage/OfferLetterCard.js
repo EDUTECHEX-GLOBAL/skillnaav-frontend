@@ -136,7 +136,7 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
         if (todayRef?.current && scrollContainerRef.current) {
           // Smooth scroll to today's row
           scrollContainerRef.current.scrollTo({
-            top: todayRef.current.offsetTop - 20, // Optional offset
+            top: todayRef.current.offsetTop - 33, // Optional offset
             behavior: "smooth",
           });
         }
