@@ -203,40 +203,62 @@ useEffect(() => {
       )}
       <h2 className="text-2xl font-semibold text-center mb-8">Choose Your Partner Plan</h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {plans.map((plan, idx) => (
-          <div
-            key={idx}
-            className={`border rounded-lg p-6 flex flex-col justify-between ${plan.bg} ${plan.border}`}
-          >
-            <div>
-              <h3 className="text-xl font-semibold mb-2">{plan.title}</h3>
-              <p className="text-2xl font-bold text-orange-600 mb-1">${plan.price}</p>
-              <p className="text-sm text-gray-600 mb-4">
-                Duration: {plan.duration ? `${plan.duration} month` : "Unlimited"}
-              </p>
-              <ul className="space-y-2 text-sm text-gray-700 mb-4">
-                {plan.features.map((f, i) => (
-                  <li key={i} className="flex items-start gap-2">
-                    <img src={Check} alt="✓" className="w-4 h-4 mt-1" />
-                    {f}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <button
-              onClick={() => selectPlan(plan, idx)}
-              disabled={plan.disabled}
-              className={`mt-4 py-2 rounded text-white ${
-                plan.disabled ? "bg-gray-400 cursor-not-allowed" : "bg-orange-500 hover:bg-orange-600"
-              }`}
-            >
-              {plan.disabled ? `On ${plan.title}` : plan.btnText}
-            </button>
-            {selectedIndex === idx && (
-              <div id={`paypal-button-container-${idx}`} className="mt-4" />
-            )}
-          </div>
-        ))}
+       {plans.map((plan, idx) => {
+  const isCurrentPlan =
+    partner.isPremium &&
+    partner.planType === plan.title &&
+    new Date(partner.premiumExpiration) > new Date();
+
+  return (
+    <div
+      key={idx}
+      className={`border rounded-lg p-6 flex flex-col justify-between ${plan.bg} ${plan.border}`}
+    >
+      <div>
+        <h3 className="text-xl font-semibold mb-2">{plan.title}</h3>
+        {isCurrentPlan && (
+          <p className="text-sm text-green-600 mb-2">
+            Subscribed until{" "}
+            {new Date(partner.premiumExpiration).toLocaleDateString()}
+          </p>
+        )}
+        <p className="text-2xl font-bold text-orange-600 mb-1">${plan.price}</p>
+        <p className="text-sm text-gray-600 mb-4">
+          Duration: {plan.duration ? `${plan.duration} month` : "Unlimited"}
+        </p>
+        <ul className="space-y-2 text-sm text-gray-700 mb-4">
+          {plan.features.map((f, i) => (
+            <li key={i} className="flex items-start gap-2">
+              <img src={Check} alt="✓" className="w-4 h-4 mt-1" />
+              {f}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <button
+        onClick={() => selectPlan(plan, idx)}
+        disabled={plan.disabled || isCurrentPlan}
+        className={`mt-4 py-2 rounded text-white ${
+          plan.disabled || isCurrentPlan
+            ? "bg-gray-400 cursor-not-allowed"
+            : "bg-orange-500 hover:bg-orange-600"
+        }`}
+      >
+        {isCurrentPlan
+          ? "Subscribed"
+          : plan.disabled
+          ? `On ${plan.title}`
+          : plan.btnText}
+      </button>
+
+      {selectedIndex === idx && (
+        <div id={`paypal-button-container-${idx}`} className="mt-4" />
+      )}
+    </div>
+  );
+})}
+
       </div>
     </div>
   );

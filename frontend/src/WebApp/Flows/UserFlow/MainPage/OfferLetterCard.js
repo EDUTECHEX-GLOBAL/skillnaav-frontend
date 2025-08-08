@@ -74,6 +74,9 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
   const [loading, setLoading] = useState(false); // ✅ THIS LINE
   const scrollContainerRef = useRef(null);
   const rowRefs = useRef({});
+  const userInfo = JSON.parse(localStorage.getItem('userInfo'));
+const userPlan = userInfo?.plan; // This should be "Freemium", "Premium Basic", or "Premium Plus"
+
 
 
   // ─── 1) Fetch internship details ───────────────────────────────────
@@ -547,38 +550,44 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
 
       {/* VIEW SCHEDULE BUTTON */}
       {/* VIEW SCHEDULE & LINK CALENDAR BUTTONS */}
-      {offer.status.toLowerCase() === "accepted" && (
-        <div className="mt-4 space-y-2">
-          {/* VIEW SCHEDULE */}
-          <button
-            onClick={() => setShowScheduleModal(true)}
-            className="flex items-center text-indigo-600 hover:text-indigo-800 text-sm font-medium"
-          >
-            <FontAwesomeIcon
-              icon={faCalendarAlt}
-              className="mr-1 text-indigo-500"
-            />
-            View Schedule
-          </button>
+  {offer.status.toLowerCase() === "accepted" && (
+  <div className="mt-4 space-y-2">
+    {(userPlan === "Premium Basic" || userPlan === "Premium Plus") ? (
+      <>
+        {/* VIEW SCHEDULE */}
+        <button
+          onClick={() => setShowScheduleModal(true)}
+          className="flex items-center text-indigo-600 hover:text-indigo-800 text-sm font-medium"
+        >
+          <FontAwesomeIcon icon={faCalendarAlt} className="mr-1 text-indigo-500" />
+          View Schedule
+        </button>
 
-          {/* LINK GOOGLE CALENDAR */}
-          <a
-            href="/api/google/auth"
-            className="inline-block bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition"
-          >
-            Link Google Calendar
-          </a>
+        {/* LINK GOOGLE CALENDAR */}
+        <a
+          href="/api/google/auth"
+          className="inline-block bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition"
+        >
+          Link Google Calendar
+        </a>
 
-          {/* ✅ UPDATE SCHEDULE BUTTON */}
-          <button
-            onClick={handleUpdateSchedule}
-            className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition"
-            disabled={loading}
-          >
-            {loading ? 'Updating...' : 'Update Schedule'}
-          </button>
-        </div>
-      )}
+        {/* UPDATE SCHEDULE */}
+        <button
+          onClick={handleUpdateSchedule}
+          className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition"
+          disabled={loading}
+        >
+          {loading ? 'Updating...' : 'Update Schedule'}
+        </button>
+      </>
+    ) : (
+      <div className="bg-yellow-100 text-yellow-800 px-4 py-2 rounded-lg text-sm font-medium">
+        Upgrade to Premium Basic or Plus to access schedule and calendar features.
+      </div>
+    )}
+  </div>
+)}
+
 
       {showScheduleModal && (
         <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">

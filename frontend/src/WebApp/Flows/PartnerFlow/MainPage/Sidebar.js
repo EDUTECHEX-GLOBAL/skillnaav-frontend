@@ -9,7 +9,6 @@ import {
   faSignOutAlt,
   faFileAlt,
 } from "@fortawesome/free-solid-svg-icons";
-import logo from "../../../../assets-webapp/Skillnaav-logo.png";
 import { useTabContext } from "./UserHomePageContext/HomePageContext";
 import { useNavigate } from "react-router-dom";
 
@@ -25,17 +24,19 @@ const Sidebar = ({ isOpen, onClose }) => {
     } else {
       setSelectedTab(tab);
       handleSelectTab(tab);
-      if (onClose) onClose(); // close on mobile
+      if (onClose) onClose();
     }
   };
 
-  const menuItems = [
-    { id: "your-job-posts", label: "Internship Posts", icon: faBriefcase },
-    { id: "post-a-job", label: "Post An Internship", icon: faPlus },
-    { id: "messages", label: "Messages", icon: faEnvelope },
-    { id: "applications", label: "Applications", icon: faFileAlt },
-    { id: "profile", label: "Profile", icon: faUser },
-  ];
+ const menuItems = [
+  { id: "your-job-posts", label: "Internship Posts", icon: faBriefcase },
+  { id: "post-a-job", label: "Post An Internship", icon: faPlus },
+  { id: "messages", label: "Messages", icon: faEnvelope },
+  { id: "applications", label: "Applications", icon: faFileAlt },
+  { id: "offer-templates", label: "Offer Templates", icon: faFileAlt }, // ✅ NEW
+  { id: "profile", label: "Profile", icon: faUser },
+];
+
 
   const actionItems = [
     { id: "support", icon: faLifeRing, label: "Support" },
@@ -73,7 +74,7 @@ const Sidebar = ({ isOpen, onClose }) => {
 
   return (
     <>
-      {/* Backdrop for mobile */}
+      {/* Mobile Backdrop */}
       {isOpen && (
         <div
           className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
@@ -82,66 +83,51 @@ const Sidebar = ({ isOpen, onClose }) => {
       )}
 
       {/* Sidebar */}
-      <div
-        className={`
-    fixed md:relative z-50 md:z-auto
+<div
+  className={`fixed md:relative z-50 md:z-auto
     top-0 left-0
-    w-64 h-screen bg-white shadow-lg font-poppins
+    w-64 bg-white shadow-lg font-poppins
     transform transition-transform duration-300 ease-in-out
     ${isOpen ? "translate-x-0" : "-translate-x-full"}
     md:translate-x-0
-    overflow-y-auto
+    flex flex-col
   `}
-        style={{
-          marginLeft: 0,
-          paddingLeft: 0,
-        }}
-      >
+  style={{ height: "calc(100vh - 96px)" }} // Adjust height under navbar
+>
 
+  {/* Scrollable area only for the list */}
+  <div className="flex-1 overflow-y-auto hide-scrollbar px-3 pt-4">
+    <ul className="space-y-2">
+      {menuItems.map((item) => (
+        <li key={item.id}>
+          <SidebarButton item={item} />
+        </li>
+      ))}
+      {actionItems.map((item) => (
+        <li key={item.id}>
+          <SidebarButton item={item} />
+        </li>
+      ))}
+    </ul>
+  </div>
 
-        {/* Logo */}
-        {/* <div className="sticky top-0 z-10 bg-white py-4 flex items-center justify-center border-b border-gray-200">
-          <img src={logo} alt="Skillnaav Logo" className="h-14 object-contain" />
-        </div> */}
+  {/* Sticky bottom Upgrade box */}
+  <div className="p-4 bg-teal-100 rounded-lg m-3">
+    <h3 className="text-teal-700 text-sm font-semibold">
+      UPGRADE TO PREMIUM
+    </h3>
+    <p className="text-xs text-teal-600 mt-1">
+      Your team has used 80% of your available space. Need more?
+    </p>
+    <button
+      onClick={() => handleTabClick("upgrade")}
+      className="mt-3 w-full bg-teal-700 text-white py-2 px-4 rounded-lg hover:bg-teal-800 transition"
+    >
+      Upgrade Plan
+    </button>
+  </div>
+</div>
 
-        {/* Navigation */}
-        <nav className="flex-1 mt-4">
-          <ul className="space-y-2">
-            {menuItems.map((item) => (
-              <li key={item.id}>
-                <SidebarButton item={item} />
-              </li>
-            ))}
-          </ul>
-        </nav>
-
-        {/* Support / Logout / Upgrade */}
-        <div className="mt-6">
-          <ul className="space-y-2">
-            {actionItems.map((item) => (
-              <li key={item.id}>
-                <SidebarButton item={item} />
-              </li>
-            ))}
-          </ul>
-
-          <div className="mt-6 p-4 bg-teal-100 rounded-lg">
-            <h3 className="text-teal-700 text-sm font-semibold">
-              UPGRADE TO PREMIUM
-            </h3>
-            <p className="text-xs text-teal-600 mt-1">
-              Your team has used 80% of your available space. Need more?
-            </p>
-            <button
-              onClick={() => handleTabClick("upgrade")}
-              className="mt-4 w-full bg-teal-700 text-white py-2 px-4 rounded-lg hover:bg-teal-800 transition"
-            >
-              Upgrade Plan
-            </button>
-          </div>
-
-        </div>
-      </div>
     </>
   );
 };

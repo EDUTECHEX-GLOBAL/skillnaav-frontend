@@ -201,69 +201,100 @@ const hasFullPremiumAccess = () => {
     }
   };
 
-  const handleSendOffer = (student) => {
-    const internship = internships.find(i => i._id === modalData.internshipId);
-    setSelectedStudent({ ...student, internship_id: modalData.internshipId });
-    setJoiningDate(
-      internship?.startDate
-        ? new Date(internship.startDate).toISOString().split("T")[0]
-        : ""
-    );
-    setTemplateId("");
+ const handleSendOffer = (student) => {
+  const internship = internships.find(i => i._id === modalData.internshipId);
+  setSelectedStudent({ ...student, internship_id: modalData.internshipId });
+  setJoiningDate(
+    internship?.startDate
+      ? new Date(internship.startDate).toISOString().split("T")[0]
+      : ""
+  );
+  setTemplateId("");
 
-    axios
-      .get(`/api/templates?partnerId=${partnerId}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      })
-      .then((res) => setTemplates(res.data))
-      .catch(console.error);
-  };
+  // Add error handling and logging
+  axios
+    .get(`/api/templates?partnerId=${partnerId}`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    })
+    .then((res) => {
+      console.log("Templates fetched:", res.data); // Debug log
+      setTemplates(res.data);
+    })
+    .catch(err => {
+      console.error("Error fetching templates:", err);
+      toast.error("Failed to load templates");
+    });
+};
 
   const handleSendOfferLetter = async () => {
-    if (!templateId || !joiningDate) return alert("Template and joining date required");
+  if (!templateId || !joiningDate) {
+    alert("Template and joining date are required.");
+    return;
+  }
 
-    try {
-      setSendingOffer(true);
+  try {
+    setSendingOffer(true);
 
-      const internship = internships.find(i => i._id === selectedStudent.internship_id);
-      const schoolAdminId = localStorage.getItem("schoolAdminId");
+    const internship = internships.find(i => i._id === selectedStudent?.internship_id);
+    const schoolAdminId = localStorage.getItem("schoolAdminId");
 
-      await axios.post(`/api/offer-letters`, {
-        student_id: selectedStudent._id,
-        internshipId: internship._id,
-        templateId,
-        name: selectedStudent.name,
-        email: selectedStudent.email,
-        position: internship.jobTitle,
-        company: internship.companyName,
-        location: internship.location,
-        duration: internship.endDateOrDuration,
-        startDate: joiningDate,
-        internshipType: internship.internshipType,
-        compensationDetails: internship.compensationDetails,
-        jobDescription: internship.jobDescription,
-        qualifications: internship.qualifications,
-        contactInfo: {
-          name: "HR Manager",
-          email: "hr@company.com",
-          phone: "9876543210",
-        },
-        noticePeriod: "2 weeks",
-        schoolAdminId: schoolAdminId || null
-      }, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
+    // ✅ Build the payload object clearly
+    const payload = {
+      partnerId: partnerData?._id,
+      student_id: selectedStudent?._id,
+      internshipId: internship?._id,
+      templateId,
+      name: selectedStudent?.name,
+      email: selectedStudent?.email,
+      position: internship?.jobTitle,
+      company: internship?.companyName,
+      location: internship?.location,
+      duration: internship?.endDateOrDuration,
+      startDate: joiningDate,
+      internshipType: internship?.internshipType,
+      compensationDetails: internship?.compensationDetails,
+      jobDescription: internship?.jobDescription,
+      qualifications: Array.isArray(internship?.qualifications)
+        ? internship.qualifications
+        : (typeof internship?.qualifications === 'string'
+            ? internship.qualifications.match(/[A-Z]?[a-z]+/g)
+            : []),
+      contactInfo: {
+        name: "HR Manager",
+        email: "hr@company.com",
+        phone: "9876543210",
+      },
+      noticePeriod: "2 weeks",
+      schoolAdminId: schoolAdminId || null,
+    };
 
-      alert("Offer sent successfully!");
-      setSelectedStudent(null);
-    } catch (err) {
-      alert(err.response?.data?.error || err.message);
-    } finally {
+    // ✅ Debug log before sending
+    console.log("Sending Offer Payload:", payload);
+
+    // ✅ Basic check for required fields
+    if (!payload.partnerId || !payload.student_id || !payload.internshipId || !payload.name || !payload.email || !payload.position || !payload.startDate) {
+      alert("Some required fields are missing.");
       setSendingOffer(false);
+      return;
     }
-  };
+
+    // ✅ POST the offer letter
+    await axios.post(`/api/offer-letters`, payload, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    });
+
+    alert("Offer sent successfully!");
+    setSelectedStudent(null);
+  } catch (err) {
+    console.error("Offer letter error:", err);
+    alert(err.response?.data?.error || "Failed to send offer letter");
+  } finally {
+    setSendingOffer(false);
+  }
+};
+
 
   const handleSchedule = (internshipId) => {
     if (!hasFullPremiumAccess()) {
@@ -325,20 +356,23 @@ const hasFullPremiumAccess = () => {
               min={new Date().toISOString().split("T")[0]}
             />
             <label className="block mb-2">Select Offer Template:</label>
-            <select
-              className="border w-full mb-4 p-2 rounded"
-              value={templateId}
-              onChange={(e) => setTemplateId(e.target.value)}
-            >
-              <option value="" disabled>
-                -- Select Template --
-              </option>
-              {templates.map((tpl) => (
-                <option key={tpl._id} value={tpl._id}>
-                  {tpl.name || tpl.title}
-                </option>
-              ))}
-            </select>
+          <select
+  className="border w-full mb-4 p-2 rounded"
+  value={templateId}
+  onChange={e => setTemplateId(e.target.value)}
+>
+  <option value="" disabled>-- Select Template --</option>
+  {templates.map(tpl => {
+    const label = tpl.name.trim();    // your user-entered name
+    return (
+      <option key={tpl._id} value={tpl._id}>
+        {label}
+      </option>
+    );
+  })}
+</select>
+
+
             <div className="flex justify-end gap-2">
               <button
                 className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"

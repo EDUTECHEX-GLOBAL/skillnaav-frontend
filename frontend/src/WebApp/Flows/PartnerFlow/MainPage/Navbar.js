@@ -88,9 +88,10 @@ const Navbar = ({ onToggleSidebar }) => {
             className="absolute right-0 top-10 w-48 bg-white shadow-lg rounded-md py-2 border border-gray-300"
           >
             {userInfo.email && (
-              <div className="px-4 py-2 text-sm text-gray-800 border-b border-gray-200">
-                {userInfo.email}
-              </div>
+             <div className="px-4 py-2 text-sm text-gray-800 border-b border-gray-200 break-words whitespace-normal max-w-[180px]">
+  {userInfo.email}
+</div>
+
             )}
 
             <button

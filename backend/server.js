@@ -53,6 +53,7 @@ const googleRoutes = require("./routes/webapp-routes/googleRoutes");
 
 // NEW: Import Offer Routes
 const offerLetterRoutes = require("./routes/webapp-routes/offerLetterRoutes");
+const offerTemplateRoutes = require("./routes/webapp-routes/offerTemplateRoutes");
 const scheduleRoutes = require("./routes/webapp-routes/scheduleRoutes");
 const uploadRoutes = require("./routes/uploadRoutes");
 //partner payment routes
@@ -92,6 +93,7 @@ app.use("/api/google", googleRoutes);
 app.use('/api/offer-letters', offerLetterRoutes);
 app.use("/api/notifications", NotificationRoutes);
 app.use("/api/schedule", scheduleRoutes);
+app.use("/api/templates", offerTemplateRoutes);
 
 // NEW: Add Partner Payment Routes
 app.use("/api/partner/payments", partnerPaymentRoutes);
