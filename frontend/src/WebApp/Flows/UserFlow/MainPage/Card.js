@@ -2,26 +2,24 @@ import React, { useEffect, useState } from "react";
 import { FaMapMarkerAlt, FaClock, FaDollarSign, FaHeart } from "react-icons/fa";
 import axios from "axios";
 
-const JobCard = ({ searchTerm, onViewDetails }) => {
-  const [jobs, setJobs] = useState([]);
-  const [loading, setLoading] = useState(true);
+const JobCard = ({ searchTerm = "", onViewDetails, jobs: propJobs }) => {
+  const [jobs, setJobs] = useState(propJobs || []);
+  const [loading, setLoading] = useState(!propJobs);
   const [error, setError] = useState(null);
-
-  useEffect(() => {
+ useEffect(() => {
+    if (propJobs) return; // ✅ Skip fetching if jobs are passed
     const fetchJobs = async () => {
       try {
         const response = await axios.get("/api/interns");
         setJobs(response.data);
-        setLoading(false);
       } catch (err) {
-        console.error("Error fetching jobs:", err);
-        setError("Failed to load jobs. Please try again.");
+        setError("Failed to load jobs.");
+      } finally {
         setLoading(false);
       }
     };
-
     fetchJobs();
-  }, []);
+  }, [propJobs]);
 
   const filteredJobs = jobs
     .filter((job) => job.adminApproved)

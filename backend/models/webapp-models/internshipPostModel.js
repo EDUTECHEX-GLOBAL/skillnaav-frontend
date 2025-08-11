@@ -20,6 +20,19 @@ const internshipPostingSchema = new mongoose.Schema(
     endDateOrDuration: { type: String, required: true }, // date or duration
     duration:          { type: String, required: true }, // "2 months" etc.
 
+    /* --------- sector --------- */
+    sector: {
+      type: String,
+      enum: [
+        "advanced-ai",
+        "quantum-computing",
+        "climate-tech",
+        "biotech",
+        "materials-science"
+      ],
+      required: true,
+    },
+
     /* --------- internship type --------- */
     internshipType: {
       type:    String,
@@ -75,7 +88,7 @@ const internshipPostingSchema = new mongoose.Schema(
   },
   {
     versionKey: false,   // hide "__v"
-    timestamps: true,    // adds createdAt / updatedAt (needed for RAG sorting)
+    timestamps: true,    // adds createdAt / updatedAt
   }
 );
 

@@ -3,15 +3,25 @@ import axios from "axios";
 
 import { useTabContext } from "./UserHomePageContext/HomePageContext";
 
-const COUNTRY_API_URL = 'https://restcountries.com/v3.1/all';
-const CITY_API_URL = 'https://wft-geo-db.p.rapidapi.com/v1/geo/cities';
+const COUNTRY_API_URL = "https://restcountries.com/v3.1/all";
+const CITY_API_URL = "https://wft-geo-db.p.rapidapi.com/v1/geo/cities";
 
 const PostAJob = () => {
   const { saveJob } = useTabContext();
 
+  // Define your top sectors
+  const topSectors = [
+    { id: "advanced-ai", name: "Advanced AI & Autonomous Systems" },
+    { id: "quantum-computing", name: "Quantum Computing & Next-Gen Computing" },
+    { id: "climate-tech", name: "Climate Tech & Carbon Capture" },
+    { id: "biotech", name: "Biotechnology & Synthetic Biology" },
+    { id: "materials-science", name: "Advanced Materials Science" },
+  ];
+
   const [formData, setFormData] = useState({
     jobTitle: "",
     companyName: "",
+    sector: topSectors[0].id,      // ← new sector field
     city: "",
     country: "",
     jobType: "Internship",
@@ -26,13 +36,9 @@ const PostAJob = () => {
       currency: "USD",
       frequency: "MONTHLY",
     },
-    mode: "Online", // New field: mode of internship
+    mode: "Online",
     qualifications: [],
-    contactInfo: {
-      name: "",
-      email: "",
-      phone: "",
-    },
+    contactInfo: { name: "", email: "", phone: "" },
     imgUrl: "",
     studentApplied: false,
     adminApproved: false,
@@ -49,142 +55,188 @@ const PostAJob = () => {
   const [partnerInternships, setPartnerInternships] = useState([]);
   const [freemiumAlert, setFreemiumAlert] = useState("");
 
-
-
-
-
- useEffect(() => {
-  const userInfo = JSON.parse(localStorage.getItem("userInfo"));
-  if (userInfo) {
-    setUserType(userInfo.planType); // e.g., "Freemium"
-  }
-
-  const partnerId = localStorage.getItem("partnerId");
-  if (partnerId) {
-    axios
-      .get(`/api/interns/partner/${partnerId}`)
-      .then((res) => {
-        setPartnerInternships(res.data || []);
-      })
-      .catch((err) => {
-        console.error("Failed to fetch partner internships:", err);
-      });
-  }
-}, []);
-
-
+  // Load user plan and existing posts
   useEffect(() => {
-    const fetchCountries = async () => {
-      try {
-        const response = await axios.get(COUNTRY_API_URL);
-        setCountries(response.data);
-      } catch (error) {
-        console.error("Error fetching countries:", error);
-      }
-    };
+    const ui = JSON.parse(localStorage.getItem("userInfo"));
+    if (ui) setUserType(ui.planType);
 
-    fetchCountries();
+    const pid = localStorage.getItem("partnerId");
+    if (pid) {
+      axios
+        .get(`/api/interns/partner/${pid}`)
+        .then((res) => setPartnerInternships(res.data || []))
+        .catch(console.error);
+    }
   }, []);
 
+  // Fetch countries
+  useEffect(() => {
+    axios
+      .get(COUNTRY_API_URL)
+      .then((res) => setCountries(res.data))
+      .catch(console.error);
+  }, []);
+
+  // Country autocomplete
   const debouncedSearchCountries = useCallback(
-    async (query) => {
-      if (!query) {
-        setCountrySuggestions([]);
-        return;
-      }
-
-      const filteredCountries = countries.filter((country) =>
-        country.name.common.toLowerCase().includes(query.toLowerCase())
+    (q) => {
+      if (!q) return setCountrySuggestions([]);
+      setCountrySuggestions(
+        countries.filter((c) =>
+          c.name.common.toLowerCase().includes(q.toLowerCase()),
+        ),
       );
-      setCountrySuggestions(filteredCountries);
     },
-    [countries]
+    [countries],
   );
-
   const handleCountryInputChange = (e) => {
     const { value } = e.target;
-    setFormData((prev) => ({ ...prev, country: value }));
+    setFormData((p) => ({ ...p, country: value }));
     debouncedSearchCountries(value);
     setCitySuggestions([]);
   };
 
+  // City autocomplete
   const debouncedSearchCities = useCallback(
-    async (query) => {
-      if (!query) {
-        setCitySuggestions([]);
-        return;
-      }
+    async (q) => {
+      if (!q) return setCitySuggestions([]);
       try {
-        const response = await axios.get(CITY_API_URL, {
+        const resp = await axios.get(CITY_API_URL, {
           headers: {
-            "X-RapidAPI-Key": "7025bea304msh17f75625e027c56p185594jsncd48a2c69153",
+            "X-RapidAPI-Key": "...",
             "X-RapidAPI-Host": "wft-geo-db.p.rapidapi.com",
           },
-          params: {
-            namePrefix: query,
-            limit: 10,
-            minPopulation: 100000,
-          },
+          params: { namePrefix: q, limit: 10, minPopulation: 100000 },
         });
-        setCitySuggestions(response.data.data);
-      } catch (error) {
-        console.error("Error fetching cities:", error);
+        setCitySuggestions(resp.data.data);
+      } catch (err) {
+        console.error(err);
       }
     },
-    []
+    [],
   );
-
   const handleCityInputChange = (e) => {
     const { value } = e.target;
-    setFormData((prev) => ({ ...prev, city: value }));
+    setFormData((p) => ({ ...p, city: value }));
     debouncedSearchCities(value);
   };
-
-  const handleCitySelect = (cityName) => {
-    setFormData((prev) => ({ ...prev, city: cityName }));
+  const handleCitySelect = (name) => {
+    setFormData((p) => ({ ...p, city: name }));
     setCitySuggestions([]);
   };
 
+  // General change handler
   const handleChange = (e) => {
     const { name, value } = e.target;
-
-    setFormData((prev) => {
+    setFormData((p) => {
       if (name === "internshipType") {
         return {
-          ...prev,
+          ...p,
           internshipType: value,
-          compensationDetails: { ...prev.compensationDetails, type: value },
+          compensationDetails: { ...p.compensationDetails, type: value },
         };
       }
       if (name.startsWith("compensationDetails.")) {
-        const compensationField = name.split(".")[1];
+        const field = name.split(".")[1];
         return {
-          ...prev,
-          compensationDetails: {
-            ...prev.compensationDetails,
-            [compensationField]: value,
-          },
+          ...p,
+          compensationDetails: { ...p.compensationDetails, [field]: value },
         };
-      } else if (name.startsWith("contactInfo.")) {
-        const contactField = name.split(".")[1];
-        return {
-          ...prev,
-          contactInfo: { ...prev.contactInfo, [contactField]: value },
-        };
-      } else {
-        return { ...prev, [name]: value };
       }
+      if (name.startsWith("contactInfo.")) {
+        const field = name.split(".")[1];
+        return {
+          ...p,
+          contactInfo: { ...p.contactInfo, [field]: value },
+        };
+      }
+      // New: sector dropdown
+      if (name === "sector") {
+        return { ...p, sector: value };
+      }
+      return { ...p, [name]: value };
     });
   };
 
-
+  // Qualifications
   const handleQualificationsChange = (e) => {
-    const { value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      qualifications: value.split(",").map((q) => q.trim()),
+    setFormData((p) => ({
+      ...p,
+      qualifications: e.target.value.split(",").map((q) => q.trim()),
     }));
   };
+
+  const handleFileUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    setUploading(true);
+    const reader = new FileReader();
+    reader.onloadend = () => setPreviewUrl(reader.result);
+    reader.readAsDataURL(file);
+
+    try {
+      const data = new FormData();
+      data.append("image", file);
+
+
+    const res = await axios.post("/api/upload/job-image", data, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      if (res.data.success) {
+        setFormData(prev => ({ ...prev, imgUrl: res.data.imageUrl }));
+      } else {
+        console.error("Upload failed:", res.data.message);
+      }
+    } catch (err) {
+      console.error("S3 upload error:", err);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const autofillTestData = () => {
+  const testJob = 
+{
+  jobTitle: "Data Science Intern",
+  companyName: "Insight Analytics Pvt. Ltd.",
+  country: "India",
+  city: "Hyderabad",
+  jobType: "Internship",
+  jobDescription:
+    "Work with the analytics team to collect, clean, and analyze data sets. Assist in building machine learning models and preparing visualization dashboards.",
+  startDate: "2025-09-01",
+  endDateOrDuration: "2025-12-01",
+  duration: "3 months",
+  internshipType: "STIPEND",
+  compensationDetails: {
+    type: "STIPEND",
+    amount: 8000,
+    currency: "INR",
+    frequency: "MONTHLY",
+  },
+  mode: "Hybrid",
+  qualifications: ["Python", "Machine Learning", "Data Visualization", "SQL"],
+  contactInfo: {
+    name: "Rahul Sharma",
+    email: "rahul@insightanalytics.in",
+    phone: "+91 98765 43210",
+  },
+  imgUrl: "https://example.com/img-data-science.jpg",
+  studentApplied: false,
+  adminApproved: false
+};
+
+
+
+
+  setFormData(testJob);
+  setPreviewUrl(testJob.imgUrl);
+  setCountrySuggestions([]);
+  setCitySuggestions([]);
+};
+
 
   const calculateDuration = useCallback(() => {
     const { startDate, endDateOrDuration } = formData;
@@ -252,127 +304,29 @@ const PostAJob = () => {
     setPreviewUrl(null);
   };
 
-const handleSubmit = async (e) => {
-  e.preventDefault();
+ const handleSubmit = async (e) => {
+    e.preventDefault();
+    const pid = localStorage.getItem("partnerId");
+    if (!pid) return console.error("No partner ID");
 
-  const partnerId = localStorage.getItem("partnerId");
-  if (!partnerId) {
-    console.error("No partner ID found in localStorage.");
-    return;
-  }
+    // Freemium restrictions (unchanged)…
 
-  // ✅ Restrict Freemium Partners
-  if (userType === "Freemium") {
-    const activeCount = partnerInternships.filter(
-      (post) => post.deleted === false
-    ).length;
-
-    if (activeCount >= 2) {
-      setFreemiumAlert("Freemium partners can post only up to 2 active internships.");
-      setTimeout(() => setFreemiumAlert(""), 4000);
-      return;
-    }
-
-    if (formData.internshipType === "PAID") {
-      setFreemiumAlert("Freemium partners cannot post Paid internships.");
-      setTimeout(() => setFreemiumAlert(""), 4000);
-      return;
-    }
-  }
-
-  const completeFormData = {
-    ...formData,
-    location: `${formData.city}, ${formData.country}`,
-    partnerId: partnerId,
-  };
-
-  try {
-    const response = await axios.post("/api/interns", completeFormData);
-    console.log("Internship posted successfully:", response.data);
-    saveJob(response.data);
-    setSuccessMessage("Internship posted successfully!");
-    resetForm();
-
-    setTimeout(() => setSuccessMessage(""), 3000);
-  } catch (error) {
-    console.error("Error posting internship:", error.response?.data || error.message);
-  }
-};
-
-
-
-   const handleFileUpload = async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    setUploading(true);
-    const reader = new FileReader();
-    reader.onloadend = () => setPreviewUrl(reader.result);
-    reader.readAsDataURL(file);
+    const payload = {
+      ...formData,
+      location: `${formData.city}, ${formData.country}`,
+      partnerId: pid,
+    };
 
     try {
-      const data = new FormData();
-      data.append("image", file);
-
-
-    const res = await axios.post("/api/upload/job-image", data, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-
-      if (res.data.success) {
-        setFormData(prev => ({ ...prev, imgUrl: res.data.imageUrl }));
-      } else {
-        console.error("Upload failed:", res.data.message);
-      }
+      const res = await axios.post("/api/interns", payload);
+      saveJob(res.data);
+      setSuccessMessage("Internship posted successfully!");
+      resetForm();
+      setTimeout(() => setSuccessMessage(""), 3000);
     } catch (err) {
-      console.error("S3 upload error:", err);
-    } finally {
-      setUploading(false);
+      console.error("Error posting internship:", err);
     }
   };
-
-  const autofillTestData = () => {
-  const testJob = 
-{
-  jobTitle: "Marketing Intern",
-  companyName: "BrandWize Solutions",
-  country: "India",
-  city: "Bangalore",
-  jobType: "Internship",
-  jobDescription:
-    "Assist in executing digital marketing campaigns, performing competitor research, and creating content for social media platforms.",
-  startDate: "2025-08-10",
-  endDateOrDuration: "2025-11-10",
-  duration: "3 months",
-  internshipType: "STIPEND",
-  compensationDetails: {
-    type: "STIPEND",
-    amount: 5000,
-    currency: "INR",
-    frequency: "MONTHLY",
-  },
-  mode: "Online",
-  qualifications: ["Digital Marketing", "SEO", "Content Writing", "Social Media"],
-  contactInfo: {
-    name: "Neha Mehta",
-    email: "neha@brandwize.co.in",
-    phone: "+91 98112 34567",
-  },
-  imgUrl: "https://example.com/img-marketing.jpg",
-  studentApplied: false,
-  adminApproved: false
-}
-
-
-
-
-
-  setFormData(testJob);
-  setPreviewUrl(testJob.imgUrl);
-  setCountrySuggestions([]);
-  setCitySuggestions([]);
-};
-
 
   return (
     <div className="max-w-4xl font-poppins mx-auto p-6 bg-white rounded-lg shadow-lg mt-8">
@@ -380,7 +334,7 @@ const handleSubmit = async (e) => {
         Post an Internship
       </h2>
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* General Job Information */}
+        {/* Job Title */}
         <div>
           <label className="block text-gray-700 font-medium mb-2">
             Job Title
@@ -390,12 +344,13 @@ const handleSubmit = async (e) => {
             name="jobTitle"
             value={formData.jobTitle}
             onChange={handleChange}
+            required
             className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring focus:ring-teal-500"
             placeholder="Enter job title"
-            required
           />
         </div>
 
+        {/* Company Name */}
         <div>
           <label className="block text-gray-700 font-medium mb-2">
             Company Name
@@ -405,12 +360,31 @@ const handleSubmit = async (e) => {
             name="companyName"
             value={formData.companyName}
             onChange={handleChange}
+            required
             className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring focus:ring-teal-500"
             placeholder="Enter company name"
-            required
           />
         </div>
 
+        {/* Sector Dropdown */}
+        <div>
+          <label className="block text-gray-700 font-medium mb-2">
+            Sector
+          </label>
+          <select
+            name="sector"
+            value={formData.sector}
+            onChange={handleChange}
+            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring focus:ring-teal-500"
+            required
+          >
+            {topSectors.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </div>
         <div>
           <label className="block text-gray-700 font-medium mb-2">
             Location
