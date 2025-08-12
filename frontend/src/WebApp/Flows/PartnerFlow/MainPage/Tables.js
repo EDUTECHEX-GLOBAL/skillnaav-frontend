@@ -64,10 +64,10 @@ export const ShortlistedTable = ({ candidates, internshipId, onSendOffer }) => {
     return <p className="text-gray-600">No candidates to display.</p>;
   }
 
-  // const handleScheduleClick = (student) => {
-  //   setStudentToSchedule(student);
-  //   setScheduleModalOpen(true);
-  // };
+const uniqueCandidates = candidates.filter(
+  (student, index, self) =>
+    index === self.findIndex((s) => s.email === student.email)
+);
 
   return (
     <div className="space-y-4">
@@ -82,7 +82,7 @@ export const ShortlistedTable = ({ candidates, internshipId, onSendOffer }) => {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {candidates.map((student) => (
+            {uniqueCandidates.map((student) => (
               <tr key={student._id} className="hover:bg-gray-50 transition">
                 <td className="px-6 py-4">{student.name || "N/A"}</td>
                 <td className="px-6 py-4">{student.email || "N/A"}</td>

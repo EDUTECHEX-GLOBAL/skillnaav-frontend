@@ -130,38 +130,57 @@ const hasFullPremiumAccess = () => {
 
 
   const handleShortlist = async (id, description, skills) => {
-    if (!hasPremiumAccess()) {
-      alert(`Please upgrade to Premium Basic or higher to shortlist candidates`);
-      return;
+  if (!hasPremiumAccess()) {
+    alert(`Please upgrade to Premium Basic or higher to shortlist candidates`);
+    return;
+  }
+
+  try {
+    setModalData({ open: true, internshipId: id, type: "shortlisted", loading: true });
+
+    let resumes = [];
+
+    // ✅ If we don't already have applications, fetch them directly
+    if (!applications[id] || applications[id].length === 0) {
+      try {
+        const { data } = await axios.get(`/api/applications/internship/${id}`);
+        const fetchedApplications = Array.isArray(data.applications) ? data.applications : [];
+        setApplications(prev => ({
+          ...prev,
+          [id]: fetchedApplications,
+        }));
+        resumes = fetchedApplications.map((s) => s.resumeUrl).filter(Boolean);
+      } catch (err) {
+        console.error("Error fetching applications for shortlisting:", err);
+      }
+    } else {
+      resumes = applications[id].map((s) => s.resumeUrl).filter(Boolean);
     }
 
-    try {
-      setModalData({ open: true, internshipId: id, type: "shortlisted", loading: true });
-      const resumeUrls = (applications[id] || []).map((s) => s.resumeUrl);
-      if (!resumeUrls.length) throw new Error("No applications to shortlist");
+    // ✅ Send request without blocking if resumes array is empty
+    const formData = new FormData();
+    formData.append("job_description", description || "");
+    formData.append("job_skills", JSON.stringify(skills || []));
+    resumes.forEach((url) => formData.append("resumes", url));
+    formData.append("internship_id", id);
 
-      const formData = new FormData();
-      formData.append("job_description", description);
-      formData.append("job_skills", JSON.stringify(skills));
-      resumeUrls.forEach((url) => formData.append("resumes", url));
-      formData.append("internship_id", id);
+    const { data } = await axios.post(
+      `${SHORTLIST_API_BASE_URL}/partner/shortlist`,
+      formData,
+      { headers: { "Content-Type": "multipart/form-data" } }
+    );
 
-      const { data } = await axios.post(
-        `${SHORTLIST_API_BASE_URL}/partner/shortlist`,
-        formData,
-        { headers: { "Content-Type": "multipart/form-data" } }
-      );
-
-      setShortlistedCandidates((prev) => ({
-        ...prev,
-        [id]: data.shortlisted_candidates,
-      }));
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setModalData((prev) => ({ ...prev, loading: false }));
-    }
-  };
+    setShortlistedCandidates((prev) => ({
+      ...prev,
+      [id]: data.shortlisted_candidates || [],
+    }));
+  } catch (err) {
+    console.error("Shortlisting error:", err);
+    setError(err.message);
+  } finally {
+    setModalData((prev) => ({ ...prev, loading: false }));
+  }
+};
 
   const showShortlisted = async (internshipId) => {
     if (!hasPremiumAccess()) {
