@@ -14,6 +14,7 @@ import {
 import Modal from "./Modal";
 import ScheduleForm from "./ScheduleForm";
 import { ApplicationsTable, ShortlistedTable } from "./Tables";
+import { toast } from "react-toastify";
 
 const SHORTLIST_API_BASE_URL = process.env.REACT_APP_SHORTLIST_API_BASE_URL || "http://localhost:8001";
 
