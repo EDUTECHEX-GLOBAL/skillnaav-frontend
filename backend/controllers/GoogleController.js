@@ -190,11 +190,11 @@ const googleCallback = async (req, res) => {
 
         // Redirect after brief delay
         setTimeout(() => {  
-          window.location.href = "/user-main-page";
+          window.location.href = "http://localhost:3000/user-main-page";
         }, 1500);
       } catch (e) {
         console.error("Error restoring session token:", e);
-        window.location.href = "/user-main-page";
+        window.location.href = "http://localhost:3000/user-main-page";
       }
     </script>
   </body>

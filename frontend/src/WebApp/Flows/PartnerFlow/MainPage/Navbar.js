@@ -83,25 +83,42 @@ const Navbar = ({ onToggleSidebar }) => {
         </button>
 
         {isDropdownOpen && (
-          <div
-            ref={dropdownRef}
-            className="absolute right-0 top-10 w-48 bg-white shadow-lg rounded-md py-2 border border-gray-300"
-          >
-            {userInfo.email && (
-              <div className="px-4 py-2 text-sm text-gray-800 border-b border-gray-200">
-                {userInfo.email}
-              </div>
-            )}
+  <div
+    ref={dropdownRef}
+    className="absolute right-0 top-10 mt-2 bg-white shadow-xl rounded-xl border border-gray-200 z-50 w-auto min-w-[20rem] max-w-[90vw]"
+  >
+    {/* Email header styled like the reference */}
+    <div className="px-4 py-3 border-b rounded-t-xl bg-white">
+      <div className="flex items-center gap-2 text-black">
+        <div className="h-6 w-6 rounded-full bg-gray-200 flex items-center justify-center">
+          <img
+            src={require("../../../../assets-webapp/user-logo.svg").default}
+            alt="User Logo"
+            className="h-7 w-7"
+          />
+        </div>
+        <span
+          className="block text-sm font-medium whitespace-nowrap"
+          title={userInfo.email}
+        >
+          {userInfo.email}
+        </span>
+      </div>
+    </div>
 
-            <button
-              onClick={handleLogout}
-              className="w-full flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-100"
-            >
-              <FontAwesomeIcon icon={faSignOutAlt} className="mr-2" />
-              Logout
-            </button>
-          </div>
-        )}
+    {/* Logout */}
+    <button
+      onClick={handleLogout}
+      className="w-full flex items-center gap-2 px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition rounded-b-xl"
+    >
+      {/* fixed icon slot = w-6 h-6 just like the email row */}
+      <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center">
+        <FontAwesomeIcon icon={faSignOutAlt} className="w-5 h-5" />
+      </div>
+      <span>Logout</span>
+    </button>
+  </div>
+)}
       </div>
     </header>
   );

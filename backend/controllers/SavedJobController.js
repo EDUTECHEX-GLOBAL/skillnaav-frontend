@@ -36,8 +36,6 @@ const saveJob = async (req, res) => {
   }
 };
 
-
-
 // ✅ Get saved jobs for a user (with job details)
 const getSavedJobs = async (req, res) => {
   const { userId } = req.params;

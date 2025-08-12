@@ -6,6 +6,7 @@ import {
   faBell,
   faBars,
   faCrown,
+  faAt,
 } from "@fortawesome/free-solid-svg-icons";
 import logo from "../../../../assets-webapp/Skillnaav-logo.png";
 import { useTabContext } from "./UserHomePageContext/HomePageContext";
@@ -148,17 +149,37 @@ const Navbar = ({ onToggleSidebar }) => {
           {isDropdownOpen && (
             <div
               ref={dropdownRef}
-              className="absolute right-0 top-16 mt-2 w-56 bg-white shadow-xl rounded-lg border border-gray-200 z-50"
+              className="absolute right-0 top-16 mt-2 bg-white shadow-xl rounded-xl border border-gray-200 z-50 w-auto min-w-[20rem] max-w-[90vw]"
             >
-              <div className="px-4 py-3 border-b text-sm text-gray-700 font-medium">
-                {userInfo.email}
+              {/* Email header styled like the reference */}
+              <div className="px-4 py-3 border-b rounded-t-xl bg-white">
+                <div className="flex items-center gap-2 text-black">
+                  <div className="h-6 w-6 rounded-full bg-gray-200 flex items-center justify-center">
+                    <img
+                      src={require("../../../../assets-webapp/user-logo.svg").default}
+                      alt="User Logo"
+                      className="h-7 w-7"
+                    />
+                  </div>
+                  <span
+                    className="block text-sm font-medium whitespace-nowrap"
+                    title={userInfo.email}
+                  >
+                    {userInfo.email}
+                  </span>
+                </div>
               </div>
+
+              {/* Logout */}
               <button
                 onClick={handleLogout}
-                className="w-full flex items-center gap-2 px-4 py-3 text-sm text-red-600 hover:bg-red-100 transition"
+                className="w-full flex items-center gap-2 px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition rounded-b-xl"
               >
-                <FontAwesomeIcon icon={faSignOutAlt} />
-                Logout
+                {/* fixed icon slot = w-6 h-6 just like the email row */}
+                <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center">
+                  <FontAwesomeIcon icon={faSignOutAlt} className="w-5 h-5" />
+                </div>
+                <span>Logout</span>
               </button>
             </div>
           )}
