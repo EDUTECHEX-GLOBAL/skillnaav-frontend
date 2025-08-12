@@ -4,6 +4,9 @@ import axios from "axios";
 import { FaHeart, FaMapMarkerAlt, FaBriefcase, FaDollarSign } from "react-icons/fa";
 import { useTabContext } from "./UserHomePageContext/HomePageContext";
 import SkillAnalysis from "./SkillnaavAnalysis";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {  faClock } from "@fortawesome/free-solid-svg-icons";
+import { format } from "date-fns";
 
 // 🟡 Limit definitions per plan
 const MAX_LIMITS = {
@@ -167,19 +170,31 @@ const ApplyCards = ({ job, onBack }) => {
 
             <div className="text-gray-500 mt-2 text-sm md:text-base flex items-center">
               <FaMapMarkerAlt className="mr-2" />
-              <p>{job.location || "Location not specified"} • {job.jobType || "Not specified"}</p>
+              <p>{job.location || "Location not specified"} </p>
             </div>
 
-            <div className="text-gray-500 mt-2 text-sm md:text-base flex items-center">
-              <FaBriefcase className="mr-2" />
-              <p>
-                From {new Date(job.startDate).toLocaleDateString()} to {job.endDateOrDuration}
-              </p>
+            <div className="flex items-center text-gray-500 mt-2 text-sm md:text-base">
+              {/* <FaBriefcase className="mr-2" /> */}
+             <p className="flex items-center">
+                                   <FontAwesomeIcon icon={faClock} className="mr-2" />
+                                   {format(new Date(job.startDate), "dd MMM yyyy")} –{" "}
+                                   {job.endDateOrDuration ? format(new Date(job.endDateOrDuration), "dd MMM yyyy") : "—"}
+                                 </p>
             </div>
 
-            <div className="text-gray-500 mt-2 text-sm md:text-base flex items-center">
+            <div className="flex items-center text-gray-500 mt-2 text-sm md:text-base">
               <FaDollarSign className="mr-2" />
-              <p>{job.salaryDetails || "Not specified"}</p>
+                <p>
+                                    <FontAwesomeIcon icon={FaDollarSign} />
+                                    {job.internshipType === "STIPEND"
+                                      ? `${job.compensationDetails?.amount} ${job.compensationDetails?.currency} per ${job.compensationDetails?.frequency?.toLowerCase()}`
+                                      : job.internshipType === "FREE"
+                                        ? "Unpaid / Free"
+                                        : job.internshipType === "PAID"
+                                          ? `Student Pays: ${job.compensationDetails?.amount} ${job.compensationDetails?.currency}`
+                                          : "N/A"
+                                    }
+                                  </p>
             </div>
 
             <div className="mt-4">

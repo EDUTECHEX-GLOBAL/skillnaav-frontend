@@ -242,24 +242,28 @@ const toggleSaveJob = async (job) => {
                     </div>
                   </div>
 
-                  <div className="text-gray-600 mb-4">
-                    <p><FontAwesomeIcon icon={faMapMarkerAlt} /> {job.location} • {job.jobType}</p>
+            <div className="text-gray-600 mb-4">
+                    <p><FontAwesomeIcon icon={faMapMarkerAlt} /> {job.location}  {job.jobType}</p>
                     <p className="flex items-center">
                       <FontAwesomeIcon icon={faClock} className="mr-2" />
                       {format(new Date(job.startDate), "dd MMM yyyy")} –{" "}
                       {job.endDateOrDuration ? format(new Date(job.endDateOrDuration), "dd MMM yyyy") : "—"}
                     </p>
-                    <p>
-                      <FontAwesomeIcon icon={faDollarSign} />
-                      {job.internshipType === "STIPEND"
-                        ? `${job.compensationDetails?.amount} ${job.compensationDetails?.currency} per ${job.compensationDetails?.frequency?.toLowerCase()}`
-                        : job.internshipType === "FREE"
-                          ? "Unpaid / Free"
-                          : job.internshipType === "PAID"
-                            ? `Student Pays: ${job.compensationDetails?.amount} ${job.compensationDetails?.currency}`
-                            : "N/A"
-                      }
-                    </p>
+              <div className="flex items-center gap-2 text-gray-600  text-sm md:text-base leading-none">
+  <FontAwesomeIcon icon={faDollarSign} className="text-gray-600 w-4 h-4 flex-shrink-0" />
+  <span className="leading-none">
+    {job.internshipType === "STIPEND"
+      ? `${job.compensationDetails?.amount} ${job.compensationDetails?.currency} per ${job.compensationDetails?.frequency?.toLowerCase()}`
+      : job.internshipType === "FREE"
+        ? "Unpaid / Free"
+        : job.internshipType === "PAID"
+          ? `Student Pays: ${job.compensationDetails?.amount} ${job.compensationDetails?.currency}`
+          : "N/A"
+    }
+  </span>
+</div>
+
+
                     {/* ← Insert mode right here: */}
                     <p className="flex items-center mt-0">
                       <FontAwesomeIcon icon={faGlobe} className="mr-2 text-gray-600" />
