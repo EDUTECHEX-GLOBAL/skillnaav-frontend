@@ -305,6 +305,17 @@ const YourJobPosts = () => {
             className="w-full border rounded-lg px-4 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
+        {/* Sector */}
+<div>
+  <label className="block text-sm font-medium text-gray-700 mb-1">Sector</label>
+  <input
+    type="text"
+    value={selectedInternship.sector || ""}
+    onChange={(e) => updateField("sector", e.target.value)}
+    className="w-full border rounded-lg px-4 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+  />
+</div>
+
 
         {/* Location */}
         <div>

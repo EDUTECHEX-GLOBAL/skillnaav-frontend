@@ -1,18 +1,34 @@
 import React, { useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faHome, faPlane, faSearch, faFileAlt, faHeart, faUser,
-  faLifeRing, faSignOutAlt
+  faHome,
+  faPlane,
+  faSearch,
+  faFileAlt,
+  faHeart,
+  faUser,
+  faLifeRing,
+  faSignOutAlt,
+  faChevronDown,
+  faChevronUp,
 } from "@fortawesome/free-solid-svg-icons";
-import logo from "../../../../assets-webapp/Skillnaav-logo.png";
 import { useTabContext } from "./UserHomePageContext/HomePageContext";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
 const Sidebar = ({ isMobile, isOpen, onClose }) => {
   const [selectedTab, setSelectedTab] = useState("home");
+  const [showSectors, setShowSectors] = useState(false);
   const { handleSelectTab } = useTabContext();
   const navigate = useNavigate();
+
+  const topSectors = [
+    { id: "advanced-ai", name: "Advanced AI & Autonomous Systems" },
+    { id: "quantum-computing", name: "Quantum Computing & Next-Gen Computing" },
+    { id: "climate-tech", name: "Climate Tech & Carbon Capture" },
+    { id: "biotech", name: "Biotechnology & Synthetic Biology" },
+    { id: "materials-science", name: "Advanced Materials Science" },
+  ];
 
   const handleTabClick = async (tab) => {
     if (tab === "logout") {
@@ -57,23 +73,15 @@ const Sidebar = ({ isMobile, isOpen, onClose }) => {
       )}
 
       {/* Sidebar */}
-    <div
-  className={`fixed md:sticky top-16
-    h-[calc(100vh-4rem)] w-64 bg-white shadow-lg font-poppins
-    z-[100] md:z-10
-    transform transition-transform duration-300 ease-in-out
-    ${isMobile ? (isOpen ? "translate-x-0" : "-translate-x-full") : "translate-x-0"}
-  `}
->
-
-
-        {/* Fixed logo (only for desktop) */}
-       {/* <div className="hidden md:flex items-center justify-center h-24 border-b border-gray-200 sticky top-0 z-20 bg-white">
-  <img src={logo} alt="Skillnaav Logo" className="h-16 object-contain max-w-[200px]" />
-</div> */}
-
-
-        {/* Scrollable content with hidden scrollbar */}
+      <div
+        className={`fixed md:sticky top-16
+        h-[calc(100vh-4rem)] w-64 bg-white shadow-lg font-poppins
+        z-[100] md:z-10
+        transform transition-transform duration-300 ease-in-out
+        ${isMobile ? (isOpen ? "translate-x-0" : "-translate-x-full") : "translate-x-0"}
+      `}
+      >
+        {/* Sidebar Content */}
         <div className="h-[calc(100%-5rem)] overflow-y-auto px-4 pt-4 pb-6 hide-scrollbar">
           {/* Navigation items */}
           <nav className="space-y-2">
@@ -98,6 +106,35 @@ const Sidebar = ({ isMobile, isOpen, onClose }) => {
                 {label}
               </button>
             ))}
+
+            {/* Top Sectors Dropdown */}
+            <div className="mt-2">
+              <button
+                onClick={() => setShowSectors(!showSectors)}
+                className="flex items-center justify-between p-3 rounded-lg w-full font-medium text-gray-700 hover:bg-gray-100"
+              >
+                <span className="flex items-center">
+                  <FontAwesomeIcon icon={faFileAlt} className="w-5 h-5 mr-3" />
+                  Top Sectors
+                </span>
+                <FontAwesomeIcon icon={showSectors ? faChevronUp : faChevronDown} />
+              </button>
+
+              {showSectors && (
+                <ul className="pl-8 mt-2 space-y-1">
+                  {topSectors.map((sector, index) => (
+                    <li
+                      key={index}
+                      className="text-sm text-gray-600 hover:text-[#7520A9] cursor-pointer"
+                      onClick={() => handleTabClick(sector.id)}
+                    >
+                      • {sector.name}
+                    </li>
+                  ))}
+
+                </ul>
+              )}
+            </div>
           </nav>
 
           {/* Support & Logout */}

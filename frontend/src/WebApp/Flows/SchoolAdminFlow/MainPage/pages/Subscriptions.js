@@ -29,6 +29,22 @@ const plans = [
     buttonColor: "bg-white text-purple-700 border border-purple-500",
   },
   {
+    title: "Premium Plus Plan",
+    price: "$25",
+    period: "",
+    credits: "2000 Student Credits",
+    features: [
+      "Full Dashboard Access",
+      "Advanced Analytics",
+      "Priority Email Support",
+      "Early Access to Features",
+    ],
+    button: "Choose Premium Plus Plan",
+    color: "bg-green-100",
+    textColor: "text-green-800",
+    buttonColor: "bg-white text-green-700 border border-green-500",
+  },
+  {
     title: "Premium Plan",
     price: "Custom Pricing",
     period: "",
@@ -43,9 +59,8 @@ const plans = [
 
 const SubscriptionPlans = () => {
   const [loading, setLoading] = useState(false);
-  const [currentPlan, setCurrentPlan] = useState(null); // 👈 store current subscribed plan
+  const [currentPlan, setCurrentPlan] = useState(null);
 
-  // 🔁 Fetch current plan from API on mount
   useEffect(() => {
     const fetchCurrentPlan = async () => {
       try {
@@ -54,7 +69,7 @@ const SubscriptionPlans = () => {
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = await res.json();
-        setCurrentPlan(data.plan); // "Free Plan", "Standard Plan", etc.
+        setCurrentPlan(data.plan);
       } catch (error) {
         console.error("Failed to fetch current plan:", error);
       }
@@ -128,7 +143,7 @@ const SubscriptionPlans = () => {
           Admin Dashboard – Subscription Plans
         </h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 max-w-7xl mx-auto">
           {plans.map((plan, index) => (
             <div
               key={index}
@@ -186,6 +201,31 @@ const SubscriptionPlans = () => {
                   onApprove={async (data, actions) => {
                     const order = await actions.order.capture();
                     await handlePaidPlanActivation("Standard Plan", order.id);
+                  }}
+                  onError={(err) => {
+                    console.error("PayPal error:", err);
+                    toast.error("❌ Payment failed. Please try again.");
+                  }}
+                />
+              ) : plan.title === "Premium Plus Plan" ? (
+                <PayPalButtons
+                  style={{ layout: "vertical" }}
+                  createOrder={(data, actions) => {
+                    return actions.order.create({
+                      purchase_units: [
+                        {
+                          amount: {
+                            value: "25.00",
+                            currency_code: "USD",
+                          },
+                          description: "One-time purchase – 2000 Student Credits",
+                        },
+                      ],
+                    });
+                  }}
+                  onApprove={async (data, actions) => {
+                    const order = await actions.order.capture();
+                    await handlePaidPlanActivation("Premium Plus Plan", order.id);
                   }}
                   onError={(err) => {
                     console.error("PayPal error:", err);

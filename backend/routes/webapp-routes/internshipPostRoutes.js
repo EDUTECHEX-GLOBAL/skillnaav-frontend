@@ -23,58 +23,36 @@ router.get("/", async (req, res) => {
 // GET all approved internships (excluding deleted ones) with sorting
 router.get("/approved", async (req, res) => {
   try {
-    let { isPremium } = req.query;
+    const isPremiumUser = req.query.isPremium === "true";
+    const { sector } = req.query;
 
-    console.log("Received request with isPremium:", isPremium);
+    const filter = { deleted: false, adminApproved: true };
+    if (sector) filter.sector = sector;
 
-    const isPremiumUser = isPremium === "true";
+    let internships = await InternshipPosting.find(filter).lean();
 
-    // Fetch only admin-approved internships
-    let internships = await InternshipPosting.find({ deleted: false, adminApproved: true }).lean();
-
-    if (!internships.length) {
-      return res.json([]);
-    }
-
-    console.log("Before sorting:", internships.map(i => ({ title: i.jobTitle, type: i.internshipType })));
-
-    // Define sorting priorities
     const premiumPriority = { PAID: 3, STIPEND: 2, FREE: 1 };
     const nonPremiumPriority = { FREE: 3, STIPEND: 2, PAID: 1 };
 
-    // Normalize internshipType to uppercase
-    internships.forEach(internship => {
-      internship.internshipType = (internship.internshipType || "FREE").toUpperCase();
-    });
-
-    // Apply sorting based on user type
+    internships.forEach(i => i.internshipType = (i.internshipType || 'FREE').toUpperCase());
     const priority = isPremiumUser ? premiumPriority : nonPremiumPriority;
 
-    internships.sort((a, b) => {
-      return (priority[b.internshipType] || 0) - (priority[a.internshipType] || 0);
-    });
+    internships.sort((a,b) => (priority[b.internshipType]||0) - (priority[a.internshipType]||0));
 
-    // **Introduce controlled randomness (20% chance per internship to swap)**
+    // Controlled randomness
     for (let i = internships.length - 1; i > 0; i--) {
-      if (Math.random() < 0.2) { // 20% chance to swap
-        let j = Math.floor(Math.random() * (i + 1));
+      if (Math.random() < 0.2) {
+        const j = Math.floor(Math.random() * (i+1));
         [internships[i], internships[j]] = [internships[j], internships[i]];
       }
     }
 
-    console.log("After sorting & shuffling:", internships.map(i => ({ title: i.jobTitle, type: i.internshipType })));
-
     res.json(internships);
   } catch (error) {
     console.error("Error fetching approved internships:", error);
-    res.status(500).json({
-      message: "Error fetching approved internships",
-      error: error.message,
-    });
+    res.status(500).json({ message: "Error fetching approved internships", error: error.message });
   }
 });
-
-
 
 // POST create a new internship posting
 router.post("/", async (req, res) => {
@@ -87,9 +65,9 @@ router.post("/", async (req, res) => {
       startDate,
       endDateOrDuration,
       duration,
+      sector, // new
       internshipType,
       internshipMode,
-      mode,
       qualifications,
       contactInfo,
       imgUrl,
@@ -97,53 +75,32 @@ router.post("/", async (req, res) => {
       compensationDetails,
     } = req.body;
 
-    // 🔍 Step 1: Fetch Partner Info
     const partner = await Partner.findById(partnerId);
-    if (!partner) {
-      return res.status(404).json({ message: "Partner not found" });
-    }
+    if (!partner) return res.status(404).json({ message: "Partner not found" });
 
-    // 🔒 Step 2: Enforce Freemium Partner Restrictions
+    // Freemium restrictions
     if (partner.planType === "Freemium") {
-      // Only allow FREE or STIPEND internships
       if (internshipType === "PAID") {
-        return res.status(403).json({
-          message: "Freemium partners cannot post paid internships.",
-        });
+        return res.status(403).json({ message: "Freemium partners cannot post paid internships." });
       }
-
-      // Limit to 2 active (not soft-deleted) internship posts
-      const activePosts = await InternshipPosting.countDocuments({
-        partnerId,
-        deleted: false,
-      });
-
-      if (activePosts >= 2) {
-        return res.status(403).json({
-          message: "Freemium partners can post up to 2 internships only.",
-        });
+      const activeCount = await InternshipPosting.countDocuments({ partnerId, deleted: false });
+      if (activeCount >= 2) {
+        return res.status(403).json({ message: "Freemium partners can post up to 2 internships only." });
       }
     }
 
-    // ✅ Step 3: Finalize Internship Mode
-    const finalMode = (mode || internshipMode || "ONLINE").toUpperCase();
-
-    // ✅ Step 4: Prepare compensationDetails
-    let finalCompensationDetails = { type: internshipType };
-    if (internshipType === "PAID" || internshipType === "STIPEND") {
-      finalCompensationDetails.amount =
-        compensationDetails?.amount ?? 0;
-      finalCompensationDetails.currency =
-        compensationDetails?.currency ?? "USD";
-      finalCompensationDetails.frequency =
-        compensationDetails?.frequency ?? "MONTHLY";
+    const finalMode = (internshipMode || "ONLINE").toUpperCase();
+    const finalComp = { type: internshipType };
+    if (["PAID","STIPEND"].includes(internshipType)) {
+      finalComp.amount = compensationDetails?.amount ?? 0;
+      finalComp.currency = compensationDetails?.currency ?? "USD";
+      finalComp.frequency = compensationDetails?.frequency ?? "MONTHLY";
     } else {
-      finalCompensationDetails.amount = 0;
-      finalCompensationDetails.currency = null;
-      finalCompensationDetails.frequency = null;
+      finalComp.amount = 0;
+      finalComp.currency = null;
+      finalComp.frequency = null;
     }
 
-    // ✅ Step 5: Create and save internship
     const newInternship = new InternshipPosting({
       jobTitle,
       companyName,
@@ -152,9 +109,10 @@ router.post("/", async (req, res) => {
       startDate,
       endDateOrDuration,
       duration,
+      sector, // new
       internshipType,
       internshipMode: finalMode,
-      compensationDetails: finalCompensationDetails,
+      compensationDetails: finalComp,
       qualifications,
       contactInfo,
       imgUrl,
@@ -165,15 +123,11 @@ router.post("/", async (req, res) => {
       deleted: false,
     });
 
-    const createdInternship = await newInternship.save();
-
-    res.status(201).json(createdInternship);
+    const created = await newInternship.save();
+    res.status(201).json(created);
   } catch (error) {
     console.error("Error creating internship post:", error);
-    res.status(400).json({
-      message: "Error: Unable to create internship post",
-      error: error.message,
-    });
+    res.status(400).json({ message: "Error: Unable to create internship post", error: error.message });
   }
 });
 
@@ -335,53 +289,43 @@ router.put("/:id", async (req, res) => {
     jobTitle,
     companyName,
     location,
-    // jobType,
     jobDescription,
     startDate,
     endDateOrDuration,
     duration,
     salaryDetails,
     qualifications,
-    // currency, 
-    // time ,
     contactInfo,
-    
     imgUrl,
     studentApplied,
     adminApproved,
     partnerId,
+    sector // ✅ Add sector
   } = req.body;
 
   try {
-    // Use findByIdAndUpdate for better efficiency and only update fields that are provided in the request
     const updatedInternship = await InternshipPosting.findByIdAndUpdate(
       req.params.id,
       {
-        // Only update fields that are present in the request
         ...(jobTitle && { jobTitle }),
         ...(companyName && { companyName }),
         ...(location && { location }),
-        // ...(jobType && { jobType }),
         ...(jobDescription && { jobDescription }),
         ...(startDate && { startDate }),
         ...(endDateOrDuration && { endDateOrDuration }),
         ...(duration && { duration }),
         ...(salaryDetails && { salaryDetails }),
         ...(qualifications && { qualifications }),
-        // ...(currency && { currency }), 
-        // ...(time && { time }),
+        ...(sector && { sector }), // ✅ Include sector in update
         ...(contactInfo && { contactInfo }),
-        
-       
         ...(imgUrl && { imgUrl }),
         ...(studentApplied !== undefined && { studentApplied }),
         ...(adminApproved !== undefined && { adminApproved }),
         ...(partnerId && { partnerId }), 
       },
-      { new: true } // Return the updated document
+      { new: true }
     );
 
-    // Check if internship was found and updated
     if (updatedInternship) {
       res.json(updatedInternship);
     } else {
@@ -395,6 +339,7 @@ router.put("/:id", async (req, res) => {
     });
   }
 });
+
 
 // DELETE an internship posting by ID
 router.delete("/:id", async (req, res) => {

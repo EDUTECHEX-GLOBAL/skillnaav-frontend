@@ -3,7 +3,7 @@ name: Deploy to Server
 on:
   push:
     branches:
-      - feature/userPlans # Adjust the branch as necessary
+      - feature/templates # Adjust the branch as necessary
 
 jobs:
   deploy:
@@ -22,5 +22,5 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@www.skillnaav.com << 'EOF'
             cd /home/ubuntu/
-            ./deploy.sh feature/userPlans  # Pass the branch name directly
+            ./deploy.sh feature/templates  # Pass the branch name directly
           EOF

@@ -4,10 +4,13 @@ const { uploadOfferLetterBuffer } = require('../utils/multer');
 const OfferLetter = require('../models/webapp-models/offerLetterModel');
 const notifyUser = require('../utils/notifyUser');
 const sendNotification = require('../utils/Notification');
+const Partnerwebapp = require('../models/webapp-models/partnerModel'); // Import partner model if needed
+const OfferTemplate = require('../models/webapp-models/OfferTemplateModel'); // Import OfferTemplate model
 
 const sendOfferLetter = async (req, res) => {
   try {
     const {
+      partnerId,
       student_id: studentId,
       name,
       email,
@@ -23,8 +26,26 @@ const sendOfferLetter = async (req, res) => {
       jobDescription,
       qualifications,
       contactInfo,
-      noticePeriod
+      noticePeriod,
+      templateId // ✅ added this
     } = req.body;
+
+    if (!partnerId) {
+      return res.status(400).json({ error: "Missing partnerId" });
+    }
+
+    const partner = await Partnerwebapp.findById(partnerId);
+    if (!partner) {
+      return res.status(404).json({ error: "Partner not found" });
+    }
+
+    if (partner.planType === "Freemium") {
+      return res.status(403).json({ error: "Upgrade your plan to send offer letters" });
+    }
+
+    if (partner.isPremium && partner.premiumExpiration && new Date() > partner.premiumExpiration) {
+      return res.status(403).json({ error: "Your premium plan has expired. Please renew to continue." });
+    }
 
     const requiredFields = ['student_id', 'name', 'email', 'position', 'startDate', 'internshipId'];
     const missing = requiredFields.filter(field => !req.body[field]);
@@ -43,6 +64,16 @@ const sendOfferLetter = async (req, res) => {
       return res.status(400).json({ error: e.message });
     }
 
+    // ✅ Fetch template if templateId is present
+    let template = null;
+    if (templateId) {
+      template = await OfferTemplate.findById(templateId);
+      if (!template) {
+        return res.status(404).json({ error: "Template not found" });
+      }
+    }
+
+    // ✅ Generate PDF with template
     const pdfBuffer = await generateOfferPDFBuffer({
       name,
       email,
@@ -57,7 +88,8 @@ const sendOfferLetter = async (req, res) => {
       jobDescription,
       qualifications,
       contactInfo,
-      noticePeriod
+      noticePeriod,
+      template // ✅ passed to generator
     });
 
     const fileName = `offer-${studentId}-${Date.now()}.pdf`;
