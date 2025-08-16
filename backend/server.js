@@ -59,6 +59,8 @@ const uploadRoutes = require("./routes/uploadRoutes");
 //partner payment routes
 const partnerPaymentRoutes = require("./routes/webapp-routes/partnerPaymentRoutes");
 
+const internshipPaymentRoutes = require("./routes/webapp-routes/internshipPaymentRoutes");
+
 // NEW: Import Offer Routes
 const schoolAdminRoutes = require("./routes/webapp-routes/schoolAdmin/schoolAdminRoutes");
 // NEW: Import School Admin Payment Routes
@@ -97,6 +99,8 @@ app.use("/api/templates", offerTemplateRoutes);
 
 // NEW: Add Partner Payment Routes
 app.use("/api/partner/payments", partnerPaymentRoutes);
+// NEW: Add Internship Payment Routes
+app.use("/api/internship/payments", internshipPaymentRoutes);
 
 // NEW: Add School Admin Routes
 app.use("/api/school-admin", schoolAdminRoutes);

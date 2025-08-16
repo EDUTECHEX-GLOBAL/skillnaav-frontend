@@ -8,6 +8,10 @@ import InternshipsPosted from "./InternshipsPosted";
 import SchoolAdminAccounts from "./SchoolAdminAccounts";
 import Bin from "./Bin";
 
+// ✅ Import new payment components
+import InternshipPayments from "./InternshipPayments";
+import PartnerPayments from "./PartnerPayments";
+
 const BodyContent = () => {
   const { selectedTab } = useTabContext();
 
@@ -18,6 +22,9 @@ const BodyContent = () => {
     "internship-posts": <InternshipsPosted />,
     "school-accounts": <SchoolAdminAccounts />,
     bin: <Bin />,
+    // ✅ New routes
+    "internship-payments": <InternshipPayments />,
+    "partner-payments": <PartnerPayments />,
   };
 
   return (

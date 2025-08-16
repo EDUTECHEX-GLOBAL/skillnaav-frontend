@@ -2,12 +2,14 @@
 import React, { useEffect, useState, useRef } from "react";
 import axios from "axios";
 import { toast } from 'react-toastify';
+import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
 import {
   faMapMarkerAlt,
   faLink,
   faDollarSign,
   faCalendarAlt,
   faClock,
+  faCreditCard,
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -42,7 +44,7 @@ function buildGoogleCalendarUrl({
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
 
-// ─── Parse “YYYY-MM-DD” + “hh:mm AM/PM” or “HH:mm” into a JS Date ─────
+// ─── Parse "YYYY-MM-DD" + "hh:mm AM/PM" or "HH:mm" into a JS Date ─────
 function parseDateTime(dateStr, timeStr) {
   if (!dateStr || !timeStr) return new Date(NaN);
 
@@ -71,11 +73,20 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [selectedSummary, setSelectedSummary] = useState(null);
-  const [loading, setLoading] = useState(false); // ✅ THIS LINE
+  const [loading, setLoading] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState(null);
   const scrollContainerRef = useRef(null);
   const rowRefs = useRef({});
   const userInfo = JSON.parse(localStorage.getItem('userInfo'));
-  const userPlan = userInfo?.plan; // This should be "Freemium", "Premium Basic", or "Premium Plus"
+  const userPlan = userInfo?.planType;
+
+  // ✅ PayPal Configuration
+  const paypalInitialOptions = {
+    "client-id": process.env.REACT_APP_PAYPAL_CLIENT_ID || "your-paypal-client-id",
+    currency: "USD",
+    intent: "capture",
+  };
 
   // ─── 1) Fetch internship details ───────────────────────────────────
   useEffect(() => {
@@ -125,6 +136,31 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
     fetchSchedule();
   }, [job, offer.status]);
 
+  // ─── 3) Check for existing payment status on load ────────
+  useEffect(() => {
+  const checkPaymentStatus = async () => {
+    if (!job || job.internshipType !== "PAID" || !userInfo?._id) return;
+    try {
+      const response = await axios.get(`/api/internship/payments/status/${offer._id}`, {
+        params: { studentId: userInfo._id }
+      });
+      
+      if (response.data.paid) {
+        setPaymentStatus({
+          paid: true,
+          paymentId: response.data.paymentId,
+          amount: response.data.amount,
+          currency: response.data.currency
+        });
+      }
+    } catch (error) {
+      console.error("Error checking payment status:", error);
+    }
+  };
+  checkPaymentStatus();
+}, [job, offer._id, userInfo]);
+
+
   useEffect(() => {
     if (showScheduleModal && schedule?.timetable?.length > 0) {
       const todaySession = schedule.timetable.find((session) =>
@@ -135,9 +171,8 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
         const refKey = `${todaySession.date}-${todaySession.startTime}`;
         const todayRef = rowRefs.current[refKey];
         if (todayRef?.current && scrollContainerRef.current) {
-          // Smooth scroll to today's row
           scrollContainerRef.current.scrollTo({
-            top: todayRef.current.offsetTop - 33, // Optional offset
+            top: todayRef.current.offsetTop - 33,
             behavior: "smooth",
           });
         }
@@ -146,6 +181,12 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
   }, [showScheduleModal, schedule]);
 
   const handleRespond = (type) => {
+    // ✅ Check if it's a PAID internship requiring payment
+    if (type === "Accepted" && job?.internshipType === "PAID" && !paymentStatus?.paid) {
+      setShowPaymentModal(true);
+      return;
+    }
+    
     setResponseType(type);
     setShowModal(true);
   };
@@ -157,24 +198,85 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
       : `https://${url}`;
   };
 
+// ✅ Updated PayPal order creation
+const createPayPalOrder = async () => {
+  try {
+    const response = await axios.post('/api/internship/payments/create-paypal-order', {
+      internshipId: offer.internshipId,
+      offerId: offer._id,
+      amount: job.compensationDetails.amount,
+      currency: job.compensationDetails.currency || 'USD',
+      studentId: userInfo._id,
+    });
+    
+    return response.data.orderId;
+  } catch (error) {
+    console.error('Error creating PayPal order:', error);
+    toast.error('Failed to create payment order');
+    throw error;
+  }
+};
+
+// ✅ Updated PayPal payment capture
+const onPayPalApprove = async (data, actions) => {
+  try {
+    const response = await axios.post('/api/internship/payments/capture-paypal-payment', {
+      orderId: data.orderID,
+      offerId: offer._id,
+      studentId: userInfo._id,
+    });
+
+    if (response.data.success) {
+      setPaymentStatus({ 
+        paid: true, 
+        paymentId: response.data.paymentId,
+        amount: job.compensationDetails.amount,
+        currency: job.compensationDetails.currency || 'USD'
+      });
+      setShowPaymentModal(false);
+      toast.success('✅ Payment successful! You can now accept the offer.');
+      
+      // Automatically show acceptance modal after successful payment
+      setTimeout(() => {
+        setResponseType("Accepted");
+        setShowModal(true);
+      }, 1500);
+    }
+  } catch (error) {
+    console.error('Error capturing payment:', error);
+    toast.error('Payment failed. Please try again.');
+  }
+};
+
   const confirmRespond = async () => {
     if (!responseType) return;
+    
     try {
-      await axios.patch(`/api/offer-letters/${offer._id}/status`, {
-        status: responseType,
-      });
+      const payload = { status: responseType };
+      
+      // ✅ Include payment info for paid internships
+      if (job?.internshipType === "PAID" && paymentStatus?.paymentId) {
+        payload.paymentId = paymentStatus.paymentId;
+      }
+
+      await axios.patch(`/api/offer-letters/${offer._id}/status`, payload);
       onStatusChange(responseType);
       setShowModal(false);
       setResponseType(null);
-    } catch {
+    } catch (error) {
+      console.error("Failed to update offer status:", error);
       alert("Failed to update status.");
     }
   };
 
+  // ✅ Determine if payment is required
+  const requiresPayment = job?.internshipType === "PAID";
+  const paymentAmount = job?.compensationDetails?.amount || 0;
+  const currency = job?.compensationDetails?.currency || "USD";
+
   const handleUpdateSchedule = async () => {
     try {
       setLoading(true);
-      const userInfo = JSON.parse(localStorage.getItem('userInfo')); // assumes user email stored
       const res = await axios.post('/api/google/update-schedule', {
         internshipId: offer.internshipId,
         studentEmail: userInfo.email,
@@ -411,36 +513,74 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
     );
   };
 
-  // ─── 4) “Loading” / “Error” / Header / Details / Actions ───────
+  // ─── 4) "Loading" / "Error" / Header / Details / Actions ───────
   if (loadingJob)
     return <div className="bg-white rounded-lg shadow-lg p-4 animate-pulse h-64" />;
   if (errorJob) return <p className="text-red-500">{errorJob}</p>;
 
-  // ─── Fix for “Invalid time value” ─────────────────────────────────
+  // ─── Fix for "Invalid time value" ─────────────────────────────────
   let timeAgo;
   if (offer.sentDate) {
-    // Try to parse ISO string
     const parsedSent = parseISO(offer.sentDate);
     if (isValid(parsedSent)) {
       timeAgo = formatDistanceToNow(parsedSent, { addSuffix: true });
     } else {
-      // Fallback if parseISO returned invalid
       timeAgo = "Date unknown";
     }
   } else {
-    // Fallback if no sentDate provided
     timeAgo = "Date unknown";
   }
 
-  const stipendDisplay =
-    job.internshipType === "STIPEND"
-      ? `${job.compensationDetails.amount} ${job.compensationDetails.currency} / ${job.compensationDetails.frequency.toLowerCase()}`
-      : job.internshipType === "FREE"
-        ? "Unpaid / Free"
-        : "N/A";
-
   return (
     <div className="bg-white rounded-lg shadow-lg p-4">
+      {/* ✅ PAYMENT MODAL */}
+      {showPaymentModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-md w-full relative">
+            <button
+              onClick={() => setShowPaymentModal(false)}
+              className="absolute top-3 right-3 text-gray-500 hover:text-gray-700 text-xl"
+            >
+              &times;
+            </button>
+            
+            <div className="text-center mb-6">
+              <FontAwesomeIcon icon={faCreditCard} className="text-4xl text-indigo-600 mb-4" />
+              <h2 className="text-xl font-semibold text-gray-800 mb-2">
+                Complete Payment
+              </h2>
+              <p className="text-sm text-gray-600 mb-4">
+                This is a paid internship. Please complete the payment to accept the offer.
+              </p>
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <p className="text-lg font-bold text-gray-800">
+                  Amount: {paymentAmount} {currency}
+                </p>
+              </div>
+            </div>
+
+            {/* ✅ PayPal Buttons */}
+            <PayPalScriptProvider options={paypalInitialOptions}>
+              <PayPalButtons
+                createOrder={createPayPalOrder}
+                onApprove={onPayPalApprove}
+                onError={(error) => {
+                  console.error('PayPal error:', error);
+                  toast.error('Payment failed. Please try again.');
+                }}
+                style={{
+                  layout: 'vertical',
+                  color: 'blue',
+                  shape: 'rect',
+                  label: 'paypal'
+                }}
+              />
+            </PayPalScriptProvider>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-sm w-full text-center relative">
@@ -518,7 +658,7 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
             : "—"}
         </p>
         <p>
-          <FontAwesomeIcon icon={faDollarSign} />
+          <FontAwesomeIcon icon={faDollarSign} className="mr-2" />
           {job.internshipType === "STIPEND"
             ? `${job.compensationDetails?.amount} ${job.compensationDetails?.currency} per ${job.compensationDetails?.frequency?.toLowerCase()}`
             : job.internshipType === "FREE"
@@ -546,47 +686,46 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
         )}
       </div>
 
-      {/* VIEW SCHEDULE BUTTON */}
       {/* VIEW SCHEDULE & LINK CALENDAR BUTTONS */}
-{offer.status.toLowerCase() === "accepted" && (
-  <div className="mt-4 space-y-2">
-    {(userPlan === "Premium Basic" || userPlan === "Premium Plus") ? (
-      <>
-        {/* VIEW SCHEDULE */}
-        <button
-          onClick={() => setShowScheduleModal(true)}
-          className="flex items-center text-indigo-600 hover:text-indigo-800 text-sm font-medium"
-        >
-          <FontAwesomeIcon icon={faCalendarAlt} className="mr-1 text-indigo-500" />
-          View Schedule
-        </button>
+      {offer.status.toLowerCase() === "accepted" && (
+        <div className="mt-4 space-y-2">
+          {(userPlan === "Premium Basic" || userPlan === "Premium Plus") ? (
+            <>
+              {/* VIEW SCHEDULE */}
+              <button
+                onClick={() => setShowScheduleModal(true)}
+                className="flex items-center text-indigo-600 hover:text-indigo-800 text-sm font-medium"
+              >
+                <FontAwesomeIcon icon={faCalendarAlt} className="mr-1 text-indigo-500" />
+                View Schedule
+              </button>
 
-        {/* LINK GOOGLE CALENDAR */}
-        <a
-          href="/api/google/auth"
-          className="inline-block bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition"
-        >
-          Link Google Calendar
-        </a>
+              {/* LINK GOOGLE CALENDAR */}
+              <a
+                href="/api/google/auth"
+                className="inline-block bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition"
+              >
+                Link Google Calendar
+              </a>
 
-        {/* UPDATE SCHEDULE */}
-        <button
-          onClick={handleUpdateSchedule}
-          className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition"
-          disabled={loading}
-        >
-          {loading ? 'Updating...' : 'Update Schedule'}
-        </button>
-      </>
-    ) : (
-      <div className="bg-yellow-100 text-yellow-800 px-4 py-2 rounded-lg text-sm font-medium">
-        Upgrade to Premium Basic or Plus to access schedule and calendar features.
-      </div>
-    )}
-  </div>
-)}
+              {/* UPDATE SCHEDULE */}
+              <button
+                onClick={handleUpdateSchedule}
+                className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition"
+                disabled={loading}
+              >
+                {loading ? 'Updating...' : 'Update Schedule'}
+              </button>
+            </>
+          ) : (
+            <div className="bg-yellow-100 text-yellow-800 px-4 py-2 rounded-lg text-sm font-medium">
+              Upgrade to Premium Basic or Plus to access schedule and calendar features.
+            </div>
+          )}
+        </div>
+      )}
 
-
+      {/* Schedule Modal */}
       {showScheduleModal && (
         <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl relative p-6">
@@ -652,7 +791,7 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
               </div>
             )}
 
-            {/* ✅ SUMMARY MODAL → PLACE HERE */}
+            {/* SUMMARY MODAL */}
             {selectedSummary && (
               <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
                 <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-md relative">
@@ -679,26 +818,42 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
                 </div>
               </div>
             )}
-
           </div>
         </div>
       )}
 
-      {/* ACTION BUTTONS */}
+      {/* ✅ ACTION BUTTONS */}
       {offer.status.toLowerCase() === "sent" && (
-        <div className="flex gap-2 mt-4">
-          <button
-            onClick={() => handleRespond("Accepted")}
-            className="flex-1 px-4 py-2 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-lg hover:from-purple-600 hover:to-indigo-600 transition"
-          >
-            Accept
-          </button>
-          <button
-            onClick={() => handleRespond("Rejected")}
-            className="flex-1 px-4 py-2 bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-lg hover:from-red-600 hover:to-pink-600 transition"
-          >
-            Reject
-          </button>
+        <div className="space-y-3 mt-4">
+          {/* Payment Status Indicator for PAID internships */}
+          {requiresPayment && (
+            <div className={`p-3 rounded-lg text-sm font-medium ${
+              paymentStatus?.paid 
+                ? 'bg-green-100 text-green-800' 
+                : 'bg-yellow-100 text-yellow-800'
+            }`}>
+              <FontAwesomeIcon icon={faCreditCard} className="mr-2" />
+              {paymentStatus?.paid 
+                ? `✅ Payment completed (${paymentAmount} ${currency})` 
+                : `💳 Payment required: ${paymentAmount} ${currency}`
+              }
+            </div>
+          )}
+          
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleRespond("Accepted")}
+              className="flex-1 px-4 py-2 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-lg hover:from-purple-600 hover:to-indigo-600 transition"
+            >
+              {requiresPayment && !paymentStatus?.paid ? 'Pay to Accept' : 'Accept'}
+            </button>
+            <button
+              onClick={() => handleRespond("Rejected")}
+              className="flex-1 px-4 py-2 bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-lg hover:from-red-600 hover:to-pink-600 transition"
+            >
+              Reject
+            </button>
+          </div>
         </div>
       )}
     </div>

@@ -12,6 +12,7 @@ import {
   faSignOutAlt,
   faBuilding,
   faBriefcase,
+  faCreditCard // ✅ New icon for payments
 } from "@fortawesome/free-solid-svg-icons";
 import logo from "../../../../assets-webapp/Skillnaav-logo.png";
 import { useTabContext } from "./UserHomePageContext/HomePageContext";
@@ -29,6 +30,7 @@ const navItems = [
 const Sidebar = ({ isSidebarOpen, setSidebarOpen }) => {
   const [tab, setTab] = useState("home");
   const [partnerOpen, setPartnerOpen] = useState(false);
+  const [paymentOpen, setPaymentOpen] = useState(false); // ✅ New state
   const { handleSelectTab } = useTabContext();
   const nav = useNavigate();
 
@@ -54,7 +56,7 @@ const Sidebar = ({ isSidebarOpen, setSidebarOpen }) => {
         <img src={logo} alt="Logo" className="h-14" />
       </div>
 
-      {/* Scrollable content (with hidden scrollbar) */}
+      {/* Scrollable content */}
       <div className="flex flex-col h-[calc(100%-5rem)] p-4 overflow-y-auto scrollbar-hide">
         <nav className="flex-1">
           <ul className="space-y-3">
@@ -74,7 +76,7 @@ const Sidebar = ({ isSidebarOpen, setSidebarOpen }) => {
               </li>
             ))}
 
-            {/* Partner Management Section */}
+            {/* Partner Management */}
             <li>
               <button
                 onClick={() => setPartnerOpen((v) => !v)}
@@ -121,7 +123,52 @@ const Sidebar = ({ isSidebarOpen, setSidebarOpen }) => {
               )}
             </li>
 
-            {/* Remaining nav items */}
+            {/* ✅ Payment Management */}
+            <li>
+              <button
+                onClick={() => setPaymentOpen((v) => !v)}
+                className="flex items-center justify-between w-full p-2 rounded-lg text-gray-700 hover:bg-gray-100"
+              >
+                <span className="flex items-center">
+                  <FontAwesomeIcon icon={faCreditCard} className="w-5 h-5 mr-3" />
+                  <p className="font-medium">Payment Management</p>
+                </span>
+                <FontAwesomeIcon
+                  icon={faChevronDown}
+                  className={`${paymentOpen ? "rotate-180" : ""} transform`}
+                />
+              </button>
+              {paymentOpen && (
+                <ul className="ml-6 mt-1 space-y-2">
+                  <li>
+                    <button
+                      onClick={() => clickTab("internship-payments")}
+                      className={`flex items-center w-full p-2 rounded-lg font-medium ${
+                        tab === "internship-payments"
+                          ? "bg-blue-100 text-blue-600"
+                          : "text-gray-700 hover:bg-gray-100"
+                      }`}
+                    >
+                      Internship Payments
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      onClick={() => clickTab("partner-payments")}
+                      className={`flex items-center w-full p-2 rounded-lg font-medium ${
+                        tab === "partner-payments"
+                          ? "bg-blue-100 text-blue-600"
+                          : "text-gray-700 hover:bg-gray-100"
+                      }`}
+                    >
+                      Partner Payments
+                    </button>
+                  </li>
+                </ul>
+              )}
+            </li>
+
+            {/* Remaining Nav Items */}
             {navItems.slice(2).map(({ key, icon, label }) => (
               <li key={key}>
                 <button
