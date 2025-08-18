@@ -7,7 +7,8 @@ const {
   getPaymentStatus,
   getStudentPayments,
   getPaymentsForInternship, // ✅ New
-  getPaymentsForPartner     // ✅ New
+  getPaymentsForPartner,    // ✅ New
+  getPaymentsListForInternship // ✅ New
 } = require('../../controllers/internshipPaymentController');
 
 // ==================== PayPal Routes ====================
@@ -24,5 +25,9 @@ router.get('/admin/internship/:internshipId', getPaymentsForInternship);
 
 // ✅ Get payment summary for all internships of a specific partner
 router.get('/admin/partner/:partnerId', getPaymentsForPartner);
+// ✅ Get payment list for a specific internship
+
+router.get("/:internshipId/payments", getPaymentsListForInternship);
+
 
 module.exports = router;

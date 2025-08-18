@@ -4,6 +4,7 @@ const OfferLetter = require('../models/webapp-models/offerLetterModel');
 const mongoose = require('mongoose');
 const Internship = require('../models/webapp-models/internshipPostModel'); // Import Internship model
 const Partner = require('../models/webapp-models/partnerModel'); // Import Partner model
+const Student = require('../models/webapp-models/userModel'); // Import Student model
 const axios = require('axios');
 
 // PayPal Configuration - ✅ Fixed Base URLs
@@ -347,6 +348,50 @@ const getPaymentsForPartner = async (req, res) => {
   }
 };
 
+// controllers/paymentController.js
+
+// Get All Payments List for a Specific Internship (Detailed)
+const getPaymentsListForInternship = async (req, res) => {
+  try {
+    const { internshipId } = req.params;
+
+    if (!internshipId) {
+      return res.status(400).json({ error: "Internship ID is required" });
+    }
+
+    const payments = await Payment.find({
+      internshipId: new mongoose.Types.ObjectId(internshipId),
+      status: "COMPLETED",
+    })
+      .populate({
+        path: "studentId",
+        select: "name email",
+        model: Student, // ✅ reference the model
+      })
+      .populate({
+        path: "offerId",
+        select: "position",
+        model: OfferLetter, // ✅ reference the model
+      })
+      .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      count: payments.length,
+      payments,
+    });
+  } catch (error) {
+    console.error(
+      "Error fetching payments list for internship:",
+      error.message
+    );
+    res.status(500).json({ error: "Failed to fetch payments list" });
+  }
+};
+
+
+
+
 // ==================== EXPORTS ====================
 module.exports = {
   createPayPalOrder,
@@ -354,5 +399,6 @@ module.exports = {
   getPaymentStatus,
   getStudentPayments,
   getPaymentsForInternship, // ✅ New
-  getPaymentsForPartner     // ✅ New
+  getPaymentsForPartner,     // ✅ New
+  getPaymentsListForInternship, // ✅ New
 };
