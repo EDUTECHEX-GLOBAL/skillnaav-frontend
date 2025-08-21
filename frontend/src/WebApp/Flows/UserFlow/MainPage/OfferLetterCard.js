@@ -19,6 +19,7 @@ import {
   isValid,
   isToday,
 } from "date-fns";
+import StipendDetailsModal from "./StipendDetailsModal";
 
 // ─── Google Calendar URL Helper ─────────────────────────────────────────
 function buildGoogleCalendarUrl({
@@ -76,6 +77,8 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
   const [loading, setLoading] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState(null);
+  const [showStipendModal, setShowStipendModal] = useState(false);
+const [stipendFormData, setStipendFormData] = useState({ /* fields */ });
   const scrollContainerRef = useRef(null);
   const rowRefs = useRef({});
   const userInfo = JSON.parse(localStorage.getItem('userInfo'));
@@ -186,6 +189,11 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
       setShowPaymentModal(true);
       return;
     }
+
+     if (job?.internshipType === "STIPEND") {
+    setShowStipendModal(true);
+    return;
+  }
     
     setResponseType(type);
     setShowModal(true);
@@ -268,6 +276,31 @@ const onPayPalApprove = async (data, actions) => {
       alert("Failed to update status.");
     }
   };
+
+  // OfferLetterCard.jsx
+
+const handleStipendSubmit = async (formData) => {
+  try {
+    // Example API endpoint:
+    const response = await axios.post('/api/internship/stipend-details', {
+      offerId: offer._id,
+      internshipId: job._id,
+      studentId: userInfo._id,
+      ...formData, // contains bank, IFSC, currency, etc.
+    });
+    if (response.data.success) {
+      toast.success('✅ Stipend details sent to partner!');
+      setShowStipendModal(false);
+      setResponseType("Accepted");
+      setShowModal(true); // Show acceptance confirmation
+    } else {
+      toast.error(response.data.message || 'Failed to send stipend details.');
+    }
+  } catch (error) {
+    toast.error('Failed to send stipend details.');
+  }
+};
+
 
   // ✅ Determine if payment is required
   const requiresPayment = job?.internshipType === "PAID";
@@ -532,7 +565,7 @@ const onPayPalApprove = async (data, actions) => {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-4">
+    <div className="bg-white rounded-lg shadow-lg p-2">
       {/* ✅ PAYMENT MODAL */}
       {showPaymentModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -671,20 +704,19 @@ const onPayPalApprove = async (data, actions) => {
       </div>
 
       {/* QUALIFICATIONS */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        {job.qualifications?.length > 0 ? (
-          job.qualifications.map((q, i) => (
-            <span
-              key={i}
-              className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded-full"
-            >
-              {q}
-            </span>
-          ))
-        ) : (
-          <span className="text-xs text-gray-500">No qualifications</span>
-        )}
-      </div>
+    <div className="flex flex-wrap gap-2">
+  {job.qualifications && job.qualifications.slice(0, 2).map((qualification, index) => (
+    <span key={index} className="text-sm bg-gray-200 text-gray-800 py-1 px-3 rounded-full">
+      {qualification}
+    </span>
+  ))}
+  {job.qualifications && job.qualifications.length > 2 && (
+    <span className="text-sm bg-gray-100 text-gray-700 py-1 px-3 rounded-full">
+      +{job.qualifications.length - 2}
+    </span>
+  )}
+</div>
+
 
       {/* VIEW SCHEDULE & LINK CALENDAR BUTTONS */}
       {offer.status.toLowerCase() === "accepted" && (
@@ -724,6 +756,15 @@ const onPayPalApprove = async (data, actions) => {
           )}
         </div>
       )}
+
+    {showStipendModal && (
+  <StipendDetailsModal
+    visible={showStipendModal}
+    onClose={() => setShowStipendModal(false)}
+    onSubmit={handleStipendSubmit}
+  />
+)}
+ 
 
       {/* Schedule Modal */}
       {showScheduleModal && (

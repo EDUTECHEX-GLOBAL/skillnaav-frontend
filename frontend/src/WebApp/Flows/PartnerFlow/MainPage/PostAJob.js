@@ -42,6 +42,7 @@ const PostAJob = () => {
     imgUrl: "",
     studentApplied: false,
     adminApproved: false,
+    applicationOpen: true,
   });
 
   const [countries, setCountries] = useState([]);
@@ -258,6 +259,7 @@ const PostAJob = () => {
       imgUrl: "",
       studentApplied: false,
       adminApproved: false,
+      applicationOpen: true,
     });
     setPreviewUrl(null);
   };
@@ -610,6 +612,22 @@ const PostAJob = () => {
             </div>
           </div>
         )}
+
+        <div>
+  <label className="inline-flex items-center space-x-2">
+    <input
+      type="checkbox"
+      name="applicationOpen"
+      checked={formData.applicationOpen}
+      onChange={(e) =>
+        setFormData((p) => ({ ...p, applicationOpen: e.target.checked }))
+      }
+      className="form-checkbox h-5 w-5 text-teal-600"
+    />
+    <span className="text-gray-700 font-medium">Open for Applications</span>
+  </label>
+</div>
+
 
         <div>
           <button

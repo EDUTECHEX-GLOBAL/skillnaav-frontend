@@ -73,6 +73,7 @@ router.post("/", async (req, res) => {
       imgUrl,
       partnerId,
       compensationDetails,
+      applicationOpen = true, // <-- new field with default true
     } = req.body;
 
     const partner = await Partner.findById(partnerId);
@@ -91,7 +92,7 @@ router.post("/", async (req, res) => {
 
     const finalMode = (internshipMode || "ONLINE").toUpperCase();
     const finalComp = { type: internshipType };
-    if (["PAID","STIPEND"].includes(internshipType)) {
+    if (["PAID", "STIPEND"].includes(internshipType)) {
       finalComp.amount = compensationDetails?.amount ?? 0;
       finalComp.currency = compensationDetails?.currency ?? "USD";
       finalComp.frequency = compensationDetails?.frequency ?? "MONTHLY";
@@ -109,13 +110,14 @@ router.post("/", async (req, res) => {
       startDate,
       endDateOrDuration,
       duration,
-      sector, // new
+      sector,
       internshipType,
       internshipMode: finalMode,
       compensationDetails: finalComp,
       qualifications,
       contactInfo,
       imgUrl,
+      applicationOpen,         // <-- save new field here
       studentApplied: false,
       adminApproved: false,
       adminReviewed: false,
@@ -300,7 +302,8 @@ router.put("/:id", async (req, res) => {
     studentApplied,
     adminApproved,
     partnerId,
-    sector // ✅ Add sector
+    sector, 
+    applicationOpen,          // <-- accept updated applicationOpen flag
   } = req.body;
 
   try {
@@ -316,12 +319,13 @@ router.put("/:id", async (req, res) => {
         ...(duration && { duration }),
         ...(salaryDetails && { salaryDetails }),
         ...(qualifications && { qualifications }),
-        ...(sector && { sector }), // ✅ Include sector in update
+        ...(sector && { sector }),
         ...(contactInfo && { contactInfo }),
         ...(imgUrl && { imgUrl }),
         ...(studentApplied !== undefined && { studentApplied }),
         ...(adminApproved !== undefined && { adminApproved }),
-        ...(partnerId && { partnerId }), 
+        ...(partnerId && { partnerId }),
+        ...(applicationOpen !== undefined && { applicationOpen }),  // <-- update field if provided
       },
       { new: true }
     );
@@ -339,7 +343,6 @@ router.put("/:id", async (req, res) => {
     });
   }
 });
-
 
 // DELETE an internship posting by ID
 router.delete("/:id", async (req, res) => {

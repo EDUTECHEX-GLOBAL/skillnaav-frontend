@@ -1,26 +1,16 @@
-/**
- *  InternshipPosting  ‒  MongoDB schema
- *  -------------------------------------------------------------
- *  ▸ Added   timestamps:true   → enables createdAt / updatedAt
- *  ▸ Added   versionKey:false  → hides “__v” field
- *  ▸ Switched to   new mongoose.Schema(...)   (same functionality,
- *    but matches other models in the project).
- */
-
 const mongoose = require("mongoose");
 
 const internshipPostingSchema = new mongoose.Schema(
   {
-    jobTitle:      { type: String, required: true },
-    companyName:   { type: String, required: true },
-    location:      { type: String, required: true },
-    jobDescription:{ type: String, required: true },
+    jobTitle:       { type: String, required: true },
+    companyName:    { type: String, required: true },
+    location:       { type: String, required: true },
+    jobDescription: { type: String, required: true },
 
     startDate:         { type: Date,   required: true },
-    endDateOrDuration: { type: String, required: true }, // date or duration
-    duration:          { type: String, required: true }, // "2 months" etc.
+    endDateOrDuration: { type: String, required: true },
+    duration:          { type: String, required: true },
 
-    /* --------- sector --------- */
     sector: {
       type: String,
       enum: [
@@ -33,14 +23,12 @@ const internshipPostingSchema = new mongoose.Schema(
       required: true,
     },
 
-    /* --------- internship type --------- */
     internshipType: {
       type:    String,
       enum:    ["FREE", "STIPEND", "PAID"],
       required:true,
     },
 
-    /* --------- internship mode --------- */
     internshipMode: {
       type:    String,
       enum:    ["OFFLINE", "ONLINE", "HYBRID"],
@@ -48,7 +36,6 @@ const internshipPostingSchema = new mongoose.Schema(
       required:true,
     },
 
-    /* --------- compensation --------- */
     compensationDetails: {
       type: {
         type:   String,
@@ -71,24 +58,25 @@ const internshipPostingSchema = new mongoose.Schema(
     partnerId:      { type: mongoose.Schema.Types.ObjectId, ref: "Partner", required: true },
     qualifications: { type: [String], required: true },
 
-    /* --------- contact --------- */
     contactInfo: {
       name:  { type: String, required: true },
       email: { type: String, required: true },
       phone: { type: String, required: true },
     },
 
-    /* --------- misc --------- */
-    imgUrl:          { type: String, default: "https://default-image-url.com/image.png" },
+    imgUrl:           { type: String, default: "https://default-image-url.com/image.png" },
 
-    studentApplied:  { type: Boolean, default: false },
-    adminApproved:   { type: Boolean, default: false },
-    adminReviewed:   { type: Boolean, default: false },
-    deleted:         { type: Boolean, default: false },
+    studentApplied:   { type: Boolean, default: false },
+    adminApproved:    { type: Boolean, default: false },
+    adminReviewed:    { type: Boolean, default: false },
+    deleted:          { type: Boolean, default: false },
+
+    // New field to control application open/close status
+    applicationOpen:  { type: Boolean, default: true },
   },
   {
-    versionKey: false,   // hide "__v"
-    timestamps: true,    // adds createdAt / updatedAt
+    versionKey: false,
+    timestamps: true,
   }
 );
 

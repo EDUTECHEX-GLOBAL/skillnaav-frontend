@@ -116,19 +116,18 @@ const Applications = () => {
                 </div>
                 <div className="flex justify-between items-center">
                   <div className="flex flex-wrap gap-2">
-                    {job?.qualifications?.length > 0 ? (
-                      job.qualifications.map((qualification, idx) => (
-                        <span
-                          key={idx}
-                          className="text-sm bg-gray-200 text-gray-800 py-1 px-3 rounded-full"
-                        >
-                          {qualification}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-sm text-gray-500">No qualifications listed</span>
-                    )}
-                  </div>
+  {job.qualifications && job.qualifications.slice(0, 2).map((qualification, index) => (
+    <span key={index} className="text-sm bg-gray-200 text-gray-800 py-1 px-3 rounded-full">
+      {qualification}
+    </span>
+  ))}
+  {job.qualifications && job.qualifications.length > 2 && (
+    <span className="text-sm bg-gray-100 text-gray-700 py-1 px-3 rounded-full">
+      +{job.qualifications.length - 2}
+    </span>
+  )}
+</div>
+
                   <button
                     onClick={() => setSelectedJob(job)} // ✅ Set selected job on click
                     className="text-purple-500 font-semibold"

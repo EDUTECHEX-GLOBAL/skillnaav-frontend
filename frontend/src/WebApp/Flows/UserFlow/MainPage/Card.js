@@ -108,13 +108,19 @@ const JobCard = ({ searchTerm = "", onViewDetails, jobs: propJobs }) => {
             </div>
 
             {/* Qualifications */}
-            <div className="flex gap-2 mt-4 flex-wrap">
-              {job.qualifications.map((qualification, index) => (
-                <span key={index} className="text-sm bg-gray-200 text-gray-800 py-1 px-3 rounded-full">
-                  {qualification}
-                </span>
-              ))}
-            </div>
+  <div className="flex flex-wrap gap-2">
+  {job.qualifications && job.qualifications.slice(0, 2).map((qualification, index) => (
+    <span key={index} className="text-sm bg-gray-200 text-gray-800 py-1 px-3 rounded-full">
+      {qualification}
+    </span>
+  ))}
+  {job.qualifications && job.qualifications.length > 2 && (
+    <span className="text-sm bg-gray-100 text-gray-700 py-1 px-3 rounded-full">
+      +{job.qualifications.length - 2}
+    </span>
+  )}
+</div>
+
 
             {/* View Details */}
             <div className="mt-4">

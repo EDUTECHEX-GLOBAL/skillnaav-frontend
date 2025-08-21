@@ -40,6 +40,11 @@ const applyForInternship = async (req, res) => {
       return res.status(404).json({ message: "Student or Internship not found." });
     }
 
+    // New check: Reject if applications are closed
+    if (!internship.applicationOpen) {
+      return res.status(403).json({ message: "Applications are currently closed for this internship." });
+    }
+
     // Enforce application limit for non-premium users
     if (!student.isPremium) {
       const applicationCount = await Application.countDocuments({ studentId });
@@ -69,7 +74,6 @@ const applyForInternship = async (req, res) => {
       userName: student.name,
       userEmail: student.email,
       jobTitle: internship.jobTitle,
-      // ✅ This is the fix:
       schoolAdmin: student.schoolAdmin || null,
     });
 

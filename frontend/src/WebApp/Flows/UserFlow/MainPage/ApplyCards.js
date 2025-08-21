@@ -5,7 +5,7 @@ import { FaHeart, FaMapMarkerAlt, FaBriefcase, FaDollarSign } from "react-icons/
 import { useTabContext } from "./UserHomePageContext/HomePageContext";
 import SkillAnalysis from "./SkillnaavAnalysis";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {  faClock } from "@fortawesome/free-solid-svg-icons";
+import { faClock } from "@fortawesome/free-solid-svg-icons";
 import { format } from "date-fns";
 
 // 🟡 Limit definitions per plan
@@ -175,26 +175,26 @@ const ApplyCards = ({ job, onBack }) => {
 
             <div className="flex items-center text-gray-500 mt-2 text-sm md:text-base">
               {/* <FaBriefcase className="mr-2" /> */}
-             <p className="flex items-center">
-                                   <FontAwesomeIcon icon={faClock} className="mr-2" />
-                                   {format(new Date(job.startDate), "dd MMM yyyy")} –{" "}
-                                   {job.endDateOrDuration ? format(new Date(job.endDateOrDuration), "dd MMM yyyy") : "—"}
-                                 </p>
+              <p className="flex items-center">
+                <FontAwesomeIcon icon={faClock} className="mr-2" />
+                {format(new Date(job.startDate), "dd MMM yyyy")} –{" "}
+                {job.endDateOrDuration ? format(new Date(job.endDateOrDuration), "dd MMM yyyy") : "—"}
+              </p>
             </div>
 
             <div className="flex items-center text-gray-500 mt-2 text-sm md:text-base">
               <FaDollarSign className="mr-2" />
-                <p>
-                                    <FontAwesomeIcon icon={FaDollarSign} />
-                                    {job.internshipType === "STIPEND"
-                                      ? `${job.compensationDetails?.amount} ${job.compensationDetails?.currency} per ${job.compensationDetails?.frequency?.toLowerCase()}`
-                                      : job.internshipType === "FREE"
-                                        ? "Unpaid / Free"
-                                        : job.internshipType === "PAID"
-                                          ? `Student Pays: ${job.compensationDetails?.amount} ${job.compensationDetails?.currency}`
-                                          : "N/A"
-                                    }
-                                  </p>
+              <p>
+                <FontAwesomeIcon icon={FaDollarSign} />
+                {job.internshipType === "STIPEND"
+                  ? `${job.compensationDetails?.amount} ${job.compensationDetails?.currency} per ${job.compensationDetails?.frequency?.toLowerCase()}`
+                  : job.internshipType === "FREE"
+                    ? "Unpaid / Free"
+                    : job.internshipType === "PAID"
+                      ? `Student Pays: ${job.compensationDetails?.amount} ${job.compensationDetails?.currency}`
+                      : "N/A"
+                }
+              </p>
             </div>
 
             <div className="mt-4">
@@ -207,21 +207,30 @@ const ApplyCards = ({ job, onBack }) => {
             </div>
 
             <div className="flex gap-4 mt-4">
-              <button
-                onClick={handleApply}
-                disabled={isApplied || isUploading}
-                className={`text-white px-4 py-2 rounded-full font-semibold ${isApplied ? "bg-green-500" : "bg-purple-500 hover:bg-purple-600"}`}
-              >
-                {isApplied ? "Applied" : isUploading ? "Uploading..." : "Apply now"}
-              </button>
+  {job.applicationOpen ? (
+    <button
+      onClick={handleApply}
+      disabled={isApplied || isUploading}
+      className={`text-white px-4 py-2 rounded-full font-semibold ${
+        isApplied ? "bg-green-500" : "bg-purple-500 hover:bg-purple-600"
+      }`}
+    >
+      {isApplied ? "Applied" : isUploading ? "Uploading..." : "Apply now"}
+    </button>
+  ) : (
+    <div className="text-red-600 font-semibold p-2 border border-red-400 rounded">
+      Applications are currently closed for this internship.
+    </div>
+  )}
 
-              <button
-                onClick={handleSkillAnalysis}
-                className="text-white bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-full font-semibold"
-              >
-                Skill Analysis
-              </button>
-            </div>
+  <button
+    onClick={handleSkillAnalysis}
+    className="text-white bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-full font-semibold"
+  >
+    Skill Analysis
+  </button>
+</div>
+
           </div>
         </div>
 

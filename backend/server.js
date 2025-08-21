@@ -67,6 +67,8 @@ const schoolAdminRoutes = require("./routes/webapp-routes/schoolAdmin/schoolAdmi
 const schoolAdminPaymentRoutes = require("./routes/webapp-routes/schoolAdmin/paymentRoutes");
 // NEW: Import School Admin Login Session Routes
 const schoolAdminLoginSessionRoutes = require("./routes/webapp-routes/schoolAdmin/LoginSessionRoutes");
+// NEW: Import Stipend Details Routes
+const stipendDetailsRoutes = require("./routes/webapp-routes/stipendDetailsRoutes");
 
 
 
@@ -108,6 +110,9 @@ app.use("/api/school-admin", schoolAdminRoutes);
 app.use("/api/school-admin/payments", schoolAdminPaymentRoutes);
 // NEW: Add School Admin Login Session Routes
 app.use("/api/sessions", schoolAdminLoginSessionRoutes);
+
+// NEW: Add Stipend Details Routes
+app.use('/api/internship/stipend-details', stipendDetailsRoutes);
 
 // New route for skill gap analysis
 app.post("/analyze-skills", async (req, res) => {

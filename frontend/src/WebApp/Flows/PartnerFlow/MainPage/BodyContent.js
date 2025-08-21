@@ -8,6 +8,7 @@ import YourJobPosts from "./YourJobPosts";
 import PostAJob from "./PostAJob";
 import PartnerPremiumPage from "./PartnerPremiumPage"; // Import the PartnerPremiumPage component
 import OfferTemplateManager from "./OfferTemplateManager"; // Import the OfferTemplateManager component
+import StipendDetails from "./StipendDetails"; // Import the StipendDetails component
 
 const BodyContent = () => {
   const { selectedTab } = useTabContext();
@@ -39,6 +40,9 @@ const BodyContent = () => {
   case "offer-templates":
   content = <OfferTemplateManager />;
   break;
+    case "stipend-details":
+      content = <StipendDetails />; // Render the StipendDetails component
+      break;
     case "logout":
       content = <div>You have been logged out. Please log in again.</div>;
       break;

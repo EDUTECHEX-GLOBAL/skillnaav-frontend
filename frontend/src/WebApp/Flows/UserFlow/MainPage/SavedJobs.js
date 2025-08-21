@@ -89,17 +89,25 @@ const SavedJobs = () => {
 
                 {/* Skills + View Details */}
                 <div className="flex items-center justify-between">
-                  <div className="flex flex-wrap gap-2">
-                    {job.jobId?.qualifications?.length > 0 ? (
-                      job.jobId.qualifications.map((q, idx) => (
-                        <span key={idx} className="text-sm bg-gray-200 text-gray-800 py-1 px-3 rounded-full">
-                          {q}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-sm text-gray-500">No qualifications listed</span>
-                    )}
-                  </div>
+        <div className="flex flex-wrap gap-2">
+  {job.jobId?.qualifications?.length > 0 ? (
+    <>
+      {job.jobId.qualifications.slice(0, 2).map((q, idx) => (
+        <span key={idx} className="text-sm bg-gray-200 text-gray-800 py-1 px-3 rounded-full">
+          {q}
+        </span>
+      ))}
+      {job.jobId.qualifications.length > 2 && (
+        <span className="text-sm bg-gray-100 text-gray-700 py-1 px-3 rounded-full">
+          +{job.jobId.qualifications.length - 2}
+        </span>
+      )}
+    </>
+  ) : (
+    <span className="text-sm text-gray-500">No qualifications listed</span>
+  )}
+</div>
+
 
                   <button
                     className="text-purple-600 hover:underline"
