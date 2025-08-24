@@ -3,6 +3,10 @@ import React, { useEffect, useState, useRef } from "react";
 import axios from "axios";
 import { toast } from 'react-toastify';
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
+import CertificateTemplate from "./CertificateTemplate";
+
 import {
   faMapMarkerAlt,
   faLink,
@@ -10,6 +14,8 @@ import {
   faCalendarAlt,
   faClock,
   faCreditCard,
+  faDownload, // ✅ add this here
+
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -19,7 +25,6 @@ import {
   isValid,
   isToday,
 } from "date-fns";
-import StipendDetailsModal from "./StipendDetailsModal";
 
 // ─── Google Calendar URL Helper ─────────────────────────────────────────
 function buildGoogleCalendarUrl({
@@ -77,8 +82,6 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
   const [loading, setLoading] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState(null);
-  const [showStipendModal, setShowStipendModal] = useState(false);
-const [stipendFormData, setStipendFormData] = useState({ /* fields */ });
   const scrollContainerRef = useRef(null);
   const rowRefs = useRef({});
   const userInfo = JSON.parse(localStorage.getItem('userInfo'));
@@ -141,27 +144,27 @@ const [stipendFormData, setStipendFormData] = useState({ /* fields */ });
 
   // ─── 3) Check for existing payment status on load ────────
   useEffect(() => {
-  const checkPaymentStatus = async () => {
-    if (!job || job.internshipType !== "PAID" || !userInfo?._id) return;
-    try {
-      const response = await axios.get(`/api/internship/payments/status/${offer._id}`, {
-        params: { studentId: userInfo._id }
-      });
-      
-      if (response.data.paid) {
-        setPaymentStatus({
-          paid: true,
-          paymentId: response.data.paymentId,
-          amount: response.data.amount,
-          currency: response.data.currency
+    const checkPaymentStatus = async () => {
+      if (!job || job.internshipType !== "PAID" || !userInfo?._id) return;
+      try {
+        const response = await axios.get(`/api/internship/payments/status/${offer._id}`, {
+          params: { studentId: userInfo._id }
         });
+
+        if (response.data.paid) {
+          setPaymentStatus({
+            paid: true,
+            paymentId: response.data.paymentId,
+            amount: response.data.amount,
+            currency: response.data.currency
+          });
+        }
+      } catch (error) {
+        console.error("Error checking payment status:", error);
       }
-    } catch (error) {
-      console.error("Error checking payment status:", error);
-    }
-  };
-  checkPaymentStatus();
-}, [job, offer._id, userInfo]);
+    };
+    checkPaymentStatus();
+  }, [job, offer._id, userInfo]);
 
 
   useEffect(() => {
@@ -190,11 +193,6 @@ const [stipendFormData, setStipendFormData] = useState({ /* fields */ });
       return;
     }
 
-     if (job?.internshipType === "STIPEND") {
-    setShowStipendModal(true);
-    return;
-  }
-    
     setResponseType(type);
     setShowModal(true);
   };
@@ -206,62 +204,62 @@ const [stipendFormData, setStipendFormData] = useState({ /* fields */ });
       : `https://${url}`;
   };
 
-// ✅ Updated PayPal order creation
-const createPayPalOrder = async () => {
-  try {
-    const response = await axios.post('/api/internship/payments/create-paypal-order', {
-      internshipId: offer.internshipId,
-      offerId: offer._id,
-      amount: job.compensationDetails.amount,
-      currency: job.compensationDetails.currency || 'USD',
-      studentId: userInfo._id,
-    });
-    
-    return response.data.orderId;
-  } catch (error) {
-    console.error('Error creating PayPal order:', error);
-    toast.error('Failed to create payment order');
-    throw error;
-  }
-};
-
-// ✅ Updated PayPal payment capture
-const onPayPalApprove = async (data, actions) => {
-  try {
-    const response = await axios.post('/api/internship/payments/capture-paypal-payment', {
-      orderId: data.orderID,
-      offerId: offer._id,
-      studentId: userInfo._id,
-    });
-
-    if (response.data.success) {
-      setPaymentStatus({ 
-        paid: true, 
-        paymentId: response.data.paymentId,
+  // ✅ Updated PayPal order creation
+  const createPayPalOrder = async () => {
+    try {
+      const response = await axios.post('/api/internship/payments/create-paypal-order', {
+        internshipId: offer.internshipId,
+        offerId: offer._id,
         amount: job.compensationDetails.amount,
-        currency: job.compensationDetails.currency || 'USD'
+        currency: job.compensationDetails.currency || 'USD',
+        studentId: userInfo._id,
       });
-      setShowPaymentModal(false);
-      toast.success('✅ Payment successful! You can now accept the offer.');
-      
-      // Automatically show acceptance modal after successful payment
-      setTimeout(() => {
-        setResponseType("Accepted");
-        setShowModal(true);
-      }, 1500);
+
+      return response.data.orderId;
+    } catch (error) {
+      console.error('Error creating PayPal order:', error);
+      toast.error('Failed to create payment order');
+      throw error;
     }
-  } catch (error) {
-    console.error('Error capturing payment:', error);
-    toast.error('Payment failed. Please try again.');
-  }
-};
+  };
+
+  // ✅ Updated PayPal payment capture
+  const onPayPalApprove = async (data, actions) => {
+    try {
+      const response = await axios.post('/api/internship/payments/capture-paypal-payment', {
+        orderId: data.orderID,
+        offerId: offer._id,
+        studentId: userInfo._id,
+      });
+
+      if (response.data.success) {
+        setPaymentStatus({
+          paid: true,
+          paymentId: response.data.paymentId,
+          amount: job.compensationDetails.amount,
+          currency: job.compensationDetails.currency || 'USD'
+        });
+        setShowPaymentModal(false);
+        toast.success('✅ Payment successful! You can now accept the offer.');
+
+        // Automatically show acceptance modal after successful payment
+        setTimeout(() => {
+          setResponseType("Accepted");
+          setShowModal(true);
+        }, 1500);
+      }
+    } catch (error) {
+      console.error('Error capturing payment:', error);
+      toast.error('Payment failed. Please try again.');
+    }
+  };
 
   const confirmRespond = async () => {
     if (!responseType) return;
-    
+
     try {
       const payload = { status: responseType };
-      
+
       // ✅ Include payment info for paid internships
       if (job?.internshipType === "PAID" && paymentStatus?.paymentId) {
         payload.paymentId = paymentStatus.paymentId;
@@ -276,31 +274,6 @@ const onPayPalApprove = async (data, actions) => {
       alert("Failed to update status.");
     }
   };
-
-  // OfferLetterCard.jsx
-
-const handleStipendSubmit = async (formData) => {
-  try {
-    // Example API endpoint:
-    const response = await axios.post('/api/internship/stipend-details', {
-      offerId: offer._id,
-      internshipId: job._id,
-      studentId: userInfo._id,
-      ...formData, // contains bank, IFSC, currency, etc.
-    });
-    if (response.data.success) {
-      toast.success('✅ Stipend details sent to partner!');
-      setShowStipendModal(false);
-      setResponseType("Accepted");
-      setShowModal(true); // Show acceptance confirmation
-    } else {
-      toast.error(response.data.message || 'Failed to send stipend details.');
-    }
-  } catch (error) {
-    toast.error('Failed to send stipend details.');
-  }
-};
-
 
   // ✅ Determine if payment is required
   const requiresPayment = job?.internshipType === "PAID";
@@ -327,6 +300,46 @@ const handleStipendSubmit = async (formData) => {
       setLoading(false);
     }
   };
+
+  const handleDownloadCertificate = async () => {
+  try {
+    // Create hidden container for rendering certificate
+    const container = document.createElement("div");
+    container.style.position = "fixed";
+    container.style.top = "-10000px"; // hide offscreen
+    document.body.appendChild(container);
+
+    // Render the CertificateTemplate inside container
+    const element = (
+      <CertificateTemplate studentName={userInfo?.name || "Student"} />
+    );
+
+    // Dynamically import ReactDOM
+    import("react-dom").then((ReactDOM) => {
+      ReactDOM.render(element, container, async () => {
+        // Convert template to canvas
+        const canvas = await html2canvas(container.querySelector("#certificate-content"));
+        const imgData = canvas.toDataURL("image/png");
+
+        // Generate PDF
+        const pdf = new jsPDF("landscape", "pt", "a4");
+        const imgProps = pdf.getImageProperties(imgData);
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+        pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+        pdf.save("Internship_Certificate.pdf");
+
+        // Cleanup
+        ReactDOM.unmountComponentAtNode(container);
+        document.body.removeChild(container);
+      });
+    });
+  } catch (err) {
+    console.error("Certificate generation failed:", err);
+    toast.error("Failed to generate certificate.");
+  }
+};
 
   // ─── 3) Render the schedule with table + per‐row Google Calendar links ─
   const renderSchedule = () => {
@@ -565,7 +578,8 @@ const handleStipendSubmit = async (formData) => {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-2">
+    // NEW
+    <div className="bg-white rounded-lg shadow-lg p-4 flex flex-col h-full">
       {/* ✅ PAYMENT MODAL */}
       {showPaymentModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -576,7 +590,7 @@ const handleStipendSubmit = async (formData) => {
             >
               &times;
             </button>
-            
+
             <div className="text-center mb-6">
               <FontAwesomeIcon icon={faCreditCard} className="text-4xl text-indigo-600 mb-4" />
               <h2 className="text-xl font-semibold text-gray-800 mb-2">
@@ -648,6 +662,9 @@ const handleStipendSubmit = async (formData) => {
         </div>
       )}
 
+      {/* BODY */}
+      <div className="flex-1"></div>
+
       {/* HEADER */}
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center">
@@ -704,19 +721,20 @@ const handleStipendSubmit = async (formData) => {
       </div>
 
       {/* QUALIFICATIONS */}
-    <div className="flex flex-wrap gap-2">
-  {job.qualifications && job.qualifications.slice(0, 2).map((qualification, index) => (
-    <span key={index} className="text-sm bg-gray-200 text-gray-800 py-1 px-3 rounded-full">
-      {qualification}
-    </span>
-  ))}
-  {job.qualifications && job.qualifications.length > 2 && (
-    <span className="text-sm bg-gray-100 text-gray-700 py-1 px-3 rounded-full">
-      +{job.qualifications.length - 2}
-    </span>
-  )}
-</div>
-
+      <div className="flex flex-wrap gap-2 mb-4">
+        {job.qualifications?.length > 0 ? (
+          job.qualifications.map((q, i) => (
+            <span
+              key={i}
+              className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded-full"
+            >
+              {q}
+            </span>
+          ))
+        ) : (
+          <span className="text-xs text-gray-500">No qualifications</span>
+        )}
+      </div>
 
       {/* VIEW SCHEDULE & LINK CALENDAR BUTTONS */}
       {offer.status.toLowerCase() === "accepted" && (
@@ -732,22 +750,41 @@ const handleStipendSubmit = async (formData) => {
                 View Schedule
               </button>
 
-              {/* LINK GOOGLE CALENDAR */}
-              <a
-                href="/api/google/auth"
-                className="inline-block bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition"
-              >
-                Link Google Calendar
-              </a>
+              {/* LINK GOOGLE CALENDAR + UPDATE SCHEDULE (wrapped together) */}
+              <div className="flex flex-wrap items-center gap-2">
+                {/* LINK GOOGLE CALENDAR */}
+                <a
+                  href="/api/google/auth"
+                  className="inline-block bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition"
+                >
+                  Link Google Calendar
+                </a>
 
-              {/* UPDATE SCHEDULE */}
-              <button
-                onClick={handleUpdateSchedule}
-                className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition"
-                disabled={loading}
-              >
-                {loading ? 'Updating...' : 'Update Schedule'}
-              </button>
+                {/* UPDATE SCHEDULE */}
+                <button
+                  onClick={handleUpdateSchedule}
+                  className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition"
+                  disabled={loading}
+                >
+                  {loading ? 'Updating...' : 'Update Schedule'}
+                </button>
+              </div>
+
+              {/* DOWNLOAD CERTIFICATE */}
+              <div className="mt-auto pt-4">
+                {offer.status.toLowerCase() === "accepted" &&
+                  (userPlan === "Premium Basic" || userPlan === "Premium Plus") && (
+                    <div className="flex justify-center">
+                      <button
+                        onClick={handleDownloadCertificate}
+                        className="flex items-center text-blue-600 hover:text-blue-800 text-sm font-medium"
+                      >
+                        <FontAwesomeIcon icon={faDownload} className="mr-2" />
+                        Download Certificate
+                      </button>
+                    </div>
+                  )}
+              </div>
             </>
           ) : (
             <div className="bg-yellow-100 text-yellow-800 px-4 py-2 rounded-lg text-sm font-medium">
@@ -756,15 +793,6 @@ const handleStipendSubmit = async (formData) => {
           )}
         </div>
       )}
-
-    {showStipendModal && (
-  <StipendDetailsModal
-    visible={showStipendModal}
-    onClose={() => setShowStipendModal(false)}
-    onSubmit={handleStipendSubmit}
-  />
-)}
- 
 
       {/* Schedule Modal */}
       {showScheduleModal && (
@@ -868,19 +896,18 @@ const handleStipendSubmit = async (formData) => {
         <div className="space-y-3 mt-4">
           {/* Payment Status Indicator for PAID internships */}
           {requiresPayment && (
-            <div className={`p-3 rounded-lg text-sm font-medium ${
-              paymentStatus?.paid 
-                ? 'bg-green-100 text-green-800' 
-                : 'bg-yellow-100 text-yellow-800'
-            }`}>
+            <div className={`p-3 rounded-lg text-sm font-medium ${paymentStatus?.paid
+              ? 'bg-green-100 text-green-800'
+              : 'bg-yellow-100 text-yellow-800'
+              }`}>
               <FontAwesomeIcon icon={faCreditCard} className="mr-2" />
-              {paymentStatus?.paid 
-                ? `✅ Payment completed (${paymentAmount} ${currency})` 
+              {paymentStatus?.paid
+                ? `✅ Payment completed (${paymentAmount} ${currency})`
                 : `💳 Payment required: ${paymentAmount} ${currency}`
               }
             </div>
           )}
-          
+
           <div className="flex gap-2">
             <button
               onClick={() => handleRespond("Accepted")}

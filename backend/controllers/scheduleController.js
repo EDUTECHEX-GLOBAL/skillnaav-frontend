@@ -78,6 +78,13 @@ const updateInternshipSchedule = async (req, res) => {
 
     let schedule = await InternshipSchedule.findOne({ internshipId, partnerId });
 
+    // 🚫 Block updates if schedule already closed
+    if (schedule && schedule.isClosed) {
+      return res.status(403).json({
+        error: 'This schedule has been closed permanently and cannot be updated.'
+      });
+    }
+
     if (schedule) {
       schedule.set(scheduleData);
     } else {

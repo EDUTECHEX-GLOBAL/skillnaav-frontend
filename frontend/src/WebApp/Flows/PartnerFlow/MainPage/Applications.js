@@ -10,11 +10,13 @@ import {
   faDownload,
   faLock,
   faCrown,
+  faTimes,
 } from "@fortawesome/free-solid-svg-icons";
 import Modal from "./Modal";
 import ScheduleForm from "./ScheduleForm";
 import { ApplicationsTable, ShortlistedTable } from "./Tables";
 import { toast } from "react-toastify";
+import ConfirmCloseSchedule from "./ConfirmCloseSchedule";
 
 const SHORTLIST_API_BASE_URL = process.env.REACT_APP_SHORTLIST_API_BASE_URL || "http://localhost:8001";
 
@@ -43,7 +45,7 @@ const InternshipList = () => {
 
   const [scheduleFormOpen, setScheduleFormOpen] = useState(false);
   const [selectedInternshipForSchedule, setSelectedInternshipForSchedule] = useState(null);
-
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
   const partnerId = localStorage.getItem("partnerId");
 
   useEffect(() => {
@@ -363,6 +365,29 @@ const InternshipList = () => {
     setScheduleFormOpen(true);
   };
 
+  // 🔹 Permanently close an internship schedule
+  const handleConfirmClose = async (internshipId) => {
+    try {
+      await axios.put('/api/schedule/close', {
+        internshipId,
+        partnerId: localStorage.getItem("partnerId")
+      }, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      });
+
+      toast.success("Schedule closed permanently!");
+      setConfirmCloseOpen(false);
+
+      // Update local UI so "Schedule" and "Close Schedule" buttons disappear
+      setInternships(prev =>
+        prev.map(i => i._id === internshipId ? { ...i, isScheduleClosed: true } : i)
+      );
+
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to close schedule");
+    }
+  };
+
   const closeModal = () =>
     setModalData({ open: false, internshipId: null, type: null, loading: false });
 
@@ -633,12 +658,23 @@ const InternshipList = () => {
 
                 {/* Schedule - Only for Premium Plus */}
                 {hasFullPremiumAccess() ? (
-                  <button
-                    onClick={() => handleSchedule(internship._id)}
-                    className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-white font-semibold rounded-lg shadow-lg hover:from-yellow-500 hover:to-orange-600 transform hover:scale-105 transition duration-200"
-                  >
-                    <FontAwesomeIcon icon={faClock} /> Schedule
-                  </button>
+                  <>
+                    {/* Open Schedule */}
+                    <button
+                      onClick={() => handleSchedule(internship._id)}
+                      className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-white font-semibold rounded-lg shadow-lg hover:from-yellow-500 hover:to-orange-600 transform hover:scale-105 transition duration-200"
+                    >
+                      <FontAwesomeIcon icon={faClock} /> Schedule
+                    </button>
+
+                    {/* Close Schedule */}
+                    <button
+                      onClick={() => setConfirmCloseOpen(internship._id)}   // pass internshipId
+                      className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-red-500 to-pink-600 text-white font-semibold rounded-lg shadow-lg hover:from-red-600 hover:to-pink-700 transform hover:scale-105 transition duration-200"
+                    >
+                      <FontAwesomeIcon icon={faTimes} /> Close Schedule
+                    </button>
+                  </>
                 ) : (
                   showPremiumLock("Schedule", "Premium Plus")
                 )}
@@ -686,6 +722,13 @@ const InternshipList = () => {
           />
         )}
       </Modal>
+
+      {/* 🔹 Confirmation Popup */}
+      <ConfirmCloseSchedule
+        isOpen={!!confirmCloseOpen}
+        onCancel={() => setConfirmCloseOpen(false)}
+        onConfirm={() => handleConfirmClose(confirmCloseOpen)}
+      />
     </div>
   );
 };

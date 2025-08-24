@@ -8,6 +8,12 @@ const internshipScheduleSchema = new mongoose.Schema({
   endDate: { type: Date, required: true },
   workHours: { type: String, required: true }, // e.g., "9 AM - 5 PM"
 
+  // ✅ NEW FIELD to mark schedule closed
+  isClosed: {
+    type: Boolean,
+    default: false
+  },
+
   defaultStartTime: { type: String },
   defaultEndTime: { type: String },
   defaultEventLink: { type: String },

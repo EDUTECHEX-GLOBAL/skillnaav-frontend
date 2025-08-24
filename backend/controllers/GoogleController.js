@@ -124,27 +124,30 @@ const googleCallback = async (req, res) => {
 
     console.log(`Successfully stored tokens for ${email}`);
 
-    try {
-      const scheduleDoc = await InternshipScheduleModel.findOne({ "timetable.0": { $exists: true } }).sort({ createdAt: -1 });
+        try {
+      const scheduleDoc = await InternshipScheduleModel
+        .findOne({ "timetable.0": { $exists: true } })
+        .sort({ createdAt: -1 });
 
       if (!scheduleDoc || !scheduleDoc.timetable || scheduleDoc.timetable.length === 0) {
         console.warn("⚠️ No internship schedule found to sync.");
       } else {
         console.log(`📅 Found ${scheduleDoc.timetable.length} schedule entries to sync for ${email}`);
 
-        const result = await addScheduleToGoogleCalendar({
+        const result = await upsertScheduleForStudent({
           studentEmail: email,
+          internshipId: scheduleDoc.internshipId,            // IMPORTANT: give a real id
           timetable: scheduleDoc.timetable,
           internshipTitle: 'Internship Schedule',
-          defaultEventLink: scheduleDoc.defaultEventLink
+          defaultEventLink: scheduleDoc.defaultEventLink || ''
         });
 
-
-        console.log('📤 Sync result:', result.summary);
+        console.log('📤 Sync result:', result);
       }
     } catch (syncErr) {
       console.error("❌ Error syncing schedule after authentication:", syncErr.message);
     }
+
 
     res.send(`
   <html>
@@ -323,44 +326,22 @@ const createTestEvent = async (email) => {
     oAuth2Client.setCredentials(studentToken.tokens);
     const calendar = google.calendar({ version: 'v3', auth: oAuth2Client });
 
-    // Create test event for 1 hour from now
     const now = new Date();
     const startTime = new Date(now.getTime() + 60 * 60 * 1000); // 1 hour from now
-    const endTime = new Date(startTime.getTime() + 60 * 60 * 1000); // 1 hour duration
+    const endTime = new Date(startTime.getTime() + 60 * 60 * 1000);
 
     const testEvent = {
-      start: {
-        dateTime: startTime.toISOString(),
-        timeZone: 'Asia/Kolkata',
-      },
-      end: {
-        dateTime: endTime.toISOString(),
-        timeZone: 'Asia/Kolkata',
-      },
-      reminders: {
-        useDefault: false,
-        overrides: [
-          { method: 'popup', minutes: 10 }
-        ]
-      },
-      colorId: '1', // Optional
+      summary: 'Test: Calendar connectivity',   // ← added
+      start: { dateTime: startTime.toISOString(), timeZone: 'Asia/Kolkata' },
+      end:   { dateTime: endTime.toISOString(),   timeZone: 'Asia/Kolkata' },
+      reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: 10 }] },
+      colorId: '1',
       status: 'confirmed',
     };
-
-    console.log('🧪 Creating test event:', {
-      summary: testEvent.summary,
-      start: testEvent.start.dateTime,
-      end: testEvent.end.dateTime
-    });
 
     const response = await calendar.events.insert({
       calendarId: 'primary',
       resource: testEvent
-    });
-
-    console.log('🧪 Test event created successfully:', {
-      eventId: response.data.id,
-      htmlLink: response.data.htmlLink
     });
 
     return {
@@ -372,10 +353,7 @@ const createTestEvent = async (email) => {
 
   } catch (err) {
     console.error('🧪 Test event creation failed:', err);
-    return {
-      success: false,
-      error: err.message
-    };
+    return { success: false, error: err.message };
   }
 };
 
@@ -453,302 +431,165 @@ Generated on: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
   };
 }
 
-const addScheduleToGoogleCalendar = async ({ studentEmail, timetable, internshipTitle, defaultEventLink }) => {
-  console.log('🚀 Starting calendar integration for:', studentEmail);
-  console.log('📅 Timetable data:', JSON.stringify(timetable, null, 2));
-  console.log('📋 Internship title:', internshipTitle);
+// Use upsert so any caller of this function won't create duplicates.
+const addScheduleToGoogleCalendar = async ({
+  studentEmail,
+  timetable,
+  internshipTitle,
+  defaultEventLink,
+  internshipId // <-- pass this whenever you can
+}) => {
+  return upsertScheduleForStudent({
+    studentEmail,
+    internshipId: String(internshipId || 'global'), // temporary fallback if id isn't available
+    timetable,
+    internshipTitle,
+    defaultEventLink: defaultEventLink || ''
+  });
+};
 
+
+// === Upsert schedule to a student's calendar by extendedProperties.private ===
+async function upsertScheduleForStudent({
+  studentEmail,
+  internshipId,
+  timetable,
+  internshipTitle = 'Internship Schedule',
+  defaultEventLink = ''
+}) {
   try {
-    // Get student tokens
+    // 0) Load tokens
     const studentToken = await TokenModel.findOne({ email: studentEmail });
-    if (!studentToken || !studentToken.tokens) {
-      console.error(`❌ No Google tokens found for ${studentEmail}`);
-      return {
-        success: false,
-        error: 'No authentication tokens found. Please authenticate with Google first.',
-        action: 'Please visit /api/google/auth to authenticate'
-      };
+    if (!studentToken?.tokens) {
+      return { success: false, message: `No Google auth for ${studentEmail}` };
     }
 
-    console.log('🔑 Found tokens for user:', studentEmail);
-    console.log('🔗 Token details:', {
-      hasAccessToken: !!studentToken.tokens.access_token,
-      hasRefreshToken: !!studentToken.tokens.refresh_token,
-      expiryDate: studentToken.tokens.expiry_date,
-      scope: studentToken.tokens.scope
-    });
-
-    // Create OAuth client
-    const oAuth2Client = new google.auth.OAuth2(
-      GOOGLE_CLIENT_ID,
-      GOOGLE_CLIENT_SECRET,
-      GOOGLE_REDIRECT_URI
-    );
-
+    // 1) Auth
+    const oAuth2Client = new google.auth.OAuth2(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI);
     oAuth2Client.setCredentials(studentToken.tokens);
-
-    // Handle token refresh
-    oAuth2Client.on('tokens', async (newTokens) => {
-      console.log('🔄 Refreshing tokens for', studentEmail);
-      try {
-        const mergedTokens = { ...studentToken.tokens, ...newTokens };
-
-        await TokenModel.findOneAndUpdate(
-          { email: studentEmail },
-          {
-            tokens: mergedTokens,
-            updatedAt: new Date()
-          }
-        );
-
-        console.log('✅ Tokens refreshed successfully');
-      } catch (saveErr) {
-        console.error('❌ Error saving refreshed tokens:', saveErr);
-      }
-    });
-
     const calendar = google.calendar({ version: 'v3', auth: oAuth2Client });
 
-    // Test calendar access first
-    console.log('🔍 Testing calendar access...');
-    try {
-      const calendarList = await calendar.calendarList.list();
-      console.log('📋 Calendar access successful. Available calendars:', calendarList.data.items.length);
-
-      // Log primary calendar details
-      const primaryCalendar = calendarList.data.items.find(cal => cal.primary);
-      if (primaryCalendar) {
-        console.log('📅 Primary calendar:', {
-          id: primaryCalendar.id,
-          summary: primaryCalendar.summary,
-          timeZone: primaryCalendar.timeZone
-        });
-      }
-    } catch (accessErr) {
-      console.error('❌ Calendar access failed:', accessErr);
-      return {
-        success: false,
-        error: 'Failed to access Google Calendar. Please re-authenticate.',
-        details: accessErr.message,
-        action: 'Please visit /api/google/auth to re-authenticate'
-      };
-    }
-
-    // Validate timetable
+    // 2) Validate timetable
     if (!Array.isArray(timetable) || timetable.length === 0) {
-      return {
-        success: false,
-        error: 'Invalid timetable: expected non-empty array',
-        received: typeof timetable
-      };
+      return { success: false, message: 'Empty timetable' };
     }
 
-    console.log(`📊 Processing ${timetable.length} time slots...`);
+    // 3) Build a window to list existing events (min..max date +-1 day)
+    const dates = timetable.map(s => new Date(
+      s.date instanceof Date ? s.date : (String(s.date).includes('T') ? s.date : `${s.date}T00:00:00.000Z`)
+    ));
+    const timeMin = new Date(Math.min(...dates));
+    const timeMax = new Date(Math.max(...dates));
+    timeMin.setDate(timeMin.getDate() - 1);
+    timeMax.setDate(timeMax.getDate() + 1);
 
-    const createdEvents = [];
-    const failedEvents = [];
+    // 4) List events tagged for this internship
+    const existing = [];
+    let pageToken;
+    do {
+      const resp = await calendar.events.list({
+        calendarId: 'primary',
+        privateExtendedProperty: `internshipId=${String(internshipId)}`,
+        timeMin: timeMin.toISOString(),
+        timeMax: timeMax.toISOString(),
+        singleEvents: true,
+        maxResults: 2500,
+        pageToken,
+      });
+      existing.push(...(resp.data.items || []));
+      pageToken = resp.data.nextPageToken;
+    } while (pageToken);
 
-    // Process each time slot
-    for (let i = 0; i < timetable.length; i++) {
-      const slot = timetable[i];
-      console.log(`\n🔄 Processing slot ${i + 1}/${timetable.length}:`, slot);
+    const existingBySlotKey = new Map(
+      existing
+        .map(e => [e.extendedProperties?.private?.slotKey, e])
+        .filter(([k]) => !!k)
+    );
 
-      try {
-        // Validate slot
-        if (!slot || typeof slot !== 'object') {
-          throw new Error('Invalid slot object');
-        }
+    // 5) Upsert every slot
+    const seenKeys = new Set();
 
-        const requiredFields = ['date', 'startTime', 'endTime'];
-        const missingFields = requiredFields.filter(field => !slot[field]);
-        if (missingFields.length > 0) {
-          throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
-        }
+    for (const slot of timetable) {
+      const key = slotKeyOf(slot);
+      seenKeys.add(key);
 
-        // Normalize slot.date to YYYY-MM-DD string
-        let dateStr;
-        if (slot.date instanceof Date) {
-          dateStr = slot.date.toISOString().split('T')[0];
-        } else if (typeof slot.date === 'string') {
-          if (slot.date.includes('T')) {
-            dateStr = slot.date.split('T')[0];
-          } else {
-            dateStr = slot.date;
-          }
-        } else {
-          throw new Error(`Invalid date format: ${slot.date}. Expected YYYY-MM-DD`);
-        }
+      // Prepare date/time strings
+      let dateStr;
+      if (slot.date instanceof Date) {
+        dateStr = slot.date.toISOString().split('T')[0];
+      } else if (typeof slot.date === 'string') {
+        dateStr = slot.date.includes('T') ? slot.date.split('T')[0] : slot.date;
+      } else {
+        throw new Error(`Invalid slot.date: ${slot.date}`);
+      }
 
-        // Validate date format (should be YYYY-MM-DD)
-        if (!isValidDate(dateStr)) {
-          throw new Error(`Invalid date format: ${dateStr}. Expected YYYY-MM-DD`);
-        }
+      const startDateTime = createISTDateTime(dateStr, slot.startTime);
+      let endDateTime = createISTDateTime(dateStr, slot.endTime);
 
-        // Validate time format (should be HH:MM)
-        if (!isValidTime(slot.startTime) || !isValidTime(slot.endTime)) {
-          throw new Error(`Invalid time format. Expected HH:MM format. Got start: ${slot.startTime}, end: ${slot.endTime}`);
-        }
+      // Handle end next day if needed
+      const [sh, sm] = slot.startTime.split(':').map(Number);
+      const [eh, em] = slot.endTime.split(':').map(Number);
+      if (eh < sh || (eh === sh && em <= sm)) {
+        const endDateObj = new Date(`${dateStr}T00:00:00.000Z`);
+        endDateObj.setDate(endDateObj.getDate() + 1);
+        const nextDateStr = endDateObj.toISOString().split('T')[0];
+        endDateTime = createISTDateTime(nextDateStr, slot.endTime);
+      }
 
-        // Create proper datetime strings for IST timezone
-        const startDateTime = createISTDateTime(dateStr, slot.startTime);
-        let endDateTime;
+      // Build event (reuse your existing builders)
+      const finalEventLink = slot.eventLink || defaultEventLink || '';
 
-        const [startHour, startMin] = slot.startTime.split(":").map(Number);
-        const [endHour, endMin] = slot.endTime.split(":").map(Number);
+      let baseEvent;
+      if (slot.type === 'offline') {
+        baseEvent = buildOfflineEvent({ slot, dateStr, startDateTime, endDateTime, internshipTitle });
+      } else if (slot.type === 'online') {
+        baseEvent = buildOnlineEvent({ slot, dateStr, startDateTime, endDateTime, internshipTitle, finalEventLink });
+      } else if (slot.type === 'hybrid') {
+        baseEvent = (slot.location?.address)
+          ? buildOfflineEvent({ slot, dateStr, startDateTime, endDateTime, internshipTitle })
+          : buildOnlineEvent({ slot, dateStr, startDateTime, endDateTime, internshipTitle, finalEventLink });
+      } else {
+        // default to online formatting to be safe
+        baseEvent = buildOnlineEvent({ slot, dateStr, startDateTime, endDateTime, internshipTitle, finalEventLink });
+      }
 
-        if (endHour < startHour || (endHour === startHour && endMin <= startMin)) {
-          // End time is next day
-          const endDateObj = new Date(dateStr);
-          endDateObj.setDate(endDateObj.getDate() + 1);
-          const endDateStr = endDateObj.toISOString().split("T")[0];
-          endDateTime = createISTDateTime(endDateStr, slot.endTime);
-        } else {
-          endDateTime = createISTDateTime(dateStr, slot.endTime);
-        }
+      const body = withExtendedProps(baseEvent, { internshipId, slot });
 
-        console.log('⏰ Created datetime strings:', {
-          start: startDateTime,
-          end: endDateTime
-        });
-
-        // Validate times
-        const startDate = new Date(startDateTime);
-        const endDate = new Date(endDateTime);
-
-        if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-          throw new Error('Invalid datetime values');
-        }
-
-        if (startDate >= endDate) {
-          throw new Error(`End time must be after start time. Got ${slot.startTime} to ${slot.endTime}`);
-        }
-
-        // Use finalEventLink before the event object
-        const finalEventLink = slot.eventLink || defaultEventLink; // fallback to default
-
-        let event;
-        if (slot.type === 'online') {
-          event = buildOnlineEvent({ slot, dateStr, startDateTime, endDateTime, internshipTitle, finalEventLink });
-        } else if (slot.type === 'offline') {
-          event = buildOfflineEvent({ slot, dateStr, startDateTime, endDateTime, internshipTitle });
-        } else if (slot.type === 'hybrid') {
-          if (slot.location?.address) {
-            event = buildOfflineEvent({ slot, dateStr, startDateTime, endDateTime, internshipTitle });
-          } else {
-            event = buildOnlineEvent({ slot, dateStr, startDateTime, endDateTime, internshipTitle, finalEventLink });
-          }
-        }
-
-        // If nothing is provided and includeMeet is true, generate a Meet link
-        if ((slot.type === 'online' || slot.type === 'hybrid') && !finalEventLink && slot.includeMeet !== false) {
-          event.conferenceData = {
-            createRequest: {
-              requestId: `meet-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-              conferenceSolutionKey: { type: 'hangoutsMeet' }
-            }
-          };
-        }
-
-        console.log('📝 Creating event with details:', {
-          summary: event.summary,
-          start: event.start.dateTime,
-          end: event.end.dateTime,
-          timeZone: event.start.timeZone,
-          hasConference: !!event.conferenceData || !!slot.eventLink
-        });
-
-        // Create the event
-        const response = await calendar.events.insert({
+      // PATCH if exists; otherwise INSERT
+      const existingEvent = existingBySlotKey.get(key);
+      if (existingEvent) {
+        await calendar.events.patch({
           calendarId: 'primary',
-          resource: event,
-          conferenceDataVersion: event.conferenceData ? 1 : 0,
-          sendNotifications: true,
+          eventId: existingEvent.id,
+          requestBody: body,
+          conferenceDataVersion: body.conferenceData ? 1 : 0,
         });
-
-        const eventData = {
-          slot,
-          eventId: response.data.id,
-          meetLink: response.data.hangoutLink || response.data.conferenceData?.entryPoints?.[0]?.uri,
-          htmlLink: response.data.htmlLink,
-          created: response.data.created,
-          summary: response.data.summary,
-          startDateTime: response.data.start.dateTime,
-          endDateTime: response.data.end.dateTime
-        };
-
-        createdEvents.push(eventData);
-
-        console.log(`✅ Event created successfully:`, {
-          eventId: response.data.id,
-          summary: response.data.summary,
-          date: slot.date,
-          time: `${slot.startTime}-${slot.endTime}`,
-          meetLink: eventData.meetLink,
-          calendarLink: response.data.htmlLink
-        });
-
-        // Delay to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 300));
-
-      } catch (slotErr) {
-        console.error(`❌ Failed to create event for slot ${i + 1}:`, {
-          error: slotErr.message,
-          slot,
-          stack: slotErr.stack
-        });
-
-        failedEvents.push({
-          slot,
-          error: slotErr.message,
-          index: i + 1
+      } else {
+        await calendar.events.insert({
+          calendarId: 'primary',
+          requestBody: body,
+          conferenceDataVersion: body.conferenceData ? 1 : 0,
         });
       }
     }
 
-    // Return comprehensive result
-    const result = {
-      success: createdEvents.length > 0,
-      studentEmail,
-      createdEvents,
-      failedEvents,
-      summary: `Successfully created ${createdEvents.length} events, ${failedEvents.length} failed`,
-      totalSlots: timetable.length,
-      calendarUrl: 'https://calendar.google.com/calendar/u/0/r',
-      details: {
-        successful: createdEvents.length,
-        failed: failedEvents.length,
-        successRate: `${Math.round((createdEvents.length / timetable.length) * 100)}%`
+    // 6) Delete stale events
+    for (const [key, ev] of existingBySlotKey.entries()) {
+      if (!seenKeys.has(key)) {
+        try {
+          await calendar.events.delete({ calendarId: 'primary', eventId: ev.id });
+        } catch (e) {
+          console.warn('Delete old event failed:', e.message);
+        }
       }
-    };
-
-    console.log('🎉 Calendar integration completed:', result.summary);
-    console.log('📊 Success rate:', result.details.successRate);
-
-    if (createdEvents.length > 0) {
-      console.log('📅 Events successfully added to Google Calendar!');
-      console.log('🔗 View calendar at:', result.calendarUrl);
     }
 
-    if (failedEvents.length > 0) {
-      console.log('⚠️ Failed events:', failedEvents.map(f => `${f.index}: ${f.error}`));
-    }
-
-    return result;
-
-  } catch (err) {
-    console.error(`❌ Calendar integration error for ${studentEmail}:`, {
-      error: err.message,
-      stack: err.stack
-    });
-
-    return {
-      success: false,
-      error: err.message,
-      studentEmail,
-      stack: err.stack
-    };
+    return { success: true };
+  } catch (e) {
+    console.error('upsertScheduleForStudent error:', e);
+    return { success: false, message: e.message };
   }
-};
+}
 
 // Helper functions
 function isValidDate(dateString) {
@@ -781,44 +622,60 @@ function formatDate(dateString) {
   });
 }
 
+// === Unique key for a slot (per day + start time) ===
+function slotKeyOf(slot) {
+  // slot.date may be Date or string; normalize to YYYY-MM-DD
+  const dateStr = (slot.date instanceof Date)
+    ? slot.date.toISOString().slice(0, 10)
+    : (typeof slot.date === 'string' && slot.date.includes('T'))
+      ? slot.date.split('T')[0]
+      : String(slot.date);
+
+  return `${dateStr}_${slot.startTime}`;
+}
+
+// === Attach private extended properties so we can find/update/delete later ===
+function withExtendedProps(baseEvent, { internshipId, slot }) {
+  return {
+    ...baseEvent,
+    extendedProperties: {
+      private: {
+        internshipId: String(internshipId),
+        slotKey: slotKeyOf(slot),
+      },
+    },
+  };
+}
+
 // Test function with immediate execution
 const debugCalendarCreation = async (studentEmail) => {
   console.log('🧪 Starting debug calendar creation for:', studentEmail);
 
-  // Create test event for tomorrow
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
-  const dateStr = slot.date instanceof Date ? slot.date.toISOString().split('T')[0] : slot.date;
+  const dateStr = tomorrow.toISOString().split('T')[0];
 
   const testTimetable = [
     {
-      date: dateString,
+      date: dateStr,
       startTime: '15:00',
       endTime: '16:00',
       sectionSummary: 'Debug Test Session',
-      description: 'This is a debug test event to verify calendar integration',
-      location: 'Virtual Debug Room',
+      instructor: 'Debugger',
+      type: 'online',
+      eventLink: '',
       includeMeet: true
     }
   ];
 
-  console.log('🧪 Test timetable:', testTimetable);
-
-  const result = await addScheduleToGoogleCalendar({
+  const result = await upsertScheduleForStudent({
     studentEmail,
+    internshipId: 'debug',
     timetable: testTimetable,
     internshipTitle: '🧪 Debug Test Internship'
   });
 
   console.log('🧪 Debug result:', JSON.stringify(result, null, 2));
-
-  if (result.success) {
-    console.log('✅ Debug test successful! Check your Google Calendar.');
-    console.log('🔗 Calendar link:', result.calendarUrl);
-  } else {
-    console.log('❌ Debug test failed:', result.error);
-  }
-
   return result;
 };
 
@@ -881,57 +738,25 @@ const updateScheduleInGoogleCalendar = async (req, res) => {
   try {
     const { internshipId, studentEmail } = req.body;
 
-    // Fetch tokens
     const studentToken = await TokenModel.findOne({ email: studentEmail });
     if (!studentToken?.tokens) {
       return res.status(401).json({ success: false, message: "Student not authenticated with Google" });
     }
 
-    // Auth setup
-    const oAuth2Client = new google.auth.OAuth2(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI);
-    oAuth2Client.setCredentials(studentToken.tokens);
-
-    const calendar = google.calendar({ version: 'v3', auth: oAuth2Client });
-
-    // Find latest schedule
     const scheduleDoc = await InternshipScheduleModel.findOne({ internshipId });
-
     if (!scheduleDoc || !Array.isArray(scheduleDoc.timetable)) {
       return res.status(404).json({ success: false, message: "No schedule found" });
     }
 
-    const timetable = scheduleDoc.timetable;
-
-    // 1. Delete previously created events if they have event IDs
-    for (const slot of timetable) {
-      if (slot.eventId) {
-        try {
-          await calendar.events.delete({ calendarId: 'primary', eventId: slot.eventId });
-        } catch (e) {
-          console.warn("Failed to delete previous event:", e.message);
-        }
-      }
-    }
-
-    // 2. Recreate schedule
-    const result = await addScheduleToGoogleCalendar({
+    const result = await upsertScheduleForStudent({
       studentEmail,
-      timetable,
+      internshipId,
+      timetable: scheduleDoc.timetable,
       internshipTitle: scheduleDoc.internshipTitle || 'Internship Schedule',
-      defaultEventLink: scheduleDoc.defaultEventLink
+      defaultEventLink: scheduleDoc.defaultEventLink || ''
     });
 
-    // 3. Save new event IDs
-    for (let i = 0; i < timetable.length; i++) {
-      if (result.createdEvents[i]?.eventId) {
-        scheduleDoc.timetable[i].eventId = result.createdEvents[i].eventId;
-      }
-    }
-
-    await scheduleDoc.save();
-
-    return res.json({ success: true, result });
-
+    return res.json({ success: result.success, result });
   } catch (error) {
     console.error("Error updating schedule in calendar:", error);
     return res.status(500).json({ success: false, message: error.message });
@@ -945,5 +770,6 @@ module.exports = {
   debugCalendarCreation,
   checkAuthStatus,
   createTestEvent,
-  updateScheduleInGoogleCalendar
+  updateScheduleInGoogleCalendar,
+  upsertScheduleForStudent,
 };
