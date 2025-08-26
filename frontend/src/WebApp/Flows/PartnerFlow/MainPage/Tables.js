@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import SendOfferLetter from "./OfferLetter";
 import ScheduleForm from "./ScheduleForm";
 import Modal from "./Modal";
-import { checkOfferStatus, getOfferStatusText, getOfferStatusColor } from "./offerUtils";
+import { checkOfferStatus, checkOfferStatuses, getOfferStatusText, getOfferStatusColor } from "./offerUtils";
 
 export const ApplicationsTable = ({ applications, onStatusUpdate }) => (
   <div className="overflow-x-auto">
