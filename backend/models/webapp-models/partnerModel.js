@@ -10,17 +10,17 @@ const partnerwebappSchema = mongoose.Schema(
     institutionId: { type: String, required: true },
     adminApproved: { type: Boolean, default: false },
     planType: {
-  type: String,
-  enum: ["Freemium", "Premium Basic", "Premium Plus"],
-  default: "Freemium",
-},
-isPremium: {
-  type: Boolean,
-  default: false,
-},
-premiumExpiration: {
-  type: Date,
-},
+      type: String,
+      enum: ["Freemium", "Premium Basic", "Premium Plus"],
+      default: "Freemium",
+    },
+    isPremium: {
+      type: Boolean,
+      default: false,
+    },
+    premiumExpiration: {
+      type: Date,
+    },
     active: { type: Boolean, default: false },
     otp: String, // New field for storing OTP
     otpExpiration: Date,
