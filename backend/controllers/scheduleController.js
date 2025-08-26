@@ -1,12 +1,74 @@
 const InternshipSchedule = require('../models/webapp-models/InternshipScheduleModel');
 const { addScheduleToGoogleCalendar } = require('../controllers/GoogleController');
 const Student = require('../models/webapp-models/userModel'); // <-- replace with your actual student model
+const OfferLetter = require('../models/webapp-models/offerLetterModel');
+const notifyUser = require('../utils/notifyUser');
+const sendNotification = require('../utils/Notification');
 
 // Utility function to fetch student who accepted
 const getStudentByInternshipId = async (internshipId) => {
   // Adjust query based on your schema (assumption: status = 'accepted')
   return await Student.findOne({ internshipId, status: 'accepted' });
 };
+
+// Send schedule email only to accepted students of this internship
+async function notifyAcceptedStudentsOfSchedule({ internshipId, scheduleDoc, isNew }) {
+  // Find accepted offers for this internship
+  const offers = await OfferLetter
+    .find({ internshipId, status: 'Accepted' })
+    .select('email studentId name')
+    .lean();
+
+  if (!offers.length) return; // nobody accepted yet → do nothing
+
+  // Minimal “what’s next” preview
+  const upcoming = (scheduleDoc?.timetable || []).find(s => {
+    const d = new Date(s.date);
+    const today = new Date();
+    d.setHours(0, 0, 0, 0); today.setHours(0, 0, 0, 0);
+    return d >= today;
+  });
+
+  const subject = isNew
+    ? 'Your internship schedule is published'
+    : 'Your internship schedule was updated';
+
+  // Send users to the public login page
+  const appUrl = (process.env.WEBAPP_BASE_URL || 'https://www.skillnaav.com') + '/user/login';
+
+  const previewHtml = upcoming
+    ? `<p><b>Next session:</b> ${new Date(upcoming.date).toLocaleDateString('en-IN')} ${upcoming.startTime}–${upcoming.endTime} (${upcoming.type || 'online'})</p>`
+    : '';
+
+  // Send emails
+  await Promise.all(
+    offers.map(o =>
+      notifyUser(
+        o.email,
+        subject,
+        `
+        <p>Hi ${o.name || 'there'},</p>
+        <p>${isNew ? 'A new' : 'An updated'} schedule has been posted for your internship.</p>
+        ${previewHtml}
+        <p><a href="${appUrl}">Open your dashboard</a> to view all sessions.</p>
+        <p>— Skillnaav Team</p>
+        `
+      ).catch(err => console.error('Schedule email failed:', o.email, err))
+    )
+  );
+
+  // Optional in-app notification
+  await Promise.all(
+    offers.map(o =>
+      sendNotification({
+        studentId: o.studentId,
+        title: isNew ? 'Schedule published' : 'Schedule updated',
+        message: 'Tap to view your sessions.',
+        link: appUrl
+      }).catch(() => { })
+    )
+  );
+}
 
 // Create or update a schedule
 const updateInternshipSchedule = async (req, res) => {
@@ -85,13 +147,26 @@ const updateInternshipSchedule = async (req, res) => {
       });
     }
 
+    let wasCreated = false;
     if (schedule) {
       schedule.set(scheduleData);
     } else {
       schedule = new InternshipSchedule(scheduleData);
+      wasCreated = true;
     }
 
     await schedule.save();
+
+    // ✅ Send schedule email only to accepted students
+    try {
+      await notifyAcceptedStudentsOfSchedule({
+        internshipId,
+        scheduleDoc: schedule,   // saved schedule doc
+        isNew: wasCreated
+      });
+    } catch (e) {
+      console.error('notifyAcceptedStudentsOfSchedule failed:', e);
+    }
 
     // Step: Send to Google Calendar
     const student = await getStudentByInternshipId(internshipId);

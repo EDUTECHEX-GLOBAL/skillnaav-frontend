@@ -1015,14 +1015,15 @@ const ScheduleForm = ({ internshipId, onClose }) => {
                         {/* HEADER Row: Checkbox, Day, Type Dropdown */}
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-4">
-                            {readOnly ? (
+                            {ro ? (
+                              // When a row is blocked (readOnly OR saved schedule & past day), remove the checkbox
+                              // but keep the same space so layout doesn’t shift.
                               <span className="inline-block h-5 w-5" aria-hidden />
                             ) : (
                               <input
                                 type="checkbox"
                                 checked={day.selected}
-                                disabled={ro}
-                                onChange={() => !ro && toggleDay(idx)}
+                                onChange={() => toggleDay(idx)}
                                 className="h-5 w-5 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
                               />
                             )}
@@ -1038,43 +1039,68 @@ const ScheduleForm = ({ internshipId, onClose }) => {
                                 })}
                               </p>
                               <span
-                                className={`inline-block mt-1 px-2 py-0.5 text-xs rounded-full ${day.type === 'online'
-                                    ? 'bg-blue-100 text-blue-800'
-                                    : day.type === 'offline'
-                                      ? 'bg-green-100 text-green-800'
-                                      : 'bg-purple-100 text-purple-800'
-                                  }`}
+                                className={`inline-block mt-1 px-2 py-0.5 text-xs rounded-full ${(form.defaultType === 'online')
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : (form.defaultType === 'offline')
+                                    ? 'bg-green-100 text-green-800'
+                                    : 'bg-purple-100 text-purple-800'
+                                  } capitalize`}
                               >
-                                {day.type}
+                                {form.defaultType}
                               </span>
                             </div>
                           </div>
 
-                          {canEditDay && (
-                            <div className="flex items-center space-x-4">
-                              <div className="flex items-center space-x-2">
-                                <input
-                                  type="time"
-                                  value={day.startTime}
-                                  onChange={(e) => changeField(idx, 'startTime', e.target.value)}
-                                  className="text-sm rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
-                                />
-                                <span className="text-gray-400 mt-5">-</span>
-                                <input
-                                  type="time"
-                                  value={day.endTime}
-                                  onChange={(e) => changeField(idx, 'endTime', e.target.value)}
-                                  className="text-sm rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
-                                />
-                              </div>
-                              <select
-                                value={day.type}
-                                onChange={(e) => changeField(idx, 'type', e.target.value)}
-                                className="text-sm mt-5 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 px-2 py-[6px]"
-                              >
-                                <option value="online">online</option>
-                                <option value="offline">offline</option>
-                              </select>
+                          {day.selected && (
+                            <div className="flex items-center">
+                              {canEditDay ? (
+                                // Editable (future days / not closed)
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="time"
+                                    value={day.startTime || form.defaultStartTimes[form.defaultType] || ''}
+                                    onChange={(e) => changeField(idx, 'startTime', e.target.value)}
+                                    disabled={ro}
+                                    className="text-sm rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
+                                  />
+                                  <span className="text-gray-600 mt-5">-</span>
+                                  <input
+                                    type="time"
+                                    value={day.endTime || form.defaultEndTimes[form.defaultType] || ''}
+                                    onChange={(e) => changeField(idx, 'endTime', e.target.value)}
+                                    disabled={ro}
+                                    className="text-sm rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
+                                  />
+
+                                  {form.defaultType === 'hybrid' ? (
+                                    <select
+                                      value={day.type}
+                                      onChange={(e) => changeField(idx, 'type', e.target.value)}
+                                      disabled={ro}
+                                      className="text-sm mt-5 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 px-2 py-[6px]"
+                                    >
+                                      <option value="online">online</option>
+                                      <option value="offline">offline</option>
+                                    </select>
+                                  ) : (
+                                    <span className="text-sm ml-2 capitalize mt-5">{day.type}</span>
+                                  )}
+                                </div>
+                              ) : (
+                                // Read-only (saved past days / closed schedule) -> EXACT format requested
+                                <div className="flex items-center text-sm text-gray-800 gap-2 w-full">
+                                  <span className="px-3 py-1 bg-white border border-gray-300 rounded-lg shadow-sm">
+                                    {day.startTime || form.defaultStartTimes[form.defaultType] || ''}
+                                  </span>
+                                  <span className="text-gray-500">-</span>
+                                  <span className="px-3 py-1 bg-white border border-gray-300 rounded-lg shadow-sm">
+                                    {day.endTime || form.defaultEndTimes[form.defaultType] || ''}
+                                  </span>
+                                  <span className="ml-auto px-3 py-1 bg-white border border-gray-300 rounded-lg shadow-sm capitalize">
+                                    {day.type}
+                                  </span>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>

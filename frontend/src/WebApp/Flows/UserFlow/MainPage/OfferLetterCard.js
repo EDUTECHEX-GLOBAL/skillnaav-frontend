@@ -86,6 +86,7 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
   const rowRefs = useRef({});
   const userInfo = JSON.parse(localStorage.getItem('userInfo'));
   const userPlan = userInfo?.planType;
+  const [showCompleteNotice, setShowCompleteNotice] = useState(false);
 
   // ✅ PayPal Configuration
   const paypalInitialOptions = {
@@ -302,44 +303,48 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
   };
 
   const handleDownloadCertificate = async () => {
-  try {
-    // Create hidden container for rendering certificate
-    const container = document.createElement("div");
-    container.style.position = "fixed";
-    container.style.top = "-10000px"; // hide offscreen
-    document.body.appendChild(container);
+    // 🔒 Gate: partner must close the schedule first
+    if (!schedule?.isClosed) {
+      // Show a simple popup/modal
+      setShowCompleteNotice(true);
+      return;
+    }
 
-    // Render the CertificateTemplate inside container
-    const element = (
-      <CertificateTemplate studentName={userInfo?.name || "Student"} />
-    );
+    try {
+      // Create hidden container for rendering certificate
+      const container = document.createElement("div");
+      container.style.position = "fixed";
+      container.style.top = "-10000px"; // hide offscreen
+      document.body.appendChild(container);
 
-    // Dynamically import ReactDOM
-    import("react-dom").then((ReactDOM) => {
-      ReactDOM.render(element, container, async () => {
-        // Convert template to canvas
-        const canvas = await html2canvas(container.querySelector("#certificate-content"));
-        const imgData = canvas.toDataURL("image/png");
+      // Render the CertificateTemplate inside container
+      const element = (
+        <CertificateTemplate studentName={userInfo?.name || "Student"} />
+      );
 
-        // Generate PDF
-        const pdf = new jsPDF("landscape", "pt", "a4");
-        const imgProps = pdf.getImageProperties(imgData);
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      // Dynamically import ReactDOM and render → capture → PDF
+      import("react-dom").then((ReactDOM) => {
+        ReactDOM.render(element, container, async () => {
+          const canvas = await html2canvas(container.querySelector("#certificate-content"));
+          const imgData = canvas.toDataURL("image/png");
 
-        pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
-        pdf.save("Internship_Certificate.pdf");
+          const pdf = new jsPDF("landscape", "pt", "a4");
+          const imgProps = pdf.getImageProperties(imgData);
+          const pdfWidth = pdf.internal.pageSize.getWidth();
+          const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
 
-        // Cleanup
-        ReactDOM.unmountComponentAtNode(container);
-        document.body.removeChild(container);
+          pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+          pdf.save("Internship_Certificate.pdf");
+
+          ReactDOM.unmountComponentAtNode(container);
+          document.body.removeChild(container);
+        });
       });
-    });
-  } catch (err) {
-    console.error("Certificate generation failed:", err);
-    toast.error("Failed to generate certificate.");
-  }
-};
+    } catch (err) {
+      console.error("Certificate generation failed:", err);
+      toast.error("Failed to generate certificate.");
+    }
+  };
 
   // ─── 3) Render the schedule with table + per‐row Google Calendar links ─
   const renderSchedule = () => {
@@ -777,7 +782,8 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
                     <div className="flex justify-center">
                       <button
                         onClick={handleDownloadCertificate}
-                        className="flex items-center text-blue-600 hover:text-blue-800 text-sm font-medium"
+                        className={`flex items-center text-sm font-medium ${schedule?.isClosed ? "text-blue-600 hover:text-blue-800" : "text-gray-500 hover:text-gray-600"
+                          }`}
                       >
                         <FontAwesomeIcon icon={faDownload} className="mr-2" />
                         Download Certificate
@@ -891,6 +897,26 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
         </div>
       )}
 
+      {/* Complete Internship Notice */}
+      {showCompleteNotice && (
+        <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-6 text-center">
+            <p className="text-gray-800 font-semibold mb-2">
+              Complete the internship first
+            </p>
+            <p className="text-gray-600 text-sm mb-6">
+              Contact Your Instructor for the Internship Certificate after completing your whole internship schedule
+            </p>
+            <button
+              onClick={() => setShowCompleteNotice(false)}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ✅ ACTION BUTTONS */}
       {offer.status.toLowerCase() === "sent" && (
         <div className="space-y-3 mt-4">
@@ -926,6 +952,6 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
       )}
     </div>
   );
-};
+}
 
 export default OfferLetterCard;
