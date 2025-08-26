@@ -148,21 +148,23 @@ const sendOfferLetter = async (req, res) => {
 const getOfferLetterByStudent = async (req, res) => {
   try {
     const { studentId } = req.params;
+
     if (!mongoose.Types.ObjectId.isValid(studentId)) {
-      return res.status(400).json({ error: 'Invalid student ID' });
+      return res.status(400).json({ error: "Invalid student ID" });
     }
 
-    const offers = await OfferLetter.find({ studentId }); // ✅ Fetch all offers
-    if (!offers.length) {
-      return res.status(404).json({ error: 'No offer letters found for this student' });
+    const offers = await OfferLetter.find({ studentId });
+
+    if (!offers || offers.length === 0) {
+      return res.status(200).json([]); // <-- better than 404 for your use case
     }
 
-    return res.status(200).json(offers); // ✅ Return array of offers
+    return res.status(200).json(offers);
   } catch (err) {
+    console.error("Error fetching offer letter:", err);
     return res.status(500).json({ error: err.message });
   }
 };
-
 
 const updateOfferStatus = async (req, res) => {
   try {
@@ -277,10 +279,57 @@ const getOffersByInternship = async (req, res) => {
   return res.status(200).json({ offers });
 };
 
+// Add this function to your offerLetterController.js
+
+const getOfferStatusesForInternship = async (req, res) => {
+  try {
+    const { internshipId } = req.params;
+    const { studentIds } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(internshipId)) {
+      return res.status(400).json({ error: 'Invalid internship ID' });
+    }
+
+    if (!Array.isArray(studentIds) || studentIds.length === 0) {
+      return res.status(400).json({ error: 'Student IDs array is required' });
+    }
+
+    // Validate all student IDs
+    const validStudentIds = studentIds.filter(id => mongoose.Types.ObjectId.isValid(id));
+    if (validStudentIds.length === 0) {
+      return res.status(400).json({ error: 'No valid student IDs provided' });
+    }
+
+    // Find all offers for this internship and these students
+    const offers = await OfferLetter.find({
+      internshipId: new mongoose.Types.ObjectId(internshipId),
+      studentId: { $in: validStudentIds }
+    });
+
+    // Create a mapping of studentId to offer status
+    const statusMap = {};
+    offers.forEach(offer => {
+      statusMap[offer.studentId.toString()] = offer.status;
+    });
+
+    // Prepare response with status for each student
+    const response = validStudentIds.map(studentId => ({
+      studentId,
+      status: statusMap[studentId] || 'Not Sent'
+    }));
+
+    return res.status(200).json(response);
+  } catch (err) {
+    console.error('Error fetching offer statuses:', err);
+    return res.status(500).json({ error: err.message });
+  }
+};
+
 
 module.exports = {
   sendOfferLetter,
   getOfferLetterByStudent,
   updateOfferStatus,
-  getOffersByInternship
+  getOffersByInternship,
+  getOfferStatusesForInternship
 };

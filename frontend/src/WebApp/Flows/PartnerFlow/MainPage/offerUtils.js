@@ -1,0 +1,66 @@
+// src/utils/offerUtils.js
+import axios from 'axios';
+
+// Batch status check - much more efficient
+export const checkOfferStatuses = async (studentIds, internshipId) => {
+  try {
+    const response = await axios.post(
+      `/api/offer-letters/internship/${internshipId}/statuses`,
+      { studentIds },
+      { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+    );
+    
+    // Convert array response to a map
+    const statusMap = {};
+    if (response.data && Array.isArray(response.data)) {
+      response.data.forEach(item => {
+        statusMap[item.studentId] = item.status || 'Not Sent';
+      });
+    }
+    
+    return statusMap;
+  } catch (error) {
+    console.error('Error checking offer statuses:', error);
+    return {};
+  }
+};
+
+// Keep individual check for fallback if needed
+export const checkOfferStatus = async (studentId, internshipId) => {
+  try {
+    const response = await axios.post(
+      `/api/offer-letters/internship/${internshipId}/statuses`,
+      { studentIds: [studentId] },
+      { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+    );
+    
+    if (response.data && response.data.length > 0) {
+      return response.data[0].status || 'Not Sent';
+    }
+    
+    return 'Not Sent';
+  } catch (error) {
+    console.error('Error checking offer status:', error);
+    return 'Not Sent';
+  }
+};
+
+export const getOfferStatusText = (status) => {
+  switch (status) {
+    case 'Sent': return 'Offer Sent';
+    case 'Accepted': return 'Accepted';
+    case 'Rejected': return 'Rejected';
+    case 'Not Sent': return 'Not Sent';
+    default: return status || 'Not Sent';
+  }
+};
+
+export const getOfferStatusColor = (status) => {
+  switch (status) {
+    case 'Sent': return 'bg-yellow-100 text-yellow-800';
+    case 'Accepted': return 'bg-green-100 text-green-800';
+    case 'Rejected': return 'bg-red-100 text-red-800';
+    case 'Not Sent': return 'bg-gray-100 text-gray-800';
+    default: return 'bg-gray-100 text-gray-800';
+  }
+};

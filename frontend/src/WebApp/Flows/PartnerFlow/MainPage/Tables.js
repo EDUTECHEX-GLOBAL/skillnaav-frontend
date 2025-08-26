@@ -1,9 +1,10 @@
 import React from "react";
 import PropTypes from "prop-types";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import SendOfferLetter from "./OfferLetter";
 import ScheduleForm from "./ScheduleForm";
 import Modal from "./Modal";
+import { checkOfferStatus, getOfferStatusText, getOfferStatusColor } from "./offerUtils";
 
 export const ApplicationsTable = ({ applications, onStatusUpdate }) => (
   <div className="overflow-x-auto">
@@ -56,21 +57,115 @@ ApplicationsTable.propTypes = {
 
 export const ShortlistedTable = ({ candidates, internshipId, onSendOffer }) => {
   const [selectedStudent, setSelectedStudent] = useState(null);
-  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
-  const [studentToSchedule, setStudentToSchedule] = useState(null);
+  const [offerStatuses, setOfferStatuses] = useState({});
+  const [loadingStatuses, setLoadingStatuses] = useState({});
+  const [showOfferModal, setShowOfferModal] = useState(false);
+  const [isLoadingAll, setIsLoadingAll] = useState(false); // ✅ Loading state for all
 
-  if (!Array.isArray(candidates)) {
-    console.error("ShortlistedTable: candidates is not an array:", candidates);
-    return <p className="text-gray-600">No candidates to display.</p>;
-  }
+  // Fetch offer status for ALL candidates in one call
+  useEffect(() => {
+    const fetchOfferStatuses = async () => {
+      if (!candidates.length) return;
+      
+      setIsLoadingAll(true);
+      
+      try {
+        // Get all valid student IDs
+        const studentIds = candidates
+          .filter(student => student.student_id)
+          .map(student => student.student_id);
+        
+        if (studentIds.length === 0) {
+          setIsLoadingAll(false);
+          return;
+        }
+        
+        // Set loading state for all students
+        const loadingStates = {};
+        studentIds.forEach(id => {
+          loadingStates[id] = true;
+        });
+        setLoadingStatuses(loadingStates);
+        
+        // Make single batch API call
+        const statusMap = await checkOfferStatuses(studentIds, internshipId);
+        
+        setOfferStatuses(statusMap);
+        
+        // Clear loading states
+        setLoadingStatuses({});
+        
+      } catch (error) {
+        console.error('Error fetching offer statuses:', error);
+        // Fallback: try individual calls if batch fails
+        await fetchIndividualStatuses();
+      } finally {
+        setIsLoadingAll(false);
+      }
+    };
 
-const uniqueCandidates = candidates.filter(
-  (student, index, self) =>
-    index === self.findIndex((s) => s.email === student.email)
-);
+    // Fallback function for individual calls
+    const fetchIndividualStatuses = async () => {
+      const statuses = {};
+      const loading = {};
+      
+      for (const student of candidates) {
+        if (student.student_id) {
+          loading[student.student_id] = true;
+          setLoadingStatuses(prev => ({ ...prev, [student.student_id]: true }));
+          
+          statuses[student.student_id] = await checkOfferStatus(student.student_id, internshipId);
+          
+          loading[student.student_id] = false;
+          setLoadingStatuses(prev => ({ ...prev, [student.student_id]: false }));
+          
+          // Update statuses incrementally for better UX
+          setOfferStatuses(prev => ({ 
+            ...prev, 
+            [student.student_id]: statuses[student.student_id] 
+          }));
+        }
+      }
+    };
+
+    fetchOfferStatuses();
+  }, [candidates, internshipId]);
+
+  const handleSendOfferClick = (student) => {
+    setSelectedStudent(student);
+    setShowOfferModal(true);
+  };
+
+  const handleOfferSuccess = () => {
+    if (selectedStudent && selectedStudent.student_id) {
+      setOfferStatuses(prev => ({
+        ...prev,
+        [selectedStudent.student_id]: 'Sent'
+      }));
+    }
+    handleCloseOfferModal();
+  };
+
+  const handleCloseOfferModal = () => {
+    setShowOfferModal(false);
+    setSelectedStudent(null);
+  };
+
+  const uniqueCandidates = candidates.filter(
+    (student, index, self) =>
+      index === self.findIndex((s) => s.email === student.email)
+  );
 
   return (
     <div className="space-y-4">
+      {/* Loading indicator for all statuses */}
+      {isLoadingAll && (
+        <div className="flex justify-center items-center p-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+          <span className="ml-3 text-gray-600">Loading offer statuses...</span>
+        </div>
+      )}
+      
       <div className="overflow-x-auto">
         <table className="min-w-full font-poppins text-sm bg-white shadow-md rounded-lg overflow-hidden">
           <thead className="bg-gray-100 text-gray-600 uppercase text-xs">
@@ -78,61 +173,81 @@ const uniqueCandidates = candidates.filter(
               <th className="px-6 py-3 text-left">Name</th>
               <th className="px-6 py-3 text-left">Email</th>
               <th className="px-6 py-3 text-left">Resume</th>
+              <th className="px-6 py-3 text-left">Offer Status</th>
               <th className="px-6 py-3 text-left">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {uniqueCandidates.map((student) => (
-              <tr key={student._id} className="hover:bg-gray-50 transition">
-                <td className="px-6 py-4">{student.name || "N/A"}</td>
-                <td className="px-6 py-4">{student.email || "N/A"}</td>
-                <td className="px-6 py-4">
-                  <a href={student.resume_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                    View Resume
-                  </a>
-                </td>
-                <td className="px-6 py-4 space-x-2">
-                  <button
-                    onClick={() => setSelectedStudent(student)}
-                    className="text-white bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded"
-                  >
-                    Send Offer
-                  </button>
-                  {/* <button
-                    onClick={() => handleScheduleClick(student)}
-                    className="text-white bg-green-600 hover:bg-green-700 px-3 py-1 rounded"
-                  >
-                    Schedule
-                  </button> */}
-                </td>
-              </tr>
-            ))}
+            {uniqueCandidates.map((student) => {
+              const status = offerStatuses[student.student_id] || 'Not Sent';
+              const isLoading = loadingStatuses[student.student_id];
+              
+              return (
+                <tr key={student.student_id} className="hover:bg-gray-50 transition">
+                  <td className="px-6 py-4">{student.name || "N/A"}</td>
+                  <td className="px-6 py-4">{student.email || "N/A"}</td>
+                  <td className="px-6 py-4">
+                    <a 
+                      href={student.resumeUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="text-blue-600 hover:underline"
+                    >
+                      View Resume
+                    </a>
+                  </td>
+                  <td className="px-6 py-4">
+                    {isLoading ? (
+                      <div className="flex items-center">
+                        <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-blue-500 mr-2"></div>
+                        <span className="text-xs text-gray-500">Checking...</span>
+                      </div>
+                    ) : (
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getOfferStatusColor(status)}`}>
+                        {getOfferStatusText(status)}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 space-x-2">
+                    {isLoading ? (
+                      <span className="text-gray-500">Loading...</span>
+                    ) : status === 'Not Sent' ? (
+                      <button
+                        onClick={() => handleSendOfferClick(student)}
+                        className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                      >
+                        Send Offer
+                      </button>
+                    ) : (
+                      <span className="text-sm text-gray-500">
+                        {getOfferStatusText(status)}
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
 
-      {/* Offer Letter Section */}
-      {selectedStudent && (
-        <div className="mt-6 p-4 border rounded-lg bg-gray-50">
-          <SendOfferLetter
-            student={selectedStudent}
-            internshipId={internshipId}
-            onSuccess={() => setSelectedStudent(null)}
-          />
-        </div>
-      )}
-
-      {/* Schedule Modal */}
-      {scheduleModalOpen && (
+      {/* Offer Letter Modal */}
+      {showOfferModal && selectedStudent && (
         <Modal
-          isOpen={scheduleModalOpen}
-          onClose={() => setScheduleModalOpen(false)}
-          title="Schedule Internship Interview"
+          isOpen={showOfferModal}
+          onClose={handleCloseOfferModal}
+          title="Send Offer Letter"
         >
-          <ScheduleForm
-            student={studentToSchedule}
+          <SendOfferLetter
+            student={{
+              _id: selectedStudent.student_id,
+              name: selectedStudent.name,
+              email: selectedStudent.email,
+              resumeUrl: selectedStudent.resumeUrl
+            }}
             internshipId={internshipId}
-            onClose={() => setScheduleModalOpen(false)}
+            onSuccess={handleOfferSuccess}
+            onCancel={handleCloseOfferModal}
           />
         </Modal>
       )}
@@ -145,5 +260,4 @@ ShortlistedTable.propTypes = {
   internshipId: PropTypes.string.isRequired,
   onSendOffer: PropTypes.func,
 };
-
 export default ShortlistedTable;

@@ -287,73 +287,66 @@ const InternshipList = () => {
   };
 
   const handleSendOfferLetter = async () => {
-    if (!templateId || !joiningDate) {
-      toast.warn("Template and joining date are required.");
-      return;
-    }
+  if (!templateId || !joiningDate) {
+    toast.warn("Template and joining date are required.");
+    return;
+  }
 
-    try {
-      setSendingOffer(true);
+  try {
+    setSendingOffer(true);
 
-      const internship = internships.find(i => i._id === selectedStudent?.internship_id);
-      const schoolAdminId = localStorage.getItem("schoolAdminId");
+    const internship = internships.find(i => i._id === selectedStudent?.internship_id);
+    const schoolAdminId = localStorage.getItem("schoolAdminId");
 
-      // Build the payload object clearly
-      const payload = {
-        partnerId: partnerData?._id,
-        student_id: selectedStudent?._id,
-        internshipId: internship?._id,
-        templateId,
-        name: selectedStudent?.name,
-        email: selectedStudent?.email,
-        position: internship?.jobTitle,
-        company: internship?.companyName,
-        location: internship?.location,
-        duration: internship?.endDateOrDuration,
-        startDate: joiningDate,
-        internshipType: internship?.internshipType,
-        compensationDetails: internship?.compensationDetails,
-        jobDescription: internship?.jobDescription,
-        qualifications: Array.isArray(internship?.qualifications)
-          ? internship.qualifications
-          : (typeof internship?.qualifications === 'string'
-            ? internship.qualifications.match(/[A-Z]?[a-z]+/g)
-            : []),
-        contactInfo: {
-          name: "HR Manager",
-          email: "hr@company.com",
-          phone: "9876543210",
-        },
-        noticePeriod: "2 weeks",
-        schoolAdminId: schoolAdminId || null,
-      };
+    // Build the payload object clearly
+    const payload = {
+      partnerId: partnerData?._id,
+      student_id: selectedStudent?._id, // ✅ Make sure this is included
+      internshipId: internship?._id,
+      templateId,
+      name: selectedStudent?.name,
+      email: selectedStudent?.email,
+      position: internship?.jobTitle,
+      company: internship?.companyName,
+      location: internship?.location,
+      duration: internship?.endDateOrDuration,
+      startDate: joiningDate,
+      internshipType: internship?.internshipType,
+      compensationDetails: internship?.compensationDetails,
+      jobDescription: internship?.jobDescription,
+      qualifications: Array.isArray(internship?.qualifications)
+        ? internship.qualifications
+        : (typeof internship?.qualifications === 'string'
+          ? internship.qualifications.match(/[A-Z]?[a-z]+/g)
+          : []),
+      contactInfo: {
+        name: "HR Manager",
+        email: "hr@company.com",
+        phone: "9876543210",
+      },
+      noticePeriod: "2 weeks",
+      schoolAdminId: schoolAdminId || null,
+    };
 
-      // Debug log before sending
-      console.log("Sending Offer Payload:", payload);
+    // Debug log before sending
+    console.log("Sending Offer Payload:", payload);
 
-      // Basic check for required fields
-      if (!payload.partnerId || !payload.student_id || !payload.internshipId || !payload.name || !payload.email || !payload.position || !payload.startDate) {
-        toast.error("Some required fields are missing.");
-        setSendingOffer(false);
-        return;
-      }
+    // POST the offer letter
+    await axios.post(`/api/offer-letters`, payload, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    });
 
-      // POST the offer letter
-      await axios.post(`/api/offer-letters`, payload, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
-
-      toast.success("Offer sent successfully!");
-      setSelectedStudent(null);
-    } catch (err) {
-      console.error("Offer letter error:", err);
-      toast.error(err.response?.data?.error || "Failed to send offer letter");
-    } finally {
-      setSendingOffer(false);
-    }
-  };
+    toast.success("Offer sent successfully!");
+    setSelectedStudent(null);
+  } catch (err) {
+    console.error("Offer letter error:", err);
+    toast.error(err.response?.data?.error || "Failed to send offer letter");
+  } finally {
+    setSendingOffer(false);
+  }
+};
 
 
   const handleSchedule = (internshipId) => {
@@ -432,7 +425,7 @@ const InternshipList = () => {
 
   return (
     <div className="font-poppins max-w-7xl mx-auto p-6 bg-white shadow-lg rounded-lg">
-      {selectedStudent && (
+      {/* {selectedStudent && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-xl w-[400px]">
             <h2 className="text-lg font-medium mb-4">
@@ -483,7 +476,7 @@ const InternshipList = () => {
             </div>
           </div>
         </div>
-      )}
+      )} */}
 
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-3xl font-semibold text-gray-900">
