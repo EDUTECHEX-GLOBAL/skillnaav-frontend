@@ -9,6 +9,9 @@ const Notifications = () => {
   const [error, setError] = useState("");
   const [openMenuId, setOpenMenuId] = useState(null);
 
+  // Count of unread notifications
+  const unreadCount = notifications.filter(n => !n.isRead).length;
+
   useEffect(() => {
     const fetchNotifications = async () => {
       try {
@@ -18,7 +21,10 @@ const Notifications = () => {
 
         const { data } = await axios.get(`/api/notifications/${studentId}`);
         if (data.success) {
-          setNotifications(data.notifications);
+          setNotifications(data.notifications.map(n => ({
+            ...n,
+            isRead: n.read
+          })));
         } else {
           setError("Failed to fetch notifications");
         }
@@ -40,10 +46,8 @@ const Notifications = () => {
           `/api/notifications/read/${notification._id}`
         );
         if (data.success) {
-          setNotifications((prev) =>
-            prev.map((n) =>
-              n._id === notification._id ? { ...n, isRead: true } : n
-            )
+          setNotifications(prev =>
+            prev.map(n => n._id === notification._id ? { ...n, isRead: true } : n)
           );
         }
       } catch (error) {
@@ -56,28 +60,29 @@ const Notifications = () => {
     }
   };
 
-const handleDelete = async (notification) => {
-  try {
-    console.log("Deleting notification with ID:", notification._id); // Log the ID
-    await axios.delete(`/api/notifications/${notification._id}`);
-    // Handle success (e.g., remove notification from state)
-    setNotifications((prev) =>
-      prev.filter((n) => n._id !== notification._id)
-    );
-  } catch (error) {
-    console.error('Error deleting notification:', error);
-  }
-};
-
-
-
-
+  const handleDelete = async (notification) => {
+    try {
+      await axios.delete(`/api/notifications/${notification._id}`);
+      setNotifications(prev =>
+        prev.filter(n => n._id !== notification._id)
+      );
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+    }
+  };
 
   return (
     <div className="p-6 min-h-screen font-[Poppins] bg-gradient-to-br from-white via-slate-100 to-slate-200">
-      <h2 className="text-3xl font-semibold mb-8 text-gray-800 tracking-tight">
-        🔔 Notifications
-      </h2>
+      <div className="flex items-center justify-between mb-8">
+        <h2 className="text-3xl font-semibold text-gray-800 tracking-tight">
+          🔔 Notifications
+        </h2>
+        {unreadCount > 0 && (
+          <span className="text-sm font-medium bg-blue-600 text-white px-3 py-1 rounded-full">
+            {unreadCount} New
+          </span>
+        )}
+      </div>
 
       {loading ? (
         <p className="text-gray-600 text-sm">Loading notifications...</p>
@@ -87,7 +92,7 @@ const handleDelete = async (notification) => {
         <p className="text-gray-500 text-sm">No notifications found.</p>
       ) : (
         <ul className="space-y-4">
-          {notifications.map((notification) => (
+          {notifications.map(notification => (
             <li
               key={notification._id}
               className={`relative p-5 rounded-2xl shadow-md flex gap-4 items-start transition-all duration-300 hover:shadow-xl hover:scale-[1.01] border ${
@@ -110,19 +115,13 @@ const handleDelete = async (notification) => {
                 className="flex-1 cursor-pointer"
                 onClick={() => handleNotificationClick(notification)}
               >
-                <p
-                  className={`text-sm ${
-                    notification.isRead
-                      ? "text-gray-700"
-                      : "text-blue-900 font-medium"
-                  }`}
-                >
+                <p className={`text-sm ${notification.isRead ? "text-gray-700" : "text-blue-900 font-medium"}`}>
                   {notification.message}
                 </p>
 
                 {notification.link && (
                   <span className="inline-block mt-2 text-sm text-blue-700 font-medium underline hover:text-blue-900 transition">
-                    📄 Download Offer Letter
+                    {notification.type === "offer" ? "📄 View Offer Letter" : "📄 View Recommendation"}
                   </span>
                 )}
 
@@ -142,9 +141,7 @@ const handleDelete = async (notification) => {
               <div className="absolute top-3 right-3 z-10">
                 <button
                   onClick={() =>
-                    setOpenMenuId((prev) =>
-                      prev === notification._id ? null : notification._id
-                    )
+                    setOpenMenuId(prev => (prev === notification._id ? null : notification._id))
                   }
                   className="text-gray-600 hover:text-gray-800"
                 >
@@ -152,14 +149,14 @@ const handleDelete = async (notification) => {
                 </button>
 
                 {openMenuId === notification._id && (
-                  <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-200 rounded-md shadow-lg z-20">
+                  <div className="absolute right-0 mt-2 w-44 bg-white border border-gray-200 rounded-md shadow-lg z-20">
                     {notification.link && (
                       <>
                         <button
                           onClick={() => window.open(notification.link, "_blank")}
                           className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
                         >
-                          Open
+                          {notification.type === "offer" ? "Open Offer Letter" : "Open Recommendation"}
                         </button>
                         <button
                           onClick={() => {
@@ -170,7 +167,7 @@ const handleDelete = async (notification) => {
                           }}
                           className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
                         >
-                          Download
+                          {notification.type === "offer" ? "Download Offer Letter" : "Download Recommendation"}
                         </button>
                       </>
                     )}

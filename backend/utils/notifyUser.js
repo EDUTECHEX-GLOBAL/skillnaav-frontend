@@ -1,67 +1,56 @@
 const nodemailer = require("nodemailer");
 
-const notifyUser = async (email, subject, message, attachments = []) => {
+const notifyUser = async (email, subject, bodyText, attachments = []) => {
   try {
     // ✅ Setup transporter with Gmail
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
         user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD, // App password (not Gmail password)
+        pass: process.env.EMAIL_PASSWORD, // App password
       },
       logger: true,
-      debug: true, // Enable debug logs in terminal
+      debug: true,
     });
 
+    // ✅ Email HTML template
     const htmlContent = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eaeaea; border-radius: 8px;">
-      <header style="text-align: center; padding: 20px; background-color: #007bff; color: white; border-radius: 8px 8px 0 0;">
-        <h1 style="margin: 0; font-size: 24px;">SkillNaav</h1>
-        <p style="margin: 5px 0; font-size: 16px;">Your Gateway to Opportunities</p>
-      </header>
-      <div style="padding: 20px; color: #333;">
-        <h3 style="color: #007bff;">Dear User,</h3>
-        <p style="font-size: 16px; line-height: 1.5;">${message}</p>
-        <p style="font-size: 16px; line-height: 1.5;">For more information, please visit us at 
-          <a href="https://www.skillnaav.com" style="color: #007bff; text-decoration: none;">SkillNaav</a>.
-        </p>
-        <p style="font-size: 16px; line-height: 1.5;">
-          If you have any questions, feel free to reach out to our support team at 
-          <a href="mailto:support@skillnaav.com" style="color: #007bff; text-decoration: none;">support@skillnaav.com</a>.
-        </p>
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eaeaea; border-radius: 8px;">
+        <header style="text-align: center; padding: 20px; background-color: #007bff; color: white; border-radius: 8px 8px 0 0;">
+          <h1 style="margin: 0;">SkillNaav</h1>
+          <p>Your Gateway to Opportunities</p>
+        </header>
+        <div style="padding: 20px; color: #333;">
+          ${bodyText}
+          <p>For more information, visit <a href="https://www.skillnaav.com" style="color:#007bff;">SkillNaav</a>.</p>
+          <p>If you have any questions, contact <a href="mailto:support@skillnaav.com" style="color:#007bff;">support@skillnaav.com</a>.</p>
+        </div>
+        <footer style="text-align: center; padding: 10px; background: #f8f9fa; color: #555; border-radius: 0 0 8px 8px;">
+          <p>Thank you for being a part of SkillNaav.</p>
+          <p>Best Regards,<br>The SkillNaav Team</p>
+        </footer>
       </div>
-      <footer style="text-align: center; padding: 10px; background-color: #f8f9fa; color: #555; border-radius: 0 0 8px 8px;">
-        <p style="font-size: 14px; margin: 5px 0;">Thank you for being a part of SkillNaav.</p>
-        <p style="font-size: 14px; margin: 5px 0;">Best Regards,<br>The SkillNaav Team</p>
-      </footer>
-    </div>`;
+    `;
 
     const mailOptions = {
       from: `"SkillNaav Support" <${process.env.EMAIL_USER}>`,
       to: email,
       subject,
+      text: bodyText.replace(/<[^>]+>/g, ""), // plain-text fallback
       html: htmlContent,
-      text: message, // plain-text fallback for deliverability
       attachments,
     };
 
     console.log("📧 Sending email to:", email);
-    if (attachments?.length) {
-      console.log("📎 Email contains attachments:", attachments.map(a => a.filename));
-    }
 
     const result = await transporter.sendMail(mailOptions);
     console.log("✅ Email sent successfully:", result.response);
+    return result;
   } catch (error) {
     console.error("❌ Failed to send email:");
     console.error("👉 Error message:", error.message);
     console.error("👉 Full error:", error);
-    console.error("👉 Email info:", {
-      to: email,
-      from: process.env.EMAIL_USER,
-      subject,
-      attachmentsSummary: attachments.map(a => a.filename),
-    });
+    return null; // don’t crash caller
   }
 };
 

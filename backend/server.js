@@ -70,6 +70,8 @@ const schoolAdminLoginSessionRoutes = require("./routes/webapp-routes/schoolAdmi
 // NEW: Import Stipend Details Routes
 const stipendDetailsRoutes = require("./routes/webapp-routes/stipendDetailsRoutes");
 
+// const recommendationRoutes = require("./routes/webapp-routes/RecommendationRoutes");
+
 
 
 app.use("/api/upload", uploadRoutes);
@@ -114,6 +116,7 @@ app.use("/api/sessions", schoolAdminLoginSessionRoutes);
 // NEW: Add Stipend Details Routes
 app.use('/api/internship/stipend-details', stipendDetailsRoutes);
 
+// app.use("/api/recommendations", recommendationRoutes);
 // New route for skill gap analysis
 app.post("/analyze-skills", async (req, res) => {
   console.log("Received request:", req.body);

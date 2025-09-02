@@ -36,6 +36,9 @@ router.get("/check-applied/:studentId/:internshipId", checkIfApplied);
 
 router.get('/counts', applicationController.getApplicationsCountForInternships);
 
+router.put('/applications/:applicationId/status', applicationController.updateApplicationStatus);
+
+
 
 
 module.exports = router;

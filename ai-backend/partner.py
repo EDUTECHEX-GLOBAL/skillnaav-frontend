@@ -10,7 +10,7 @@ import asyncio
 import tempfile
 import docx2txt
 
-from fastapi import FastAPI, Form, HTTPException, Query, status, Request, Path
+from fastapi import FastAPI, Form, HTTPException, Query, status, Request, Path, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
 from datetime import datetime
@@ -19,6 +19,8 @@ from pymongo import MongoClient
 from bson import ObjectId
 from bson.errors import InvalidId
 from sentence_transformers import SentenceTransformer, util
+import requests
+import httpx
 
 # === Utility ===
 def now():
@@ -166,19 +168,63 @@ async def log_requests(request: Request, call_next):
     print(f"[{now()}] 🔚 Response status: {response.status_code}")
     return response
 
-# === Routes ===
+
+# --- Helper function ---
+async def notify_rejection(app_doc):
+    student_id = str(app_doc.get("studentId"))
+    job_title = app_doc.get("jobTitle", "the internship")
+    student_email = app_doc.get("userEmail") or app_doc.get("studentEmail")
+
+    if not student_email:
+        print(f"[{now()}] ⚠️ No email found for studentId: {student_id}")
+        return
+    
+    async with httpx.AsyncClient(timeout=10) as client:
+        try:
+            # Update status
+            await client.put(
+                f"http://localhost:5000/api/applications/{app_doc['_id']}/status",
+                json={"status": "Rejected"}
+            )
+
+            # Trigger notification + email
+            notif_payload = {
+                "studentId": student_id,
+                "email": student_email,
+                "title": "Application Rejected",
+                "message": f"Unfortunately, your application for {job_title} was rejected. "
+                           f"But don’t worry—we recommend exploring new opportunities.",
+                "link": "/student-dashboard/recommendations"
+            }
+
+            resp = await client.post(
+                "http://localhost:5000/api/notifications",
+                json=notif_payload
+            )
+
+            if resp.status_code in (200, 201):
+                print(f"[{now()}] ✅ Notification + email triggered for student {student_id} ({student_email})")
+            else:
+                print(f"[{now()}] ❌ Node API returned {resp.status_code} for student {student_id}: {resp.text}")
+
+        except Exception as e:
+            print(f"[{now()}] ❌ Failed notification/email trigger for {student_id}: {e}")
+
 @app.post("/partner/shortlist")
 async def shortlist_candidates(
     internship_id: str = Form(...),
     job_description: str = Form(...),
     job_skills: str = Form(...),
-    resumes: list[str] = Form(...)
+    resumes: list[str] = Form(...),
+    background_tasks: BackgroundTasks = None
 ):
+    # Validate internship_id
     try:
         internship_obj_id = ObjectId(internship_id)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid internship_id: {e}")
 
+    # Parse job skills
     try:
         job_skills_list = json.loads(job_skills)
     except Exception:
@@ -187,13 +233,16 @@ async def shortlist_candidates(
     if not resumes:
         raise HTTPException(status_code=400, detail="No resumes provided.")
 
+    # Generate job embedding
     job_text = job_description + " " + " ".join(job_skills_list)
     job_embedding = embedder.encode(job_text, convert_to_tensor=True)
 
+    # Process all resumes
     tasks = [process_resume(url, job_embedding) for url in resumes]
     results = await asyncio.gather(*tasks)
     candidates = [c for c in results if c and c['similarity_score'] >= 0.3]
 
+    # Attach metadata
     for cand in candidates:
         cand['internship_id'] = internship_obj_id
         if cand.get("school_admin_id") and ObjectId.is_valid(str(cand['school_admin_id'])):
@@ -204,7 +253,29 @@ async def shortlist_candidates(
     if candidates:
         shortlist_collection.insert_many(candidates)
 
+        shortlisted_resume_urls = [c['resumeUrl'] for c in candidates]
+        all_applications = list(applications_collection.find({"internshipId": internship_obj_id}))
+        all_resume_urls = [app['resumeUrl'] for app in all_applications]
+        rejected_resume_urls = list(set(all_resume_urls) - set(shortlisted_resume_urls))
+
+        # Update DB statuses
+        applications_collection.update_many(
+            {"resumeUrl": {"$in": shortlisted_resume_urls}},
+            {"$set": {"status": "Shortlisted"}}
+        )
+        applications_collection.update_many(
+            {"resumeUrl": {"$in": rejected_resume_urls}},
+            {"$set": {"status": "Rejected"}}
+        )
+
+        # Trigger notifications + email in background
+        for resume_url in rejected_resume_urls:
+            app_doc = applications_collection.find_one({"resumeUrl": resume_url})
+            if app_doc:
+                background_tasks.add_task(notify_rejection, app_doc)
+
     return {"shortlisted_candidates": convert_object_ids(candidates)}
+
 
 @app.get("/partner/shortlisted/by-admin")
 async def get_shortlisted_by_admin(

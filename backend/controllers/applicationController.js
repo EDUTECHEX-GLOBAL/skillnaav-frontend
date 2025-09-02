@@ -2,6 +2,8 @@ const Application = require("../models/webapp-models/applicationModel"); // Impo
 const mongoose = require("mongoose");
 const Userwebapp = require("../models/webapp-models/userModel");  // Ensure correct import path
 const InternshipPosting = require("../models/webapp-models/internshipPostModel.js"); 
+const { sendNotification } = require("../utils/Notification.js");
+const notifyUser = require("../utils/notifyUser.js");
 const multer = require("multer"); // Multer for file uploads
 const path = require("path");
 const fs = require("fs");
@@ -266,6 +268,104 @@ const getApplicationsCountForInternships = async (req, res) => {
   }
 };
 
+const updateApplicationStatus = async (req, res) => {
+  const { applicationId } = req.params;
+  const { status } = req.body;
+
+  if (!["Accepted", "Rejected"].includes(status)) {
+    return res.status(400).json({ error: "Status must be 'Accepted' or 'Rejected'" });
+  }
+
+  try {
+    // ✅ Update application status
+    const application = await Application.findByIdAndUpdate(
+      applicationId,
+      { status },
+      { new: true }
+    );
+
+    if (!application) {
+      return res.status(404).json({ error: "Application not found" });
+    }
+
+    // ✅ Fetch student details
+    let student = await Userwebapp.findById(application.studentId).lean();
+    if (!student) {
+      student = {
+        name: application.userName || "Student",
+        email: application.userEmail || null,
+      };
+    }
+
+    if (!student.email) {
+      console.warn(`⚠️ No email found for studentId: ${application.studentId}`);
+    }
+
+    // 👉 Handle rejection
+    if (status === "Rejected") {
+      // 1️⃣ Save in-app notification
+      try {
+        await sendNotification({
+          studentId: application.studentId,
+          title: "Application Rejected",
+          message: `Unfortunately, your application for ${application.jobTitle} was rejected.`,
+          link: "/student-dashboard/recommendations",
+        });
+        console.log(`✅ Notification saved for studentId: ${application.studentId}`);
+      } catch (err) {
+        console.error("❌ Failed to save notification:", err.message);
+      }
+
+      // 2️⃣ Prepare recommended internships
+      let recommendationsHtml = "<p>No recommendations available at the moment.</p>";
+      try {
+        const recommendations = await InternshipPosting.find({ applicationOpen: true })
+          .limit(3)
+          .lean();
+
+        if (recommendations.length > 0) {
+          recommendationsHtml = `<ul>${recommendations
+            .map(
+              (job) =>
+                `<li><b>${job.jobTitle}</b> at ${job.companyName || "Company"} – <a href="https://yourdomain.com/internship/${job._id}">Apply Now</a></li>`
+            )
+            .join("")}</ul>`;
+        }
+      } catch (err) {
+        console.error("❌ Failed to fetch recommendations:", err.message);
+      }
+
+      // 3️⃣ Send rejection email
+      if (student.email) {
+        try {
+          const mailResult = await notifyUser(
+            student.email,
+            "Application Rejected - Explore New Opportunities",
+            `<p>Hi ${student.name},</p>
+             <p>We regret to inform you that your application for <b>${application.jobTitle}</b> has been rejected.</p>
+             <p>But don’t worry! Here are some recommended internships for you:</p>
+             ${recommendationsHtml}
+             <p><a href="https://yourdomain.com/student-dashboard/recommendations">View All Recommendations</a></p>`
+          );
+          console.log("✅ Email sent successfully:", mailResult);
+        } catch (err) {
+          console.error("❌ Failed to send email:", err.message);
+        }
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Application status updated to ${status}`,
+      application,
+    });
+  } catch (err) {
+    console.error("❌ Error in updateApplicationStatus:", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+};
+
+
 module.exports = {
   applyForInternship,
   getApplicationsForInternship,
@@ -275,4 +375,5 @@ module.exports = {
   upgradeToPremium,
   getApplicationCount,
   getApplicationsCountForInternships,
+  updateApplicationStatus,
 };

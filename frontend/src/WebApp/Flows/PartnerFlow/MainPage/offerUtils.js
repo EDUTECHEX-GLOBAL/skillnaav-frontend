@@ -47,20 +47,21 @@ export const checkOfferStatus = async (studentId, internshipId) => {
 
 export const getOfferStatusText = (status) => {
   switch (status) {
-    case 'Sent': return 'Offer Sent';
-    case 'Accepted': return 'Accepted';
-    case 'Rejected': return 'Rejected';
-    case 'Not Sent': return 'Not Sent';
-    default: return status || 'Not Sent';
+    // NBSP ensures the two words don't wrap
+    case 'Sent':      return 'Offer\u00A0Sent';
+    case 'Accepted':  return 'Accepted';
+    case 'Rejected':  return 'Rejected';
+    case 'Not Sent':  return 'Not\u00A0Sent';
+    default:          return status || 'Not\u00A0Sent';
   }
 };
 
 export const getOfferStatusColor = (status) => {
   switch (status) {
-    case 'Sent': return 'bg-yellow-100 text-yellow-800';
-    case 'Accepted': return 'bg-green-100 text-green-800';
-    case 'Rejected': return 'bg-red-100 text-red-800';
-    case 'Not Sent': return 'bg-gray-100 text-gray-800';
-    default: return 'bg-gray-100 text-gray-800';
+    case 'Sent':      return 'bg-yellow-100 text-yellow-800 whitespace-nowrap';
+    case 'Accepted':  return 'bg-green-100 text-green-800 whitespace-nowrap';
+    case 'Rejected':  return 'bg-red-100 text-red-800 whitespace-nowrap';
+    case 'Not Sent':  return 'bg-gray-100 text-gray-800 whitespace-nowrap';
+    default:          return 'bg-gray-100 text-gray-800 whitespace-nowrap';
   }
 };
