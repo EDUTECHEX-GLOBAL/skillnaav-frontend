@@ -3,7 +3,7 @@ name: Deploy to Server
 on:
   push:
     branches:
-      - feature/offersent # Adjust the branch as necessary
+      - feature/notifications # Adjust the branch as necessary
 
 jobs:
   deploy:
@@ -22,5 +22,5 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@www.skillnaav.com << 'EOF'
             cd /home/ubuntu/
-            ./deploy.sh feature/offersent # Pass the branch name directly
+            ./deploy.sh feature/notifications # Pass the branch name directly
           EOF

@@ -4,13 +4,13 @@ const router = express.Router();
 
 router.post("/", async (req, res) => {
   try {
-    const { message, partnerId } = req.body;
+    const { message, partnerId, featureIndex } = req.body;
 
     if (!message || !partnerId) {
       return res.status(400).json({ error: "Message and partnerId are required" });
     }
 
-    const reply = await askMistral(message, partnerId);
+    const reply = await askMistral(message, partnerId, featureIndex);
     res.json({ reply });
   } catch (err) {
     console.error("Chatbot error:", err);

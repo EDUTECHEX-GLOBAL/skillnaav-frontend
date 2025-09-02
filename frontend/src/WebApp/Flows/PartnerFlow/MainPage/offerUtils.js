@@ -58,10 +58,10 @@ export const getOfferStatusText = (status) => {
 
 export const getOfferStatusColor = (status) => {
   switch (status) {
-    case 'Sent':      return 'bg-yellow-100 text-yellow-800 whitespace-nowrap';
-    case 'Accepted':  return 'bg-green-100 text-green-800 whitespace-nowrap';
-    case 'Rejected':  return 'bg-red-100 text-red-800 whitespace-nowrap';
-    case 'Not Sent':  return 'bg-gray-100 text-gray-800 whitespace-nowrap';
-    default:          return 'bg-gray-100 text-gray-800 whitespace-nowrap';
+    case 'Sent':      return 'bg-yellow-200 text-yellow-800 whitespace-nowrap';
+    case 'Accepted':  return 'bg-green-200 text-green-800 whitespace-nowrap';
+    case 'Rejected':  return 'bg-red-200 text-red-800 whitespace-nowrap';
+    case 'Not Sent':  return 'bg-gray-200 text-gray-800 whitespace-nowrap';
+    default:          return 'bg-gray-200 text-gray-800 whitespace-nowrap';
   }
 };

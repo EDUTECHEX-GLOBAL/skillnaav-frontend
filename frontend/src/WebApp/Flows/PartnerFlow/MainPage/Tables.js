@@ -7,8 +7,8 @@ import Modal from "./Modal";
 import { checkOfferStatus, checkOfferStatuses, getOfferStatusText, getOfferStatusColor } from "./offerUtils";
 
 export const ApplicationsTable = ({ applications, onStatusUpdate }) => (
-  <div className="overflow-x-auto">
-    <table className="min-w-full table-auto font-poppins text-sm">
+  <div className="h-[60vh] overflow-auto -mr-6 pr-6 bg-white">
+    <table className="min-w-full table-auto font-poppins text-sm bg-white">
       <thead>
         <tr className="bg-gray-100 text-gray-600 uppercase text-xs leading-normal">
           <th className="px-6 py-3 text-left">Name</th>
@@ -66,35 +66,35 @@ export const ShortlistedTable = ({ candidates, internshipId, onSendOffer }) => {
   useEffect(() => {
     const fetchOfferStatuses = async () => {
       if (!candidates.length) return;
-      
+
       setIsLoadingAll(true);
-      
+
       try {
         // Get all valid student IDs
         const studentIds = candidates
           .filter(student => student.student_id)
           .map(student => student.student_id);
-        
+
         if (studentIds.length === 0) {
           setIsLoadingAll(false);
           return;
         }
-        
+
         // Set loading state for all students
         const loadingStates = {};
         studentIds.forEach(id => {
           loadingStates[id] = true;
         });
         setLoadingStatuses(loadingStates);
-        
+
         // Make single batch API call
         const statusMap = await checkOfferStatuses(studentIds, internshipId);
-        
+
         setOfferStatuses(statusMap);
-        
+
         // Clear loading states
         setLoadingStatuses({});
-        
+
       } catch (error) {
         console.error('Error fetching offer statuses:', error);
         // Fallback: try individual calls if batch fails
@@ -108,21 +108,21 @@ export const ShortlistedTable = ({ candidates, internshipId, onSendOffer }) => {
     const fetchIndividualStatuses = async () => {
       const statuses = {};
       const loading = {};
-      
+
       for (const student of candidates) {
         if (student.student_id) {
           loading[student.student_id] = true;
           setLoadingStatuses(prev => ({ ...prev, [student.student_id]: true }));
-          
+
           statuses[student.student_id] = await checkOfferStatus(student.student_id, internshipId);
-          
+
           loading[student.student_id] = false;
           setLoadingStatuses(prev => ({ ...prev, [student.student_id]: false }));
-          
+
           // Update statuses incrementally for better UX
-          setOfferStatuses(prev => ({ 
-            ...prev, 
-            [student.student_id]: statuses[student.student_id] 
+          setOfferStatuses(prev => ({
+            ...prev,
+            [student.student_id]: statuses[student.student_id]
           }));
         }
       }
@@ -165,32 +165,32 @@ export const ShortlistedTable = ({ candidates, internshipId, onSendOffer }) => {
           <span className="ml-3 text-gray-600">Loading offer statuses...</span>
         </div>
       )}
-      
-      <div className="overflow-x-auto">
-        <table className="min-w-full font-poppins text-sm bg-white shadow-md rounded-lg overflow-hidden">
-          <thead className="bg-gray-100 text-gray-600 uppercase text-xs">
+
+      <div className="h-[80vh] overflow-auto -mr-6 pr-6 bg-white">
+        <table className="min-w-full font-poppins text-sm bg-white">
+          <thead className="bg-gray-100 text-gray-600 uppercase text-xs sticky top-0 z-20">
             <tr>
-              <th className="px-6 py-3 text-left">Name</th>
-              <th className="px-6 py-3 text-left">Email</th>
-              <th className="px-6 py-3 text-left">Resume</th>
-              <th className="px-6 py-3 text-left">Offer Status</th>
-              <th className="px-6 py-3 text-left">Actions</th>
+              <th className="px-6 py-3 text-center bg-gray-100">Name</th>
+              <th className="px-6 py-3 text-center bg-gray-100">Email</th>
+              <th className="px-6 py-3 text-center bg-gray-100">Resume</th>
+              <th className="px-6 py-3 text-center bg-gray-100">Offer Status</th>
+              <th className="px-6 py-3 text-center bg-gray-100">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
+          <tbody className="divide-y divide-gray-200 text-center">
             {uniqueCandidates.map((student) => {
-              const status = offerStatuses[student.student_id] || 'Not Sent';
+              const status = offerStatuses[student.student_id] || "Not Sent";
               const isLoading = loadingStatuses[student.student_id];
-              
+
               return (
                 <tr key={student.student_id} className="hover:bg-gray-50 transition">
                   <td className="px-6 py-4">{student.name || "N/A"}</td>
                   <td className="px-6 py-4">{student.email || "N/A"}</td>
                   <td className="px-6 py-4">
-                    <a 
-                      href={student.resumeUrl} 
-                      target="_blank" 
-                      rel="noopener noreferrer" 
+                    <a
+                      href={student.resumeUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="text-blue-600 hover:underline"
                     >
                       View Resume
@@ -198,12 +198,16 @@ export const ShortlistedTable = ({ candidates, internshipId, onSendOffer }) => {
                   </td>
                   <td className="px-6 py-4">
                     {isLoading ? (
-                      <div className="flex items-center">
+                      <div className="flex justify-center items-center">
                         <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-blue-500 mr-2"></div>
                         <span className="text-xs text-gray-500">Checking...</span>
                       </div>
                     ) : (
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getOfferStatusColor(status)}`}>
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-medium ${getOfferStatusColor(
+                          status
+                        )}`}
+                      >
                         {getOfferStatusText(status)}
                       </span>
                     )}
@@ -211,7 +215,7 @@ export const ShortlistedTable = ({ candidates, internshipId, onSendOffer }) => {
                   <td className="px-6 py-4 space-x-2">
                     {isLoading ? (
                       <span className="text-gray-500">Loading...</span>
-                    ) : status === 'Not Sent' ? (
+                    ) : status === "Not Sent" ? (
                       <button
                         onClick={() => handleSendOfferClick(student)}
                         className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"

@@ -64,11 +64,10 @@ const Sidebar = ({ isSidebarOpen, setSidebarOpen }) => {
               <li key={key}>
                 <button
                   onClick={() => clickTab(key)}
-                  className={`flex items-center w-full p-2 rounded-lg text-left font-medium ${
-                    tab === key
+                  className={`flex items-center w-full p-2 rounded-lg text-left font-medium ${tab === key
                       ? "bg-blue-100 text-blue-600"
                       : "text-gray-700 hover:bg-gray-100"
-                  }`}
+                    }`}
                 >
                   <FontAwesomeIcon icon={icon} className="w-5 h-5 mr-3" />
                   {label}
@@ -96,11 +95,10 @@ const Sidebar = ({ isSidebarOpen, setSidebarOpen }) => {
                   <li>
                     <button
                       onClick={() => clickTab("partner-accounts")}
-                      className={`flex items-center w-full p-2 rounded-lg font-medium ${
-                        tab === "partner-accounts"
+                      className={`flex items-center w-full p-2 rounded-lg font-medium ${tab === "partner-accounts"
                           ? "bg-blue-100 text-blue-600"
                           : "text-gray-700 hover:bg-gray-100"
-                      }`}
+                        }`}
                     >
                       <FontAwesomeIcon icon={faBuilding} className="w-4 h-4 mr-2" />
                       Partner Accounts
@@ -109,11 +107,10 @@ const Sidebar = ({ isSidebarOpen, setSidebarOpen }) => {
                   <li>
                     <button
                       onClick={() => clickTab("internship-posts")}
-                      className={`flex items-center w-full p-2 rounded-lg font-medium ${
-                        tab === "internship-posts"
+                      className={`flex items-center w-full p-2 rounded-lg font-medium ${tab === "internship-posts"
                           ? "bg-blue-100 text-blue-600"
                           : "text-gray-700 hover:bg-gray-100"
-                      }`}
+                        }`}
                     >
                       <FontAwesomeIcon icon={faBriefcase} className="w-4 h-4 mr-2" />
                       Internship Posts
@@ -143,11 +140,10 @@ const Sidebar = ({ isSidebarOpen, setSidebarOpen }) => {
                   <li>
                     <button
                       onClick={() => clickTab("internship-payments")}
-                      className={`flex items-center w-full p-2 rounded-lg font-medium ${
-                        tab === "internship-payments"
+                      className={`flex items-center w-full p-2 rounded-lg font-medium ${tab === "internship-payments"
                           ? "bg-blue-100 text-blue-600"
                           : "text-gray-700 hover:bg-gray-100"
-                      }`}
+                        }`}
                     >
                       Internship Payments
                     </button>
@@ -155,11 +151,10 @@ const Sidebar = ({ isSidebarOpen, setSidebarOpen }) => {
                   <li>
                     <button
                       onClick={() => clickTab("partner-payments")}
-                      className={`flex items-center w-full p-2 rounded-lg font-medium ${
-                        tab === "partner-payments"
+                      className={`flex items-center w-full p-2 rounded-lg font-medium ${tab === "partner-payments"
                           ? "bg-blue-100 text-blue-600"
                           : "text-gray-700 hover:bg-gray-100"
-                      }`}
+                        }`}
                     >
                       Partner Payments
                     </button>
@@ -173,11 +168,10 @@ const Sidebar = ({ isSidebarOpen, setSidebarOpen }) => {
               <li key={key}>
                 <button
                   onClick={() => clickTab(key)}
-                  className={`flex items-center w-full p-2 rounded-lg text-left font-medium ${
-                    tab === key
+                  className={`flex items-center w-full p-2 rounded-lg text-left font-medium ${tab === key
                       ? "bg-blue-100 text-blue-600"
                       : "text-gray-700 hover:bg-gray-100"
-                  }`}
+                    }`}
                 >
                   <FontAwesomeIcon icon={icon} className="w-5 h-5 mr-3" />
                   {label}

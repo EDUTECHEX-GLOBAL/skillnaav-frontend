@@ -3,7 +3,7 @@ import axios from "axios";
 import { FiMessageCircle, FiX } from "react-icons/fi";
 import ReactMarkdown from "react-markdown";
 
-const Chatbot = () => {
+const Chatbot = ({ featureIndex = [] }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -17,31 +17,33 @@ const Chatbot = () => {
   }, [messages]);
 
   const sendMessage = async () => {
-    if (!input.trim()) return;
+  const text = input.trim();
+  if (!text) return;
 
-    const userMessage = { sender: "user", text: input };
-    setMessages((prev) => [...prev, userMessage]);
+  // Add the user message and clear the input RIGHT AWAY
+  const userMessage = { sender: "user", text };
+  setMessages((prev) => [...prev, userMessage]);
+  setInput("");
 
-    try {
-      const partnerId = localStorage.getItem("partnerId");
+  try {
+    const partnerId = localStorage.getItem("partnerId");
 
-      const res = await axios.post("/api/chatbot", {
-        message: input,
-        partnerId,
-      });
+    const res = await axios.post("/api/chatbot", {
+      message: text,          // use the captured text
+      partnerId,
+      featureIndex,           // keep passing your sidebar features
+    });
 
-      const botMessage = { sender: "bot", text: res.data.reply };
-      setMessages((prev) => [...prev, botMessage]);
-    } catch (err) {
-      const errorMessage = {
-        sender: "bot",
-        text: "Something went wrong. Try again.",
-      };
-      setMessages((prev) => [...prev, errorMessage]);
-    }
-
-    setInput("");
-  };
+    const botMessage = { sender: "bot", text: res.data.reply };
+    setMessages((prev) => [...prev, botMessage]);
+  } catch (err) {
+    const errorMessage = {
+      sender: "bot",
+      text: "Something went wrong. Try again.",
+    };
+    setMessages((prev) => [...prev, errorMessage]);
+  }
+};
 
   return (
     <div className="fixed bottom-6 right-6 z-50">

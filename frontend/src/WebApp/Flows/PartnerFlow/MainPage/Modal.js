@@ -12,9 +12,9 @@ const Modal = ({ isOpen, onClose, title, children, isLoading }) => {
       {/* backdrop */}
       <div className="absolute inset-0 bg-black opacity-50" onClick={onClose} />
 
-      <div className="relative bg-white rounded-lg shadow-lg max-w-3xl w-full mx-4">
+      <div className="relative bg-white rounded-2xl shadow-lg max-w-5xl w-full mx-4 max-h-[95vh] flex flex-col overflow-hidden">
         {/* Sticky header */}
-        <div className="sticky top-0 bg-white flex items-center justify-between px-6 py-4 border-b z-10">
+        <div className="sticky top-0 bg-white flex items-center justify-between px-6 py-4 border-b z-10 rounded-t-2xl">
           <button
             onClick={onClose}
             className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
@@ -32,7 +32,7 @@ const Modal = ({ isOpen, onClose, title, children, isLoading }) => {
         </div>
 
         {/* Scrollable body */}
-        <div className="px-6 py-4 max-h-[70vh] overflow-y-auto">
+        <div className="px-6 py-4 flex-1 overflow-y-auto rounded-b-2xl">
           {isLoading ? (
             <div className="flex justify-center items-center h-32">
               <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500" />
