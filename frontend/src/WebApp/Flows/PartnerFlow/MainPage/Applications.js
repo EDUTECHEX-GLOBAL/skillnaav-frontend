@@ -11,12 +11,14 @@ import {
   faLock,
   faCrown,
   faTimes,
+  faCalendarAlt,
 } from "@fortawesome/free-solid-svg-icons";
 import Modal from "./Modal";
 import ScheduleForm from "./ScheduleForm";
 import { ApplicationsTable, ShortlistedTable } from "./Tables";
 import { toast } from "react-toastify";
 import ConfirmCloseSchedule from "./ConfirmCloseSchedule";
+import InternshipScheduleViewer from "./InternshipScheduleViewer";
 
 const SHORTLIST_API_BASE_URL = process.env.REACT_APP_SHORTLIST_API_BASE_URL || "http://localhost:8001";
 
@@ -46,6 +48,8 @@ const InternshipList = () => {
   const [scheduleFormOpen, setScheduleFormOpen] = useState(false);
   const [selectedInternshipForSchedule, setSelectedInternshipForSchedule] = useState(null);
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
+  const [scheduleViewerOpen, setScheduleViewerOpen] = useState(false);
+  const [selectedInternshipForView, setSelectedInternshipForView] = useState(null);
   const partnerId = localStorage.getItem("partnerId");
 
   useEffect(() => {
@@ -287,67 +291,66 @@ const InternshipList = () => {
   };
 
   const handleSendOfferLetter = async () => {
-  if (!templateId || !joiningDate) {
-    toast.warn("Template and joining date are required.");
-    return;
-  }
+    if (!templateId || !joiningDate) {
+      toast.warn("Template and joining date are required.");
+      return;
+    }
 
-  try {
-    setSendingOffer(true);
+    try {
+      setSendingOffer(true);
 
-    const internship = internships.find(i => i._id === selectedStudent?.internship_id);
-    const schoolAdminId = localStorage.getItem("schoolAdminId");
+      const internship = internships.find(i => i._id === selectedStudent?.internship_id);
+      const schoolAdminId = localStorage.getItem("schoolAdminId");
 
-    // Build the payload object clearly
-    const payload = {
-      partnerId: partnerData?._id,
-      student_id: selectedStudent?._id, // ✅ Make sure this is included
-      internshipId: internship?._id,
-      templateId,
-      name: selectedStudent?.name,
-      email: selectedStudent?.email,
-      position: internship?.jobTitle,
-      company: internship?.companyName,
-      location: internship?.location,
-      duration: internship?.endDateOrDuration,
-      startDate: joiningDate,
-      internshipType: internship?.internshipType,
-      compensationDetails: internship?.compensationDetails,
-      jobDescription: internship?.jobDescription,
-      qualifications: Array.isArray(internship?.qualifications)
-        ? internship.qualifications
-        : (typeof internship?.qualifications === 'string'
-          ? internship.qualifications.match(/[A-Z]?[a-z]+/g)
-          : []),
-      contactInfo: {
-        name: "HR Manager",
-        email: "hr@company.com",
-        phone: "9876543210",
-      },
-      noticePeriod: "2 weeks",
-      schoolAdminId: schoolAdminId || null,
-    };
+      // Build the payload object clearly
+      const payload = {
+        partnerId: partnerData?._id,
+        student_id: selectedStudent?._id, // ✅ Make sure this is included
+        internshipId: internship?._id,
+        templateId,
+        name: selectedStudent?.name,
+        email: selectedStudent?.email,
+        position: internship?.jobTitle,
+        company: internship?.companyName,
+        location: internship?.location,
+        duration: internship?.endDateOrDuration,
+        startDate: joiningDate,
+        internshipType: internship?.internshipType,
+        compensationDetails: internship?.compensationDetails,
+        jobDescription: internship?.jobDescription,
+        qualifications: Array.isArray(internship?.qualifications)
+          ? internship.qualifications
+          : (typeof internship?.qualifications === 'string'
+            ? internship.qualifications.match(/[A-Z]?[a-z]+/g)
+            : []),
+        contactInfo: {
+          name: "HR Manager",
+          email: "hr@company.com",
+          phone: "9876543210",
+        },
+        noticePeriod: "2 weeks",
+        schoolAdminId: schoolAdminId || null,
+      };
 
-    // Debug log before sending
-    console.log("Sending Offer Payload:", payload);
+      // Debug log before sending
+      console.log("Sending Offer Payload:", payload);
 
-    // POST the offer letter
-    await axios.post(`/api/offer-letters`, payload, {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
-    });
+      // POST the offer letter
+      await axios.post(`/api/offer-letters`, payload, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
 
-    toast.success("Offer sent successfully!");
-    setSelectedStudent(null);
-  } catch (err) {
-    console.error("Offer letter error:", err);
-    toast.error(err.response?.data?.error || "Failed to send offer letter");
-  } finally {
-    setSendingOffer(false);
-  }
-};
-
+      toast.success("Offer sent successfully!");
+      setSelectedStudent(null);
+    } catch (err) {
+      console.error("Offer letter error:", err);
+      toast.error(err.response?.data?.error || "Failed to send offer letter");
+    } finally {
+      setSendingOffer(false);
+    }
+  };
 
   const handleSchedule = (internshipId) => {
     if (!hasFullPremiumAccess()) {
@@ -356,6 +359,16 @@ const InternshipList = () => {
     }
     setSelectedInternshipForSchedule(internshipId);
     setScheduleFormOpen(true);
+  };
+
+  // 🔹 Open "View Schedule" (Partner can view schedule for an internship)
+  const openScheduleViewer = (internshipId) => {
+    if (!hasPremiumAccess()) {
+      toast.error("Please upgrade to Premium Basic or higher to view schedules");
+      return;
+    }
+    setSelectedInternshipForView(internshipId);
+    setScheduleViewerOpen(true);
   };
 
   // 🔹 Permanently close an internship schedule
@@ -657,8 +670,20 @@ const InternshipList = () => {
                       onClick={() => handleSchedule(internship._id)}
                       className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-white font-semibold rounded-lg shadow-lg hover:from-yellow-500 hover:to-orange-600 transform hover:scale-105 transition duration-200"
                     >
-                      <FontAwesomeIcon icon={faClock} /> Schedule
+                      <FontAwesomeIcon icon={faClock} /> Internship Schedule
                     </button>
+
+                    {/* View Schedule - Available for Premium Basic and Premium Plus */}
+                    {hasPremiumAccess() ? (
+                      <button
+                        onClick={() => openScheduleViewer(internship._id)}
+                        className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-cyan-500 to-sky-600 text-white font-semibold rounded-lg shadow-lg hover:from-cyan-600 hover:to-sky-700 transform hover:scale-105 transition duration-200"
+                      >
+                        <FontAwesomeIcon icon={faCalendarAlt} /> View Schedule
+                      </button>
+                    ) : (
+                      showPremiumLock("View Schedule", "Premium Basic")
+                    )}
 
                     {/* Close Schedule */}
                     <button
@@ -722,6 +747,18 @@ const InternshipList = () => {
         onCancel={() => setConfirmCloseOpen(false)}
         onConfirm={() => handleConfirmClose(confirmCloseOpen)}
       />
+
+      {/* 🔹 View Schedule Modal */}
+      <InternshipScheduleViewer
+        isOpen={scheduleViewerOpen}
+        onClose={() => {
+          setScheduleViewerOpen(false);
+          setSelectedInternshipForView(null);
+        }}
+        internshipId={selectedInternshipForView}
+        partnerId={partnerData?._id || localStorage.getItem("partnerId")}
+      />
+
     </div>
   );
 };

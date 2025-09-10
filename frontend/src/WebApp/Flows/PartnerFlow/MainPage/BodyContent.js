@@ -9,6 +9,7 @@ import PostAJob from "./PostAJob";
 import PartnerPremiumPage from "./PartnerPremiumPage"; // Import the PartnerPremiumPage component
 import OfferTemplateManager from "./OfferTemplateManager"; // Import the OfferTemplateManager component
 import StipendDetails from "./StipendDetails"; // Import the StipendDetails component
+import InstructureManagement from "./InstructureManagement";
 
 const BodyContent = () => {
   const { selectedTab } = useTabContext();
@@ -18,6 +19,9 @@ const BodyContent = () => {
   switch (selectedTab) {
     case "your-job-posts":
       content = <YourJobPosts />;
+      break;
+    case "instructors":
+      content = <InstructureManagement />;
       break;
     case "post-a-job":
       content = <PostAJob />;
@@ -34,12 +38,12 @@ const BodyContent = () => {
     case "support":
       content = <Support />;
       break;
-      case "upgrade":
-  content = <PartnerPremiumPage />;
-  break;
-  case "offer-templates":
-  content = <OfferTemplateManager />;
-  break;
+    case "upgrade":
+      content = <PartnerPremiumPage />;
+      break;
+    case "offer-templates":
+      content = <OfferTemplateManager />;
+      break;
     case "stipend-details":
       content = <StipendDetails />; // Render the StipendDetails component
       break;

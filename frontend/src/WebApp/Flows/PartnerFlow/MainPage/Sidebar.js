@@ -9,6 +9,7 @@ import {
   faSignOutAlt,
   faFileAlt,
   faMoneyBillWave, // ✅ New Icon for Stipend
+  faUsers,        // ✅ New Icon for Instructors
 } from "@fortawesome/free-solid-svg-icons";
 import { useTabContext } from "./UserHomePageContext/HomePageContext";
 import { useNavigate } from "react-router-dom";
@@ -35,6 +36,7 @@ const Sidebar = ({ isOpen, onClose }) => {
     { id: "post-a-job", label: "Post An Internship", icon: faPlus },
     { id: "messages", label: "Messages", icon: faEnvelope },
     { id: "applications", label: "Applications", icon: faFileAlt },
+    { id: "instructors", label: "Instructor Management", icon: faUsers }, // ✅ NEW
     { id: "offer-templates", label: "Offer Templates", icon: faFileAlt },
     { id: "stipend-details", label: "Stipend Details", icon: faMoneyBillWave }, // ✅ NEW
     { id: "profile", label: "Profile", icon: faUser },
@@ -59,15 +61,13 @@ const Sidebar = ({ isOpen, onClose }) => {
     return (
       <button
         onClick={() => handleTabClick(item.id)}
-        className={`flex items-center p-3 rounded-lg w-full text-left font-semibold ${
-          isSelected ? selectedColor : defaultColor
-        } ${item.hoverBg || "hover:bg-gray-100"}`}
+        className={`flex items-center p-3 rounded-lg w-full text-left font-semibold ${isSelected ? selectedColor : defaultColor
+          } ${item.hoverBg || "hover:bg-gray-100"}`}
       >
         <FontAwesomeIcon
           icon={item.icon}
-          className={`w-5 h-5 mr-3 ${
-            isSelected ? "text-teal-500" : "text-gray-600"
-          }`}
+          className={`w-5 h-5 mr-3 ${isSelected ? "text-teal-500" : "text-gray-600"
+            }`}
         />
         <span className={`${isSelected ? "text-teal-500" : "text-gray-700"}`}>
           {item.label}

@@ -87,6 +87,10 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
   const userInfo = JSON.parse(localStorage.getItem('userInfo'));
   const userPlan = userInfo?.planType;
   const [showCompleteNotice, setShowCompleteNotice] = useState(false);
+  const [showTimeModal, setShowTimeModal] = useState(false);
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState(null);
+  const TIME_SLOTS = ["09:00 - 12:00", "14:00 - 05:00", "18:00 - 21:00"];
+
 
   // ✅ PayPal Configuration
   const paypalInitialOptions = {
@@ -258,10 +262,17 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
   const confirmRespond = async () => {
     if (!responseType) return;
 
+    // ✅ If accepting, show time slot selection first
+    if (responseType === "Accepted") {
+      setShowModal(false);
+      setShowTimeModal(true);
+      return;
+    }
+
+    // Rejection flow stays the same
     try {
       const payload = { status: responseType };
 
-      // ✅ Include payment info for paid internships
       if (job?.internshipType === "PAID" && paymentStatus?.paymentId) {
         payload.paymentId = paymentStatus.paymentId;
       }
@@ -273,6 +284,35 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
     } catch (error) {
       console.error("Failed to update offer status:", error);
       alert("Failed to update status.");
+    }
+  };
+
+  const confirmTimeSelection = async () => {
+    if (!selectedTimeSlot) {
+      toast.error("Please select a time slot");
+      return;
+    }
+
+    try {
+      const payload = {
+        status: "Accepted",
+        preferredTimeSlot: selectedTimeSlot,
+      };
+
+      if (job?.internshipType === "PAID" && paymentStatus?.paymentId) {
+        payload.paymentId = paymentStatus.paymentId;
+      }
+
+      await axios.patch(`/api/offer-letters/${offer._id}/status`, payload);
+
+      onStatusChange("Accepted");
+      toast.success("Offer accepted and time slot saved");
+      setShowTimeModal(false);
+      setSelectedTimeSlot(null);
+      setResponseType(null);
+    } catch (error) {
+      console.error("Failed to accept offer with time slot:", error);
+      toast.error("Failed to save your time slot. Please try again.");
     }
   };
 
@@ -637,7 +677,7 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-sm w-full text-center relative">
             <h2 className="text-xl font-semibold text-gray-800 mb-2">
-              Confirm {responseType === "Accepted" ? "Acceptance" : "Rejection"}
+              Confirm {responseType === "Accepted" ? "Accept" : "Reject"}
             </h2>
             <p className="text-sm text-gray-600 mb-4">
               Are you sure you want to{" "}
@@ -654,13 +694,78 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
                   : "bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600"
                   }`}
               >
-                Yes, {responseType}
+                {responseType === "Accepted" ? "Yes, Accept" : "Yes, Reject"}
               </button>
+
               <button
                 onClick={() => setShowModal(false)}
-                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-100"
+                className="px-4 py-2 rounded-lg text-white transition bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600"
               >
                 Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Time Selection Modal (shown after clicking "Yes, Accept") */}
+      {showTimeModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-md w-full relative">
+            <button
+              onClick={() => { setShowTimeModal(false); setSelectedTimeSlot(null); }}
+              className="absolute top-3 right-3 text-gray-500 hover:text-gray-700 text-xl"
+              aria-label="Close"
+            >
+              &times;
+            </button>
+
+            <h2 className="text-xl font-semibold text-gray-800 mb-2 text-center">
+              Select a Time Slot
+            </h2>
+            <p className="text-sm text-gray-600 mb-4 text-center">
+              Please choose your preferred time.
+            </p>
+
+            <div className="flex items-stretch justify-center gap-2 mb-6">
+              {TIME_SLOTS.map((slot) => {
+                const selected = selectedTimeSlot === slot;
+                return (
+                  <button
+                    key={slot}
+                    type="button"
+                    onClick={() => setSelectedTimeSlot(slot)}
+                    className={[
+                      "px-3 py-2 rounded-lg text-sm font-medium border transition whitespace-nowrap",
+                      selected
+                        ? "bg-indigo-600 text-white border-indigo-600"
+                        : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                    ].join(" ")}
+                  >
+                    {slot}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => { setShowTimeModal(false); setSelectedTimeSlot(null); }}
+                className="px-4 py-2 rounded-lg text-white bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmTimeSelection}
+                disabled={!selectedTimeSlot}
+                className={`px-4 py-2 rounded-lg text-white transition ${selectedTimeSlot
+                  ? "bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600"
+                  : "bg-gray-300 cursor-not-allowed"
+                  }`}
+              >
+                Confirm
               </button>
             </div>
           </div>
@@ -931,15 +1036,16 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
         <div className="space-y-3 mt-4">
           {/* Payment Status Indicator for PAID internships */}
           {requiresPayment && (
-            <div className={`p-3 rounded-lg text-sm font-medium ${paymentStatus?.paid
-              ? 'bg-green-100 text-green-800'
-              : 'bg-yellow-100 text-yellow-800'
-              }`}>
+            <div
+              className={`p-3 rounded-lg text-sm font-medium text-center ${paymentStatus?.paid
+                ? "bg-green-100 text-green-800"
+                : "bg-yellow-100 text-yellow-800"
+                }`}
+            >
               <FontAwesomeIcon icon={faCreditCard} className="mr-2" />
               {paymentStatus?.paid
                 ? `✅ Payment completed (${paymentAmount} ${currency})`
-                : `💳 Payment required: ${paymentAmount} ${currency}`
-              }
+                : ` Payment Required: ${paymentAmount} ${currency}`}
             </div>
           )}
 

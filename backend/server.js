@@ -7,7 +7,7 @@ const connectDB = require("./config/dbConfig");
 const { notFound, errorHandler } = require("./middlewares/errorMiddleware");
 const cron = require("node-cron");
 const checkPremiumExpiration = require("./utils/checkpremiumExipiration");
-
+const instructureRoutes = require("./routes/webapp-routes/InstructureManagementRoutes");
 
 // Load environment variables
 dotenv.config();
@@ -18,6 +18,19 @@ const app = express(); // Initialize express app
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// CORS should be before ANY routes
+app.use(
+  cors({
+    origin: "*", // or restrict to your frontend origin
+    methods: "GET,POST,PUT,DELETE",
+    credentials: true,
+  })
+);
+
+// Serve uploaded files (resumes / photos / certificates)
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/api/instructors", instructureRoutes);
+
 // MongoDB Connection
 connectDB(); // Establish MongoDB connection
 
@@ -27,13 +40,7 @@ const chatbotRoute = require('./routes/chatbot');
 app.use('/api', chatRoute);
 app.use('/api/chatbot', chatbotRoute);
 
-app.use(
-  cors({
-    origin: "*", // or specify your front-end origin
-    methods: "GET,POST,PUT,DELETE",
-    credentials: true,
-  })
-);
+// CORS is already configured above
 
 // Routes
 const userRoutes = require("./routes/webapp-routes/userRoutes");
