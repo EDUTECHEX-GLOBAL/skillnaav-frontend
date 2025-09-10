@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-import LevelThree from './LevelThree'; // Import the LevelThree component
+import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
+import LevelThree from "./LevelThree";
 
 const ProfileForm = () => {
   const [user, setUser] = useState({
@@ -23,7 +24,10 @@ const ProfileForm = () => {
     postalCode: "",
     currentGrade: "",
     gradePercentage: "",
-    profileImage: "", // New profileImage state for storing the selected image
+    profileImage: "",
+    skills: "",
+    interests: "",
+    preferredLocations: "",
   });
 
   const [errorMessage, setErrorMessage] = useState(null);
@@ -31,48 +35,63 @@ const ProfileForm = () => {
   const [isLevel1Open, setIsLevel1Open] = useState(true);
   const [isLevel2Open, setIsLevel2Open] = useState(false);
   const [isLevel3Open, setIsLevel3Open] = useState(false);
-  const navigate = useNavigate();
-  const isValidDate = (date) => {
-  if (!date || typeof date !== 'string') return false;
-  if (date.toLowerCase().includes("not provided")) return false;
-  const parsed = new Date(date);
-  return !isNaN(parsed.getTime());
-};
 
+  // 👁 state for password visibility
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  const navigate = useNavigate();
+
+  const isValidDate = (date) => {
+    if (!date || typeof date !== "string") return false;
+    if (date.toLowerCase().includes("not provided")) return false;
+    const parsed = new Date(date);
+    return !isNaN(parsed.getTime());
+  };
 
   useEffect(() => {
-   const fetchUserProfile = async () => {
-  try {
-    const userInfo = JSON.parse(localStorage.getItem("userInfo"));
-    const token = userInfo?.token;
+    const fetchUserProfile = async () => {
+      try {
+        const userInfo = JSON.parse(localStorage.getItem("userInfo"));
+        const token = userInfo?.token;
 
-    if (token) {
-      const config = {
-        headers: { Authorization: `Bearer ${token}` },
-      };
+        if (token) {
+          const config = {
+            headers: { Authorization: `Bearer ${token}` },
+          };
 
-      const { data } = await axios.get("/api/users/profile", config);
+          const { data } = await axios.get("/api/users/profile", config);
 
-      setUser((prevUser) => ({
-        ...prevUser,
-        ...data,
-        password: "",
-        confirmPassword: "",
-        dob: isValidDate(data.dob) ? new Date(data.dob).toISOString().split("T")[0] : "",
-        profileImage: data.profileImage || prevUser.profileImage,
-      }));
-    }
-  } catch (error) {
-    console.error("Error fetching profile:", error);
-    setErrorMessage("Failed to load profile data.");
-  }
-};
+          setUser((prevUser) => ({
+  ...prevUser,
+  ...data,
+  password: "",
+  confirmPassword: "",
+  dob: isValidDate(data.dob)
+    ? new Date(data.dob).toISOString().split("T")[0]
+    : "",
+  profileImage: data.profileImage || prevUser.profileImage,
+  skills: Array.isArray(data.skills) && data.skills.filter(Boolean).length > 0 
+    ? data.skills.join(", ") 
+    : "",
+  interests: Array.isArray(data.interests) && data.interests.filter(Boolean).length > 0 
+    ? data.interests.join(", ") 
+    : "",
+  preferredLocations: Array.isArray(data.preferredLocations) && data.preferredLocations.filter(Boolean).length > 0 
+    ? data.preferredLocations.join(", ") 
+    : "",
+}));
 
-  
+        }
+      } catch (error) {
+        console.error("Error fetching profile:", error);
+        setErrorMessage("Failed to load profile data.");
+      }
+    };
+
     fetchUserProfile();
   }, []);
-  
-  
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setUser((prevUser) => ({
@@ -88,165 +107,240 @@ const ProfileForm = () => {
       reader.onloadend = () => {
         setUser((prevUser) => ({
           ...prevUser,
-          profileImage: reader.result, // Set the image as a base64 string
+          profileImage: reader.result,
         }));
       };
-      reader.readAsDataURL(file); // Convert image to base64
+      reader.readAsDataURL(file);
     }
   };
 
   const handleUpdateProfile = async () => {
     setErrorMessage(null);
     setSuccessMessage("");
-  
+
     try {
       const userInfo = JSON.parse(localStorage.getItem("userInfo"));
       const token = userInfo?.token;
-  
+
       if (!token) {
         setErrorMessage("No token found. Please log in again.");
         return;
       }
-  
+
       const config = {
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
       };
-  
-      const { data } = await axios.put("/api/users/profile", user, config);
-  
+
+     const payload = {
+  ...user,
+  skills: user.skills
+    ? user.skills.split(",").map((s) => s.trim()).filter(Boolean)
+    : [],
+  interests: user.interests
+    ? user.interests.split(",").map((i) => i.trim()).filter(Boolean)
+    : [],
+  preferredLocations: user.preferredLocations
+    ? user.preferredLocations.split(",").map((l) => l.trim()).filter(Boolean)
+    : [],
+};
+
+
+      const { data } = await axios.put("/api/users/profile", payload, config);
+
       if (data) {
         localStorage.setItem("userInfo", JSON.stringify({ ...data, token }));
         setSuccessMessage("Profile updated successfully!");
-  
+
         setUser((prevUser) => ({
           ...prevUser,
           password: "",
           confirmPassword: "",
-          profileImage: data.profilePic || prevUser.profileImage, // Update profile image after saving
+          profileImage: data.profileImage || prevUser.profileImage,
         }));
       }
     } catch (error) {
       console.error("Update error:", error);
-      setErrorMessage("Failed to update profile. " + (error.response?.data?.message || "Unknown error"));
+      setErrorMessage(
+        "Failed to update profile. " +
+          (error.response?.data?.message || "Unknown error")
+      );
     }
   };
-  
+
   const level1Fields = [
-    { label: "Full name", name: "name", type: "text", placeholder: "Enter your full name" },
-    { label: "Email Address", name: "email", type: "email", placeholder: "Enter your email address" },
-    { label: "University Name", name: "universityName", type: "text", placeholder: "Enter your university name" },
+    { label: "Full name", name: "name", type: "text" },
+    { label: "Email Address", name: "email", type: "email" },
+    { label: "University Name", name: "universityName", type: "text" },
     { label: "Date of Birth", name: "dob", type: "date" },
-    { label: "Education Level", name: "educationLevel", type: "text", placeholder: "Enter your education level" },
-    { label: "Field of Study", name: "fieldOfStudy", type: "text", placeholder: "Enter your field of study" },
-    { label: "Desired Field", name: "desiredField", type: "text", placeholder: "Enter your desired field" },
-    { label: "LinkedIn Profile", name: "linkedin", type: "url", placeholder: "Enter your LinkedIn URL" },
-    { label: "Portfolio Link", name: "portfolio", type: "url", placeholder: "Enter your portfolio URL" },
-    { label: "Password", name: "password", type: "password", placeholder: "Enter your password" },
-    { label: "Confirm Password", name: "confirmPassword", type: "password", placeholder: "Confirm your password" },
+    { label: "Education Level", name: "educationLevel", type: "text" },
+    { label: "Field of Study", name: "fieldOfStudy", type: "text" },
+    { label: "Desired Field", name: "desiredField", type: "text" },
+    { label: "LinkedIn Profile", name: "linkedin", type: "url" },
+    { label: "Portfolio Link", name: "portfolio", type: "url" },
+    { label: "Skills", name: "skills", type: "text", placeholder: "React, Node.js, SQL" },
+    { label: "Interests", name: "interests", type: "text", placeholder: "AI, Robotics, Cloud" },
+    { label: "Preferred Locations", name: "preferredLocations", type: "text", placeholder: "Hyderabad, Remote" },
+    { label: "Password", name: "password", type: "password" },
+    { label: "Confirm Password", name: "confirmPassword", type: "password" },
   ];
 
   const level2Fields = [
-    { label: "Financial Status", name: "financialStatus", type: "text", placeholder: "Enter your financial status" },
-    { label: "Country", name: "country", type: "text", placeholder: "Enter your country" },
-    { label: "State", name: "state", type: "text", placeholder: "Enter your state" },
-    { label: "City", name: "city", type: "text", placeholder: "Enter your city" },
-    { label: "Postal Code", name: "postalCode", type: "text", placeholder: "Enter your postal code" },
-    { label: "Current Grade", name: "currentGrade", type: "text", placeholder: "Enter your current grade" },
-    { label: "Grade Percentage", name: "gradePercentage", type: "text", placeholder: "Enter your grade percentage" },
+    { label: "Financial Status", name: "financialStatus", type: "text" },
+    { label: "Country", name: "country", type: "text" },
+    { label: "State", name: "state", type: "text" },
+    { label: "City", name: "city", type: "text" },
+    { label: "Postal Code", name: "postalCode", type: "text" },
+    { label: "Current Grade", name: "currentGrade", type: "text" },
+    { label: "Grade Percentage", name: "gradePercentage", type: "text" },
   ];
 
   return (
     <div className="min-h-screen mt-12 bg-white-50 flex items-center justify-center font-poppins">
-    <div className="relative w-full max-w-4xl bg-white p-6 rounded-lg shadow-lg">
-      <div className="text-center md:text-left mb-6">
-        <h2 className="text-3xl font-bold text-gray-800">Your Profile</h2>
-        <p className="text-gray-500 mt-2">Update your photo and personal details here.</p>
-      </div>
-  
-      {errorMessage && <div className="text-red-500 mb-4">{errorMessage}</div>}
-      {successMessage && <div className="text-green-500 mb-4">{successMessage}</div>}
-  
-      <form>
-        {[{ level: 1, isOpen: isLevel1Open, toggle: setIsLevel1Open, fields: level1Fields }, { level: 2, isOpen: isLevel2Open, toggle: setIsLevel2Open, fields: level2Fields }].map(({ level, isOpen, toggle, fields }) => (
-          <div key={level}>
-            <div className="flex items-center justify-between mt-6">
-              <h3 className="text-2xl font-semibold text-gray-800">Profile Level {level}</h3>
-              <button
-                type="button"
-                onClick={() => toggle(!isOpen)}
-                className="text-gray-500 focus:outline-none"
-              >
-                {isOpen ? '▲' : '▼'}
-              </button>
-            </div>
-            {isOpen && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-4">
-                {fields.map(({ label, name, type, placeholder }) => (
-                  <div className="flex flex-col" key={name}>
-                    <label htmlFor={name} className="text-sm font-medium text-gray-600 mb-2">{label}</label>
-                    <input
-                      type={type}
-                      id={name}
-                      name={name}
-                      value={user[name]}
-                      onChange={handleChange}
-                      placeholder={placeholder}
-                      className="px-4 py-2 border rounded-md"
-                    />
-                  </div>
-                ))}
-                {/* Profile Image upload section */}
-                {level === 1 && (
-  <div className="flex flex-col">
-    <label htmlFor="profileImage" className="text-sm font-medium text-gray-600 mb-2">Profile Image</label>
+      <div className="relative w-full max-w-4xl bg-white p-6 rounded-lg shadow-lg">
+        <div className="text-center md:text-left mb-6">
+          <h2 className="text-3xl font-bold text-gray-800">Your Profile</h2>
+          <p className="text-gray-500 mt-2">
+            Update your photo and personal details here.
+          </p>
+        </div>
+
+        {errorMessage && <div className="text-red-500 mb-4">{errorMessage}</div>}
+        {successMessage && (
+          <div className="text-green-500 mb-4">{successMessage}</div>
+        )}
+
+        <form>
+          {[{ level: 1, isOpen: isLevel1Open, toggle: setIsLevel1Open, fields: level1Fields },
+            { level: 2, isOpen: isLevel2Open, toggle: setIsLevel2Open, fields: level2Fields }].map(({ level, isOpen, toggle, fields }) => (
+            <div key={level}>
+              <div className="flex items-center justify-between mt-6">
+                <h3 className="text-2xl font-semibold text-gray-800">
+                  Profile Level {level}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => toggle(!isOpen)}
+                  className="text-gray-500 focus:outline-none"
+                >
+                  {isOpen ? "▲" : "▼"}
+                </button>
+              </div>
+              {isOpen && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-4">
+                  {fields.map(({ label, name, type, placeholder }) => (
+                    <div className="flex flex-col relative" key={name}>
+                      <label
+                        htmlFor={name}
+                        className="text-sm font-medium text-gray-600 mb-2"
+                      >
+                        {label}
+                      </label>
+
+       {(name === "password" || name === "confirmPassword") ? (
+  <div className="relative">
     <input
-      type="file"
-      id="profileImage"
-      name="profileImage"
-      accept="image/*"
-      onChange={handleFileChange}
-      className="px-4 py-2 border rounded-md"
+      type={
+        name === "password"
+          ? showPassword ? "text" : "password"
+          : showConfirm ? "text" : "password"
+      }
+      id={name}
+      name={name}
+      value={user[name]}
+      onChange={handleChange}
+      placeholder={placeholder}
+      className="px-4 py-2 border rounded-md w-full pr-10 mt-1"
     />
-    <div className="mt-4 flex justify-center items-center">
-      {/* Display the uploaded or existing profile image */}
-      {user.profileImage && (
-        <img 
-          src={user.profileImage} 
-          alt="Profile"
-          className="w-24 h-24 rounded-full object-cover border-4 border-gray-300"
-        />
-      )}
-    </div>
+    <span
+      onClick={() =>
+        name === "password"
+          ? setShowPassword(!showPassword)
+          : setShowConfirm(!showConfirm)
+      }
+      className="absolute inset-y-0 right-3 flex items-center cursor-pointer"
+    >
+      {name === "password"
+        ? showPassword
+          ? <EyeSlashIcon className="h-5 w-5 text-gray-500" />
+          : <EyeIcon className="h-5 w-5 text-gray-500" />
+        : showConfirm
+        ? <EyeSlashIcon className="h-5 w-5 text-gray-500" />
+        : <EyeIcon className="h-5 w-5 text-gray-500" />}
+    </span>
   </div>
+) : (
+  <input
+    type={type}
+    id={name}
+    name={name}
+    value={user[name]}
+    onChange={handleChange}
+    placeholder={placeholder}
+    className="px-4 py-2 border rounded-md"
+  />
 )}
 
-                {level === 2 && (
-                  <button
-                    type="button"
-                    onClick={handleUpdateProfile}
-                    className="mt-6 bg-blue-500 text-white px-6 py-2 rounded-md w-full"
-                  >
-                    Save Changes
-                  </button>
-                )}
-              </div>
-              
-            )}
-          </div>
-          
-        ))}
-         <div>
+                    </div>
+                  ))}
+
+                  {/* Profile Image upload section */}
+                  {level === 1 && (
+                    <div className="flex flex-col">
+                      <label
+                        htmlFor="profileImage"
+                        className="text-sm font-medium text-gray-600 mb-2"
+                      >
+                        Profile Image
+                      </label>
+                      <input
+                        type="file"
+                        id="profileImage"
+                        name="profileImage"
+                        accept="image/*"
+                        onChange={handleFileChange}
+                        className="px-4 py-2 border rounded-md"
+                      />
+                      <div className="mt-4 flex justify-center items-center">
+                        {user.profileImage && (
+                          <img
+                            src={user.profileImage}
+                            alt="Profile"
+                            className="w-24 h-24 rounded-full object-cover border-4 border-gray-300"
+                          />
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {level === 2 && (
+                    <button
+                      type="button"
+                      onClick={handleUpdateProfile}
+                      className="mt-6 bg-blue-500 text-white px-6 py-2 rounded-md w-full"
+                    >
+                      Save Changes
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+
+          {/* Level 3 Personality */}
+          <div>
             <div className="flex items-center justify-between mt-6">
-              <h3 className="text-2xl font-semibold text-gray-800">Profile Level 3 (Personality Questions)</h3>
+              <h3 className="text-2xl font-semibold text-gray-800">
+                Profile Level 3 (Personality Questions)
+              </h3>
               <button
                 type="button"
                 onClick={() => setIsLevel3Open(!isLevel3Open)}
                 className="text-gray-500 focus:outline-none"
               >
-                {isLevel3Open ? '▲' : '▼'}
+                {isLevel3Open ? "▲" : "▼"}
               </button>
             </div>
             {isLevel3Open && (
@@ -258,10 +352,9 @@ const ProfileForm = () => {
               />
             )}
           </div>
-      </form>
+        </form>
+      </div>
     </div>
-  </div>
-  
   );
 };
 

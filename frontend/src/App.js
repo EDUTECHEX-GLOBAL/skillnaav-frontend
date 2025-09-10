@@ -42,6 +42,10 @@ import TryforFree from "./WebApp/TryforFree";
  import SchoolAdminResetPassword from "./WebApp/Flows/SchoolAdminFlow/SignUpLogin/SchoolAdminResetPassword";
  import SchoolAdminForgotPassword from "./WebApp/Flows/SchoolAdminFlow/SignUpLogin/SchoolAdminForgotPassword";
 
+//  import InternshipDetail from "./WebApp/Flows/UserFlow/MainPage/InternshipDetail";
+ import { TabProvider } from "./WebApp/Flows/UserFlow/MainPage/UserHomePageContext/HomePageContext";
+
+
 function App() {
   const { skillnaavData, reloadData } = useSelector((state) => state.root);
   const dispatch = useDispatch();
@@ -70,6 +74,14 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="/admin-login" element={<Login />} />
+        {/* <Route
+  path="/internship/:id"
+  element={
+    <TabProvider>
+      <InternshipDetail />
+    </TabProvider>
+  }
+/> */}
         <Route path="*" element={<Navigate to="/" replace />} />
         
 

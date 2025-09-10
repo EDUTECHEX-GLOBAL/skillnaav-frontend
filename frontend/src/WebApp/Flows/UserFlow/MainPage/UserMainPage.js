@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from "react";
 import { Skeleton, Modal } from "antd";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import Navbar from "./Navbar";
 import Sidebar from "./Sidebar";
 import BodyContent from "./BodyContent";
-import { TabProvider } from "./UserHomePageContext/HomePageContext";
+import { TabProvider, useTabContext } from "./UserHomePageContext/HomePageContext";
 import axios from "axios";
 import PremiumPage from "./PremiumPage";
 import Chatbot from "../../../../components/Chatbot";
 import chatBotImage from "../../../../assets-webapp/chat-bot.png";
 
-const UserMainPage = () => {
+const UserMainPageContent = () => {
+  const { handleSelectTab } = useTabContext();
+
   const [userInfo, setUserInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isApproved, setIsApproved] = useState(false);
@@ -21,6 +23,7 @@ const UserMainPage = () => {
   const [showChatbot, setShowChatbot] = useState(false);
 
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   useEffect(() => {
     const handleResize = () => {
@@ -30,40 +33,50 @@ const UserMainPage = () => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
- useEffect(() => {
-  const fetchUserInfo = async () => {
-    try {
-      // 🛡️ Load token from localStorage or recover from sessionStorage
-      let token = localStorage.getItem("userToken");
-      if (!token) {
-        token = sessionStorage.getItem("userToken");
-        if (token) {
-          localStorage.setItem("userToken", token); // restore to localStorage
+  useEffect(() => {
+    const fetchUserInfo = async () => {
+      try {
+        let token = localStorage.getItem("userToken");
+        if (!token) {
+          token = sessionStorage.getItem("userToken");
+          if (token) localStorage.setItem("userToken", token);
         }
+
+        if (token) {
+          const parsedToken = JSON.parse(token);
+          const response = await axios.get("/api/users/profile", {
+            headers: { Authorization: `Bearer ${parsedToken}` },
+          });
+          setUserInfo(response.data);
+          setIsApproved(response.data.adminApproved);
+
+          // Handle query params after fetching user info
+          const openTab = searchParams.get("openTab");
+          const openRec = searchParams.get("openRec");
+          if (openTab) {
+            handleSelectTab(openTab);
+            // Optionally handle openRec inside the tab content component
+          }
+        } else {
+          const openTab = searchParams.get("openTab");
+          const openRec = searchParams.get("openRec");
+          if (openTab) {
+            const nextPath = `/user-main-page?openTab=${openTab}${openRec ? `&openRec=${openRec}` : ""}`;
+            navigate(`/user/login?next=${encodeURIComponent(nextPath)}`, { replace: true });
+          } else {
+            navigate("/user/login");
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch user info:", error);
+        navigate("/user/login");
+      } finally {
+        setLoading(false);
       }
+    };
 
-      if (token) {
-        const parsedToken = JSON.parse(token);
-        const response = await axios.get("/api/users/profile", {
-          headers: { Authorization: `Bearer ${parsedToken}` },
-        });
-        setUserInfo(response.data);
-        setIsApproved(response.data.adminApproved);
-      } else {
-        console.warn("⚠️ No user token found in storage");
-        navigate("/user/login"); // redirect to login if token missing
-      }
-    } catch (error) {
-      console.error("Failed to fetch user info:", error);
-      navigate("/user/login"); // fallback if token is invalid
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  fetchUserInfo();
-}, []);
-
+    fetchUserInfo();
+  }, [searchParams, navigate, handleSelectTab]);
 
   useEffect(() => {
     if (userInfo && !userInfo.isPremium) {
@@ -79,50 +92,39 @@ const UserMainPage = () => {
   const handleCloseSidebar = () => setIsSidebarOpen(false);
 
   return (
-    <TabProvider>
-     <div className="min-h-screen font-poppins bg-gray-50">
-  {/* Navbar at the top */}
-  <Navbar onToggleSidebar={handleToggleSidebar} />
+    <>
+      <Navbar onToggleSidebar={handleToggleSidebar} />
 
-  <div className="flex">
-    {/* Sidebar below navbar */}
-    <Sidebar
-      isMobile={isMobile}
-      isOpen={isSidebarOpen}
-      onClose={handleCloseSidebar}
-    />
+      <div className="flex">
+        <Sidebar isMobile={isMobile} isOpen={isSidebarOpen} onClose={handleCloseSidebar} />
 
-    {/* Page Content */}
-    <div className="flex-1 flex flex-col relative">
-      {loading ? (
-        <div className="p-4">
-          <Skeleton active />
-        </div>
-      ) : (
-        <div className="relative flex-1 overflow-y-auto">
-          <BodyContent />
+        <div className="flex-1 flex flex-col relative">
+          {loading ? (
+            <div className="p-4">
+              <Skeleton active />
+            </div>
+          ) : (
+            <div className="relative flex-1 overflow-y-auto">
+              <BodyContent />
 
-          {!isApproved && (
-            <>
-              <div className="absolute inset-0 bg-gray-500 opacity-50 z-10" />
-              <div className="absolute inset-0 flex items-center justify-center z-20">
-                <div className="bg-white p-4 rounded shadow-md text-center max-w-xs mx-auto">
-                  <h2 className="text-lg font-semibold">Account Not Approved</h2>
-                  <p className="text-sm">
-                    Your account is not approved by an admin yet. Some features may be restricted.
-                  </p>
-                </div>
-              </div>
-            </>
+              {!isApproved && (
+                <>
+                  <div className="absolute inset-0 bg-gray-500 opacity-50 z-10" />
+                  <div className="absolute inset-0 flex items-center justify-center z-20">
+                    <div className="bg-white p-4 rounded shadow-md text-center max-w-xs mx-auto">
+                      <h2 className="text-lg font-semibold">Account Not Approved</h2>
+                      <p className="text-sm">
+                        Your account is not approved by an admin yet. Some features may be restricted.
+                      </p>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
           )}
         </div>
-      )}
-    </div>
-  </div>
-</div>
+      </div>
 
-
-      {/* Premium Pricing Modal */}
       {showPricingModal && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
           <div className="relative bg-white p-6 rounded-lg shadow-lg max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
@@ -138,7 +140,6 @@ const UserMainPage = () => {
         </div>
       )}
 
-      {/* Upgrade Prompt Modal */}
       <Modal
         open={showUpgradePopup}
         onCancel={() => setShowUpgradePopup(false)}
@@ -163,10 +164,8 @@ const UserMainPage = () => {
         </div>
       </Modal>
 
-      {/* Chatbot Component */}
       {showChatbot ? (
         <div className="fixed bottom-5 right-5 w-[360px] max-h-[80vh] z-50 shadow-xl rounded-lg bg-white border">
-          {/* Header */}
           <div className="flex items-center justify-between bg-red-600 text-white p-3 rounded-t-lg">
             <span className="font-semibold">Career Assistance</span>
             <button
@@ -176,8 +175,6 @@ const UserMainPage = () => {
               ✕
             </button>
           </div>
-
-          {/* Chatbot UI */}
           <div className="p-4 max-h-[calc(80vh-60px)] overflow-y-auto">
             <Chatbot />
           </div>
@@ -190,13 +187,17 @@ const UserMainPage = () => {
           <div className="text-sm font-semibold text-red-600 leading-tight">
             Career Assistance
           </div>
-          <img
-            src={chatBotImage}
-            alt="Bot Avatar"
-            className="w-10 h-10 rounded-full border"
-          />
+          <img src={chatBotImage} alt="Bot Avatar" className="w-10 h-10 rounded-full border" />
         </div>
       )}
+    </>
+  );
+};
+
+const UserMainPage = () => {
+  return (
+    <TabProvider>
+      <UserMainPageContent />
     </TabProvider>
   );
 };

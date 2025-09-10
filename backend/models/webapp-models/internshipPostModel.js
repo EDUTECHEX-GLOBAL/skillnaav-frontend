@@ -36,6 +36,13 @@ const internshipPostingSchema = new mongoose.Schema(
       required:true,
     },
 
+    // 🔹 New field for Internship Classification
+    classification: {
+      type: String,
+      enum: ["Basic", "Intermediate", "Advanced"],
+      required: true,
+    },
+
     compensationDetails: {
       type: {
         type:   String,

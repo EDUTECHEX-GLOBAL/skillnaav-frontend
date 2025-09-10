@@ -9,13 +9,18 @@ const UserProfilePicture = () => {
   // Initialize formData with profile picture field
   const [formData, setFormData] = useState(() => {
     const savedData = localStorage.getItem("userProfileData");
-    return savedData ? JSON.parse(savedData) : {
-      fieldOfStudy: location.state?.formData.fieldOfStudy || "",
-      desiredField: "",
-      linkedin: "",
-      portfolio: "",
-      profilePic: null,
-    };
+    return savedData
+      ? JSON.parse(savedData)
+      : {
+          fieldOfStudy: location.state?.formData.fieldOfStudy || "",
+          desiredField: "",
+          linkedin: "",
+          portfolio: "",
+          skills: "",
+          interests: "",
+          preferredLocations: "",
+          profilePic: null,
+        };
   });
 
   // Save form data to localStorage
@@ -49,12 +54,19 @@ const UserProfilePicture = () => {
 
     // Validate required fields
     const requiredFields = [
-      "name", "email", "password", "confirmPassword",
-      "universityName", "dob", "educationLevel",
-      "fieldOfStudy", "desiredField", "linkedin"
+      "name",
+      "email",
+      "password",
+      "confirmPassword",
+      "universityName",
+      "dob",
+      "educationLevel",
+      "fieldOfStudy",
+      "desiredField",
+      "linkedin",
     ];
 
-    if (!requiredFields.every(field => completeData[field])) {
+    if (!requiredFields.every((field) => completeData[field])) {
       alert("Please fill all required fields");
       return;
     }
@@ -66,16 +78,20 @@ const UserProfilePicture = () => {
 
     try {
       const formDataToSend = new FormData();
-      
+
       // Append all registration fields
       Object.entries(completeData).forEach(([key, value]) => {
         if (key === "profilePic") return; // Handle file separately
-        formDataToSend.append(key, value);
+        if (["skills", "interests", "preferredLocations"].includes(key)) {
+          // Normalize to comma separated string
+          formDataToSend.append(key, value.split(",").map((v) => v.trim()).join(","));
+        } else {
+          formDataToSend.append(key, value);
+        }
       });
 
       // Append profile picture with correct field name
       formDataToSend.append("profileImage", formData.profilePic);
-
 
       const response = await axios.post("/api/users/register", formDataToSend, {
         headers: {
@@ -91,7 +107,7 @@ const UserProfilePicture = () => {
       console.error("Registration error:", error);
       alert(
         error.response?.data?.error ||
-        "Registration failed. Please check your inputs and try again."
+          "Registration failed. Please check your inputs and try again."
       );
     }
   };
@@ -112,7 +128,9 @@ const UserProfilePicture = () => {
             <h2 className="text-lg font-bold text-gray-700">PROFESSIONAL INFORMATION</h2>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Desired field of Internship/Job</label>
+            <label className="block text-sm font-medium text-gray-700">
+              Desired field of Internship/Job
+            </label>
             <select
               name="desiredField"
               value={formData.desiredField}
@@ -137,7 +155,9 @@ const UserProfilePicture = () => {
           <div className="space-y-4">
             {/* LinkedIn Profile Input */}
             <div>
-              <label htmlFor="linkedin" className="block text-sm font-medium text-gray-700">LinkedIn Profile</label>
+              <label htmlFor="linkedin" className="block text-sm font-medium text-gray-700">
+                LinkedIn Profile
+              </label>
               <input
                 id="linkedin"
                 type="text"
@@ -152,7 +172,9 @@ const UserProfilePicture = () => {
 
             {/* Portfolio Website Input (Optional) */}
             <div>
-              <label htmlFor="portfolio" className="block text-sm font-medium text-gray-700">Portfolio Website (Optional)</label>
+              <label htmlFor="portfolio" className="block text-sm font-medium text-gray-700">
+                Portfolio Website (Optional)
+              </label>
               <input
                 id="portfolio"
                 type="text"
@@ -164,9 +186,59 @@ const UserProfilePicture = () => {
               />
             </div>
 
+            {/* Skills Input */}
+            <div>
+              <label htmlFor="skills" className="block text-sm font-medium text-gray-700">
+                Skills (comma separated)
+              </label>
+              <input
+                id="skills"
+                type="text"
+                name="skills"
+                value={formData.skills}
+                onChange={handleChange}
+                className="mt-2 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
+                placeholder="e.g. React, Python, SQL"
+              />
+            </div>
+
+            {/* Interests Input */}
+            <div>
+              <label htmlFor="interests" className="block text-sm font-medium text-gray-700">
+                Interests (comma separated)
+              </label>
+              <input
+                id="interests"
+                type="text"
+                name="interests"
+                value={formData.interests}
+                onChange={handleChange}
+                className="mt-2 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
+                placeholder="e.g. AI, Robotics, Data Science"
+              />
+            </div>
+
+            {/* Preferred Locations Input */}
+            <div>
+              <label htmlFor="preferredLocations" className="block text-sm font-medium text-gray-700">
+                Preferred Locations (comma separated)
+              </label>
+              <input
+                id="preferredLocations"
+                type="text"
+                name="preferredLocations"
+                value={formData.preferredLocations}
+                onChange={handleChange}
+                className="mt-2 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
+                placeholder="e.g. Hyderabad, Remote, Bangalore"
+              />
+            </div>
+
             {/* Profile Image Input */}
             <div>
-              <label htmlFor="profilepic" className="block text-sm font-medium text-gray-700">Profile Image</label>
+              <label htmlFor="profilepic" className="block text-sm font-medium text-gray-700">
+                Profile Image
+              </label>
               <input
                 id="profilePic"
                 type="file"
@@ -191,7 +263,11 @@ const UserProfilePicture = () => {
               type="button"
               onClick={handleSubmit}
               disabled={!isFormValid()}
-              className={`w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${isFormValid() ? "bg-purple-600 hover:bg-purple-700" : "bg-purple-300 cursor-not-allowed"} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500`}
+              className={`w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
+                isFormValid()
+                  ? "bg-purple-600 hover:bg-purple-700"
+                  : "bg-purple-300 cursor-not-allowed"
+              } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500`}
             >
               Submit
             </button>

@@ -40,104 +40,108 @@ const JobCard = ({ searchTerm = "", onViewDetails, jobs: propJobs }) => {
     return `${differenceInDays}d ago`;
   };
 
-  return (
-    <div className="flex flex-col md:flex-row flex-wrap gap-4">
-      {filteredJobs.length > 0 ? (
-        filteredJobs.map((job, index) => (
-          <div
-            key={index}
-            className="w-full max-w-sm p-4 border rounded-lg shadow-md relative"
-          >
-            {/* Badge and Heart */}
-            <div className="absolute top-2 right-2 flex items-center gap-2">
-              {job.internshipType === "STIPEND" && (
-                <span className="text-xs font-semibold text-green-700 bg-blue-200 px-2 py-1 rounded-full">
-                  STIPEND
-                </span>
-              )}
-              {job.internshipType === "FREE" && (
-                <span className="text-xs font-semibold text-gray-700 bg-green-200 px-2 py-1 rounded-full">
-                  FREE
-                </span>
-              )}
-              {job.internshipType === "PAID" && (
-                <span className="text-xs font-semibold text-red-700 bg-red-200 px-2 py-1 rounded-full">
-                  PAID
-                </span>
-              )}
-              <button className="text-gray-400 hover:text-red-500">
-                <FaHeart />
-              </button>
-            </div>
+ return (
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    {filteredJobs.length > 0 ? (
+      filteredJobs.map((job, index) => (
+        <div
+          key={index}
+          className="w-full p-4 border rounded-lg shadow-md relative"
+        >
+          {/* Badge and Heart */}
+          <div className="absolute top-2 right-2 flex items-center gap-2">
+            {job.internshipType === "STIPEND" && (
+              <span className="text-xs font-semibold text-green-700 bg-blue-200 px-2 py-1 rounded-full">
+                STIPEND
+              </span>
+            )}
+            {job.internshipType === "FREE" && (
+              <span className="text-xs font-semibold text-gray-700 bg-green-200 px-2 py-1 rounded-full">
+                FREE
+              </span>
+            )}
+            {job.internshipType === "PAID" && (
+              <span className="text-xs font-semibold text-red-700 bg-red-200 px-2 py-1 rounded-full">
+                PAID
+              </span>
+            )}
+            <button className="text-gray-400 hover:text-red-500">
+              <FaHeart />
+            </button>
+          </div>
 
-            {/* Job Info */}
-            <div className="flex items-start gap-4">
-              <img
-                src={job.imgUrl}
-                alt="Company Logo"
-                className="w-10 h-10 rounded-full"
-              />
-              <div className="flex-grow">
-                <h5 className="text-lg font-medium">{job.jobTitle}</h5>
-                <p className="text-sm text-gray-500">
-                  {job.companyName} • {calculatePostedTime(job.createdAt)}
-                </p>
-              </div>
-            </div>
-
-            {/* Details */}
-            <div className="mt-4">
-              <p className="flex items-center text-sm text-gray-500">
-                <FaMapMarkerAlt className="mr-2" />
-                {job.location}
+          {/* Job Info */}
+          <div className="flex items-start gap-4">
+            <img
+              src={job.imgUrl}
+              alt="Company Logo"
+              className="w-10 h-10 rounded-full"
+            />
+            <div className="flex-grow">
+              <h5 className="text-lg font-medium">{job.jobTitle}</h5>
+              <p className="text-sm text-gray-500">
+                {job.companyName} • {calculatePostedTime(job.createdAt)}
               </p>
-              <p className="flex items-center mt-2 text-sm text-gray-500">
-                <FaClock className="mr-2" />
-                {new Date(job.startDate).toLocaleDateString()} - {job.endDateOrDuration}
-              </p>
-              <p className="flex items-center mt-2 text-sm text-gray-500">
-                <FaDollarSign className="mr-2" />
-                {job.internshipType === "STIPEND"
-                  ? `${job.compensationDetails?.amount} ${job.compensationDetails?.currency} per ${job.compensationDetails?.frequency?.toLowerCase()}`
-                  : job.internshipType === "FREE"
-                    ? "Unpaid / Free"
-                    : job.internshipType === "PAID"
-                      ? `Student Pays: ${job.compensationDetails?.amount} ${job.compensationDetails?.currency}`
-                      : "N/A"}
-              </p>
-            </div>
-
-            {/* Qualifications */}
-  <div className="flex flex-wrap gap-2">
-  {job.qualifications && job.qualifications.slice(0, 2).map((qualification, index) => (
-    <span key={index} className="text-sm bg-gray-200 text-gray-800 py-1 px-3 rounded-full">
-      {qualification}
-    </span>
-  ))}
-  {job.qualifications && job.qualifications.length > 2 && (
-    <span className="text-sm bg-gray-100 text-gray-700 py-1 px-3 rounded-full">
-      +{job.qualifications.length - 2}
-    </span>
-  )}
-</div>
-
-
-            {/* View Details */}
-            <div className="mt-4">
-              <button
-                onClick={() => onViewDetails(job)} // ✅ triggers ApplyCards view
-                className="text-purple-600 text-sm font-medium"
-              >
-                View details
-              </button>
             </div>
           </div>
-        ))
-      ) : (
-        <p className="text-center text-gray-500">No jobs found</p>
-      )}
-    </div>
-  );
+
+          {/* Details */}
+          <div className="mt-4">
+            <p className="flex items-center text-sm text-gray-500">
+              <FaMapMarkerAlt className="mr-2" />
+              {job.location}
+            </p>
+            <p className="flex items-center mt-2 text-sm text-gray-500">
+              <FaClock className="mr-2" />
+              {new Date(job.startDate).toLocaleDateString()} - {job.endDateOrDuration}
+            </p>
+            <p className="flex items-center mt-2 text-sm text-gray-500">
+              <FaDollarSign className="mr-2" />
+              {job.internshipType === "STIPEND"
+                ? `${job.compensationDetails?.amount} ${job.compensationDetails?.currency} per ${job.compensationDetails?.frequency?.toLowerCase()}`
+                : job.internshipType === "FREE"
+                ? "Unpaid / Free"
+                : job.internshipType === "PAID"
+                ? `Student Pays: ${job.compensationDetails?.amount} ${job.compensationDetails?.currency}`
+                : "N/A"}
+            </p>
+          </div>
+
+          {/* Qualifications */}
+          <div className="flex flex-wrap gap-2 mt-2">
+            {job.qualifications &&
+              job.qualifications.slice(0, 2).map((qualification, index) => (
+                <span
+                  key={index}
+                  className="text-sm bg-gray-200 text-gray-800 py-1 px-3 rounded-full"
+                >
+                  {qualification}
+                </span>
+              ))}
+            {job.qualifications && job.qualifications.length > 2 && (
+              <span className="text-sm bg-gray-100 text-gray-700 py-1 px-3 rounded-full">
+                +{job.qualifications.length - 2}
+              </span>
+            )}
+          </div>
+
+          {/* View Details */}
+          <div className="mt-4">
+            <button
+              onClick={() => onViewDetails(job)}
+              className="text-purple-600 text-sm font-medium"
+            >
+              View details
+            </button>
+          </div>
+        </div>
+      ))
+    ) : (
+      <p className="text-center text-gray-500">No jobs found</p>
+    )}
+  </div>
+);
+
 };
 
 export default JobCard;

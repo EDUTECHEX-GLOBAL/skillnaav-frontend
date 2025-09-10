@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const applicationController = require("../../controllers/applicationController");
 const { resumeUpload } = require("../../utils/multer"); // Multer middleware for file uploads
+const { authenticate } = require("../../middlewares/authMiddleware");
 
 // Destructure the required function from applicationController
 const {
@@ -12,6 +13,7 @@ const {
   checkIfApplied,
   upgradeToPremium,
   getApplicationCount, // Add the new function
+  getRecommendationsForStudent,
 } = applicationController;
 
 router.post("/upgrade-to-premium", upgradeToPremium);
@@ -36,9 +38,9 @@ router.get("/check-applied/:studentId/:internshipId", checkIfApplied);
 
 router.get('/counts', applicationController.getApplicationsCountForInternships);
 
-router.put('/applications/:applicationId/status', applicationController.updateApplicationStatus);
+router.put('/:applicationId/status', applicationController.updateApplicationStatus);
 
-
-
+// routes/webapp-routes/applicationRoutes.js
+router.get("/recommendations", authenticate, applicationController.getRecommendationsForStudent);
 
 module.exports = router;

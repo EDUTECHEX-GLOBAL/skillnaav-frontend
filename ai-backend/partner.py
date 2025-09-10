@@ -176,26 +176,31 @@ async def notify_rejection(app_doc):
     student_email = app_doc.get("userEmail") or app_doc.get("studentEmail")
 
     if not student_email:
-        print(f"[{now()}] ⚠️ No email found for studentId: {student_id}")
-        return
-    
+     print(f"[{now()}] ⚠️ No email found for studentId: {student_id}")
+     return
+
     async with httpx.AsyncClient(timeout=10) as client:
         try:
-            # Update status
+            # Update status (Node will send rich recommendations email)
             await client.put(
                 f"http://localhost:5000/api/applications/{app_doc['_id']}/status",
                 json={"status": "Rejected"}
             )
 
-            # Trigger notification + email
+            # Create only in-app notification; skip generic email
             notif_payload = {
                 "studentId": student_id,
                 "email": student_email,
                 "title": "Application Rejected",
-                "message": f"Unfortunately, your application for {job_title} was rejected. "
-                           f"But don’t worry—we recommend exploring new opportunities.",
-                "link": "/student-dashboard/recommendations"
+                "message": (
+                    f"Unfortunately, your application for {job_title} was rejected. "
+                    f"But don’t worry—we recommend exploring new opportunities."
+                ),
+                "link": "http://localhost:3000/user-main-page?openTab=recommendations",
+                "skipEmail": True
             }
+
+            print(f"[{now()}] Posting notification with skipEmail=True → {notif_payload}")
 
             resp = await client.post(
                 "http://localhost:5000/api/notifications",
@@ -203,12 +208,13 @@ async def notify_rejection(app_doc):
             )
 
             if resp.status_code in (200, 201):
-                print(f"[{now()}] ✅ Notification + email triggered for student {student_id} ({student_email})")
+                print(f"[{now()}] ✅ In-app notification created for student {student_id} ({student_email})")
             else:
                 print(f"[{now()}] ❌ Node API returned {resp.status_code} for student {student_id}: {resp.text}")
 
         except Exception as e:
             print(f"[{now()}] ❌ Failed notification/email trigger for {student_id}: {e}")
+
 
 @app.post("/partner/shortlist")
 async def shortlist_candidates(

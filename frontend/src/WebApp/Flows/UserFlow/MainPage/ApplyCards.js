@@ -207,29 +207,28 @@ const ApplyCards = ({ job, onBack }) => {
             </div>
 
             <div className="flex gap-4 mt-4">
-  {job.applicationOpen ? (
-    <button
-      onClick={handleApply}
-      disabled={isApplied || isUploading}
-      className={`text-white px-4 py-2 rounded-full font-semibold ${
-        isApplied ? "bg-green-500" : "bg-purple-500 hover:bg-purple-600"
-      }`}
-    >
-      {isApplied ? "Applied" : isUploading ? "Uploading..." : "Apply now"}
-    </button>
-  ) : (
-    <div className="text-red-600 font-semibold p-2 border border-red-400 rounded">
-      Applications are currently closed for this internship.
-    </div>
-  )}
+              {job.applicationOpen ? (
+                <button
+                  onClick={handleApply}
+                  disabled={isApplied || isUploading}
+                  className={`text-white px-4 py-2 rounded-full font-semibold ${isApplied ? "bg-green-500" : "bg-purple-500 hover:bg-purple-600"
+                    }`}
+                >
+                  {isApplied ? "Applied" : isUploading ? "Uploading..." : "Apply now"}
+                </button>
+              ) : (
+                <div className="text-red-600 font-semibold p-2 border border-red-400 rounded">
+                  Applications are currently closed for this internship.
+                </div>
+              )}
 
-  <button
-    onClick={handleSkillAnalysis}
-    className="text-white bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-full font-semibold"
-  >
-    Skill Analysis
-  </button>
-</div>
+              <button
+                onClick={handleSkillAnalysis}
+                className="text-white bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-full font-semibold"
+              >
+                Skill Analysis
+              </button>
+            </div>
 
           </div>
         </div>

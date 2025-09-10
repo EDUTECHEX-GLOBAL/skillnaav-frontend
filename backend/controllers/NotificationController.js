@@ -6,48 +6,44 @@ const notifyUser = require("../utils/notifyUser");
 // 👉 Create & save a new notification (can be called from Python or other services)
 const createNotification = async (req, res) => {
   try {
-    let { studentId, email, title, message, link, type } = req.body;
+    let { studentId, email, title, message, link, type, skipEmail } = req.body
 
-    if (!studentId || !title || !message) {
-      return res.status(400).json({
-        success: false,
-        message: "studentId, title, and message are required",
-      });
-    }
+  if (!studentId || !title || !message) {
+  return res.status(400).json({
+    success: false,
+    message: "studentId, title, and message are required",
+  });
+}
 
-    // Auto-set type if not provided
-    if (!type) {
-      if (title.toLowerCase().includes("offer")) {
-        type = "offer";
-      } else if (title.toLowerCase().includes("recommendation")) {
-        type = "recommendation";
-      } else {
-        type = "general";
-      }
-    }
+if (!type) {
+  if (title.toLowerCase().includes("offer")) type = "offer";
+  else if (title.toLowerCase().includes("recommendation")) type = "recommendation";
+  else type = "general";
+}
 
-    // Save in-app notification with type
-    const notification = await sendNotificationUtil({
-      studentId,
-      title,
-      message,
-      link,
-      type, // ✅ now guaranteed to have correct type
-    });
+const notification = await sendNotificationUtil({
+  studentId,
+  title,
+  message,
+  link,
+  type,
+});
 
-    // Send email if available
-    if (email) {
-      try {
-        await notifyUser(email, title, message);
-      } catch (err) {
-        console.error(`❌ Failed to send email to ${email}:`, err.message);
-      }
-    }
+// If caller requests no email, return now
+if (skipEmail) {
+  return res.status(201).json({ success: true, notification }); // ← short‑circuit[2][1]
+}
 
-    res.status(201).json({
-      success: true,
-      notification,
-    });
+if (email) {
+  try {
+    await notifyUser(email, title, message);
+  } catch (err) {
+    console.error(`Failed to send email to ${email}:`, err.message);
+  }
+}
+
+res.status(201).json({ success: true, notification });
+
   } catch (error) {
     console.error("Error creating notification:", error);
     res.status(500).json({
@@ -82,33 +78,23 @@ const getNotificationsByStudent = async (req, res) => {
   }
 };
 
-// 👉 Mark a notification as read
+// controllers/NotificationController.js
 const markNotificationAsRead = async (req, res) => {
   try {
     const { notificationId } = req.params;
-
     const notification = await Notification.findByIdAndUpdate(
       notificationId,
-      { read: true }, // ✅ matches your schema field `read`
+      { isRead: true }, // <-- fix here
       { new: true }
     );
-
-    if (!notification) {
-      return res.status(404).json({ message: "Notification not found" });
-    }
-
-    res.status(200).json({
-      success: true,
-      notification,
-    });
+    if (!notification) return res.status(404).json({ message: "Notification not found" });
+    res.status(200).json({ success: true, notification });
   } catch (error) {
     console.error("Error marking notification as read:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to mark notification as read",
-    });
+    res.status(500).json({ success: false, message: "Failed to mark notification as read" });
   }
 };
+
 
 // 👉 Delete a notification by ID
 const deleteNotification = async (req, res) => {

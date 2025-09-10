@@ -17,6 +17,8 @@ import MaterialScience from "./MaterialScience"; // Import the new component
 import QuantumComputing from "./QuantumComputing";
 import ClimateTech from "./ClimateTech";
 import BioTech from "./BioTech";
+import Recommendations from "./Recommendations"; // add import
+
 
 // Optional: create simple components as placeholders for now
 const SectorPlaceholder = ({ name }) => (
@@ -39,6 +41,9 @@ const BodyContent = () => {
       break;
     case "searchbar":
       content = <SearchBar />;
+      break;
+    case "recommendations":
+      content = <Recommendations />;
       break;
     case "messages":
       content = <Message />;

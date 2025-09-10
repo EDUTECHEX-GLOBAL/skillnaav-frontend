@@ -65,7 +65,7 @@ router.post("/", async (req, res) => {
       startDate,
       endDateOrDuration,
       duration,
-      sector, // new
+      sector,
       internshipType,
       internshipMode,
       qualifications,
@@ -73,7 +73,8 @@ router.post("/", async (req, res) => {
       imgUrl,
       partnerId,
       compensationDetails,
-      applicationOpen = true, // <-- new field with default true
+      classification,          // 🔹 new field
+      applicationOpen = true,
     } = req.body;
 
     const partner = await Partner.findById(partnerId);
@@ -82,11 +83,18 @@ router.post("/", async (req, res) => {
     // Freemium restrictions
     if (partner.planType === "Freemium") {
       if (internshipType === "PAID") {
-        return res.status(403).json({ message: "Freemium partners cannot post paid internships." });
+        return res
+          .status(403)
+          .json({ message: "Freemium partners cannot post paid internships." });
       }
-      const activeCount = await InternshipPosting.countDocuments({ partnerId, deleted: false });
+      const activeCount = await InternshipPosting.countDocuments({
+        partnerId,
+        deleted: false,
+      });
       if (activeCount >= 2) {
-        return res.status(403).json({ message: "Freemium partners can post up to 2 internships only." });
+        return res
+          .status(403)
+          .json({ message: "Freemium partners can post up to 2 internships only." });
       }
     }
 
@@ -113,11 +121,12 @@ router.post("/", async (req, res) => {
       sector,
       internshipType,
       internshipMode: finalMode,
+      classification,            // 🔹 save new field
       compensationDetails: finalComp,
       qualifications,
       contactInfo,
       imgUrl,
-      applicationOpen,         // <-- save new field here
+      applicationOpen,
       studentApplied: false,
       adminApproved: false,
       adminReviewed: false,
@@ -129,9 +138,12 @@ router.post("/", async (req, res) => {
     res.status(201).json(created);
   } catch (error) {
     console.error("Error creating internship post:", error);
-    res.status(400).json({ message: "Error: Unable to create internship post", error: error.message });
+    res
+      .status(400)
+      .json({ message: "Error: Unable to create internship post", error: error.message });
   }
 });
+
 
 
 // GET all deleted internship postings (soft deleted)
@@ -302,8 +314,9 @@ router.put("/:id", async (req, res) => {
     studentApplied,
     adminApproved,
     partnerId,
-    sector, 
-    applicationOpen,          // <-- accept updated applicationOpen flag
+    sector,
+    classification,            // 🔹 accept new field
+    applicationOpen,
   } = req.body;
 
   try {
@@ -320,12 +333,13 @@ router.put("/:id", async (req, res) => {
         ...(salaryDetails && { salaryDetails }),
         ...(qualifications && { qualifications }),
         ...(sector && { sector }),
+        ...(classification && { classification }), // 🔹 update if provided
         ...(contactInfo && { contactInfo }),
         ...(imgUrl && { imgUrl }),
         ...(studentApplied !== undefined && { studentApplied }),
         ...(adminApproved !== undefined && { adminApproved }),
         ...(partnerId && { partnerId }),
-        ...(applicationOpen !== undefined && { applicationOpen }),  // <-- update field if provided
+        ...(applicationOpen !== undefined && { applicationOpen }),
       },
       { new: true }
     );
@@ -343,6 +357,7 @@ router.put("/:id", async (req, res) => {
     });
   }
 });
+
 
 // DELETE an internship posting by ID
 router.delete("/:id", async (req, res) => {

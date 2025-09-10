@@ -25,6 +25,9 @@ const getUserProfile = asyncHandler(async (req, res) => {
     desiredField: user.desiredField,
     linkedin: user.linkedin,
     portfolio: user.portfolio,
+    skills: user.skills,
+    interests: user.interests,
+    preferredLocations: user.preferredLocations,
     adminApproved: user.adminApproved,
     financialStatus: user.financialStatus,
     state: user.state,
@@ -110,7 +113,7 @@ const verifyOTPAndResetPassword = asyncHandler(async (req, res) => {
 
 // Register a new user
 const registerUser = asyncHandler(async (req, res) => {
-  console.log('Request Body:', req.body); // Log the request body
+  console.log("Request Body:", req.body);
 
   const {
     name,
@@ -124,10 +127,26 @@ const registerUser = asyncHandler(async (req, res) => {
     desiredField,
     linkedin,
     portfolio,
+    skills,
+    interests,
+    preferredLocations,
   } = req.body;
 
   // Check for required fields
-  if (!areFieldsFilled([name, email, password, confirmPassword, universityName, dob, educationLevel, fieldOfStudy, desiredField, linkedin])) {
+  if (
+    !areFieldsFilled([
+      name,
+      email,
+      password,
+      confirmPassword,
+      universityName,
+      dob,
+      educationLevel,
+      fieldOfStudy,
+      desiredField,
+      linkedin,
+    ])
+  ) {
     res.status(400);
     throw new Error("Please fill all required fields.");
   }
@@ -154,21 +173,29 @@ const registerUser = asyncHandler(async (req, res) => {
   // Get the S3 URL of the uploaded profile picture
   const profilePicUrl = req.file.location;
 
+  // ✅ Clean arrays properly
+  const parsedSkills = cleanArray(skills);
+  const parsedInterests = cleanArray(interests);
+  const parsedLocations = cleanArray(preferredLocations);
+
   // Create new user
   const user = await Userwebapp.create({
     name,
     email,
-    password, // Ensure password hashing occurs in the model pre-save hook
+    password, // hashed by pre-save hook
     universityName,
-    dob,
+    dob: new Date(dob),
     educationLevel,
     fieldOfStudy,
     desiredField,
     linkedin,
     portfolio,
-    profileImage: profilePicUrl, // Save the profile picture URL (aligned with model)
-    adminApproved: false, // Default to false
-    premiumExpiration: null, 
+    skills: parsedSkills,
+    interests: parsedInterests,
+    preferredLocations: parsedLocations,
+    profileImage: profilePicUrl,
+    adminApproved: false,
+    premiumExpiration: null,
   });
 
   if (user) {
@@ -183,15 +210,27 @@ const registerUser = asyncHandler(async (req, res) => {
       desiredField: user.desiredField,
       linkedin: user.linkedin,
       portfolio: user.portfolio,
-      profileImage: user.profileImage, // Include profile image URL in the response (aligned with model)
-      token: generateToken(user._id), // Generate token
-      adminApproved: user.adminApproved, // Include admin approval status
+      skills: user.skills,
+      interests: user.interests,
+      preferredLocations: user.preferredLocations,
+      profileImage: user.profileImage,
+      token: generateToken(user._id),
+      adminApproved: user.adminApproved,
     });
   } else {
     res.status(400);
     throw new Error("Error occurred while registering user.");
   }
 });
+
+// Helper: clean arrays (remove empty strings, trim values)
+const cleanArray = (arr) =>
+  Array.isArray(arr)
+    ? arr.map((x) => x.trim()).filter(Boolean)
+    : arr && typeof arr === "string"
+    ? arr.split(",").map((x) => x.trim()).filter(Boolean)
+    : [];
+
 
 
 // Authenticate user (login)
@@ -243,11 +282,11 @@ const updateUserProfile = asyncHandler(async (req, res) => {
     throw new Error("User not found.");
   }
 
-  // Update fields if they are provided, otherwise retain existing values
+  // Update scalar fields
   user.name = req.body.name || user.name;
   user.email = req.body.email || user.email;
   user.universityName = req.body.universityName || user.universityName;
-  user.dob = req.body.dob || user.dob;
+  user.dob = req.body.dob ? new Date(req.body.dob) : user.dob;
   user.educationLevel = req.body.educationLevel || user.educationLevel;
   user.fieldOfStudy = req.body.fieldOfStudy || user.fieldOfStudy;
   user.desiredField = req.body.desiredField || user.desiredField;
@@ -261,12 +300,23 @@ const updateUserProfile = asyncHandler(async (req, res) => {
   user.currentGrade = req.body.currentGrade || user.currentGrade;
   user.gradePercentage = req.body.gradePercentage || user.gradePercentage;
   user.isPremium = req.body.isPremium || user.isPremium;
-  // Add profile image if provided
-  
+
+  // ✅ Clean arrays properly
+  if (req.body.skills !== undefined) {
+    user.skills = cleanArray(req.body.skills);
+  }
+  if (req.body.interests !== undefined) {
+    user.interests = cleanArray(req.body.interests);
+  }
+  if (req.body.preferredLocations !== undefined) {
+    user.preferredLocations = cleanArray(req.body.preferredLocations);
+  }
+
+  // Profile image
   user.profileImage = req.body.profileImage || user.profileImage;
 
   if (req.body.password) {
-    user.password = req.body.password; // This will trigger the password hashing pre-save hook
+    user.password = req.body.password; // will be hashed
   }
 
   const updatedUser = await user.save();
@@ -282,16 +332,19 @@ const updateUserProfile = asyncHandler(async (req, res) => {
     desiredField: updatedUser.desiredField,
     linkedin: updatedUser.linkedin,
     portfolio: updatedUser.portfolio,
+    skills: updatedUser.skills,
+    interests: updatedUser.interests,
+    preferredLocations: updatedUser.preferredLocations,
     financialStatus: updatedUser.financialStatus,
     state: updatedUser.state,
     country: updatedUser.country,
     city: updatedUser.city,
     postalCode: updatedUser.postalCode,
     currentGrade: updatedUser.currentGrade,
-    planType: updatedUser.planType,
     gradePercentage: updatedUser.gradePercentage,
-    profileImage: updatedUser.profileImage,  // Include the updated profile image in the response
-    token: generateToken(updatedUser._id), // Regenerate token
+    planType: updatedUser.planType,
+    profileImage: updatedUser.profileImage,
+    token: generateToken(updatedUser._id),
   });
 });
 

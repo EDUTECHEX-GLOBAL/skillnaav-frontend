@@ -1,8 +1,9 @@
 const Application = require("../models/webapp-models/applicationModel"); // Import the Application model
 const mongoose = require("mongoose");
 const Userwebapp = require("../models/webapp-models/userModel");  // Ensure correct import path
-const InternshipPosting = require("../models/webapp-models/internshipPostModel.js"); 
-const { sendNotification } = require("../utils/Notification.js");
+const InternshipPosting = require("../models/webapp-models/internshipPostModel.js");
+const sendNotification = require("../utils/Notification.js");
+const { getPersonalizedRecommendations } = require("../utils/recommendationService.js");
 const notifyUser = require("../utils/notifyUser.js");
 const multer = require("multer"); // Multer for file uploads
 const path = require("path");
@@ -224,7 +225,7 @@ const checkIfApplied = async (req, res) => {
 const getApplicationsCountForInternships = async (req, res) => {
   try {
     const { internshipIds } = req.query;
-    
+
     if (!internshipIds) {
       return res.status(400).json({ message: "Internship IDs are required" });
     }
@@ -261,9 +262,9 @@ const getApplicationsCountForInternships = async (req, res) => {
     res.status(200).json({ counts: countsMap });
   } catch (error) {
     console.error("Error fetching application counts:", error);
-    res.status(500).json({ 
+    res.status(500).json({
       message: "Error fetching application counts",
-      error: error.message 
+      error: error.message
     });
   }
 };
@@ -277,7 +278,7 @@ const updateApplicationStatus = async (req, res) => {
   }
 
   try {
-    // ✅ Update application status
+    // Update application status
     const application = await Application.findByIdAndUpdate(
       applicationId,
       { status },
@@ -288,7 +289,7 @@ const updateApplicationStatus = async (req, res) => {
       return res.status(404).json({ error: "Application not found" });
     }
 
-    // ✅ Fetch student details
+    // Fetch student info
     let student = await Userwebapp.findById(application.studentId).lean();
     if (!student) {
       student = {
@@ -298,58 +299,85 @@ const updateApplicationStatus = async (req, res) => {
     }
 
     if (!student.email) {
-      console.warn(`⚠️ No email found for studentId: ${application.studentId}`);
+      console.warn(`No email found for studentId: ${application.studentId}`);
     }
 
-    // 👉 Handle rejection
+    // Handle rejection
     if (status === "Rejected") {
-      // 1️⃣ Save in-app notification
+      let recommendations = [];
       try {
-        await sendNotification({
-          studentId: application.studentId,
-          title: "Application Rejected",
-          message: `Unfortunately, your application for ${application.jobTitle} was rejected.`,
-          link: "/student-dashboard/recommendations",
-        });
-        console.log(`✅ Notification saved for studentId: ${application.studentId}`);
-      } catch (err) {
-        console.error("❌ Failed to save notification:", err.message);
+        recommendations = await getPersonalizedRecommendations(application.studentId, 5);
+      } catch (e) {
+        console.error("Failed to fetch personalized recommendations:", e.message);
       }
 
-      // 2️⃣ Prepare recommended internships
-      let recommendationsHtml = "<p>No recommendations available at the moment.</p>";
-      try {
-        const recommendations = await InternshipPosting.find({ applicationOpen: true })
-          .limit(3)
+      if (!recommendations.length) {
+        recommendations = await InternshipPosting.find({ applicationOpen: true })
+          .sort({ createdAt: -1 })
+          .limit(5)
           .lean();
-
-        if (recommendations.length > 0) {
-          recommendationsHtml = `<ul>${recommendations
-            .map(
-              (job) =>
-                `<li><b>${job.jobTitle}</b> at ${job.companyName || "Company"} – <a href="https://yourdomain.com/internship/${job._id}">Apply Now</a></li>`
-            )
-            .join("")}</ul>`;
-        }
-      } catch (err) {
-        console.error("❌ Failed to fetch recommendations:", err.message);
       }
 
-      // 3️⃣ Send rejection email
+      // Build email content
+      const items = recommendations.map((job) => {
+        const stipend = job?.compensationDetails?.amount
+          ? ` – Stipend: ${job.compensationDetails.amount} ${job.compensationDetails.currency || ""}`.trim()
+          : "";
+        const deadline = job?.applicationDeadline
+          ? ` – Apply by: ${new Date(job.applicationDeadline).toDateString()}`
+          : "";
+        const locOrMode = job?.location || job?.internshipMode || "—";
+        const jobUrl = `http://localhost:3000/user-main-page?openTab=recommendations&openRec=${job?._id}`;
+        return `<li style="margin:6px 0;">
+                  <strong>${job?.jobTitle || "Internship"}</strong>${job?.companyName ? ` at ${job.companyName}` : ""} — ${locOrMode}${stipend}${deadline}
+                  — <a href="${jobUrl}" style="color:#2563eb; text-decoration:underline;">View & Apply</a>
+                </li>`;
+      }).join("");
+
+      const listHtml = recommendations.length
+        ? `<p style="margin:12px 0;">Based on your profile, here are some internships:</p>
+           <ul style="margin:0; margin-left:20px; padding:0; font-family:Arial,Helvetica,sans-serif; font-size:14px; line-height:20px;" type="disc">
+             ${items}
+           </ul>
+           <p style="margin:12px 0;">
+             <a href="http://localhost:3000/user-main-page?openTab=recommendations" style="color:#2563eb; text-decoration:underline;">View all recommendations</a>
+           </p>`
+        : `<p style="margin:12px 0;">No strong matches right now. Check new roles here:
+             <a href="http://localhost:3000/user-main-page?openTab=recommendations" style="color:#2563eb; text-decoration:underline;">Recommendations</a>.
+           </p>`;
+
+      // Send in-app notification
+      // try {
+      //   await sendNotification({
+      //     studentId: application.studentId,
+      //     title: "Application Rejected",
+      //     message: recommendations.length
+      //       ? `We found ${recommendations.length} internships that may suit you.`
+      //       : "We couldn’t find strong matches right now, but keep checking recommendations!",
+      //     link: "http://localhost:3000/user-main-page?openTab=recommendations",
+      //     type: "recommendation",
+      //   });
+      //   console.log(`✅ In-app rejection notification saved for studentId: ${application.studentId}`);
+      // } catch (err) {
+      //   console.error("Failed to save notification:", err.message);
+      // }
+
+      // Send email if available
       if (student.email) {
         try {
-          const mailResult = await notifyUser(
+          const emailContent = `
+            <p>Hi ${student.name || "there"},</p>
+            <p>Unfortunately, the application for <strong>${application.jobTitle}</strong> was not shortlisted this time.</p>
+            ${listHtml}
+          `;
+          await notifyUser(
             student.email,
-            "Application Rejected - Explore New Opportunities",
-            `<p>Hi ${student.name},</p>
-             <p>We regret to inform you that your application for <b>${application.jobTitle}</b> has been rejected.</p>
-             <p>But don’t worry! Here are some recommended internships for you:</p>
-             ${recommendationsHtml}
-             <p><a href="https://yourdomain.com/student-dashboard/recommendations">View All Recommendations</a></p>`
+            "Application Rejected – Explore new opportunities",
+            emailContent
           );
-          console.log("✅ Email sent successfully:", mailResult);
+          console.log(`✅ Rejection email sent to ${student.email}`);
         } catch (err) {
-          console.error("❌ Failed to send email:", err.message);
+          console.error("Failed to send rejection email:", err.message);
         }
       }
     }
@@ -365,6 +393,17 @@ const updateApplicationStatus = async (req, res) => {
   }
 };
 
+const getRecommendationsForStudent = async (req, res) => {
+  try {
+    const studentId = req.query.studentId || req.user._id; // req.user set by auth middleware
+    if (!studentId) return res.status(400).json({ message: "Missing studentId" });
+    const recs = await getPersonalizedRecommendations(studentId, Number(req.query.limit) || 10);
+    res.status(200).json({ success: true, recommendations: recs });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ success: false, message: "Failed to fetch recommendations" });
+  }
+};
 
 module.exports = {
   applyForInternship,
@@ -376,4 +415,5 @@ module.exports = {
   getApplicationCount,
   getApplicationsCountForInternships,
   updateApplicationStatus,
+  getRecommendationsForStudent,
 };

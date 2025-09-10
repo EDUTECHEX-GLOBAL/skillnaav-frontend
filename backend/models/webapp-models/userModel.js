@@ -17,6 +17,11 @@ const userwebappSchema = new mongoose.Schema(
     portfolio: { type: String },
     profileImage: { type: String, required: true },
 
+     // NEW: richer signals for recommendations
+  skills: [{ type: String, trim: true }],        // ["Python", "React", "SQL"]
+  interests: [{ type: String, trim: true }],     // ["AI", "Robotics"]
+  preferredLocations: [{ type: String, trim: true }], // ["Hyderabad", "Remote"]
+
     financialStatus: { type: String },
     state: { type: String },
     country: { type: String },

@@ -11,6 +11,7 @@ import {
   faSignOutAlt,
   faChevronDown,
   faChevronUp,
+  faStar,
 } from "@fortawesome/free-solid-svg-icons";
 import { useTabContext } from "./UserHomePageContext/HomePageContext";
 import { useNavigate } from "react-router-dom";
@@ -89,6 +90,7 @@ const Sidebar = ({ isMobile, isOpen, onClose }) => {
               { id: "home", icon: faHome, label: "HomePage" },
               { id: "aeronautical-jobs", icon: faPlane, label: "Aeronautical Jobs" },
               { id: "searchbar", icon: faSearch, label: "Search" },
+              { id: "recommendations", icon: faStar, label: "Recommendations" },
               { id: "applications", icon: faFileAlt, label: "Applications" },
               { id: "offer-letter", icon: faFileAlt, label: "Offer Letter" },
               { id: "saved-jobs", icon: faHeart, label: "Saved Jobs" },
