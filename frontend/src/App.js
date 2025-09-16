@@ -11,6 +11,14 @@ import { HideLoading, SetSkillNaavData } from "./redux/rootSlice";
 import Admin from "./pages/Admin";
 import Login from "./pages/Admin/Login";
 
+
+import PricingPage from "./pages/PricingPage";
+import FeaturesPage from "./pages/FeaturesPage";
+import TeamPage from "./pages/TeamPage";
+import FaqPage from "./pages/FaqPage";
+import ContactPage from "./pages/ContactPage";
+import VisionPage from "./pages/VisionPage";
+
 import UserCreateAccount from "./WebApp/Flows/UserFlow/SignUpLogin/UserCreateAccount";
 import UserLogin from "./WebApp/Flows/UserFlow/SignUpLogin/UserLogin";
 import UserFlow from "./WebApp/Flows/UserFlow/UserFlow";
@@ -38,12 +46,12 @@ import AdminProfilePicture from "./WebApp/Flows/AdminFlow/SignUpLogin/AdminProfi
 import AdminMainPage from "./WebApp/Flows/AdminFlow/MainPage/AdminMainPage";
 import TryforFree from "./WebApp/TryforFree";
 
- import SchoolAdminFlow from "./WebApp/Flows/SchoolAdminFlow/SchoolAdminFlow";
- import SchoolAdminResetPassword from "./WebApp/Flows/SchoolAdminFlow/SignUpLogin/SchoolAdminResetPassword";
- import SchoolAdminForgotPassword from "./WebApp/Flows/SchoolAdminFlow/SignUpLogin/SchoolAdminForgotPassword";
+import SchoolAdminFlow from "./WebApp/Flows/SchoolAdminFlow/SchoolAdminFlow";
+import SchoolAdminResetPassword from "./WebApp/Flows/SchoolAdminFlow/SignUpLogin/SchoolAdminResetPassword";
+import SchoolAdminForgotPassword from "./WebApp/Flows/SchoolAdminFlow/SignUpLogin/SchoolAdminForgotPassword";
 
 //  import InternshipDetail from "./WebApp/Flows/UserFlow/MainPage/InternshipDetail";
- import { TabProvider } from "./WebApp/Flows/UserFlow/MainPage/UserHomePageContext/HomePageContext";
+import { TabProvider } from "./WebApp/Flows/UserFlow/MainPage/UserHomePageContext/HomePageContext";
 
 
 function App() {
@@ -74,6 +82,12 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="/admin-login" element={<Login />} />
+        <Route path="/features" element={<FeaturesPage />} />
+        <Route path="/team" element={<TeamPage />} />
+        <Route path="/pricing" element={<PricingPage />} />
+        <Route path="/faqs" element={<FaqPage />} />
+        <Route path="/contact" element={<ContactPage />} />
+        <Route path="/vision" element={<VisionPage />} />
         {/* <Route
   path="/internship/:id"
   element={
@@ -83,7 +97,7 @@ function App() {
   }
 /> */}
         <Route path="*" element={<Navigate to="/" replace />} />
-        
+
 
         {/* Skillnaav Web App Routes */}
         {/* User Flow */}
@@ -95,10 +109,10 @@ function App() {
         <Route path="/user-main-page" element={<UserMainPage />} />
         <Route path="/user-forgot-password" element={<UserforgotPassword />} />
         <Route path="/google-user-profileform" element={<GoogleUserProfileForm />} />
-  
-        
+
+
         <Route path="/skillnaav-analysis" element={<SkillnaavAnalysis />} />
-        
+
 
 
         {/* Partner Flow */}
@@ -111,7 +125,7 @@ function App() {
         <Route path="/partner-profile-picture" element={<PartnerProfilePicture />}
         />
         <Route path="/partner-main-page" element={<PartnerMainPage />} />
-        
+
         <Route path="/partner-forgot-password" element={<PartnerforgotPassword />} />
 
         {/* Admin Flow */}

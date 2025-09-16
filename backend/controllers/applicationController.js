@@ -318,7 +318,7 @@ const updateApplicationStatus = async (req, res) => {
           .lean();
       }
 
-      // Build email content
+      // Build HTML list of recommended internships
       const items = recommendations.map((job) => {
         const stipend = job?.compensationDetails?.amount
           ? ` – Stipend: ${job.compensationDetails.amount} ${job.compensationDetails.currency || ""}`.trim()
@@ -346,23 +346,25 @@ const updateApplicationStatus = async (req, res) => {
              <a href="http://localhost:3000/user-main-page?openTab=recommendations" style="color:#2563eb; text-decoration:underline;">Recommendations</a>.
            </p>`;
 
-      // Send in-app notification
-      // try {
-      //   await sendNotification({
-      //     studentId: application.studentId,
-      //     title: "Application Rejected",
-      //     message: recommendations.length
-      //       ? `We found ${recommendations.length} internships that may suit you.`
-      //       : "We couldn’t find strong matches right now, but keep checking recommendations!",
-      //     link: "http://localhost:3000/user-main-page?openTab=recommendations",
-      //     type: "recommendation",
-      //   });
-      //   console.log(`✅ In-app rejection notification saved for studentId: ${application.studentId}`);
-      // } catch (err) {
-      //   console.error("Failed to save notification:", err.message);
-      // }
+      // Optional: Send in-app notification for rejection with recommendations
+      /*
+      try {
+        await sendNotification({
+          studentId: application.studentId,
+          title: "Application Rejected",
+          message: recommendations.length
+            ? `We found ${recommendations.length} internships that may suit you.`
+            : "We couldn’t find strong matches right now, but keep checking recommendations!",
+          link: "http://localhost:3000/user-main-page?openTab=recommendations",
+          type: "recommendation",
+        });
+        console.log(`✅ In-app rejection notification saved for studentId: ${application.studentId}`);
+      } catch (err) {
+        console.error("Failed to save notification:", err.message);
+      }
+      */
 
-      // Send email if available
+      // Send rejection email with recommendations if email present
       if (student.email) {
         try {
           const emailContent = `
@@ -370,6 +372,7 @@ const updateApplicationStatus = async (req, res) => {
             <p>Unfortunately, the application for <strong>${application.jobTitle}</strong> was not shortlisted this time.</p>
             ${listHtml}
           `;
+
           await notifyUser(
             student.email,
             "Application Rejected – Explore new opportunities",
@@ -392,6 +395,8 @@ const updateApplicationStatus = async (req, res) => {
     return res.status(500).json({ error: "Server error" });
   }
 };
+
+
 
 const getRecommendationsForStudent = async (req, res) => {
   try {

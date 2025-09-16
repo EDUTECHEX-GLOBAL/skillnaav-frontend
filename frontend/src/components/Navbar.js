@@ -4,13 +4,15 @@ import Menu from "../assets/Menu.svg";
 import Close from "../assets/close.png";
 
 const navLinks = [
-  { name: "Discover", href: "#discover" },
-  { name: "Vision", href: "#vision" },
-  { name: "Features", href: "#features" },
-  { name: "Team", href: "#team" },
-  { name: "Pricing", href: "#pricing" },
-  { name: "FAQs", href: "#faqs" },
+  { name: "Discover", href: "/" }, // homepage
+  { name: "Vision", href: "/vision" },   // keep inside home
+  { name: "Features", href: "/features" },
+  { name: "Team", href: "/team" },
+  { name: "Pricing", href: "/pricing" },
+  { name: "FAQs", href: "/faqs" },
+  { name: "Contact", href: "/contact" },
 ];
+
 
 const Navbar = () => {
   const [menuOpen, setMenuOpen] = useState(false);

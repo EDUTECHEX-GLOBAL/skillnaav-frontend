@@ -73,7 +73,32 @@ const Recommendations = () => {
     hydrateJobs();
   }, [jobSummaries]);
 
-  if (loading) return <div>Loading recommendations...</div>;
+  // ✅ Skeleton loader effect
+  const SkeletonLoader = () => (
+    <div className="animate-pulse space-y-4">
+      {[...Array(3)].map((_, i) => (
+        <div
+          key={i}
+          className="p-4 border rounded-lg shadow-md bg-white flex flex-col gap-3"
+        >
+          <div className="h-6 bg-gray-300 rounded w-1/3"></div>
+          <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+          <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+          <div className="h-10 bg-gray-300 rounded mt-2"></div>
+        </div>
+      ))}
+    </div>
+  );
+
+  if (loading) {
+    return (
+      <div className="p-6 font-[Poppins]">
+        <h2 className="text-2xl font-bold mb-4">Recommended Internships</h2>
+        <SkeletonLoader />
+      </div>
+    );
+  }
+
   if (error) return <div className="text-red-600">Error: {error}</div>;
   if (!jobs.length) return <div>No recommendations at the moment.</div>;
 

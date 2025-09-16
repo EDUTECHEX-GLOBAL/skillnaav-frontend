@@ -239,32 +239,38 @@ async def shortlist_candidates(
     if not resumes:
         raise HTTPException(status_code=400, detail="No resumes provided.")
 
-    # Generate job embedding
+    # Compose job text and get embedding
     job_text = job_description + " " + " ".join(job_skills_list)
     job_embedding = embedder.encode(job_text, convert_to_tensor=True)
 
-    # Process all resumes
+    # Async process each resume and compute similarity
     tasks = [process_resume(url, job_embedding) for url in resumes]
     results = await asyncio.gather(*tasks)
+
+    # Filter candidates by similarity threshold
     candidates = [c for c in results if c and c['similarity_score'] >= 0.3]
 
-    # Attach metadata
+    # Attach normalized IDs and validate school_admin_id
     for cand in candidates:
         cand['internship_id'] = internship_obj_id
         if cand.get("school_admin_id") and ObjectId.is_valid(str(cand['school_admin_id'])):
             cand['school_admin_id'] = ObjectId(cand['school_admin_id'])
 
+    # Sort candidates in descending order of similarity
     candidates = sorted(candidates, key=lambda x: x['similarity_score'], reverse=True)
 
     if candidates:
+        # Insert shortlisted candidates into MongoDB collection
         shortlist_collection.insert_many(candidates)
 
         shortlisted_resume_urls = [c['resumeUrl'] for c in candidates]
         all_applications = list(applications_collection.find({"internshipId": internship_obj_id}))
         all_resume_urls = [app['resumeUrl'] for app in all_applications]
+
+        # Identify rejected resumes as those applied but not shortlisted
         rejected_resume_urls = list(set(all_resume_urls) - set(shortlisted_resume_urls))
 
-        # Update DB statuses
+        # Update statuses in application collection
         applications_collection.update_many(
             {"resumeUrl": {"$in": shortlisted_resume_urls}},
             {"$set": {"status": "Shortlisted"}}
@@ -274,14 +280,13 @@ async def shortlist_candidates(
             {"$set": {"status": "Rejected"}}
         )
 
-        # Trigger notifications + email in background
+        # Trigger rejection notifications asynchronously
         for resume_url in rejected_resume_urls:
             app_doc = applications_collection.find_one({"resumeUrl": resume_url})
             if app_doc:
                 background_tasks.add_task(notify_rejection, app_doc)
 
     return {"shortlisted_candidates": convert_object_ids(candidates)}
-
 
 @app.get("/partner/shortlisted/by-admin")
 async def get_shortlisted_by_admin(
