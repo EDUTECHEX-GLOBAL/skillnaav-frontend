@@ -2,57 +2,98 @@ import React from "react";
 import PropTypes from "prop-types";
 import { useState, useEffect } from "react";
 import SendOfferLetter from "./OfferLetter";
-import ScheduleForm from "./ScheduleForm";
 import Modal from "./Modal";
 import { checkOfferStatus, checkOfferStatuses, getOfferStatusText, getOfferStatusColor } from "./offerUtils";
 
-export const ApplicationsTable = ({ applications, onStatusUpdate }) => (
-  <div className="h-[60vh] overflow-auto -mr-6 pr-6 bg-white">
-    <table className="min-w-full table-auto font-poppins text-sm bg-white">
-      <thead>
-        <tr className="bg-gray-100 text-gray-600 uppercase text-xs leading-normal">
-          <th className="px-6 py-3 text-left">Name</th>
-          <th className="px-6 py-3 text-left">Email</th>
-          <th className="px-6 py-3 text-left">Applied Date</th>
-          <th className="px-6 py-3 text-left">Resume</th>
-          <th className="px-6 py-3 text-left">Status</th>
-          <th className="px-6 py-3 text-left">Update Status</th>
+// --- Applications UI helpers (chips + date) ---
+const formatAppDate = (iso) => {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  return `${dd}/${mm}/${yyyy}`; // e.g., 17/07/2025
+};
+
+const getApplicationStatusText = (status) => {
+  const s = (status || "").trim().toLowerCase();
+  if (s === "shortlisted") return "Shortlisted";
+  if (s === "approved" || s === "selected") return "Approved";
+  if (s === "rejected" || s === "declined") return "Rejected";
+  if (s === "pending" || !s) return "Pending";
+  return status.charAt(0).toUpperCase() + status.slice(1); // fallback
+};
+
+const getApplicationStatusColor = (status) => {
+  switch ((status || "").trim().toLowerCase()) {
+    case "shortlisted":
+      return "bg-yellow-100 text-yellow-800";
+    case "approved":
+    case "selected":
+      return "bg-green-100 text-green-800";
+    case "rejected":
+    case "declined":
+      return "bg-red-100 text-red-800";
+    case "pending":
+    default:
+      return "bg-gray-100 text-gray-800";
+  }
+};
+
+// Tables.js — REPLACE THIS WHOLE BLOCK
+
+export const ApplicationsTable = ({ applications }) => (
+  <div className="h-[80vh] overflow-auto -mr-6 pr-6 bg-white">
+    <table className="min-w-full font-poppins text-sm bg-white">
+      <thead className="bg-gray-100 text-gray-600 uppercase text-xs sticky top-0 z-20">
+        <tr>
+          <th className="px-6 py-3 text-center bg-gray-100">Name</th>
+          <th className="px-6 py-3 text-center bg-gray-100">Email</th>
+          <th className="px-6 py-3 text-center bg-gray-100">Applied Date</th>
+          <th className="px-6 py-3 text-center bg-gray-100">Resume</th>
+          <th className="px-6 py-3 text-center bg-gray-100">Status</th>
         </tr>
       </thead>
-      <tbody className="text-gray-700">
-        {applications.map((student) => (
-          <tr key={student._id} className="border-b hover:bg-gray-50 transition">
-            <td className="px-6 py-4">{student.userName}</td>
-            <td className="px-6 py-4">{student.userEmail}</td>
-            <td className="px-6 py-4">{new Date(student.appliedDate).toLocaleDateString()}</td>
-            <td className="px-6 py-4">
-              <a href={student.resumeUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                View Resume
-              </a>
-            </td>
-            <td className="px-6 py-4">{student.status || "Pending"}</td>
-            <td className="px-6 py-4">
-              <select
-                value={student.status || "Pending"}
-                onChange={(e) => onStatusUpdate(student._id, e.target.value)}
-                className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="Pending">Pending</option>
-                <option value="Approved">Approved</option>
-                <option value="Rejected">Rejected</option>
-              </select>
-            </td>
-          </tr>
-        ))}
+
+      <tbody className="divide-y divide-gray-200 text-center">
+        {applications.map((student) => {
+          const statusText = getApplicationStatusText(student.status);
+          const statusCls = getApplicationStatusColor(student.status);
+
+          return (
+            <tr key={student._id} className="hover:bg-gray-50 transition">
+              <td className="px-6 py-4">{student.userName || "N/A"}</td>
+              <td className="px-6 py-4">{student.userEmail || "N/A"}</td>
+              <td className="px-6 py-4">{formatAppDate(student.appliedDate)}</td>
+              <td className="px-6 py-4">
+                {student.resumeUrl ? (
+                  <a
+                    href={student.resumeUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline"
+                  >
+                    View Resume
+                  </a>
+                ) : (
+                  <span className="text-gray-400">—</span>
+                )}
+              </td>
+              <td className="px-6 py-4">
+                <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusCls}`}>
+                  {statusText}
+                </span>
+              </td>
+            </tr>
+          );
+        })}
       </tbody>
     </table>
-
   </div>
 );
 
 ApplicationsTable.propTypes = {
   applications: PropTypes.array.isRequired,
-  onStatusUpdate: PropTypes.func.isRequired,
 };
 
 export const ShortlistedTable = ({ candidates, internshipId, onSendOffer }) => {
