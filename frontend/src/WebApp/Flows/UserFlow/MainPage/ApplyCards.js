@@ -185,7 +185,7 @@ const ApplyCards = ({ job, onBack }) => {
             <div className="flex items-center text-gray-500 mt-2 text-sm md:text-base">
               <FaDollarSign className="mr-2" />
               <p>
-                <FontAwesomeIcon icon={FaDollarSign} />
+                {/* <FontAwesomeIcon icon={FaDollarSign} /> */}
                 {job.internshipType === "STIPEND"
                   ? `${job.compensationDetails?.amount} ${job.compensationDetails?.currency} per ${job.compensationDetails?.frequency?.toLowerCase()}`
                   : job.internshipType === "FREE"

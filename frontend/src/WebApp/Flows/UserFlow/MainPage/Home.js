@@ -145,34 +145,34 @@ const Home = () => {
 
 
   // Toggle Save Job Logic (check saved job limit)
-const toggleSaveJob = async (job) => {
-  try {
-    // Wait until planType is correctly fetched (avoids false limit)
-    if (isPremium && planType === "Freemium") {
-      console.log("⏳ Waiting for planType to load...");
-      return;
-    }
+  const toggleSaveJob = async (job) => {
+    try {
+      // Wait until planType is correctly fetched (avoids false limit)
+      if (isPremium && planType === "Freemium") {
+        console.log("⏳ Waiting for planType to load...");
+        return;
+      }
 
-    const savedLimit = getSavedLimitByPlan(planType);
-    if (savedJobs.length >= savedLimit && savedLimit !== Infinity) {
-      setShowSavedJobPopup(true);
-      return;
-    }
+      const savedLimit = getSavedLimitByPlan(planType);
+      if (savedJobs.length >= savedLimit && savedLimit !== Infinity) {
+        setShowSavedJobPopup(true);
+        return;
+      }
 
-    const jobExists = savedJobs.some((savedJob) => {
-      const jobToCheck = savedJob.savedJob || savedJob;
-      return jobToCheck.jobId?._id === job._id || jobToCheck._id === job._id;
-    });
+      const jobExists = savedJobs.some((savedJob) => {
+        const jobToCheck = savedJob.savedJob || savedJob;
+        return jobToCheck.jobId?._id === job._id || jobToCheck._id === job._id;
+      });
 
-    if (jobExists) {
-      await removeJob(job._id);
-    } else {
-      await saveJob(job);
+      if (jobExists) {
+        await removeJob(job._id);
+      } else {
+        await saveJob(job);
+      }
+    } catch (error) {
+      console.error("Error toggling job save:", error);
     }
-  } catch (error) {
-    console.error("Error toggling job save:", error);
-  }
-};
+  };
 
 
 
@@ -242,26 +242,26 @@ const toggleSaveJob = async (job) => {
                     </div>
                   </div>
 
-            <div className="text-gray-600 mb-4">
+                  <div className="text-gray-600 mb-4">
                     <p><FontAwesomeIcon icon={faMapMarkerAlt} /> {job.location}  {job.jobType}</p>
                     <p className="flex items-center">
                       <FontAwesomeIcon icon={faClock} className="mr-2" />
                       {format(new Date(job.startDate), "dd MMM yyyy")} –{" "}
                       {job.endDateOrDuration ? format(new Date(job.endDateOrDuration), "dd MMM yyyy") : "—"}
                     </p>
-              <div className="flex items-center gap-2 text-gray-600  text-sm md:text-base leading-none">
-  <FontAwesomeIcon icon={faDollarSign} className="text-gray-600 w-4 h-4 flex-shrink-0" />
-  <span className="leading-none">
-    {job.internshipType === "STIPEND"
-      ? `${job.compensationDetails?.amount} ${job.compensationDetails?.currency} per ${job.compensationDetails?.frequency?.toLowerCase()}`
-      : job.internshipType === "FREE"
-        ? "Unpaid / Free"
-        : job.internshipType === "PAID"
-          ? `Student Pays: ${job.compensationDetails?.amount} ${job.compensationDetails?.currency}`
-          : "N/A"
-    }
-  </span>
-</div>
+                    <div className="flex items-center gap-2 text-gray-600  text-sm md:text-base leading-none">
+                      <FontAwesomeIcon icon={faDollarSign} className="text-gray-600 w-4 h-4 flex-shrink-0" />
+                      <span className="leading-none">
+                        {job.internshipType === "STIPEND"
+                          ? `${job.compensationDetails?.amount} ${job.compensationDetails?.currency} per ${job.compensationDetails?.frequency?.toLowerCase()}`
+                          : job.internshipType === "FREE"
+                            ? "Unpaid / Free"
+                            : job.internshipType === "PAID"
+                              ? `Student Pays: ${job.compensationDetails?.amount} ${job.compensationDetails?.currency}`
+                              : "N/A"
+                        }
+                      </span>
+                    </div>
 
 
                     {/* ← Insert mode right here: */}
@@ -280,18 +280,18 @@ const toggleSaveJob = async (job) => {
 
                   {/* Qualifications and View Details */}
                   <div className="flex items-center justify-between">
-                   <div className="flex flex-wrap gap-2">
-  {job.qualifications && job.qualifications.slice(0, 2).map((qualification, index) => (
-    <span key={index} className="text-sm bg-gray-200 text-gray-800 py-1 px-3 rounded-full">
-      {qualification}
-    </span>
-  ))}
-  {job.qualifications && job.qualifications.length > 2 && (
-    <span className="text-sm bg-gray-100 text-gray-700 py-1 px-3 rounded-full">
-      +{job.qualifications.length - 2}
-    </span>
-  )}
-</div>
+                    <div className="flex flex-wrap gap-2">
+                      {job.qualifications && job.qualifications.slice(0, 2).map((qualification, index) => (
+                        <span key={index} className="text-sm bg-gray-200 text-gray-800 py-1 px-3 rounded-full">
+                          {qualification}
+                        </span>
+                      ))}
+                      {job.qualifications && job.qualifications.length > 2 && (
+                        <span className="text-sm bg-gray-100 text-gray-700 py-1 px-3 rounded-full">
+                          +{job.qualifications.length - 2}
+                        </span>
+                      )}
+                    </div>
 
                     <button className="text-purple-600 hover:underline" onClick={() => handleViewDetails(job)}>
                       View details
@@ -368,10 +368,10 @@ const toggleSaveJob = async (job) => {
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
           <div className="bg-white p-6 rounded-lg shadow-lg max-w-sm text-center">
             <h2 className="text-xl font-semibold text-gray-800">Saved Jobs Limit Reached</h2>
-           <p className="text-gray-600 mt-2">
-  You have reached the maximum of{" "}
-  {getSavedLimitByPlan(planType) === Infinity ? "unlimited" : getSavedLimitByPlan(planType)} saved jobs.
-</p>
+            <p className="text-gray-600 mt-2">
+              You have reached the maximum of{" "}
+              {getSavedLimitByPlan(planType) === Infinity ? "unlimited" : getSavedLimitByPlan(planType)} saved jobs.
+            </p>
 
             <div className="flex justify-between mt-4">
               <button

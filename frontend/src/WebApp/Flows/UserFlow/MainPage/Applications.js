@@ -52,11 +52,15 @@ const Applications = () => {
 
   if (error) return <p>{error}</p>;
 
-  const appliedInternships = applications.filter(
-    (application) => application.status === "Applied"
-  );
+  const statusColors = {
+    Applied: "bg-green-100 text-green-700",
+    Shortlisted: "bg-blue-100 text-blue-700",
+    Rejected: "bg-red-100 text-red-700",
+    Pending: "bg-yellow-100 text-yellow-700",
+    // Add other statuses and colors as needed
+  };
 
-  // ✅ If a job is selected, show ApplyCards view
+  // If a job is selected, show ApplyCards view
   if (selectedJob) {
     return (
       <ApplyCards
@@ -69,11 +73,11 @@ const Applications = () => {
   return (
     <div className="p-4 font-poppins">
       <h2 className="text-xl font-semibold mb-4">Your Applications</h2>
-      {appliedInternships.length === 0 ? (
+      {applications.length === 0 ? (
         <p>No applications yet.</p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {appliedInternships.map((application, index) => {
+          {applications.map((application, index) => {
             const job = application.internshipId;
             if (!job) return null;
 
@@ -91,10 +95,16 @@ const Applications = () => {
                       <p className="text-gray-500">{job?.companyName || "Unknown Company"}</p>
                     </div>
                   </div>
-                  <button className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm">
-                    Applied
-                  </button>
+
+                  <span
+                    className={`px-3 py-1 rounded-full text-sm ${
+                      statusColors[application.status] || "bg-gray-100 text-gray-700"
+                    }`}
+                  >
+                    {application.status}
+                  </span>
                 </div>
+
                 <div className="text-gray-500 text-sm mb-2">
                   <p>
                     <FontAwesomeIcon icon={faMapMarkerAlt} /> {job?.location || "N/A"} •{" "}
@@ -114,22 +124,27 @@ const Applications = () => {
                       : "N/A"}
                   </p>
                 </div>
+
                 <div className="flex justify-between items-center">
                   <div className="flex flex-wrap gap-2">
-  {job.qualifications && job.qualifications.slice(0, 2).map((qualification, index) => (
-    <span key={index} className="text-sm bg-gray-200 text-gray-800 py-1 px-3 rounded-full">
-      {qualification}
-    </span>
-  ))}
-  {job.qualifications && job.qualifications.length > 2 && (
-    <span className="text-sm bg-gray-100 text-gray-700 py-1 px-3 rounded-full">
-      +{job.qualifications.length - 2}
-    </span>
-  )}
-</div>
+                    {job.qualifications &&
+                      job.qualifications.slice(0, 2).map((qualification, idx) => (
+                        <span
+                          key={idx}
+                          className="text-sm bg-gray-200 text-gray-800 py-1 px-3 rounded-full"
+                        >
+                          {qualification}
+                        </span>
+                      ))}
+                    {job.qualifications && job.qualifications.length > 2 && (
+                      <span className="text-sm bg-gray-100 text-gray-700 py-1 px-3 rounded-full">
+                        +{job.qualifications.length - 2}
+                      </span>
+                    )}
+                  </div>
 
                   <button
-                    onClick={() => setSelectedJob(job)} // ✅ Set selected job on click
+                    onClick={() => setSelectedJob(job)}
                     className="text-purple-500 font-semibold"
                   >
                     View details
