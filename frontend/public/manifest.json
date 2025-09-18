@@ -1,13 +1,11 @@
 {
-  "short_name": "SkillNaav",
-  "name": "SkillNaav - Navigate Your Skills",
   "short_name": "Skill Naav",
   "name": "Skill Naav — Navigate Your Skills",
   "icons": [
     {
-      "src": "favicon.jpg",
+      "src": "favicon.ico",
       "sizes": "64x64 32x32 24x24 16x16",
-      "type": "image/jpeg"
+      "type": "image/x-icon"
     },
     {
       "src": "logo192.png",

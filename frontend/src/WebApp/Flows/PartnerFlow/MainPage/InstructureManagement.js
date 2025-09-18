@@ -255,38 +255,24 @@ const InstructureManagement = () => {
         }
     };
 
-    // --- NEW: assign via AI backend
     const handleAssignInstructor = async () => {
         try {
-            // send your current visible list (or full list) to AI
-            const { data } = await axios.post("/api/ai/instructure/assign", {
-                candidates: instructors, // you can later add internshipId, requiredSkills, etc.
-            });
+            const partnerId = localStorage.getItem("partnerId") || undefined;
 
-            const assigned =
-                data?.assigned || data?.best || data?.result || data?.instructor || null;
+            const { data } = await axios.post(
+                "/api/instructors/ai/instructure/assign",
+                { partnerId }
+            );
 
-            if (!assigned) {
-                alert("AI did not return an assignment.");
-                return;
-            }
+            const made = data.assignments_made || 0;
+            const lines = (data.assignments || [])
+                .map(r => `Internship ${r.internshipId} → ${r.sessionsUpdated} session(s)`)
+                .join("\n");
 
-            // If AI returned just an id, find it; if full doc, use it directly
-            let chosen = assigned;
-            const assignedId = assigned._id || assigned.id;
-            if (assignedId && !assigned.firstName) {
-                const found = instructors.find(
-                    (x) => (x._id || x.id) === assignedId
-                );
-                if (found) chosen = found;
-            }
-
-            // Show the assigned instructor in your existing details modal
-            setIsAddOpen(false);
-            setViewing(chosen);
+            alert(`Assigned ${made} session${made === 1 ? "" : "s"}.\n${lines}`);
         } catch (err) {
             console.error("Assign Instructor failed:", err);
-            alert("Assign Instructor failed. Check console for details.");
+            alert("Assign Instructor failed. Check server logs.");
         }
     };
 
