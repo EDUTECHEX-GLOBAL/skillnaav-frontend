@@ -259,14 +259,17 @@ const InstructureManagement = () => {
         try {
             const partnerId = localStorage.getItem("partnerId") || undefined;
 
+            // Point directly to your FastAPI service on :8003
+            const PY_API = process.env.REACT_APP_PY_API || "http://127.0.0.1:8003";
+
             const { data } = await axios.post(
-                "/api/instructors/ai/instructure/assign",
+                `${PY_API}/assign-instructors`,
                 { partnerId }
             );
 
             const made = data.assignments_made || 0;
             const lines = (data.assignments || [])
-                .map(r => `Internship ${r.internshipId} → ${r.sessionsUpdated} session(s)`)
+                .map((r) => `Internship ${r.internshipId} → ${r.sessionsUpdated} session(s)`)
                 .join("\n");
 
             alert(`Assigned ${made} session${made === 1 ? "" : "s"}.\n${lines}`);
