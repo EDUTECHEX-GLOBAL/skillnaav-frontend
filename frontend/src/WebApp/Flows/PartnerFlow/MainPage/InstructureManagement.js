@@ -2,7 +2,7 @@
 import axios from "axios";
 import React, { useState, useEffect } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faSearch, faPlus } from "@fortawesome/free-solid-svg-icons";
+import { faSearch, faPlus, faUserCheck } from "@fortawesome/free-solid-svg-icons";
 import InstructureDetailsView from "./InstructureDetailsView";
 
 const inputCls =
@@ -255,6 +255,41 @@ const InstructureManagement = () => {
         }
     };
 
+    // --- NEW: assign via AI backend
+    const handleAssignInstructor = async () => {
+        try {
+            // send your current visible list (or full list) to AI
+            const { data } = await axios.post("/api/ai/instructure/assign", {
+                candidates: instructors, // you can later add internshipId, requiredSkills, etc.
+            });
+
+            const assigned =
+                data?.assigned || data?.best || data?.result || data?.instructor || null;
+
+            if (!assigned) {
+                alert("AI did not return an assignment.");
+                return;
+            }
+
+            // If AI returned just an id, find it; if full doc, use it directly
+            let chosen = assigned;
+            const assignedId = assigned._id || assigned.id;
+            if (assignedId && !assigned.firstName) {
+                const found = instructors.find(
+                    (x) => (x._id || x.id) === assignedId
+                );
+                if (found) chosen = found;
+            }
+
+            // Show the assigned instructor in your existing details modal
+            setIsAddOpen(false);
+            setViewing(chosen);
+        } catch (err) {
+            console.error("Assign Instructor failed:", err);
+            alert("Assign Instructor failed. Check console for details.");
+        }
+    };
+
     // FIXED
     const filteredInstructors = instructors.filter((i) => {
         const hay = [
@@ -269,14 +304,29 @@ const InstructureManagement = () => {
         <div className="w-full">
             <div className="flex items-center justify-between mb-6">
                 <h1 className="text-2xl font-bold text-gray-900">Instructor Management</h1>
-                <button
-                    type="button"
-                    onClick={() => { setViewing(null); setIsAddOpen(true); }}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-teal-500 to-cyan-600 text-white font-semibold shadow hover:from-teal-600 hover:to-cyan-700"
-                >
-                    <FontAwesomeIcon icon={faPlus} />
-                    <span>Add Instructor</span>
-                </button>
+
+                {/* Right-side buttons: Add Instructor + Assign Instructor */}
+                <div className="flex items-center gap-3">
+                    {/* UPDATED COLORS */}
+                    <button
+                        type="button"
+                        onClick={() => { setViewing(null); setIsAddOpen(true); }}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-semibold shadow hover:from-indigo-700 hover:to-blue-700"
+                    >
+                        <FontAwesomeIcon icon={faPlus} />
+                        <span>Add Instructor</span>
+                    </button>
+
+                    {/* UPDATED COLORS + ICON */}
+                    <button
+                        type="button"
+                        onClick={handleAssignInstructor}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-600 text-white font-semibold shadow hover:from-amber-600 hover:to-orange-700"
+                    >
+                        <FontAwesomeIcon icon={faUserCheck} />
+                        <span>Assign Instructor</span>
+                    </button>
+                </div>
             </div>
 
             {!isAddOpen && (

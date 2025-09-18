@@ -1,6 +1,8 @@
 {
   "short_name": "SkillNaav",
   "name": "SkillNaav - Navigate Your Skills",
+  "short_name": "Skill Naav",
+  "name": "Skill Naav — Navigate Your Skills",
   "icons": [
     {
       "src": "favicon.jpg",
