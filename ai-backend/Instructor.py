@@ -210,10 +210,10 @@ def assign_instructors(partner_id: Optional[str] = None) -> Dict[str, Any]:
     client = MongoClient(MONGO_URI)
     db = client[DB_NAME]
 
-    instructors_coll = db[INSTRUCTORS_COLL or "instructures"]
-    schedules_coll   = db[SCHEDULES_COLL   or "internshipschedules"]
+    instructors_coll = db[_resolve_collection(db, INSTRUCTORS_COLL, GUESSES["instructors"])]
+    schedules_coll   = db[_resolve_collection(db, SCHEDULES_COLL,   GUESSES["schedules"])]
 
-    instructors = _load_instructors(instructors_coll, None)
+    instructors = _load_instructors(instructors_coll, partner_id)
 
     # 👉 Fetch ALL schedules with timetables (ignore partnerId, restrictions, etc.)
     schedules = list(schedules_coll.find({"timetable": {"$exists": True, "$ne": []}}))
