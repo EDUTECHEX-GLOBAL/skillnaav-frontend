@@ -26,12 +26,23 @@ db = client[DB_NAME]
 application_collection = db.applications
 user_collection = db.userwebapps
 internship_collection = db.internshippostings
+personality_collection = db.personalityresponses # or whatever your personality results collection is
 
 # Initialize Sentence-Transformer model
 embedder = SentenceTransformer('all-MiniLM-L6-v2')
 
 # Level ranking for career progression logic
 LEVEL_RANK = {'basic': 1, 'intermediate': 2, 'advanced': 3}
+
+# --- RIASEC-to-sector mapping ---
+RIASEC_SECTOR_MAP = {
+    "R": ["engineering", "mechanical", "electrical", "construction", "it support"],
+    "I": ["research", "data", "analysis", "scientific", "technical", "programming"],
+    "A": ["design", "creative", "art", "music", "fashion", "writer", "graphic"],
+    "S": ["teaching", "counseling", "healthcare", "social work", "customer support"],
+    "E": ["marketing", "sales", "entrepreneurship", "management", "leadership"],
+    "C": ["accounting", "finance", "administration", "data entry", "project management"],
+}
 
 # --- Helper Functions ---
 
@@ -110,8 +121,19 @@ async def infer_from_recent_applications(student_id: ObjectId) -> Dict[str, Any]
         'highestLevel': highest_level
     }
 
-def score_job(job: Dict[str, Any], signals: Dict[str, Any], student: Dict[str, Any]) -> float:
-    """Scores a single job based on various matching criteria."""
+async def get_personality(student_id_obj: ObjectId) -> Dict[str, Any]:
+    """Fetches RIASEC personality test results for a student."""
+    personality = await personality_collection.find_one({'userId': student_id_obj})
+    if not personality:
+        return {'hollandCode': '', 'dominantTraits': []}
+    holland_code = personality.get('hollandCode', '') or ''
+    return {
+        'hollandCode': holland_code,
+        'dominantTraits': list(holland_code) if holland_code else []
+    }
+
+def score_job(job: Dict[str, Any], signals: Dict[str, Any], student: Dict[str, Any], dominant_traits: List[str]) -> float:
+    """Scores a single job based on various matching criteria and RIASEC traits."""
     score = 0.0
     job_skills = [norm(s) for s in job.get('qualifications', [])]
     job_title = norm(job.get('jobTitle', ''))
@@ -156,15 +178,20 @@ def score_job(job: Dict[str, Any], signals: Dict[str, Any], student: Dict[str, A
     else:
         score -= 1
 
+    # RIASEC personality boost
+    for trait in dominant_traits:
+        if job_cat in RIASEC_SECTOR_MAP.get(trait, []):
+            score += 8  # substantial boost for a direct personality/sector match
+
     return score
 
 async def embed_text(text: str):
     """Encodes text into a vector embedding."""
     return embedder.encode(text, convert_to_tensor=True)
 
-async def score_job_with_embedding(job: Dict[str, Any], signals: Dict[str, Any], student_embedding, student: Dict[str, Any]) -> float:
-    """Combines a base score with an embedding-based similarity score."""
-    base_score = score_job(job, signals, student)
+async def score_job_with_embedding(job: Dict[str, Any], signals: Dict[str, Any], student_embedding, student: Dict[str, Any], dominant_traits: List[str]) -> float:
+    """Combines a base score, embedding similarity, and RIASEC trait boost."""
+    base_score = score_job(job, signals, student, dominant_traits)
     job_text = ' '.join(filter(None, [job.get('jobTitle', ''), job.get('jobDescription', '')] + job.get('qualifications', [])))
     job_embedding = await embed_text(job_text)
     sim_score = util.cos_sim(student_embedding, job_embedding).item()
@@ -175,7 +202,7 @@ async def score_job_with_embedding(job: Dict[str, Any], signals: Dict[str, Any],
 @app.get('/recommendations/{student_id}', response_class=ORJSONResponse)
 async def get_personalized_recommendations(student_id: str, limit: int = 6) -> Dict[str, List[Dict[str, Any]]]:
     """
-    Provides a personalized list of internship recommendations for a student.
+    Provides a personalized list of internship recommendations for a student, using RIASEC personality results.
     """
     if not ObjectId.is_valid(student_id):
         raise HTTPException(status_code=400, detail="Invalid student ID")
@@ -197,35 +224,54 @@ async def get_personalized_recommendations(student_id: str, limit: int = 6) -> D
         'highestLevel': highest_level
     }
 
+    # Get student's RIASEC personality code and dominant traits
+    personality = await get_personality(student_id_obj)
+    dominant_traits = personality.get('dominantTraits', [])  # ["R", "I", "A"]
+
     applied_ids = await application_collection.distinct('internshipId', {'studentId': student_id_obj})
-    
+
+    # Prefer internships matching the student's RIASEC sectors
+    matched_sectors = set()
+    for trait in dominant_traits:
+        matched_sectors.update(RIASEC_SECTOR_MAP.get(trait, []))
+
     query = {
         'applicationOpen': True,
         '_id': {'$nin': applied_ids}
     }
+    if matched_sectors:
+        query['sector'] = {'$in': list(matched_sectors)}
 
     candidates_cursor = internship_collection.find(query).limit(100)
     candidates = await candidates_cursor.to_list(length=100)
+
+    # If insufficient candidates, broaden search
+    if not candidates:
+        query = {
+            'applicationOpen': True,
+            '_id': {'$nin': applied_ids}
+        }
+        candidates_cursor = internship_collection.find(query).limit(100)
+        candidates = await candidates_cursor.to_list(length=100)
 
     student_text = ' '.join(signals['skills'] + signals['roles'] + signals['locations'])
     student_embedding = await embed_text(student_text)
 
     scored_jobs = []
     for job in candidates:
-        score = await score_job_with_embedding(job, signals, student_embedding, student)
+        score = await score_job_with_embedding(job, signals, student_embedding, student, dominant_traits)
         scored_jobs.append({'job': job, 'score': score})
     scored_jobs.sort(key=lambda x: x['score'], reverse=True)
 
     final_list = [item['job'] for item in scored_jobs[:limit]]
 
     # Fallback logic
-    if not final_list or scored_jobs[0]['score'] <= 0:
+    if not final_list or (scored_jobs and scored_jobs[0]['score'] <= 0):
         fallback_cursor = internship_collection.find({
             'applicationOpen': True,
             '_id': {'$nin': applied_ids},
             'classification': {'$in': ['basic', 'intermediate']}
         }).sort('createdAt', -1).limit(limit)
-        
         fallback_docs = await fallback_cursor.to_list(length=limit)
         final_list = fallback_docs
 
