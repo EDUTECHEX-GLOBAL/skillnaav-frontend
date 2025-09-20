@@ -1,18 +1,22 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import PropTypes from "prop-types";
-import { useState, useEffect } from "react";
-import SendOfferLetter from "./OfferLetter";
 import Modal from "./Modal";
-import { checkOfferStatus, checkOfferStatuses, getOfferStatusText, getOfferStatusColor } from "./offerUtils";
+import SendOfferLetter from "./OfferLetter";
+import BulkSendOffer from "./BulkSendOffer"; // ensure this file exists
+import {
+  checkOfferStatuses,
+  getOfferStatusText,
+  getOfferStatusColor,
+} from "./offerUtils";
 
-// --- Applications UI helpers (chips + date) ---
+// --- Applications UI helpers ---
 const formatAppDate = (iso) => {
   if (!iso) return "-";
   const d = new Date(iso);
   const dd = String(d.getDate()).padStart(2, "0");
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const yyyy = d.getFullYear();
-  return `${dd}/${mm}/${yyyy}`; // e.g., 17/07/2025
+  return `${dd}/${mm}/${yyyy}`;
 };
 
 const getApplicationStatusText = (status) => {
@@ -21,7 +25,7 @@ const getApplicationStatusText = (status) => {
   if (s === "approved" || s === "selected") return "Approved";
   if (s === "rejected" || s === "declined") return "Rejected";
   if (s === "pending" || !s) return "Pending";
-  return status.charAt(0).toUpperCase() + status.slice(1); // fallback
+  return status.charAt(0).toUpperCase() + status.slice(1);
 };
 
 const getApplicationStatusColor = (status) => {
@@ -40,21 +44,19 @@ const getApplicationStatusColor = (status) => {
   }
 };
 
-// Tables.js — REPLACE THIS WHOLE BLOCK
-
+// ApplicationsTable
 export const ApplicationsTable = ({ applications }) => (
   <div className="h-[80vh] overflow-auto -mr-6 pr-6 bg-white">
     <table className="min-w-full font-poppins text-sm bg-white">
       <thead className="bg-gray-100 text-gray-600 uppercase text-xs sticky top-0 z-20">
         <tr>
-          <th className="px-6 py-3 text-center bg-gray-100">Name</th>
-          <th className="px-6 py-3 text-center bg-gray-100">Email</th>
-          <th className="px-6 py-3 text-center bg-gray-100">Applied Date</th>
-          <th className="px-6 py-3 text-center bg-gray-100">Resume</th>
-          <th className="px-6 py-3 text-center bg-gray-100">Status</th>
+          <th className="px-6 py-3 text-center">Name</th>
+          <th className="px-6 py-3 text-center">Email</th>
+          <th className="px-6 py-3 text-center">Applied Date</th>
+          <th className="px-6 py-3 text-center">Resume</th>
+          <th className="px-6 py-3 text-center">Status</th>
         </tr>
       </thead>
-
       <tbody className="divide-y divide-gray-200 text-center">
         {applications.map((student) => {
           const statusText = getApplicationStatusText(student.status);
@@ -80,7 +82,9 @@ export const ApplicationsTable = ({ applications }) => (
                 )}
               </td>
               <td className="px-6 py-4">
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusCls}`}>
+                <span
+                  className={`px-2 py-1 rounded-full text-xs font-medium ${statusCls}`}
+                >
                   {statusText}
                 </span>
               </td>
@@ -96,95 +100,87 @@ ApplicationsTable.propTypes = {
   applications: PropTypes.array.isRequired,
 };
 
-export const ShortlistedTable = ({ candidates, internshipId, onSendOffer }) => {
-  const [selectedStudent, setSelectedStudent] = useState(null);
+// ShortlistedTable
+export const ShortlistedTable = ({ candidates, internshipId }) => {
+  const [selectedStudents, setSelectedStudents] = useState([]);
   const [offerStatuses, setOfferStatuses] = useState({});
   const [loadingStatuses, setLoadingStatuses] = useState({});
+  const [isLoadingAll, setIsLoadingAll] = useState(false);
   const [showOfferModal, setShowOfferModal] = useState(false);
-  const [isLoadingAll, setIsLoadingAll] = useState(false); // ✅ Loading state for all
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState(null);
 
-  // Fetch offer status for ALL candidates in one call
+  const uniqueCandidates = candidates.filter(
+    (student, index, self) =>
+      index === self.findIndex((s) => s.email === student.email)
+  );
+
   useEffect(() => {
-    const fetchOfferStatuses = async () => {
+    async function fetchStatuses() {
       if (!candidates.length) return;
-
       setIsLoadingAll(true);
-
       try {
-        // Get all valid student IDs
         const studentIds = candidates
-          .filter(student => student.student_id)
-          .map(student => student.student_id);
-
-        if (studentIds.length === 0) {
+          .filter((s) => s.student_id)
+          .map((s) => s.student_id);
+        if (!studentIds.length) {
           setIsLoadingAll(false);
           return;
         }
-
-        // Set loading state for all students
-        const loadingStates = {};
-        studentIds.forEach(id => {
-          loadingStates[id] = true;
+        const loadingMap = {};
+        studentIds.forEach((id) => {
+          loadingMap[id] = true;
         });
-        setLoadingStatuses(loadingStates);
+        setLoadingStatuses(loadingMap);
 
-        // Make single batch API call
         const statusMap = await checkOfferStatuses(studentIds, internshipId);
-
         setOfferStatuses(statusMap);
-
-        // Clear loading states
         setLoadingStatuses({});
-
-      } catch (error) {
-        console.error('Error fetching offer statuses:', error);
-        // Fallback: try individual calls if batch fails
-        await fetchIndividualStatuses();
       } finally {
         setIsLoadingAll(false);
       }
-    };
-
-    // Fallback function for individual calls
-    const fetchIndividualStatuses = async () => {
-      const statuses = {};
-      const loading = {};
-
-      for (const student of candidates) {
-        if (student.student_id) {
-          loading[student.student_id] = true;
-          setLoadingStatuses(prev => ({ ...prev, [student.student_id]: true }));
-
-          statuses[student.student_id] = await checkOfferStatus(student.student_id, internshipId);
-
-          loading[student.student_id] = false;
-          setLoadingStatuses(prev => ({ ...prev, [student.student_id]: false }));
-
-          // Update statuses incrementally for better UX
-          setOfferStatuses(prev => ({
-            ...prev,
-            [student.student_id]: statuses[student.student_id]
-          }));
-        }
-      }
-    };
-
-    fetchOfferStatuses();
+    }
+    fetchStatuses();
   }, [candidates, internshipId]);
 
+  // Bulk selection handlers
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
+      setSelectedStudents(
+        uniqueCandidates
+          .filter((s) => offerStatuses[s.student_id] !== "Sent")
+          .map((s) => s.student_id)
+      );
+    } else {
+      setSelectedStudents([]);
+    }
+  };
+
+  const toggleStudentSelect = (id) => {
+    if (offerStatuses[id] === "Sent") return; // don't allow reselect
+    if (selectedStudents.includes(id)) {
+      setSelectedStudents(selectedStudents.filter((sid) => sid !== id));
+    } else {
+      setSelectedStudents([...selectedStudents, id]);
+    }
+  };
+
+  // Single offer modal handlers
   const handleSendOfferClick = (student) => {
+    if (offerStatuses[student.student_id] === "Sent") return;
     setSelectedStudent(student);
     setShowOfferModal(true);
   };
 
   const handleOfferSuccess = () => {
-    if (selectedStudent && selectedStudent.student_id) {
-      setOfferStatuses(prev => ({
+    if (selectedStudent?.student_id) {
+      setOfferStatuses((prev) => ({
         ...prev,
-        [selectedStudent.student_id]: 'Sent'
+        [selectedStudent.student_id]: "Sent",
       }));
     }
-    handleCloseOfferModal();
+    setShowOfferModal(false);
+    setSelectedStudent(null);
   };
 
   const handleCloseOfferModal = () => {
@@ -192,14 +188,23 @@ export const ShortlistedTable = ({ candidates, internshipId, onSendOffer }) => {
     setSelectedStudent(null);
   };
 
-  const uniqueCandidates = candidates.filter(
-    (student, index, self) =>
-      index === self.findIndex((s) => s.email === student.email)
-  );
+  // Bulk offer modal handlers
+  const handleBulkOfferSuccess = (sentStudents) => {
+    setShowBulkModal(false);
+    setSelectedStudents([]);
+    setOfferStatuses((prev) => {
+      const updated = { ...prev };
+      sentStudents.forEach((student) => {
+        if (student?.student_id) {
+          updated[student.student_id] = "Sent";
+        }
+      });
+      return updated;
+    });
+  };
 
   return (
     <div className="space-y-4">
-      {/* Loading indicator for all statuses */}
       {isLoadingAll && (
         <div className="flex justify-center items-center p-4">
           <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
@@ -207,15 +212,37 @@ export const ShortlistedTable = ({ candidates, internshipId, onSendOffer }) => {
         </div>
       )}
 
+      {/* Bulk send button */}
+      <button
+        className="mb-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400"
+        disabled={selectedStudents.length === 0}
+        onClick={() => setShowBulkModal(true)}
+      >
+        Send Offer Letter to Selected ({selectedStudents.length})
+      </button>
+
       <div className="h-[80vh] overflow-auto -mr-6 pr-6 bg-white">
         <table className="min-w-full font-poppins text-sm bg-white">
           <thead className="bg-gray-100 text-gray-600 uppercase text-xs sticky top-0 z-20">
             <tr>
-              <th className="px-6 py-3 text-center bg-gray-100">Name</th>
-              <th className="px-6 py-3 text-center bg-gray-100">Email</th>
-              <th className="px-6 py-3 text-center bg-gray-100">Resume</th>
-              <th className="px-6 py-3 text-center bg-gray-100">Offer Status</th>
-              <th className="px-6 py-3 text-center bg-gray-100">Actions</th>
+              <th className="px-6 py-3 text-center">
+                <input
+                  type="checkbox"
+                  checked={
+                    selectedStudents.length > 0 &&
+                    selectedStudents.length ===
+                      uniqueCandidates.filter(
+                        (s) => offerStatuses[s.student_id] !== "Sent"
+                      ).length
+                  }
+                  onChange={handleSelectAll}
+                />
+              </th>
+              <th className="px-6 py-3 text-center">Name</th>
+              <th className="px-6 py-3 text-center">Email</th>
+              <th className="px-6 py-3 text-center">Resume</th>
+              <th className="px-6 py-3 text-center">Offer Status</th>
+              <th className="px-6 py-3 text-center">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200 text-center">
@@ -225,6 +252,14 @@ export const ShortlistedTable = ({ candidates, internshipId, onSendOffer }) => {
 
               return (
                 <tr key={student.student_id} className="hover:bg-gray-50 transition">
+                  <td className="px-6 py-4">
+                    <input
+                      type="checkbox"
+                      checked={selectedStudents.includes(student.student_id)}
+                      disabled={status === "Sent"}
+                      onChange={() => toggleStudentSelect(student.student_id)}
+                    />
+                  </td>
                   <td className="px-6 py-4">{student.name || "N/A"}</td>
                   <td className="px-6 py-4">{student.email || "N/A"}</td>
                   <td className="px-6 py-4">
@@ -276,7 +311,7 @@ export const ShortlistedTable = ({ candidates, internshipId, onSendOffer }) => {
         </table>
       </div>
 
-      {/* Offer Letter Modal */}
+      {/* Single send modal */}
       {showOfferModal && selectedStudent && (
         <Modal
           isOpen={showOfferModal}
@@ -288,11 +323,29 @@ export const ShortlistedTable = ({ candidates, internshipId, onSendOffer }) => {
               _id: selectedStudent.student_id,
               name: selectedStudent.name,
               email: selectedStudent.email,
-              resumeUrl: selectedStudent.resumeUrl
+              resumeUrl: selectedStudent.resumeUrl,
             }}
             internshipId={internshipId}
             onSuccess={handleOfferSuccess}
             onCancel={handleCloseOfferModal}
+          />
+        </Modal>
+      )}
+
+      {/* Bulk send modal */}
+      {showBulkModal && (
+        <Modal
+          isOpen={showBulkModal}
+          onClose={() => setShowBulkModal(false)}
+          title={`Send Offers to ${selectedStudents.length} Students`}
+        >
+          <BulkSendOffer
+            selectedStudents={selectedStudents.map((id) =>
+              uniqueCandidates.find((student) => student.student_id === id)
+            )}
+            internshipId={internshipId}
+            onCancel={() => setShowBulkModal(false)}
+            onSuccess={handleBulkOfferSuccess}
           />
         </Modal>
       )}
@@ -303,6 +356,6 @@ export const ShortlistedTable = ({ candidates, internshipId, onSendOffer }) => {
 ShortlistedTable.propTypes = {
   candidates: PropTypes.array.isRequired,
   internshipId: PropTypes.string.isRequired,
-  onSendOffer: PropTypes.func,
 };
+
 export default ShortlistedTable;

@@ -130,38 +130,39 @@ function PremiumPage() {
     setPaymentData({ amount, planType, duration, userInfo });
   };
 
-  const pricingcard = [
-    {
-      plantype: "Free",
-      plantypesubhead: "Basic access to explore internships",
-      price: "$0",
-      duration: 1,
-      pricebtn: "Start Free",
-      pricepoint1: "Apply to 5 internships",
-      pricepoint2: "Save 3 internships",
-      pricepoint3: "Basic AI suggestions",
-    },
-    {
-      plantype: "Premium Basic",
-      plantypesubhead: "Tools for active internship seekers",
-      price: "$2.99",
-      duration: 1,
-      pricebtn: "Subscribe",
-      pricepoint1: "Apply up to 25 internships",
-      pricepoint2: "Resume builder + career assistant",
-      pricepoint3: "Monthly mentorship + interview tips",
-    },
-    {
-      plantype: "Premium Plus",
-      plantypesubhead: "Everything you need to succeed",
-      price: "$6.99",
-      duration: 1,
-      pricebtn: "Subscribe",
-      pricepoint1: "Unlimited applications & saves",
-      pricepoint2: "Mock AI interviews & resume AI",
-      pricepoint3: "Mentorship + full AI insights",
-    },
-  ];
+ const pricingcard = [
+  {
+    plantype: "Free",
+    plantypesubhead: "Basic access to explore internships",
+    price: "$0",
+    duration: "1 month",
+    pricebtn: "Start Free",
+    pricepoint1: "Apply to 5 internships",
+    pricepoint2: "Save 3 internships",
+    pricepoint3: "Basic AI suggestions",
+  },
+  {
+    plantype: "Premium Basic",
+    plantypesubhead: "Tools for active internship seekers",
+    price: "$2.99",
+    duration: "2 days",   // changed
+    pricebtn: "Subscribe",
+    pricepoint1: "Apply up to 25 internships",
+    pricepoint2: "Resume builder + career assistant",
+    pricepoint3: "Monthly mentorship + interview tips",
+  },
+  {
+    plantype: "Premium Plus",
+    plantypesubhead: "Everything you need to succeed",
+    price: "$6.99",
+    duration: "7 days",   // changed
+    pricebtn: "Subscribe",
+    pricepoint1: "Unlimited applications & saves",
+    pricepoint2: "Mock AI interviews & resume AI",
+    pricepoint3: "Mentorship + full AI insights",
+  },
+];
+
 
   const colorStyles = [
     {
@@ -223,9 +224,10 @@ function PremiumPage() {
                 <h2 className={`pt-4 text-2xl font-medium ${color.text} lg:text-3xl`}>
                   {card.price}
                 </h2>
-                <p className={`pt-2 ${color.subtext} lg:text-lg`}>
-                  Duration: {card.duration} month
-                </p>
+               <p className={`pt-2 ${color.subtext} lg:text-lg`}>
+  Duration: {card.duration}
+</p>
+
                 <ul className={`flex flex-col gap-2 pt-4 ${color.subtext}`}>
                   {[card.pricepoint1, card.pricepoint2, card.pricepoint3].map(
                     (point, i) =>

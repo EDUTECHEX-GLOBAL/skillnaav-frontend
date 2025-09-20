@@ -46,7 +46,7 @@ router.post("/paypal/order", async (req, res) => {
   }
 });
 
-// Verify and capture payment
+
 // Verify and capture payment
 router.post("/paypal/verify", async (req, res) => {
   const { orderID, userId, planType, amount, email, duration } = req.body;
@@ -69,7 +69,7 @@ router.post("/paypal/verify", async (req, res) => {
     );
 
     const premiumExpiration = new Date();
-    premiumExpiration.setMonth(premiumExpiration.getMonth() + parseInt(duration));
+    premiumExpiration.setDate(premiumExpiration.getDate() + parseInt(duration)); // ✅ days instead of months
 
     const payment = new Payment({
       userId,
@@ -87,7 +87,7 @@ router.post("/paypal/verify", async (req, res) => {
       userId,
       {
         isPremium: true,
-        planType, // ✅ added here
+        planType,
         premiumExpiration,
       },
       { new: true }
