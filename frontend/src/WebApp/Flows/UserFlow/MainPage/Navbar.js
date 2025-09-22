@@ -22,27 +22,52 @@ const Navbar = ({ onToggleSidebar }) => {
   const [planType, setPlanType] = useState("Free");
   const [unreadCount, setUnreadCount] = useState(0);
 
-  useEffect(() => {
-    const storedUserInfo = JSON.parse(localStorage.getItem("userInfo"));
-    if (storedUserInfo) {
-      setUserInfo(storedUserInfo);
-      setPlanType(storedUserInfo.planType || "Free");
+ useEffect(() => {
+  const storedUserInfo = JSON.parse(localStorage.getItem("userInfo"));
+  if (storedUserInfo) {
+    setUserInfo(storedUserInfo);
+    setPlanType(storedUserInfo.planType || "Free");
 
-      const studentId = storedUserInfo._id;
-      const fetchNotifications = async () => {
-        try {
-          const { data } = await axios.get(`/api/notifications/${studentId}`);
-          if (data.success) {
-            const unread = data.notifications.filter((n) => !n.isRead).length;
-            setUnreadCount(unread);
-          }
-        } catch (err) {
-          console.error("Failed to fetch notifications:", err);
+    const studentId = storedUserInfo._id;
+
+    // Fetch Notifications
+    const fetchNotifications = async () => {
+      try {
+        const { data } = await axios.get(`/api/notifications/${studentId}`);
+        if (data.success) {
+          const unread = data.notifications.filter((n) => !n.isRead).length;
+          setUnreadCount(unread);
         }
-      };
-      fetchNotifications();
-    }
-  }, []);
+      } catch (err) {
+        console.error("Failed to fetch notifications:", err);
+      }
+    };
+
+    // Fetch Latest Premium Status
+    const fetchPremiumStatus = async () => {
+      try {
+        const token = JSON.parse(localStorage.getItem("userToken"));
+        const { data } = await axios.get(`/api/users/premium-status`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        setPlanType(data.planType || "Free");
+
+        // 🔄 Also update localStorage so UI stays in sync
+        localStorage.setItem(
+          "userInfo",
+          JSON.stringify({ ...storedUserInfo, planType: data.planType })
+        );
+      } catch (err) {
+        console.error("Failed to fetch premium status:", err);
+      }
+    };
+
+    fetchNotifications();
+    fetchPremiumStatus();
+  }
+}, []);
+
 
   const handleUserClick = () => setIsDropdownOpen(!isDropdownOpen);
 

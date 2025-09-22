@@ -7,11 +7,19 @@ const EmailVerification = require("../models/webapp-models/EmailVerificationMode
 
 // In your controller file (e.g., userController.js)
 const getUserProfile = asyncHandler(async (req, res) => {
-  const user = await Userwebapp.findById(req.user._id); // Assuming req.user is set by authentication middleware
+  let user = await Userwebapp.findById(req.user._id);
 
   if (!user) {
     res.status(404);
     throw new Error("User not found");
+  }
+
+  // 🔎 Expiration check
+  if (user.isPremium && user.premiumExpiration && user.premiumExpiration < new Date()) {
+    user.isPremium = false;
+    user.planType = "Free";
+    user.premiumExpiration = null;
+    await user.save();
   }
 
   res.json({
@@ -36,12 +44,13 @@ const getUserProfile = asyncHandler(async (req, res) => {
     postalCode: user.postalCode,
     currentGrade: user.currentGrade,
     gradePercentage: user.gradePercentage,
-    profileImage: user.profileImage,  // Include the profile image in the response
+    profileImage: user.profileImage,
     isPremium: user.isPremium,
-    planType: user.planType, // Include the plan type
+    planType: user.planType,
     premiumExpiration: user.premiumExpiration,
   });
 });
+
 
 // Helper function to check required fields
 const areFieldsFilled = (fields) => fields.every((field) => field);
@@ -231,8 +240,6 @@ const cleanArray = (arr) =>
     ? arr.split(",").map((x) => x.trim()).filter(Boolean)
     : [];
 
-
-
 // Authenticate user (login)
 const authUser = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
@@ -240,11 +247,18 @@ const authUser = asyncHandler(async (req, res) => {
   const user = await Userwebapp.findOne({ email });
 
   if (user && await user.matchPassword(password)) {
-
-    // ✅ Only restrict if user has a schoolAdmin assigned
+    // ✅ Restriction check
     if (user.schoolAdmin && !user.isActive) {
       res.status(403);
       throw new Error("Your account has been restricted by your school administrator. Please contact them.");
+    }
+
+    // 🔎 Expiration check
+    if (user.isPremium && user.premiumExpiration && user.premiumExpiration < new Date()) {
+      user.isPremium = false;
+      user.planType = "Free";
+      user.premiumExpiration = null;
+      await user.save();
     }
 
     const token = generateToken(user._id);
@@ -262,10 +276,10 @@ const authUser = asyncHandler(async (req, res) => {
       portfolio: user.portfolio,
       profileImage: user.profileImage,
       isPremium: user.isPremium,
-      planType: user.planType,  
+      planType: user.planType,
       premiumExpiration: user.premiumExpiration,
       token,
-      adminApproved: user.adminApproved
+      adminApproved: user.adminApproved,
     });
   } else {
     res.status(400);
@@ -361,7 +375,7 @@ const getAllUsers = asyncHandler(async (req, res) => {
     throw new Error("No users found.");
   }
 });
-// jhfjf
+
 
 // Admin approve a user
 const approveUser = asyncHandler(async (req, res) => {
@@ -416,15 +430,24 @@ const rejectUser = asyncHandler(async (req, res) => {
 
 const getPremiumStatus = asyncHandler(async (req, res) => {
   try {
-    const user = await Userwebapp.findById(req.user._id); // req.user is set by the protect middleware
+    let user = await Userwebapp.findById(req.user._id); // req.user is set by the protect middleware
 
     if (!user) {
       res.status(404);
       throw new Error("User not found");
     }
 
+    // 🔎 Check if expired
+    if (user.isPremium && user.premiumExpiration && user.premiumExpiration < new Date()) {
+      user.isPremium = false;
+      user.planType = "Free";            // reset to free plan
+      user.premiumExpiration = null;     // clear expiration
+      await user.save();                 // save changes
+    }
+
     res.status(200).json({
       isPremium: user.isPremium,
+      planType: user.planType,
       premiumExpiration: user.premiumExpiration,
     });
   } catch (error) {
@@ -432,6 +455,7 @@ const getPremiumStatus = asyncHandler(async (req, res) => {
     res.status(500).json({ message: "Error fetching premium status" });
   }
 });
+
 
 // Send verification code for signup
 const sendSignupVerificationCode = asyncHandler(async (req, res) => {
