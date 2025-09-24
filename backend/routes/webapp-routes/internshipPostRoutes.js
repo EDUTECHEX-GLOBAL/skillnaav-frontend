@@ -6,25 +6,46 @@ const mongoose = require("mongoose");
 const Application = require("../../models/webapp-models/applicationModel.js"); // Adjust path if needed
 const SavedJob = require("../../models/webapp-models/SavedJobModel.js"); // Adjust path if needed
 const Partner = require("../../models/webapp-models/partnerModel.js"); // Adjust path if needed
+const redisClient = require("../../utils/redisClient.js")
 
 
-// GET all internship postings (excluding deleted)
+// GET all internship postings (excluding deleted) with caching
 router.get("/", async (req, res) => {
+  const cacheKey = "internships:all";
   try {
-    // Filter internships to exclude those that are soft-deleted
+    const cached = await redisClient.get(cacheKey);
+    if (cached) {
+      console.log("Cache hit for all internships");
+      return res.json(JSON.parse(cached));
+    }
+    console.log("Cache miss for all internships");
+
     const internships = await InternshipPosting.find({ deleted: false });
+
+    // Cache for 5 minutes (300 seconds)
+    await redisClient.setEx(cacheKey, 300, JSON.stringify(internships));
+
     res.json(internships);
   } catch (error) {
     res.status(500).json({ message: "Server Error: Unable to fetch internships" });
   }
 });
 
-
-// GET all approved internships (excluding deleted ones) with sorting
+// GET all approved internships (excluding deleted ones) with sorting and caching
 router.get("/approved", async (req, res) => {
+  const isPremiumUser = req.query.isPremium === "true";
+  const { sector } = req.query;
+
+  // Compose unique cache key based on isPremiumUser and sector
+  const cacheKey = `internships:approved:isPremium=${isPremiumUser}:sector=${sector || "all"}`;
+
   try {
-    const isPremiumUser = req.query.isPremium === "true";
-    const { sector } = req.query;
+    const cached = await redisClient.get(cacheKey);
+    if (cached) {
+      console.log("Cache hit for approved internships", cacheKey);
+      return res.json(JSON.parse(cached));
+    }
+    console.log("Cache miss for approved internships", cacheKey);
 
     const filter = { deleted: false, adminApproved: true };
     if (sector) filter.sector = sector;
@@ -37,15 +58,18 @@ router.get("/approved", async (req, res) => {
     internships.forEach(i => i.internshipType = (i.internshipType || 'FREE').toUpperCase());
     const priority = isPremiumUser ? premiumPriority : nonPremiumPriority;
 
-    internships.sort((a,b) => (priority[b.internshipType]||0) - (priority[a.internshipType]||0));
+    internships.sort((a, b) => (priority[b.internshipType] || 0) - (priority[a.internshipType] || 0));
 
     // Controlled randomness
     for (let i = internships.length - 1; i > 0; i--) {
       if (Math.random() < 0.2) {
-        const j = Math.floor(Math.random() * (i+1));
+        const j = Math.floor(Math.random() * (i + 1));
         [internships[i], internships[j]] = [internships[j], internships[i]];
       }
     }
+
+    // Cache the result for 5 mins before sending
+    await redisClient.setEx(cacheKey, 300, JSON.stringify(internships));
 
     res.json(internships);
   } catch (error) {
@@ -144,16 +168,25 @@ router.post("/", async (req, res) => {
   }
 });
 
-
-
 // GET all deleted internship postings (soft deleted)
 router.get("/bin", async (req, res) => {
+  const cacheKey = "internships:deleted";
   try {
+    const cached = await redisClient.get(cacheKey);
+    if (cached) {
+      console.log("Cache hit for deleted internships");
+      return res.json(JSON.parse(cached));
+    }
+    console.log("Cache miss for deleted internships");
+
     const deletedInternships = await InternshipPosting.find({ deleted: true });
 
     if (deletedInternships.length === 0) {
       return res.status(404).json({ message: "No deleted internships found" });
     }
+
+    // Cache for 5 minutes
+    await redisClient.setEx(cacheKey, 300, JSON.stringify(deletedInternships));
 
     res.json(deletedInternships);
   } catch (error) {
@@ -269,10 +302,19 @@ router.delete("/:id/permanent", async (req, res) => {
 
 // GET a single internship posting by ID
 router.get("/:id", async (req, res) => {
+  const cacheKey = `internship:${req.params.id}`;
   try {
-    const internship = await InternshipPosting.findById(req.params.id);
+    const cached = await redisClient.get(cacheKey);
+    if (cached) {
+      console.log("Cache hit for internship id:", req.params.id);
+      return res.json(JSON.parse(cached));
+    }
+    console.log("Cache miss for internship id:", req.params.id);
 
+    const internship = await InternshipPosting.findById(req.params.id);
     if (internship) {
+      // Cache for 5 minutes
+      await redisClient.setEx(cacheKey, 300, JSON.stringify(internship));
       res.json(internship);
     } else {
       res.status(404).json({ message: "Internship not found" });
@@ -282,14 +324,21 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-
-
+// GET internships by partner ID
 router.get("/partner/:partnerId", async (req, res) => {
+  const cacheKey = `partnerInternships:${req.params.partnerId}`;
   try {
-    const { partnerId } = req.params;
-    const internships = await InternshipPosting.find({ partnerId });
+    const cached = await redisClient.get(cacheKey);
+    if (cached) {
+      console.log("Cache hit for partner internships:", req.params.partnerId);
+      return res.status(200).json(JSON.parse(cached));
+    }
+    console.log("Cache miss for partner internships:", req.params.partnerId);
 
-    // Always respond with 200 and the list (even if it's empty)
+    const internships = await InternshipPosting.find({ partnerId: req.params.partnerId });
+
+    // Always respond 200 with list, empty if none
+    await redisClient.setEx(cacheKey, 300, JSON.stringify(internships));
     res.status(200).json(internships);
   } catch (error) {
     res.status(500).json({ message: "Server Error" });
@@ -357,7 +406,6 @@ router.put("/:id", async (req, res) => {
     });
   }
 });
-
 
 // DELETE an internship posting by ID
 router.delete("/:id", async (req, res) => {
@@ -449,8 +497,6 @@ router.patch("/:id/reject", async (req, res) => {
     res.status(500).json({ message: "Server Error: Unable to reject internship", error: error.message });
   }
 });
-
-
 
 router.post("/:id/review", async (req, res) => {
   try {

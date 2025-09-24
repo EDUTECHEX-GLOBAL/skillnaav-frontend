@@ -4,9 +4,21 @@ const generateToken = require("../utils/generateToken");
 const notifyUser = require("../utils/notifyUser"); // Import the notifyUser function
 const { profilePicUpload } = require('../utils/multer'); // Import the profilePicUpload middleware
 const EmailVerification = require("../models/webapp-models/EmailVerificationModel");
+const redisClient = require("../utils/redisClient");
 
 // In your controller file (e.g., userController.js)
 const getUserProfile = asyncHandler(async (req, res) => {
+  const cacheKey = `userProfile:${req.user._id}`;
+
+  // Try fetching cached profile from Redis
+ const cachedProfile = await redisClient.get(cacheKey);
+if (cachedProfile) {
+  console.log('Cache hit for user profile:', req.user._id);
+  return res.json(JSON.parse(cachedProfile));
+}
+console.log('Cache miss for user profile:', req.user._id);
+
+
   let user = await Userwebapp.findById(req.user._id);
 
   if (!user) {
@@ -14,7 +26,7 @@ const getUserProfile = asyncHandler(async (req, res) => {
     throw new Error("User not found");
   }
 
-  // 🔎 Expiration check
+  // Expiration check and update user premium fields as before
   if (user.isPremium && user.premiumExpiration && user.premiumExpiration < new Date()) {
     user.isPremium = false;
     user.planType = "Free";
@@ -22,7 +34,7 @@ const getUserProfile = asyncHandler(async (req, res) => {
     await user.save();
   }
 
-  res.json({
+  const userProfile = {
     _id: user._id,
     name: user.name,
     email: user.email,
@@ -48,8 +60,14 @@ const getUserProfile = asyncHandler(async (req, res) => {
     isPremium: user.isPremium,
     planType: user.planType,
     premiumExpiration: user.premiumExpiration,
-  });
+  };
+
+  // Cache the profile data for 5 minutes (300 seconds)
+  await redisClient.setEx(cacheKey, 300, JSON.stringify(userProfile));
+
+  res.json(userProfile);
 });
+
 
 
 // Helper function to check required fields
@@ -57,10 +75,30 @@ const areFieldsFilled = (fields) => fields.every((field) => field);
 
 // Check if user exists by email
 const checkIfUserExists = asyncHandler(async (req, res) => {
-  const { email } = req.query; // Get email from query parameters
+  const { email } = req.query; 
+  if (!email) {
+    res.status(400);
+    throw new Error("Email query parameter is required.");
+  }
+
+  const cacheKey = `userExists:${email.toLowerCase()}`;
+
+  // Try getting cached result
+  const cachedExists = await redisClient.get(cacheKey);
+  if (cachedExists !== null) {
+    console.log(`Cache hit for user exists check: ${email}`);
+    return res.json({ exists: cachedExists === 'true' });
+  }
+
+  console.log(`Cache miss for user exists check: ${email}`);
+
+  // Query the database
   const userExists = await Userwebapp.findOne({ email });
-  
-  res.json({ exists: !!userExists }); // Respond with true or false
+
+  // Cache the result for a short duration (5 minutes)
+  await redisClient.setEx(cacheKey, 300, userExists ? 'true' : 'false');
+
+  res.json({ exists: !!userExists });
 });
 
   // Generate a random OTP
@@ -315,7 +353,7 @@ const updateUserProfile = asyncHandler(async (req, res) => {
   user.gradePercentage = req.body.gradePercentage || user.gradePercentage;
   user.isPremium = req.body.isPremium || user.isPremium;
 
-  // ✅ Clean arrays properly
+  // Clean arrays properly
   if (req.body.skills !== undefined) {
     user.skills = cleanArray(req.body.skills);
   }
@@ -330,10 +368,14 @@ const updateUserProfile = asyncHandler(async (req, res) => {
   user.profileImage = req.body.profileImage || user.profileImage;
 
   if (req.body.password) {
-    user.password = req.body.password; // will be hashed
+    user.password = req.body.password; // will be hashed by pre-save hook
   }
 
   const updatedUser = await user.save();
+
+  // Invalidate Redis cache after update
+  const cacheKey = `userProfile:${updatedUser._id}`;
+  await redisClient.del(cacheKey);
 
   res.json({
     _id: updatedUser._id,
@@ -366,15 +408,27 @@ const updateUserProfile = asyncHandler(async (req, res) => {
 
 // Get all users with additional fields
 const getAllUsers = asyncHandler(async (req, res) => {
-  const users = await Userwebapp.find({}, "name email universityName dob educationLevel fieldOfStudy desiredField linkedin  adminApproved");
+  const cacheKey = "allUsers";
 
-  if (users && users.length > 0) {
-    res.status(200).json(users);
-  } else {
+  const cachedUsers = await redisClient.get(cacheKey);
+  if (cachedUsers) {
+    console.log("Cache hit for all users");
+    return res.status(200).json(JSON.parse(cachedUsers));
+  }
+  console.log("Cache miss for all users");
+
+  const users = await Userwebapp.find({}, "name email universityName dob educationLevel fieldOfStudy desiredField linkedin adminApproved");
+  
+  if (!users || users.length === 0) {
     res.status(404);
     throw new Error("No users found.");
   }
+
+  await redisClient.setEx(cacheKey, 300, JSON.stringify(users)); // Cache for 5 minutes
+
+  res.status(200).json(users);
 });
+
 
 
 // Admin approve a user
@@ -429,30 +483,49 @@ const rejectUser = asyncHandler(async (req, res) => {
 });
 
 const getPremiumStatus = asyncHandler(async (req, res) => {
+  const cacheKey = `premiumStatus:${req.user._id}`;
+
   try {
-    let user = await Userwebapp.findById(req.user._id); // req.user is set by the protect middleware
+    // Try fetching cached data
+    const cachedStatus = await redisClient.get(cacheKey);
+    if (cachedStatus) {
+      console.log('Cache hit for premium status:', req.user._id);
+      return res.status(200).json(JSON.parse(cachedStatus));
+    }
+    console.log('Cache miss for premium status:', req.user._id);
+
+    let user = await Userwebapp.findById(req.user._id);
 
     if (!user) {
       res.status(404);
-      throw new Error("User not found");
+      throw new Error('User not found');
     }
 
-    // 🔎 Check if expired
+    // Expiration check and update user premium fields
     if (user.isPremium && user.premiumExpiration && user.premiumExpiration < new Date()) {
       user.isPremium = false;
-      user.planType = "Free";            // reset to free plan
-      user.premiumExpiration = null;     // clear expiration
-      await user.save();                 // save changes
+      user.planType = "Free";
+      user.premiumExpiration = null;
+      await user.save();
+
+      // Invalidate any cached premium status after update
+      await redisClient.del(cacheKey);
     }
 
-    res.status(200).json({
+    const statusData = {
       isPremium: user.isPremium,
       planType: user.planType,
       premiumExpiration: user.premiumExpiration,
-    });
+    };
+
+    // Cache the premium status for 5 minutes
+    await redisClient.setEx(cacheKey, 300, JSON.stringify(statusData));
+
+    res.status(200).json(statusData);
+
   } catch (error) {
-    console.error("Error fetching premium status:", error);
-    res.status(500).json({ message: "Error fetching premium status" });
+    console.error('Error fetching premium status:', error);
+    res.status(500).json({ message: 'Error fetching premium status' });
   }
 });
 
@@ -525,5 +598,3 @@ module.exports = {
    sendSignupVerificationCode,
    verifySignupOTP,
 };
-
-//HI

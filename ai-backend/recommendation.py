@@ -7,6 +7,7 @@ from motor.motor_asyncio import AsyncIOMotorClient # type: ignore
 from bson import ObjectId
 from sentence_transformers import SentenceTransformer, util
 from typing import List, Dict, Any, Union
+import redis.asyncio as redis 
 
 # Load environment variables from .env file
 load_dotenv()
@@ -27,6 +28,8 @@ application_collection = db.applications
 user_collection = db.userwebapps
 internship_collection = db.internshippostings
 personality_collection = db.personalityresponses # or whatever your personality results collection is
+
+redis_client = redis.from_url("redis://localhost:6379") 
 
 # Initialize Sentence-Transformer model
 embedder = SentenceTransformer('all-MiniLM-L6-v2')
@@ -201,11 +204,16 @@ async def score_job_with_embedding(job: Dict[str, Any], signals: Dict[str, Any],
 
 @app.get('/recommendations/{student_id}', response_class=ORJSONResponse)
 async def get_personalized_recommendations(student_id: str, limit: int = 6) -> Dict[str, List[Dict[str, Any]]]:
-    """
-    Provides a personalized list of internship recommendations for a student, using RIASEC personality results.
-    """
     if not ObjectId.is_valid(student_id):
         raise HTTPException(status_code=400, detail="Invalid student ID")
+
+    cache_key = f"recommendations:{student_id}:{limit}"
+    cached_data = await redis_client.get(cache_key)
+    if cached_data:
+        print("Cache hit for recommendations")
+        return orjson.loads(cached_data)
+
+    print("Cache miss for recommendations")
 
     student_id_obj = ObjectId(student_id)
     student = await user_collection.find_one({'_id': student_id_obj})
@@ -224,13 +232,11 @@ async def get_personalized_recommendations(student_id: str, limit: int = 6) -> D
         'highestLevel': highest_level
     }
 
-    # Get student's RIASEC personality code and dominant traits
     personality = await get_personality(student_id_obj)
-    dominant_traits = personality.get('dominantTraits', [])  # ["R", "I", "A"]
+    dominant_traits = personality.get('dominantTraits', [])
 
     applied_ids = await application_collection.distinct('internshipId', {'studentId': student_id_obj})
 
-    # Prefer internships matching the student's RIASEC sectors
     matched_sectors = set()
     for trait in dominant_traits:
         matched_sectors.update(RIASEC_SECTOR_MAP.get(trait, []))
@@ -245,7 +251,6 @@ async def get_personalized_recommendations(student_id: str, limit: int = 6) -> D
     candidates_cursor = internship_collection.find(query).limit(100)
     candidates = await candidates_cursor.to_list(length=100)
 
-    # If insufficient candidates, broaden search
     if not candidates:
         query = {
             'applicationOpen': True,
@@ -265,7 +270,6 @@ async def get_personalized_recommendations(student_id: str, limit: int = 6) -> D
 
     final_list = [item['job'] for item in scored_jobs[:limit]]
 
-    # Fallback logic
     if not final_list or (scored_jobs and scored_jobs[0]['score'] <= 0):
         fallback_cursor = internship_collection.find({
             'applicationOpen': True,
@@ -275,7 +279,9 @@ async def get_personalized_recommendations(student_id: str, limit: int = 6) -> D
         fallback_docs = await fallback_cursor.to_list(length=limit)
         final_list = fallback_docs
 
-    # Convert all ObjectIds to strings before returning the response
     final_list = convert_object_ids(final_list)
+
+    # Cache the final recommendations for 10 minutes
+    await redis_client.setex(cache_key, 600, orjson.dumps({'recommendations': final_list}))
 
     return {'recommendations': final_list}

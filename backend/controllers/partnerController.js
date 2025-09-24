@@ -5,35 +5,49 @@ const notifyUser = require("../utils/notifyUser");
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const PartnerEmailVerification = require("../models/webapp-models/partnerVerificationModel");
+const redisClient = require("../utils/redisClient");
 
 // Get partner profile
 const getPartnerProfile = asyncHandler(async (req, res) => {
-    // Check if req.user exists
-    if (!req.user) {
-        res.status(401); // Unauthorized
-        throw new Error("User not authenticated.");
-    }
+  if (!req.user) {
+    res.status(401);
+    throw new Error("User not authenticated.");
+  }
 
-    const partner = await Partnerwebapp.findById(req.user._id);
+  const cacheKey = `partnerProfile:${req.user._id}`;
+  const cachedProfile = await redisClient.get(cacheKey);
 
-    if (partner) {
-        res.json({
-            _id: partner._id,
-            name: partner.name,
-            email: partner.email,
-            universityName: partner.universityName,
-            institutionId: partner.institutionId,
-            adminApproved: partner.adminApproved,
-            isPremium: partner.isPremium, // ✅
-  planType: partner.planType,   // ✅
-  premiumExpiration: partner.premiumExpiration ,// ✅
-            active: partner.active,
-        });
-    } else {
-        res.status(404);
-        throw new Error("Partner not found.");
-    }
+  if (cachedProfile) {
+    console.log('Cache hit for partner profile:', req.user._id);
+    return res.json(JSON.parse(cachedProfile));
+  }
+  console.log('Cache miss for partner profile:', req.user._id);
+
+  const partner = await Partnerwebapp.findById(req.user._id);
+
+  if (!partner) {
+    res.status(404);
+    throw new Error("Partner not found.");
+  }
+
+  const profileData = {
+    _id: partner._id,
+    name: partner.name,
+    email: partner.email,
+    universityName: partner.universityName,
+    institutionId: partner.institutionId,
+    adminApproved: partner.adminApproved,
+    isPremium: partner.isPremium,
+    planType: partner.planType,
+    premiumExpiration: partner.premiumExpiration,
+    active: partner.active,
+  };
+
+  await redisClient.setEx(cacheKey, 300, JSON.stringify(profileData)); // Cache 5 mins
+
+  res.json(profileData);
 });
+
 
 // Helper function to check required fields
 const areFieldsFilled = (fields) => fields.every((field) => field);
@@ -186,30 +200,33 @@ const authPartner = asyncHandler(async (req, res) => {
 
 // Update partner profile
 const updatePartnerProfile = asyncHandler(async (req, res) => {
-    // Check if req.user exists
-    if (!req.user) {
-        res.status(401); // Unauthorized
-        throw new Error("User not authenticated.");
-    }
+  if (!req.user) {
+    res.status(401);
+    throw new Error("User not authenticated.");
+  }
 
-    const partner = await Partnerwebapp.findById(req.user._id);
-    if (!partner) {
-        res.status(404);
-        throw new Error("Partner not found.");
-    }
+  const partner = await Partnerwebapp.findById(req.user._id);
+  if (!partner) {
+    res.status(404);
+    throw new Error("Partner not found.");
+  }
 
-    // Update fields if they are provided; otherwise retain existing values
-    partner.name = req.body.name || partner.name;
-    partner.email = req.body.email || partner.email;
-    partner.universityName = req.body.universityName || partner.universityName;
-    partner.institutionId = req.body.institutionId || partner.institutionId;
+  partner.name = req.body.name || partner.name;
+  partner.email = req.body.email || partner.email;
+  partner.universityName = req.body.universityName || partner.universityName;
+  partner.institutionId = req.body.institutionId || partner.institutionId;
 
-    if (req.body.password) {
-        partner.password = req.body.password; // Ensure password hashing occurs in the model pre-save hook.
-    }
+  if (req.body.password) {
+    partner.password = req.body.password; // Will be hashed in pre-save hook
+  }
 
-    const updatedPartner = await partner.save();
-     res.json({
+  const updatedPartner = await partner.save();
+
+  // Invalidate Redis cache after update
+  const cacheKey = `partnerProfile:${updatedPartner._id}`;
+  await redisClient.del(cacheKey);
+
+  res.json({
     _id: updatedPartner._id,
     name: updatedPartner.name,
     email: updatedPartner.email,
@@ -218,42 +235,58 @@ const updatePartnerProfile = asyncHandler(async (req, res) => {
     adminApproved: updatedPartner.adminApproved,
     isPremium: updatedPartner.isPremium,
     planType: updatedPartner.planType,
+    premiumExpiration: updatedPartner.premiumExpiration,
     token: generateToken(updatedPartner._id),
   });
 });
 
+
 // Get all partners
 const getAllPartners = asyncHandler(async (req, res) => {
-    const partners = await Partnerwebapp.find({}, "name email universityName institutionId adminApproved");
-    if (partners && partners.length > 0) {
-        res.status(200).json(partners);
-    } else {
-        res.status(404);
-        throw new Error("No partners found.");
-    }
+  const cacheKey = 'allPartners';
+
+  const cachedPartners = await redisClient.get(cacheKey);
+  if (cachedPartners) {
+    console.log("Cache hit for all partners");
+    return res.status(200).json(JSON.parse(cachedPartners));
+  }
+  console.log("Cache miss for all partners");
+
+  const partners = await Partnerwebapp.find({}, "name email universityName institutionId adminApproved");
+
+  if (!partners || partners.length === 0) {
+    res.status(404);
+    throw new Error("No partners found.");
+  }
+
+  await redisClient.setEx(cacheKey, 300, JSON.stringify(partners)); // Cache 5 minutes
+
+  res.status(200).json(partners);
 });
 
 // Admin approve a partner account
 const approvePartner = asyncHandler(async (req, res) => {
-    const { partnerId } = req.params;
-    console.log("Approving Partner ID:", partnerId);
+  const { partnerId } = req.params;
 
-    const partner = await Partnerwebapp.findById(partnerId);
-    if (!partner) {
-        res.status(404);
-        throw new Error("Partner not found.");
-    }
+  const partner = await Partnerwebapp.findById(partnerId);
+  if (!partner) {
+    res.status(404);
+    throw new Error("Partner not found.");
+  }
 
-    // Approve the account and set active to true.
-    partner.adminApproved = true;
-    partner.active = true;
+  partner.adminApproved = true;
+  partner.active = true;
+  await partner.save();
 
-    await notifyUser(partner.email, "Your SkillNaav account has been approved!", "Congratulations! Your SkillNaav account has been approved by the admin.");
+  await notifyUser(partner.email, "Your SkillNaav account has been approved!", "Congratulations! Your SkillNaav account has been approved by the admin.");
 
-    await partner.save();
+  // Invalidate individual and list cache
+  await redisClient.del(`partnerProfile:${partner._id}`);
+  await redisClient.del('allPartners');
 
-    res.status(200).json({ message: "Partner approved successfully." });
+  res.status(200).json({ message: "Partner approved successfully." });
 });
+
 
 // Admin reject a partner account
 const rejectPartner = asyncHandler(async (req, res) => {
@@ -364,10 +397,6 @@ const updatePartnerPlan = asyncHandler(async (req, res) => {
     premiumExpiration: updated.premiumExpiration,
   });
 });
-
-
-
-
 
 // Exporting functions for use in routes.
 module.exports = {

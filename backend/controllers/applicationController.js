@@ -8,6 +8,8 @@ const notifyUser = require("../utils/notifyUser.js");
 const multer = require("multer"); // Multer for file uploads
 const path = require("path");
 const fs = require("fs");
+const redisClient = require('../utils/redisClient'); // Adjust path as per your project structure
+
 
 const upgradeToPremium = async (req, res) => {
   const { studentId } = req.body;
@@ -99,18 +101,19 @@ const applyForInternship = async (req, res) => {
 
 
 const getApplicationCount = async (req, res) => {
+  const { studentId } = req.params;
+  const cacheKey = `applicationCount:${studentId}`;
+
   try {
-    console.log("Request received at /count/:studentId"); // Debugging log
-    console.log("Params received:", req.params);
-
-    const { studentId } = req.params;
-
-    if (!studentId) {
-      return res.status(400).json({ message: "Student ID is required" });
+    const cachedCount = await redisClient.get(cacheKey);
+    if (cachedCount !== null) {
+      console.log('Cache hit for application count:', studentId);
+      return res.status(200).json({ count: parseInt(cachedCount, 10) });
     }
+    console.log('Cache miss for application count:', studentId);
 
     const applicationCount = await Application.countDocuments({ studentId });
-
+    await redisClient.setEx(cacheKey, 300, applicationCount.toString());
     res.status(200).json({ count: applicationCount });
   } catch (error) {
     console.error("Error fetching application count:", error.message);
@@ -185,17 +188,26 @@ const getApplicationStatus = async (req, res) => {
 };
 
 const getApplicationsForStudent = async (req, res) => {
+  const cacheKey = `applicationsForStudent:${req.params.studentId}`;
   try {
-    const applications = await Application.find({ studentId: req.params.studentId })
-      .populate('internshipId')  // Populate internship details
-      .populate('studentId', 'userName userEmail');  // Populate user details
+    const cached = await redisClient.get(cacheKey);
+    if (cached) {
+      console.log("Cache hit for student applications", req.params.studentId);
+      return res.json(JSON.parse(cached));
+    }
+    console.log("Cache miss for student applications", req.params.studentId);
 
+    const applications = await Application.find({ studentId: req.params.studentId })
+      .populate('internshipId')
+      .populate('studentId', 'userName userEmail');
+    await redisClient.setEx(cacheKey, 300, JSON.stringify({ applications }));
     res.json({ applications });
   } catch (err) {
     console.error("Error fetching applications:", err);
     res.status(500).json({ message: "Error fetching applications" });
   }
 };
+
 
 // Controller to check if a specific job has been applied by the user
 const checkIfApplied = async (req, res) => {
@@ -400,15 +412,25 @@ const updateApplicationStatus = async (req, res) => {
 
 const getRecommendationsForStudent = async (req, res) => {
   try {
-    const studentId = req.query.studentId || req.user._id; // req.user set by auth middleware
-    if (!studentId) return res.status(400).json({ message: "Missing studentId" });
-    const recs = await getPersonalizedRecommendations(studentId, Number(req.query.limit) || 10);
+    const studentId = req.query.studentId || req.user._id;
+    const limit = Number(req.query.limit) || 10;
+    const cacheKey = `recommendations:${studentId}:${limit}`;
+    const cached = await redisClient.get(cacheKey);
+    if (cached) {
+      console.log("Cache hit for recommendations", studentId, limit);
+      return res.status(200).json({ success: true, recommendations: JSON.parse(cached) });
+    }
+    console.log("Cache miss for recommendations", studentId, limit);
+
+    const recs = await getPersonalizedRecommendations(studentId, limit);
+    await redisClient.setEx(cacheKey, 600, JSON.stringify(recs)); // Cache for 10 min
     res.status(200).json({ success: true, recommendations: recs });
   } catch (e) {
     console.error(e);
     res.status(500).json({ success: false, message: "Failed to fetch recommendations" });
   }
 };
+
 
 module.exports = {
   applyForInternship,
