@@ -2,6 +2,11 @@
 const fs = require("fs");
 const path = require("path");
 const Instructure = require("../models/webapp-models/InstructureManagementModel");
+// ADD: email helper to notify instructors after creation
+const { sendInstructorCreatedEmail } = require("../utils/instructorMailer");
+// ADD (top)
+const notifyUser = require("../utils/notifyUser"); // uses your EMAIL_* env
+const { issueOtp, verifyOtp, isVerified, clearOtp } = require("../utils/otpStore");
 
 const fileToMeta = (file) => {
     if (!file) return undefined;
@@ -38,6 +43,19 @@ exports.createInstructure = async (req, res) => {
             return res.status(400).json({ message: "End Time must be after Start Time." });
         }
 
+        // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>  ADD THIS BLOCK  <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+        // OTP email verification guard (run BEFORE handling files or saving)
+        const emailToCheck = (payload?.email || "").trim().toLowerCase();
+        if (!emailToCheck) {
+            return res.status(400).json({ message: "Email is required." });
+        }
+        if (!isVerified(emailToCheck)) {
+            return res.status(400).json({
+                message: "Email not verified. Please complete OTP verification and try again.",
+            });
+        }
+        // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<  ADD THIS BLOCK  >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
         const resumeFile = req.files?.resume?.[0];
         if (!resumeFile) return res.status(400).json({ message: "Resume is required." });
 
@@ -52,6 +70,20 @@ exports.createInstructure = async (req, res) => {
         };
 
         const created = await Instructure.create(doc);
+
+        // Try sending the notification email to the instructor.
+        // Do NOT fail the API if email fails — just log the error.
+        try {
+            await sendInstructorCreatedEmail(created);
+        } catch (mailErr) {
+            console.error("[createInstructure] Email send failed:", mailErr?.message || mailErr);
+        }
+
+        // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>  ADD THIS LINE  <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+        // Clear OTP for this verified email after successful create (+mail)
+        try { clearOtp(emailToCheck); } catch (_) { }
+        // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<  ADD THIS LINE  >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
         return res.status(201).json(created);
     } catch (err) {
         console.error("createInstructure error:", err);
@@ -141,5 +173,46 @@ exports.deleteInstructure = async (req, res) => {
     } catch (err) {
         console.error("deleteInstructure error:", err);
         return res.status(500).json({ message: "Failed to delete instructure." });
+    }
+};
+
+// ADD: Start OTP (send code to provided email)
+exports.startInstructorEmailOtp = async (req, res) => {
+    try {
+        const { email } = req.body || {};
+        if (!email) return res.status(400).json({ message: "Email is required." });
+
+        const code = issueOtp(email);
+        const subject = "SkillNaav — Verify your email (OTP)";
+        const bodyHtml = `
+      <div style="font-family:Arial,sans-serif;line-height:1.6">
+        <h2>Verify your email</h2>
+        <p>Your 6-digit code:</p>
+        <p style="font-size:24px;font-weight:700;letter-spacing:2px">${code}</p>
+        <p>This code expires in ${process.env.OTP_TTL_MIN || 10} minutes.</p>
+      </div>
+    `;
+        await notifyUser(email, subject, bodyHtml);
+
+        return res.json({ ok: true });
+    } catch (err) {
+        console.error("startInstructorEmailOtp error:", err);
+        return res.status(500).json({ message: "Failed to start OTP." });
+    }
+};
+
+// ADD: Verify OTP
+exports.verifyInstructorEmailOtp = async (req, res) => {
+    try {
+        const { email, otp } = req.body || {};
+        if (!email || !otp) return res.status(400).json({ message: "Email and OTP are required." });
+
+        const ok = verifyOtp(email, otp);
+        if (!ok) return res.status(400).json({ message: "Invalid or expired OTP." });
+
+        return res.json({ ok: true });
+    } catch (err) {
+        console.error("verifyInstructorEmailOtp error:", err);
+        return res.status(500).json({ message: "Failed to verify OTP." });
     }
 };

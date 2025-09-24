@@ -9,6 +9,9 @@ const {
     getInstructure,
     updateInstructure,
     deleteInstructure,
+    // ADD:
+    startInstructorEmailOtp,
+    verifyInstructorEmailOtp,
 } = require("../../controllers/InstructureManagementController");
 
 const router = express.Router();
@@ -37,6 +40,11 @@ const fields = upload.fields([
     { name: "certificates", maxCount: 20 },
 ]);
 
+// OTP endpoints first (optional but future-proof)
+router.post("/otp/start", startInstructorEmailOtp);
+router.post("/otp/verify", verifyInstructorEmailOtp);
+
+// Core CRUD
 router.post("/", fields, createInstructure);
 router.get("/", listInstructures);
 router.get("/:id", getInstructure);

@@ -79,6 +79,12 @@ const InstructureManagement = () => {
     const [tz, setTz] = useState("America/Los_Angeles");
     const [viewing, setViewing] = useState(null);
 
+    // ADD near the top inside the component
+    const [otpOpen, setOtpOpen] = useState(false);
+    const [otpEmail, setOtpEmail] = useState("");
+    const [otpCode, setOtpCode] = useState("");
+    const [pendingFormData, setPendingFormData] = useState(null); // holds the prepared FormData
+
     // Keep payout method valid for the selected country
     useEffect(() => {
         if (country === "Canada") {
@@ -144,6 +150,14 @@ const InstructureManagement = () => {
                     : payoutMethod === "Interac e-Transfer"
                         ? "Email or mobile number"
                         : "PayPal email";
+
+    // --- ADD: helper to do the actual create POST (same endpoint you already use) ---
+    async function createInstructorWithFormData(fd) {
+        const { data } = await axios.post("/api/instructors", fd, {
+            headers: { "Content-Type": "multipart/form-data" },
+        });
+        return data;
+    }
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -229,24 +243,30 @@ const InstructureManagement = () => {
             if (photo instanceof File && photo.size) formData.append("photo", photo);
             certificates.forEach((file) => formData.append("certificates", file));
 
-            // Save to backend
-            const { data: created } = await axios.post("/api/instructors", formData, {
-                headers: { "Content-Type": "multipart/form-data" },
-            });
+            // --- OTP START FLOW (replaces the direct POST above) ---
+            try {
+                const email = (payload.email || "").trim();
+                if (!email) {
+                    alert("Email is required for OTP verification.");
+                    setSubmitting(false);
+                    return;
+                }
 
-            // update local list so the newly added instructor is visible instantly
-            // update local list with server-created record (fallback to payload if no response)
-            // AFTER — tolerate {data}, {instructor}, {doc}, {result}, or raw
-            const newDoc = (created && (created.data || created.instructor || created.doc || created.result)) || created;
-            const createdRecord = newDoc
-                ? { id: newDoc._id || newDoc.id || String(Date.now()), ...newDoc }
-                : { id: String(Date.now()), ...payload };
+                // 1) Ask backend to send OTP
+                await axios.post("/api/instructors/otp/start", { email });
 
-            setInstructors((prev) => [createdRecord, ...prev]);
+                // 2) Freeze the exact payload being verified, then open OTP modal
+                setPendingFormData(formData);
+                setOtpEmail(email);
+                setOtpOpen(true);
 
-            console.log("Instructor payload (JSON):", payload);
-            e.target.reset();
-            setIsAddOpen(false); // close the popup after save
+                // IMPORTANT: stop here; the actual create will happen from the OTP modal
+                return;
+            } catch (err) {
+                console.error("Start OTP failed:", err);
+                alert(err?.response?.data?.message || "Failed to start OTP.");
+                // fall through to finally { setSubmitting(false) }
+            }
         } catch (err) {
             console.error("Submit failed:", err);
             alert("Something went wrong while saving the instructor.");
@@ -933,7 +953,7 @@ const InstructureManagement = () => {
                                 <div className="flex items-center gap-3">
                                     <button
                                         type="submit"
-                                        disabled={submitting}
+                                        disabled={submitting || otpOpen}
                                         className="inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-teal-500 to-cyan-600 text-white font-semibold rounded-lg shadow-lg hover:from-teal-600 hover:to-cyan-700 disabled:opacity-60"
                                     >
                                         <FontAwesomeIcon icon={faPlus} />
@@ -942,6 +962,87 @@ const InstructureManagement = () => {
                                     <span className="text-xs text-gray-500">You can edit or assign later from the list below.</span>
                                 </div>
                             </form>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {otpOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
+                        <h3 className="text-lg font-semibold mb-2">Verify Email</h3>
+                        <p className="text-sm text-gray-600 mb-4">
+                            We have sent a 6-digit code to your Mail ID: <span className="font-medium">{otpEmail}</span>.
+                        </p>
+                        <input
+                            type="text"
+                            inputMode="numeric"
+                            maxLength={6}
+                            placeholder="Enter 6-digit OTP"
+                            value={otpCode}
+                            onChange={(e) => setOtpCode(e.target.value)}
+                            className="w-full h-11 rounded-lg border border-gray-300 px-3 focus:outline-none focus:ring-2 focus:ring-teal-500 mb-4"
+                        />
+
+                        <div className="flex items-center justify-end gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setOtpOpen(false)}
+                                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700"
+                            >
+                                Cancel
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={async () => {
+                                    try {
+                                        // 1) Verify OTP
+                                        await axios.post("/api/instructors/otp/verify", {
+                                            email: otpEmail,
+                                            otp: otpCode,
+                                        });
+
+                                        // 2) Create with frozen FormData
+                                        const data = await createInstructorWithFormData(pendingFormData);
+
+                                        // 3) Update list & close the Add modal so the new instructor is visible immediately
+                                        const normalized = { id: data._id || data.id, ...data };
+                                        setInstructors((prev) => [normalized, ...prev]);
+                                        setIsAddOpen(false);
+
+                                        // 4) Reset OTP UI
+                                        setOtpOpen(false);
+                                        setOtpCode("");
+                                        setPendingFormData(null);
+
+                                        alert("Instructor created successfully.");
+                                    } catch (err) {
+                                        console.error("Verify OTP or Create failed:", err);
+                                        alert(err?.response?.data?.message || "Invalid OTP or create failed.");
+                                    }
+                                }}
+                                className="px-4 py-2 rounded-lg bg-teal-600 text-white"
+                            >
+                                Verify & Save
+                            </button>
+                        </div>
+
+                        <div className="mt-3">
+                            <button
+                                type="button"
+                                className="text-sm text-teal-700 underline"
+                                onClick={async () => {
+                                    try {
+                                        await axios.post("/api/instructors/otp/start", { email: otpEmail });
+                                        alert("OTP resent.");
+                                    } catch (e) {
+                                        alert("Failed to resend OTP.");
+                                    }
+                                }}
+                            >
+                                Resend code
+                            </button>
                         </div>
                     </div>
                 </div>
