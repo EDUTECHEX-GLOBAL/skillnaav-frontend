@@ -101,7 +101,7 @@ const PartnerManagement = () => {
       if (!selectedInternship) return;
 
       try {
-        const response = await axios.get(`/api/chats/${selectedInternship._id}`);
+        const response = await axios.get(`/api/chats/internship/${selectedInternship._id}`);
         const data = response.data;
         if (Array.isArray(data) && data.length > 0) {
           setChatMessages(data);
@@ -133,7 +133,7 @@ const PartnerManagement = () => {
         message: newMessage.trim(),
       };
 
-      const response = await axios.post("/api/chats", messagePayload);
+      const response = await axios.post("/api/chats/send", messagePayload);
 
       setChatMessages((prev) => [
         ...prev,
