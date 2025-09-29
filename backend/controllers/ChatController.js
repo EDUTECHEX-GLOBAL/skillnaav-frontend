@@ -1,136 +1,133 @@
-const Chat = require('../models/webapp-models/ChatModel');
-const Userwebapp = require('../models/webapp-models/userModel'); // Import User model
+const Chat = require("../models/webapp-models/ChatModel");
+const Userwebapp = require("../models/webapp-models/userModel"); // Import User model
 
-// Fetch chat messages based on partnerId
+/**
+ * ✅ Get chat messages between Admin & Partner for a specific internship
+ */
 const getChatMessages = async (req, res) => {
   const { internshipId, partnerId } = req.params;
 
-  console.log('Fetching messages for internshipId:', internshipId, 'and partnerId:', partnerId);
+  console.log("📩 Fetching messages for internshipId:", internshipId, "partnerId:", partnerId);
 
   try {
     if (!internshipId || !partnerId) {
-      console.error('Missing internshipId or partnerId in request parameters.');
-      return res.status(400).json({ error: 'Internship ID and Partner ID are required.' });
+      return res
+        .status(400)
+        .json({ error: "Internship ID and Partner ID are required." });
     }
 
     const messages = await Chat.find({
       internship: internshipId,
-      $or: [
-        { sender: partnerId },
-        { receiver: partnerId },
-      ],
-    }).sort({ createdAt: 1 }); // Sort by creation time
+      $or: [{ sender: partnerId }, { receiver: partnerId }],
+    }).sort({ createdAt: 1 });
 
-    console.log(`Found ${messages.length} messages for partnerId ${partnerId}.`);
+    console.log(`✅ Found ${messages.length} messages for partnerId ${partnerId}`);
 
-  if (!messages.length) {
-  return res.status(200).json([]); // ✅ Return empty array instead of 404
-}
-
-
-    const responseMessages = messages.map((msg) => ({
-      sender: msg.sender,
-      receiver: msg.receiver,
-      message: msg.message,
-      internship: msg.internship,
-      createdAt: msg.createdAt, // Include timestamp if needed
-    }));
-
-    res.status(200).json(responseMessages);
+    return res.status(200).json(messages || []);
   } catch (err) {
-    console.error('Error fetching chat messages:', err);
-    res.status(500).json({ error: 'Failed to fetch chat messages', details: err.message });
+    console.error("❌ Error fetching chat messages:", err);
+    return res.status(500).json({
+      error: "Failed to fetch chat messages",
+      details: err.message,
+    });
   }
 };
 
-
-// Send a message
+/**
+ * ✅ Admin/Partner sends a new message
+ */
 const sendMessage = async (req, res) => {
   const { internshipId, senderId, receiverId, message } = req.body;
 
   try {
-    if (!internshipId || !senderId || !receiverId || !message) {
-      return res.status(400).json({ error: 'All fields are required.' });
+    if (!internshipId || !senderId || !receiverId || !message?.trim()) {
+      return res.status(400).json({ error: "All fields are required." });
     }
 
     const newMessage = await Chat.create({
       internship: internshipId,
       sender: senderId,
       receiver: receiverId,
-      message,
+      message: message.trim(),
     });
 
-    console.log('New message created:', newMessage);
+    console.log("💬 New message created:", newMessage);
 
-    res.status(201).json(newMessage);
+    // If using Socket.IO, emit the message to the room (internshipId)
+    if (req.io) {
+      req.io.to(internshipId).emit("newMessage", newMessage);
+    }
+
+    return res.status(201).json(newMessage);
   } catch (err) {
-    console.error('Error sending message:', err);
-    res.status(500).json({ error: 'Failed to send message', details: err.message });
+    console.error("❌ Error sending message:", err);
+    return res
+      .status(500)
+      .json({ error: "Failed to send message", details: err.message });
   }
 };
 
-
-
+/**
+ * ✅ Reply to an existing chat thread
+ * (Essentially the same as sendMessage, but kept separate for clarity)
+ */
 const sendReply = async (req, res) => {
   const { internshipId, senderId, receiverId, message } = req.body;
 
   try {
-    // Validate that all fields are provided
-    if (!internshipId || !senderId || !receiverId || !message) {
-      return res.status(400).json({ error: 'All fields are required.' });
+    if (!internshipId || !senderId || !receiverId || !message?.trim()) {
+      return res.status(400).json({ error: "All fields are required." });
     }
 
-    // Create a new chat message
-    const newMessage = new Chat({
+    const newMessage = await Chat.create({
       internship: internshipId,
       sender: senderId,
-      receiver: receiverId, // Use receiverId from request body
-      message,
+      receiver: receiverId,
+      message: message.trim(),
     });
 
-    await newMessage.save();
-    res.status(201).json(newMessage); // Respond with the newly created message object
-  } catch (err) {
-    console.error('Error sending message:', err);
-    res.status(500).json({ error: 'Failed to send message', details: err.message });
-  }
-};  
+    console.log("↩️ Reply created:", newMessage);
 
-
-const getMessages = async (req, res) => {
-  const { internshipId } = req.params;
-
-  console.log('Fetching messages for internshipId:', internshipId);
-
-  try {
-    if (!internshipId) {
-      return res.status(400).json({ error: 'Internship ID is required.' });
+    if (req.io) {
+      req.io.to(internshipId).emit("newMessage", newMessage);
     }
 
-    const messages = await Chat.find({ internship: internshipId }).sort({ createdAt: 1 });
-
-    console.log(`Found ${messages.length} messages for internshipId ${internshipId}.`);
-
- if (!messages.length) {
-  return res.status(200).json([]); // ✅ Return empty array instead of 404
-}
-
-
-    const responseMessages = messages.map((msg) => ({
-      sender: msg.sender,
-      receiver: msg.receiver,
-      message: msg.message,
-      createdAt: msg.createdAt,
-    }));
-
-    res.status(200).json(responseMessages);
+    return res.status(201).json(newMessage);
   } catch (err) {
-    console.error('Error fetching chat messages:', err);
-    res.status(500).json({ error: 'Failed to fetch chat messages', details: err.message });
+    console.error("❌ Error sending reply:", err);
+    return res
+      .status(500)
+      .json({ error: "Failed to send reply", details: err.message });
   }
 };
 
+/**
+ * ✅ Get all messages for a specific internship (no partner filter)
+ */
+const getMessages = async (req, res) => {
+  const { internshipId } = req.params;
 
+  console.log("📥 Fetching all messages for internshipId:", internshipId);
+
+  try {
+    if (!internshipId) {
+      return res.status(400).json({ error: "Internship ID is required." });
+    }
+
+    const messages = await Chat.find({ internship: internshipId }).sort({
+      createdAt: 1,
+    });
+
+    console.log(`✅ Found ${messages.length} messages for internshipId ${internshipId}`);
+
+    return res.status(200).json(messages || []);
+  } catch (err) {
+    console.error("❌ Error fetching messages:", err);
+    return res
+      .status(500)
+      .json({ error: "Failed to fetch messages", details: err.message });
+  }
+};
 
 module.exports = {
   getChatMessages,
