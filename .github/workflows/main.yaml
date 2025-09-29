@@ -24,3 +24,4 @@ jobs:
             cd /home/ubuntu/
             ./deploy.sh git feature/redis # Pass the branch name directly
           EOF
+
