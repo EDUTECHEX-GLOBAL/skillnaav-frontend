@@ -1,7 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import axios from "axios";
 import Modal from "react-modal";
-
 
 Modal.setAppElement("#root");
 
@@ -14,225 +13,194 @@ const PartnerManagement = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [internshipToDelete, setInternshipToDelete] = useState(null);
   const [comment, setComment] = useState("");
-  const [showFullDescription, setShowFullDescription] = useState(false);
   const [deletedInternships, setDeletedInternships] = useState([]);
-  const [chatMessages, setChatMessages] = useState([]); // Chat messages for the review
-  const [newMessage, setNewMessage] = useState(""); // New message input
-  const [chatError, setChatError] = useState(null); // NEW
+  const [chatMessages, setChatMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState("");
+  const [chatError, setChatError] = useState(null);
 
-  // Pagination state
+  const messagesEndRef = useRef(null);
+
+  // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const applicationsPerPage = 10;
 
-  // Sorting state
+  // Sorting
   const [sortCriteria, setSortCriteria] = useState("jobTitle");
   const [sortDirection, setSortDirection] = useState("asc");
 
-  // Search state
+  // Search
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Auto-scroll chat
+  const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  useEffect(scrollToBottom, [chatMessages]);
+
+  // Fetch internships
   useEffect(() => {
     const fetchInternships = async () => {
       try {
         const response = await axios.get("/api/interns");
-        setInternships(response.data);
-      } catch (error) {
-        console.error("Error fetching internships:", error);
+        setInternships(response.data || []);
+      } catch (err) {
+        console.error("Error fetching internships:", err);
       }
     };
     fetchInternships();
   }, []);
 
+  // Approve internship
   const handleApprove = async (internId) => {
     try {
-      await axios.patch(`/api/interns/${internId}/approve`, {
-        status: "approved",
-      });
-      setInternships((prevInternships) =>
-        prevInternships.map((internship) =>
-          internship._id === internId ? { ...internship, adminApproved: true } : internship
-        )
+      await axios.patch(`/api/interns/${internId}/approve`, { status: "approved" });
+      setInternships((prev) =>
+        prev.map((i) => (i._id === internId ? { ...i, adminApproved: true } : i))
       );
-    } catch (error) {
-      console.error("Error approving internship:", error);
+    } catch (err) {
+      console.error("Error approving internship:", err);
     }
   };
 
+  // Reject internship
   const handleRejectClick = (internship) => {
     setInternshipToReject(internship);
     setIsRejectModalOpen(true);
   };
-
   const confirmReject = async () => {
     if (!internshipToReject) return;
     try {
       await axios.patch(`/api/interns/${internshipToReject._id}/reject`, {
         status: "rejected",
-        reason: comment, // Include the reason here
+        reason: comment,
       });
-      setInternships((prevInternships) => prevInternships.map((internship) => internship._id === internshipToReject._id ? { ...internship, adminApproved: false } : internship));
+      setInternships((prev) =>
+        prev.map((i) => (i._id === internshipToReject._id ? { ...i, adminApproved: false } : i))
+      );
       setIsRejectModalOpen(false);
-    } catch (error) {
-      console.error("Error rejecting internship:", error);
+      setComment("");
+    } catch (err) {
+      console.error("Error rejecting internship:", err);
     }
   };
 
+  // Review / Chat
   const handleReview = (internship) => {
-    setSelectedInternship(internship); // Set the selected internship
-    setIsModalOpen(true); // Open chat modal
+    setSelectedInternship(internship);
+    setIsModalOpen(true);
   };
   const closeModal = () => {
     setIsModalOpen(false);
     setSelectedInternship(null);
-    setComment(""); // Reset comment when closing modal
+    setChatMessages([]);
+    setNewMessage("");
+    setChatError(null);
   };
 
-  const closeRejectModal = () => {
-    setIsRejectModalOpen(false);
-  };
-
-
-  const handleSendMessage = async () => {
-    if (!newMessage.trim()) return; // Prevent sending empty messages
-
-    try {
-      // Retrieve the admin ID from localStorage
-      const adminInfo = JSON.parse(localStorage.getItem("adminInfo"));
-      if (!adminInfo || !adminInfo.id) {
-        console.error("Admin ID not found");
-        return;
-      }
-      const adminId = adminInfo.id; // Use the dynamically fetched admin ID
-
-      // Send message to backend
-      const response = await axios.post(`/api/chats`, {
-        internshipId: selectedInternship._id, // Include selected internship ID
-        senderId: adminId,
-        receiverId: selectedInternship.partnerId, // Assuming you have submitterId in internship data
-        message: newMessage,
-      });
-
-      // Update chat history with new message
-      setChatMessages((prev) => [
-        ...prev,
-        { sender: adminId, message: newMessage, timestamp: new Date() },
-      ]);
-
-      setNewMessage(""); // Clear input field
-
-      // Update internship's AdminReviewed status to true after sending the message
-      const updateResponse = await axios.patch(`/api/interns/${selectedInternship._id}/update`, {
-        AdminReviewed: true,  // Mark as reviewed
-      });
-
-      // If the update is successful, update local state
-      if (updateResponse.status === 200) {
-        // Update local state to reflect that the internship is reviewed
-        setSelectedInternship((prevInternship) => ({
-          ...prevInternship,
-          AdminReviewed: true,
-        }));
-      }
-
-    } catch (error) {
-      console.error("Error sending message:", error.response?.data || error.message); // Log detailed error response
-    }
-  };
-
-  const closeDeleteModal = () => {
-    setIsDeleteModalOpen(false);
-    setInternshipToDelete(null); // Reset selected internship to delete
-  };
-
-  const handleDeleteClick = (internship) => {
-    setInternshipToDelete(internship); // Set the internship to delete
-    setIsDeleteModalOpen(true); // Open delete confirmation modal
-  };
-
-  const confirmDelete = async () => {
-    if (!internshipToDelete) return;
-
-    try {
-      // Optimistic UI update: Immediately move the internship to the deleted list
-      setDeletedInternships((prev) => [...prev, internshipToDelete]);
-
-      // Call API to mark the internship as deleted (soft delete)
-      const response = await axios.delete(`/api/interns/${internshipToDelete._id}`);
-
-      console.log("Marked as deleted:", response.data);
-
-      // Update the internships list by removing the deleted internship
-      setInternships((prevInternships) =>
-        prevInternships.filter((i) => i._id !== internshipToDelete._id)
-      );
-
-      closeDeleteModal(); // Close the modal after deletion
-    } catch (error) {
-      // If an error occurs, revert the optimistic UI changes and show an error message
-      setDeletedInternships((prev) => prev.filter((i) => i._id !== internshipToDelete._id)); // Revert
-      setInternships((prevInternships) => [
-        ...prevInternships,
-        internshipToDelete, // Revert the deletion
-      ]);
-      console.error("Error deleting internship:", error);
-      alert("Error deleting internship. Please try again later.");
-    }
-  };
-
+  // Fetch chat messages
   useEffect(() => {
     const fetchMessages = async () => {
       if (!selectedInternship) return;
 
       try {
-        const response = await axios.get(`/api/chats/${selectedInternship._id}`);
+        const response = await axios.get(`/api/chats/internship/${selectedInternship._id}`);
         const data = response.data;
-
         if (Array.isArray(data) && data.length > 0) {
           setChatMessages(data);
-          setChatError(null); // ✅ messages exist
+          setChatError(null);
         } else {
-          setChatMessages([]); // ✅ no messages, but not an error
+          setChatMessages([]);
           setChatError("No messages yet. Let’s review the internship.");
         }
-      } catch (error) {
+      } catch (err) {
         setChatMessages([]);
-        setChatError("No messages yet. Let’s review the internship."); // ✅ shows this in UI
-
-        console.error("Error fetching messages:", error);
+        setChatError("No messages yet. Let’s review the internship.");
+        console.error("Error fetching messages:", err);
       }
     };
-
     fetchMessages();
   }, [selectedInternship]);
 
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || !selectedInternship) return;
 
-  // Trigger on selectedInternship change
+    try {
+      const adminInfo = JSON.parse(localStorage.getItem("adminInfo"));
+      if (!adminInfo?.id) return console.error("Admin ID not found");
 
-  const sortInternships = (internships) => {
-    return internships.sort((a, b) => {
-      const aValue = a[sortCriteria].toLowerCase();
-      const bValue = b[sortCriteria].toLowerCase();
+      const messagePayload = {
+        internshipId: selectedInternship._id,
+        senderId: adminInfo.id,
+        receiverId: selectedInternship.partnerId,
+        message: newMessage.trim(),
+      };
 
-      return sortDirection === "asc"
-        ? aValue.localeCompare(bValue)
-        : bValue.localeCompare(aValue);
-    });
+      const response = await axios.post("/api/chats/send", messagePayload);
+
+      setChatMessages((prev) => [
+        ...prev,
+        { sender: adminInfo.id, message: newMessage, timestamp: new Date() },
+      ]);
+      setNewMessage("");
+
+      // Update internship review status
+      await axios.patch(`/api/interns/${selectedInternship._id}/update`, {
+        AdminReviewed: true,
+      });
+      setSelectedInternship((prev) => ({ ...prev, AdminReviewed: true }));
+    } catch (err) {
+      console.error("Error sending message:", err.response?.data || err.message);
+    }
   };
 
-  const filteredInternships = internships.filter((internship) => {
-    const lowerCaseQuery = searchQuery.toLowerCase();
+  // Delete internship
+  const handleDeleteClick = (internship) => {
+    setInternshipToDelete(internship);
+    setIsDeleteModalOpen(true);
+  };
+  const confirmDelete = async () => {
+    if (!internshipToDelete) return;
+    try {
+      setDeletedInternships((prev) => [...prev, internshipToDelete]);
+      await axios.delete(`/api/interns/${internshipToDelete._id}`);
+      setInternships((prev) => prev.filter((i) => i._id !== internshipToDelete._id));
+      setIsDeleteModalOpen(false);
+    } catch (err) {
+      setDeletedInternships((prev) => prev.filter((i) => i._id !== internshipToDelete._id));
+      setInternships((prev) => [...prev, internshipToDelete]);
+      console.error("Error deleting internship:", err);
+      alert("Error deleting internship. Please try again later.");
+    }
+  };
+  const closeDeleteModal = () => {
+    setIsDeleteModalOpen(false);
+    setInternshipToDelete(null);
+  };
+
+  const closeRejectModal = () => {
+    setIsRejectModalOpen(false);
+    setInternshipToReject(null);
+    setComment("");
+  };
+
+  // Sorting & Pagination
+  const sortInternships = (list) =>
+    list.sort((a, b) => {
+      const aValue = a[sortCriteria]?.toLowerCase() || "";
+      const bValue = b[sortCriteria]?.toLowerCase() || "";
+      return sortDirection === "asc" ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue);
+    });
+
+  const filteredInternships = internships.filter((i) => {
+    const q = searchQuery.toLowerCase();
     return (
-      internship.jobTitle.toLowerCase().includes(lowerCaseQuery) ||
-      internship.companyName.toLowerCase().includes(lowerCaseQuery) ||
-      (internship.organization &&
-        internship.organization.toLowerCase().includes(lowerCaseQuery))
+      i.jobTitle.toLowerCase().includes(q) ||
+      i.companyName.toLowerCase().includes(q) ||
+      (i.organization && i.organization.toLowerCase().includes(q))
     );
   });
 
   const indexOfLastInternship = currentPage * applicationsPerPage;
   const indexOfFirstInternship = indexOfLastInternship - applicationsPerPage;
-  const sortedInternships = sortInternships([...filteredInternships]);
-  const currentInternships = sortedInternships.slice(
+  const currentInternships = sortInternships([...filteredInternships]).slice(
     indexOfFirstInternship,
     indexOfLastInternship
   );
@@ -244,7 +212,7 @@ const PartnerManagement = () => {
         Admin Dashboard - Internship Management
       </h2>
 
-      {/* Search Input */}
+      {/* Search */}
       <div className="mb-4">
         <input
           type="text"
@@ -255,7 +223,7 @@ const PartnerManagement = () => {
         />
       </div>
 
-      {/* Sorting Controls */}
+      {/* Sorting */}
       <div className="flex mb-4 space-x-4">
         <select
           value={sortCriteria}
@@ -275,6 +243,7 @@ const PartnerManagement = () => {
         </select>
       </div>
 
+      {/* Internships Table */}
       <div className="mb-4 overflow-x-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200">
         <table className="min-w-full bg-white rounded-lg shadow-lg">
           <thead className="bg-gray-200">
@@ -303,7 +272,6 @@ const PartnerManagement = () => {
                         ? `Student Pays: ${internship.compensationDetails?.amount} ${internship.compensationDetails?.currency}`
                         : "N/A"}
                 </td>
-
                 <td className="px-4 py-2 flex space-x-2">
                   <button
                     className={`px-3 py-1 rounded-md text-white ${internship.adminApproved ? "bg-green-500" : "bg-blue-500 hover:bg-blue-700"}`}
@@ -312,11 +280,11 @@ const PartnerManagement = () => {
                   >
                     {internship.adminApproved ? "Approved" : "Approve"}
                   </button>
+
                   <button
-                    className={`px-3 py-1 rounded-md text-white ${internship.isAdminReviewed ? "bg-green-500 cursor-not-allowed" : "bg-indigo-500 hover:bg-indigo-700"
-                      }`}
-                    onClick={() => !internship.isAdminReviewed && handleReview(internship)}
-                    disabled={internship.isAdminReviewed}
+                    className={`px-3 py-1 rounded-md text-white ${internship.AdminReviewed ? "bg-green-500 cursor-not-allowed" : "bg-indigo-500 hover:bg-indigo-700"}`}
+                    onClick={() => !internship.AdminReviewed && handleReview(internship)}
+                    disabled={internship.AdminReviewed}
                   >
                     {internship.AdminReviewed ? "Reviewed" : "Review"}
                   </button>
@@ -327,6 +295,7 @@ const PartnerManagement = () => {
                   >
                     Reject
                   </button>
+
                   <button
                     className="px-3 py-1 bg-gray-500 text-white rounded-md hover:bg-gray-700"
                     onClick={() => handleDeleteClick(internship)}
@@ -341,62 +310,77 @@ const PartnerManagement = () => {
       </div>
 
       {/* Pagination */}
-      <div className="overflow-x-auto">
-        <div className="flex justify-between mt-4 whitespace-nowrap">
-          <button
-            className="bg-gray-300 text-gray-700 rounded-md px-4 py-2 disabled:opacity-50"
-            onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-            disabled={currentPage === 1}
-          >
-            Previous
-          </button>
-          <span className="text-gray-700">
-            Page {currentPage} of {totalPages}
-          </span>
-          <button
-            className="bg-gray-300 text-gray-700 rounded-md px-4 py-2 disabled:opacity-50"
-            onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-            disabled={currentPage === totalPages}
-          >
-            Next
-          </button>
-        </div>
+      <div className="flex justify-between mt-4">
+        <button
+          className="bg-gray-300 text-gray-700 rounded-md px-4 py-2 disabled:opacity-50"
+          onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+          disabled={currentPage === 1}
+        >
+          Previous
+        </button>
+        <span className="text-gray-700">
+          Page {currentPage} of {totalPages}
+        </span>
+        <button
+          className="bg-gray-300 text-gray-700 rounded-md px-4 py-2 disabled:opacity-50"
+          onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+          disabled={currentPage === totalPages}
+        >
+          Next
+        </button>
       </div>
 
-      {/* Delete Confirmation Modal */}
+      {/* Modals */}
+      {/* Delete Modal */}
       <Modal
         isOpen={isDeleteModalOpen}
         onRequestClose={closeDeleteModal}
-        overlayClassName="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-[999]" // Ensure overlay has a lower z-index
-        className="bg-white p-6 rounded-lg shadow-lg w-96 z-[1000]" // Ensure modal has a higher z-index
+        overlayClassName="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-[999]"
+        className="bg-white p-6 rounded-lg shadow-lg w-96 z-[1000]"
       >
         <h2 className="text-lg font-semibold mb-4">Confirm Deletion</h2>
         {internshipToDelete && (
           <div>
             <p>
-              Are you sure you want to delete the internship for
-              <strong> {internshipToDelete.jobTitle} </strong> at
-              <strong> {internshipToDelete.companyName} </strong>?
+              Are you sure you want to delete the internship for <strong>{internshipToDelete.jobTitle}</strong> at <strong>{internshipToDelete.companyName}</strong>?
             </p>
             <div className="flex space-x-2 mt-4">
-              <button
-                onClick={confirmDelete}
-                className="w-full bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
-              >
-                Delete
-              </button>
-              <button
-                onClick={closeDeleteModal}
-                className="w-full bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-400"
-              >
-                Cancel
-              </button>
+              <button onClick={confirmDelete} className="w-full bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">Delete</button>
+              <button onClick={closeDeleteModal} className="w-full bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400">Cancel</button>
             </div>
           </div>
         )}
       </Modal>
-      {/* Review Modal */}
-      {/* Chat Modal */}
+
+      {/* Reject Modal */}
+      <Modal
+        isOpen={isRejectModalOpen}
+        onRequestClose={closeRejectModal}
+        overlayClassName="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-[999]"
+        className="bg-white p-6 rounded-lg shadow-lg w-96 z-[1000]"
+      >
+        <h2 className="text-lg font-semibold mb-4">Reject Internship</h2>
+        {internshipToReject && (
+          <div>
+            <p className="text-gray-700 mb-4">
+              Are you sure you want to reject the internship for <strong>{internshipToReject.jobTitle}</strong> at <strong>{internshipToReject.companyName}</strong>?
+            </p>
+            <textarea
+              placeholder="Optional rejection comment..."
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              className="w-full border border-gray-300 p-3 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none mb-4"
+              rows="4"
+            />
+            <div className="flex space-x-2">
+              <button onClick={confirmReject} className="w-full bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">Confirm Reject</button>
+              <button onClick={closeRejectModal} className="w-full bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400">Cancel</button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Review / Chat Modal */}
       <Modal
         isOpen={isModalOpen}
         onRequestClose={closeModal}
@@ -409,33 +393,21 @@ const PartnerManagement = () => {
           </h2>
 
           {/* Chat Messages */}
-          {/* Chat Messages */}
-          {/* Chat Messages */}
           <div className="overflow-y-auto max-h-[300px] bg-gray-50 p-4 rounded-lg shadow-sm space-y-4">
             {chatError ? (
               <div className="text-center text-gray-500 text-sm">{chatError}</div>
             ) : (
-              chatMessages.map((message, index) => (
-                <div
-                  key={index}
-                  className={`flex ${message.sender === JSON.parse(localStorage.getItem("adminInfo")).id
-                      ? "justify-end"
-                      : "justify-start"
-                    }`}
-                >
-                  <div
-                    className={`rounded-lg px-4 py-3 max-w-[70%] ${message.sender === JSON.parse(localStorage.getItem("adminInfo")).id
-                        ? "bg-blue-500 text-white"
-                        : "bg-gray-200 text-gray-700"
-                      }`}
-                  >
-                    <p className="text-sm">{message.message}</p>
+              chatMessages.map((msg, idx) => (
+                <div key={idx} className={`flex ${msg.sender === JSON.parse(localStorage.getItem("adminInfo"))?.id ? "justify-end" : "justify-start"}`}>
+                  <div className={`rounded-lg px-4 py-3 max-w-[70%] ${msg.sender === JSON.parse(localStorage.getItem("adminInfo"))?.id ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-700"}`}>
+                    <p className="text-sm">{msg.message}</p>
                   </div>
                 </div>
               ))
             )}
+            <div ref={messagesEndRef} />
           </div>
-          
+
           {/* Message Input */}
           <div className="flex items-center space-x-3">
             <input
@@ -455,54 +427,9 @@ const PartnerManagement = () => {
 
           {/* Close Button */}
           <div className="text-center mt-4">
-            <button
-              onClick={closeModal}
-              className="text-sm text-blue-600 hover:underline"
-            >
-              Close
-            </button>
+            <button onClick={closeModal} className="text-sm text-blue-600 hover:underline">Close</button>
           </div>
         </div>
-      </Modal>
-
-      {/* Reject Modal */}
-      <Modal
-        isOpen={isRejectModalOpen}
-        onRequestClose={closeRejectModal}
-        overlayClassName="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-[999]" // Ensure overlay has a lower z-index
-        className="bg-white p-6 rounded-lg shadow-lg w-96 z-[1000]" // Ensure modal has a higher z-index
-      >
-        <h2 className="text-lg font-semibold mb-4">Reject Internship</h2>
-        {internshipToReject && (
-          <div>
-            <p className="text-gray-700 mb-4">
-              Are you sure you want to reject the internship for <strong>{internshipToReject.jobTitle}</strong> at <strong>{internshipToReject.companyName}</strong>?
-            </p>
-
-            <textarea
-              placeholder="Optional rejection comment..."
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              className="w-full border border-gray-300 p-3 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none mb-4"
-              rows="4"
-            />
-
-            <div className="flex space-x-2">
-              <button
-                onClick={confirmReject}
-                className="w-full bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 focus:ring-2 focus:ring-red-500"
-              >
-                Confirm Reject
-              </button>
-              <button
-                onClick={closeRejectModal}
-                className="w-full bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
       </Modal>
     </div>
   );

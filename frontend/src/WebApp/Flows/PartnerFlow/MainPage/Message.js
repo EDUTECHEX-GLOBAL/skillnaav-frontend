@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 
 // Component for Internship Card
 const InternshipCard = ({ internshipId, jobTitle, onClick }) => (
   <div
     className="p-4 mb-4 bg-white shadow-lg rounded-lg cursor-pointer hover:bg-gray-100 transition duration-200"
-    onClick={() => onClick(internshipId, jobTitle)}  // Pass both ID and Title
+    onClick={() => onClick(internshipId, jobTitle)}
   >
     <h3 className="text-lg font-bold text-gray-700">{jobTitle}</h3>
     <p className="text-sm text-gray-500">Internship ID: {internshipId}</p>
@@ -21,114 +21,109 @@ const ChatInterface = () => {
   const [partnerId, setPartnerId] = useState(null);
   const [adminId, setAdminId] = useState(null);
   const [selectedInternshipId, setSelectedInternshipId] = useState(null);
-  const [selectedInternshipTitle, setSelectedInternshipTitle] = useState("");  // Track Title
+  const [selectedInternshipTitle, setSelectedInternshipTitle] = useState("");
   const [showChat, setShowChat] = useState(false);
+
+  const messagesEndRef = useRef(null);
+
+  // Scroll to bottom whenever messages change
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(scrollToBottom, [messages]);
 
   // Load partnerId and adminId from localStorage
   useEffect(() => {
     const storedPartnerId = localStorage.getItem("partnerId");
-    const adminInfo = localStorage.getItem("adminInfo");
+    const adminInfo = JSON.parse(localStorage.getItem("adminInfo"));
 
     if (storedPartnerId) setPartnerId(storedPartnerId);
-    if (adminInfo) setAdminId(JSON.parse(adminInfo)?.id);
+    if (adminInfo?.id) setAdminId(adminInfo.id);
   }, []);
 
-  // Fetch internships on component mount
-   useEffect(() => {
+  // Fetch internships
+  useEffect(() => {
     const fetchInternships = async () => {
+      if (!partnerId) return;
+
       try {
-        if (partnerId) {
-          const response = await axios.get(`/api/interns/partner/${partnerId}`);
-          console.log("Fetched internships:", response.data);
-          setInternships(response.data);
-        } else {
-          console.error("Partner ID not found");
-        }
-      } catch (error) {
-        console.error("Error fetching internships:", error);
+        const response = await axios.get(`/api/interns/partner/${partnerId}`);
+        setInternships(response.data || []);
+      } catch (err) {
+        console.error("Error fetching internships:", err);
       }
     };
-  
-    fetchInternships();
-  }, [partnerId])
 
-  // Fetch messages for the selected internship
+    fetchInternships();
+  }, [partnerId]);
+
+  // Fetch messages for selected internship
   const fetchMessages = async (internshipId) => {
+    if (!partnerId || !internshipId) return;
+
     setLoading(true);
     try {
-      const response = await axios.get(`/api/chats/${partnerId}/${internshipId}`);
-      if (response.status === 200) {
-        setMessages(response.data);
-      }
-    } catch (error) {
-      console.error("Error fetching messages:", error);
+      const response = await axios.get(`/api/chats/partner/${partnerId}/internship/${internshipId}`);
+      setMessages(response.data || []);
+    } catch (err) {
+      console.error("Error fetching messages:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  // Handle selecting an internship and fetching its messages
+  // Handle selecting an internship
   const handleInternshipClick = (id, jobTitle) => {
-    setSelectedInternshipId(id);       // Set the selected internship ID
-    setSelectedInternshipTitle(jobTitle); // Set the selected internship title
-    fetchMessages(id);                 // Fetch messages for the selected internship
-    setShowChat(true);                 // Show the chat UI
+    setSelectedInternshipId(id);
+    setSelectedInternshipTitle(jobTitle);
+    setShowChat(true);
+    fetchMessages(id);
   };
 
-  // Handle sending new messages
+  // Handle sending a message
   const handleSend = async () => {
-    if (input.trim() && adminId && partnerId && selectedInternshipId) {
-      const newMessage = {
-        internshipId: selectedInternshipId,
-        senderId: partnerId,
-        receiverId: adminId,
-        message: input,
-      };
+    if (!input.trim() || !adminId || !partnerId || !selectedInternshipId) return;
 
-      console.log('Message being sent:', newMessage); // Log before sending the message
+    const newMessage = {
+      internshipId: selectedInternshipId,
+      senderId: partnerId,
+      receiverId: adminId,
+      message: input.trim(),
+    };
 
-      try {
-        const response = await axios.post(`/api/chats/send`, newMessage, {
-          headers: {
-            "Content-Type": "application/json",
-          },
-        });
+    try {
+      const response = await axios.post("/api/chats/send", newMessage, {
+        headers: { "Content-Type": "application/json" },
+      });
 
-        console.log('Response from backend:', response.data); // Log response data
-
-        if (response.status === 201) { // Change from 200 to 201
-          console.log('Current messages:', messages);
-
-          setMessages((prevMessages) => {
-            console.log('Updating messages with:', response.data);
-            return [...prevMessages, response.data];
-          });
-
-          setInput(""); // Clear input after sending
-        } else {
-          console.error("Failed to send message due to unexpected response status:", response.status);
-        }
-      } catch (error) {
-        console.error("Error sending message:", error);
+      if (response.status === 201) {
+        setMessages((prev) => [...prev, response.data]);
+        setInput("");
+      } else {
+        console.error("Unexpected response status:", response.status);
       }
-    } else {
-      console.error("Input, adminId, partnerId, or internshipId is missing");
+    } catch (err) {
+      console.error("Error sending message:", err);
     }
   };
 
-
-  // Show internship cards before opening chat
+  // Render internship list if chat is not open
   if (!showChat) {
     return (
       <div className="p-6 bg-gray-100 min-h-screen">
-        {internships.map(({ jobTitle, _id }) => (
-          <InternshipCard
-            key={_id}
-            internshipId={_id}
-            jobTitle={jobTitle}
-            onClick={handleInternshipClick}  // Pass ID and Title on click
-          />
-        ))}
+        {internships.length === 0 ? (
+          <div className="text-gray-500">No internships found.</div>
+        ) : (
+          internships.map(({ _id, jobTitle }) => (
+            <InternshipCard
+              key={_id}
+              internshipId={_id}
+              jobTitle={jobTitle}
+              onClick={handleInternshipClick}
+            />
+          ))
+        )}
       </div>
     );
   }
@@ -136,43 +131,45 @@ const ChatInterface = () => {
   // Chat UI
   return (
     <div className="flex flex-col font-poppins h-screen bg-gray-100">
-      {/* Chat Header */}
+      {/* Header */}
       <div className="p-4 bg-white shadow-md flex items-center justify-between">
         <button
           className="text-blue-500 hover:text-blue-700 font-medium"
-          onClick={() => setShowChat(false)} // Toggle showChat to false
+          onClick={() => setShowChat(false)}
         >
           ← Back
         </button>
         <h2 className="text-lg font-semibold">
-          Chat - (Title: {selectedInternshipTitle}) (ID: {selectedInternshipId})
+          Chat - {selectedInternshipTitle} (ID: {selectedInternshipId})
         </h2>
       </div>
 
-      {/* Messages Display */}
-      <div className="flex-grow overflow-y-auto p-4">
+      {/* Messages */}
+      <div className="flex-grow overflow-y-auto p-4 space-y-2">
         {loading ? (
           <div className="text-center text-gray-500">Loading messages...</div>
+        ) : messages.length === 0 ? (
+          <div className="text-center text-gray-400">No messages yet.</div>
         ) : (
-          messages.map((msg, index) => (
+          messages.map((msg, idx) => (
             <div
-              key={index}
-              className={`flex mb-4 ${msg.sender === partnerId ? "justify-end" : "justify-start"
-                }`}
+              key={idx}
+              className={`flex ${msg.sender === partnerId ? "justify-end" : "justify-start"}`}
             >
               <div
-                className={`max-w-sm p-3 rounded-lg shadow-md ${msg.sender === partnerId ? "bg-blue-100 text-right" : "bg-gray-200 text-left"
-                  }`}
+                className={`max-w-sm p-3 rounded-lg shadow-md ${
+                  msg.sender === partnerId ? "bg-blue-100 text-right" : "bg-gray-200 text-left"
+                }`}
               >
                 <div className="text-sm text-gray-700">{msg.message}</div>
               </div>
             </div>
           ))
         )}
+        <div ref={messagesEndRef} />
       </div>
 
-
-      {/* Message Input */}
+      {/* Input */}
       <div className="p-4 bg-white border-t flex items-center">
         <input
           type="text"
@@ -180,6 +177,7 @@ const ChatInterface = () => {
           placeholder="Type a message..."
           value={input}
           onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleSend()}
         />
         <button
           className="ml-2 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
