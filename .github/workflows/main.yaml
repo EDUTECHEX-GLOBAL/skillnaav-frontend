@@ -3,7 +3,7 @@ name: Build & Deploy Skillnaav
 on:
   push:
     branches:
-      - feature/redis  # <-- your branch
+      - feature/7-10-25  # <-- your branch
 
 # ================================
 # Job 1: Build Frontend
