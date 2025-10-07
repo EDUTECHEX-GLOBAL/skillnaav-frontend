@@ -806,5 +806,3 @@ module.exports = {
   updateScheduleInGoogleCalendar,
   upsertScheduleForStudent,
 };
-
-//
