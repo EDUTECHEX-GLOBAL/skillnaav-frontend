@@ -6,6 +6,13 @@ import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import CertificateTemplate from "./CertificateTemplate";
+// ADD: import your env-backed bases (correct relative path from this file)
+import { API_BASE, FRONTEND_BASE, GOOGLE_AUTH_URL } from "../../../../config";
+
+// ADD: Set axios base URL once for this module
+if (API_BASE) {
+  axios.defaults.baseURL = API_BASE;
+}
 
 import {
   faMapMarkerAlt,
@@ -339,6 +346,21 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
       toast.error("Something went wrong");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Always start Google OAuth, carrying internshipId + email in state.
+  // The backend callback will sync the full schedule after auth.
+  const handleAddUpdateCalendar = () => {
+    try {
+      const stateObj = { internshipId: offer.internshipId, email: userInfo.email };
+      const state = btoa(JSON.stringify(stateObj));
+
+      // If GOOGLE_AUTH_URL was working before (your anchor href), keep using it:
+      window.location.href = `${GOOGLE_AUTH_URL}?state=${encodeURIComponent(state)}`;
+    } catch (e) {
+      console.error('Failed to start Google OAuth:', e);
+      toast.error('Could not start Google sign-in');
     }
   };
 
@@ -860,23 +882,14 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
                 View Schedule
               </button>
 
-              {/* LINK GOOGLE CALENDAR + UPDATE SCHEDULE (wrapped together) */}
+              {/* LINK + UPDATE merged */}
               <div className="flex flex-wrap items-center gap-2">
-                {/* LINK GOOGLE CALENDAR */}
-                <a
-                  href="/api/google/auth"
-                  className="inline-block bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition"
-                >
-                  Link Google Calendar
-                </a>
-
-                {/* UPDATE SCHEDULE */}
                 <button
-                  onClick={handleUpdateSchedule}
-                  className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition"
+                  onClick={handleAddUpdateCalendar}
+                  className="inline-block bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition"
                   disabled={loading}
                 >
-                  {loading ? 'Updating...' : 'Update Schedule'}
+                  {loading ? 'Syncing…' : 'Add/Update to Calendar'}
                 </button>
               </div>
 

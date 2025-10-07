@@ -18,33 +18,33 @@ const PostAJob = () => {
     { id: "materials-science", name: "Advanced Materials Science" },
   ];
 
-const [formData, setFormData] = useState({
-  jobTitle: "",
-  companyName: "",
-  sector: topSectors[0].id,
-  city: "",
-  country: "",
-  jobType: "Internship",
-  jobDescription: "",
-  startDate: "",
-  endDateOrDuration: "",
-  duration: "",
-  internshipType: "FREE",
-  classification: "",   // 🔹 new field
-  compensationDetails: {
-    type: "FREE",
-    amount: null,
-    currency: "USD",
-    frequency: "MONTHLY",
-  },
-  mode: "Online",
-  qualifications: [],
-  contactInfo: { name: "", email: "", phone: "" },
-  imgUrl: "",
-  studentApplied: false,
-  adminApproved: false,
-  applicationOpen: true,
-});
+  const [formData, setFormData] = useState({
+    jobTitle: "",
+    companyName: "",
+    sector: topSectors[0].id,
+    city: "",
+    country: "",
+    jobType: "Internship",
+    jobDescription: "",
+    startDate: "",
+    endDateOrDuration: "",
+    duration: "",
+    internshipType: "FREE",
+    classification: "",   // 🔹 new field
+    compensationDetails: {
+      type: "FREE",
+      amount: null,
+      currency: "USD",
+      frequency: "MONTHLY",
+    },
+    mode: "Online",
+    qualifications: [],
+    contactInfo: { name: "", email: "", phone: "" },
+    imgUrl: "",
+    studentApplied: false,
+    adminApproved: false,
+    applicationOpen: true,
+  });
 
   const [countries, setCountries] = useState([]);
   const [cities, setCities] = useState([]);
@@ -348,24 +348,24 @@ const [formData, setFormData] = useState({
         </div>
 
         <div>
-  <label className="block text-gray-700 font-medium mb-2">
-    Internship Classification
-  </label>
-  <select
-    name="classification"
-    value={formData.classification}
-    onChange={handleChange}
-    className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring focus:ring-teal-500"
-    required
-  >
-    <option value="" disabled>
-      Select Classification
-    </option>
-    <option value="Basic">Basic</option>
-    <option value="Intermediate">Intermediate</option>
-    <option value="Advanced">Advanced</option>
-  </select>
-</div>
+          <label className="block text-gray-700 font-medium mb-2">
+            Internship Classification
+          </label>
+          <select
+            name="classification"
+            value={formData.classification}
+            onChange={handleChange}
+            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring focus:ring-teal-500"
+            required
+          >
+            <option value="" disabled>
+              Select Classification
+            </option>
+            <option value="Basic">Basic</option>
+            <option value="Intermediate">Intermediate</option>
+            <option value="Advanced">Advanced</option>
+          </select>
+        </div>
 
         <div>
           <label className="block text-gray-700 font-medium mb-2">
@@ -636,19 +636,19 @@ const [formData, setFormData] = useState({
         )}
 
         <div>
-  <label className="inline-flex items-center space-x-2">
-    <input
-      type="checkbox"
-      name="applicationOpen"
-      checked={formData.applicationOpen}
-      onChange={(e) =>
-        setFormData((p) => ({ ...p, applicationOpen: e.target.checked }))
-      }
-      className="form-checkbox h-5 w-5 text-teal-600"
-    />
-    <span className="text-gray-700 font-medium">Open for Applications</span>
-  </label>
-</div>
+          <label className="inline-flex items-center space-x-2">
+            <input
+              type="checkbox"
+              name="applicationOpen"
+              checked={formData.applicationOpen}
+              onChange={(e) =>
+                setFormData((p) => ({ ...p, applicationOpen: e.target.checked }))
+              }
+              className="form-checkbox h-5 w-5 text-teal-600"
+            />
+            <span className="text-gray-700 font-medium">Open for Applications</span>
+          </label>
+        </div>
 
 
         <div>

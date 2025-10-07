@@ -7,12 +7,68 @@ const { sendInstructorCreatedEmail } = require("../utils/instructorMailer");
 // ADD (top)
 const notifyUser = require("../utils/notifyUser"); // uses your EMAIL_* env
 const { issueOtp, verifyOtp, isVerified, clearOtp } = require("../utils/otpStore");
+// ADD: S3 upload deps
+const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
+const crypto = require("crypto");
 
-const fileToMeta = (file) => {
+// ADD: S3 client
+const s3 = new S3Client({
+    region: process.env.AWS_REGION,
+    credentials: (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) ? {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    } : undefined,
+});
+
+// Map each field to a bucket from your .env
+const bucketFor = (field) => {
+    if (field === "resume") return process.env.AWS_RESUME_BUCKET;
+    if (field === "photo") return process.env.AWS_PROFILE_PIC_BUCKET;
+    if (field === "certificates") return process.env.AWS_IMAGE_BUCKET || process.env.AWS_PROFILE_PIC_BUCKET || process.env.AWS_RESUME_BUCKET;
+    // default fallback
+    return process.env.AWS_IMAGE_BUCKET || process.env.AWS_RESUME_BUCKET;
+};
+
+// Map field to the folder (key prefix) you want in S3
+// Per your examples: resume -> "resumes/...", images (photo/certificates) -> "jobs/..."
+const keyPrefixFor = (field) => (field === "resume" ? "resumes" : "jobs");
+
+// Build a filename like: 1752840415245-508278277.png
+const randomSuffix = () => `${Date.now()}-${Math.floor(Math.random() * 1_000_000_000)}`;
+
+// Encode each path segment but preserve folder slashes
+const encodeS3KeyForUrl = (k) => k.split("/").map(encodeURIComponent).join("/");
+const httpsUrl = (bucket, key) =>
+    `https://${bucket}.s3.${process.env.AWS_REGION}.amazonaws.com/${encodeS3KeyForUrl(key)}`;
+
+// REPLACE this function
+const fileToMeta = async (file) => {
     if (!file) return undefined;
-    const url = `/uploads/instructors/${path.basename(file.path)}`;
+
+    // infer fieldname: "resume" | "photo" | "certificates"
+    const field = file.fieldname;
+    const bucket = bucketFor(field);
+    if (!bucket) return undefined;
+
+    const ext = path.extname(file.originalname) || "";
+    const key = `${keyPrefixFor(field)}/${randomSuffix()}${ext}`;
+
+    // stream the temp file to S3
+    const Body = fs.createReadStream(file.path);
+    await s3.send(new PutObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        Body,
+        ContentType: file.mimetype || "application/octet-stream",
+        // No ACL here — bucket has "Bucket owner enforced" (ACLs disabled)
+    }));
+
+    // remove temp file quietly
+    try { fs.unlink(file.path, () => { }); } catch (_) { }
+
+    // return the doc to store in Mongo
     return {
-        url,
+        url: httpsUrl(bucket, key),         // e.g. https://skillnaavres.s3.us-west-1.amazonaws.com/jobs/1752-...png
         originalName: file.originalname,
         mimeType: file.mimetype,
         size: file.size,
@@ -57,19 +113,23 @@ exports.createInstructure = async (req, res) => {
         // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<  ADD THIS BLOCK  >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
         const resumeFile = req.files?.resume?.[0];
-        if (!resumeFile) return res.status(400).json({ message: "Resume is required." });
-
         const photoFile = req.files?.photo?.[0];
         const certFiles = req.files?.certificates || [];
 
-        const doc = {
-            ...payload,
-            resume: fileToMeta(resumeFile),
-            photo: fileToMeta(photoFile),
-            certificates: certFiles.map(fileToMeta).filter(Boolean),
-        };
+        // OLD (disk):
+        // files.resume = fileToMeta(resumeFile);
+        // if (photoFile) files.photo = fileToMeta(photoFile);
+        // if (certFiles.length) files.certificates = certFiles.map(fileToMeta).filter(Boolean);
 
-        const created = await Instructure.create(doc);
+        // REPLACE WITH (S3, async):
+        const files = {};
+        if (!resumeFile) return res.status(400).json({ message: "Resume is required." });
+        files.resume = await fileToMeta(resumeFile);
+        if (photoFile) files.photo = await fileToMeta(photoFile);
+        if (certFiles.length) files.certificates = (await Promise.all(certFiles.map(fileToMeta))).filter(Boolean);
+
+        // Then include ...files when creating the document:
+        const created = await Instructure.create({ ...payload, ...files });
 
         // Try sending the notification email to the instructor.
         // Do NOT fail the API if email fails — just log the error.
@@ -145,9 +205,9 @@ exports.updateInstructure = async (req, res) => {
             const photoFile = req.files?.photo?.[0];
             const certFiles = req.files?.certificates || [];
 
-            if (resumeFile) patch.resume = fileToMeta(resumeFile);
-            if (photoFile) patch.photo = fileToMeta(photoFile);
-            if (certFiles.length) patch.certificates = certFiles.map(fileToMeta).filter(Boolean);
+            if (resumeFile) patch.resume = await fileToMeta(resumeFile);
+            if (photoFile) patch.photo = await fileToMeta(photoFile);
+            if (certFiles.length) patch.certificates = (await Promise.all(certFiles.map(fileToMeta))).filter(Boolean);
         } else {
             patch = req.body || {};
         }

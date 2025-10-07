@@ -1,27 +1,204 @@
-name: Deploy to Server
+name: Build & Deploy Skillnaav
 
 on:
   push:
     branches:
-      - feature/redis # Adjust the branch as necessary
+      - feature/redis  # <-- your branch
 
+# ================================
+# Job 1: Build Frontend
+# ================================
 jobs:
-  deploy:
+  build-frontend:
+    name: Build Frontend
     runs-on: ubuntu-latest
-
+    env:
+      SKIP_PREFLIGHT_CHECK: true
+      ESLINT_NO_DEV_ERRORS: true
+      REACT_APP_RAZORPAY_KEY_ID: ${{ secrets.REACT_APP_RAZORPAY_KEY_ID }}
+      DANGEROUSLY_DISABLE_HOST_CHECK: true
+      REACT_APP_PAYPAL_CLIENT_ID: ${{ secrets.REACT_APP_PAYPAL_CLIENT_ID }}
+      REACT_APP_SHORTLIST_API_BASE_URL: ${{ secrets.REACT_APP_SHORTLIST_API_BASE_URL }}
+      REACT_APP_SKILLGAP_API_BASE_URL: ${{ secrets.REACT_APP_SKILLGAP_API_BASE_URL }}
+      REACT_APP_PY_API: ${{ secrets.REACT_APP_PY_API }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+
+      - name: Cache frontend node_modules
+        uses: actions/cache@v3
+        with:
+          path: frontend/node_modules
+          key: frontend-node-modules-${{ hashFiles('frontend/package-lock.json') }}
+          restore-keys: frontend-node-modules-
+
+      - name: Install frontend dependencies and build
+        working-directory: ./frontend
+        run: |
+          npm install --legacy-peer-deps
+          CI=false npm run build
+
+      - name: Upload frontend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/build
+
+# ================================
+# Job 2: Build Backend
+# ================================
+  build-backend:
+    name: Build Backend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+
+      - name: Cache backend node_modules
+        uses: actions/cache@v3
+        with:
+          path: backend/node_modules
+          key: backend-node-modules-${{ hashFiles('backend/package-lock.json') }}
+          restore-keys: backend-node-modules-
+
+      - name: Install backend dependencies
+        working-directory: ./backend
+        run: npm install --legacy-peer-deps
+
+      - name: Upload backend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-build
+          path: backend
+
+# ================================
+# Job 3: Build AI Backend
+# ================================
+  build-ai-backend:
+    name: Build AI Backend
+    runs-on: ubuntu-latest
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      MONGO_URI: ${{ secrets.MONGO_URI }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      Resume_AWS_ACCESS_KEY_ID: ${{ secrets.Resume_AWS_ACCESS_KEY_ID }}
+      Resume_AWS_SECRET_ACCESS_KEY: ${{ secrets.Resume_AWS_SECRET_ACCESS_KEY }}
+      Resume_AWS_REGION: ${{ secrets.Resume_AWS_REGION }}
+      MONGO_DB_NAME: ${{ secrets.MONGO_DB_NAME }}
+      INSTRUCTORS_COLL: ${{ secrets.INSTRUCTORS_COLL }}
+      SCHEDULES_COLL: ${{ secrets.SCHEDULES_COLL }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+
+      - name: Cache Python packages
+        uses: actions/cache@v3
+        with:
+          path: |
+            ai-backend/venv
+            ~/.cache/pip
+          key: ai-backend-pip-${{ hashFiles('ai-backend/requirements.txt') }}
+          restore-keys: ai-backend-pip-
+
+      - name: Install AI backend dependencies
+        working-directory: ./ai-backend
+        run: |
+          python -m venv venv
+          source venv/bin/activate
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Package AI backend
+        working-directory: ./ai-backend
+        run: tar czf ai-backend-build.tar.gz *.py requirements.txt
+
+      - name: Upload AI backend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-backend-build
+          path: ai-backend/ai-backend-build.tar.gz
+
+# ================================
+# Job 4: Deploy to EC2
+# ================================
+  deploy:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+    needs:
+      - build-frontend
+      - build-backend
+      - build-ai-backend
+    steps:
+      - name: Download frontend build
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-build
+          path: /tmp/frontend-build
+
+      - name: Download backend build
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-build
+          path: /tmp/backend-build
+
+      - name: Download AI backend build
+        uses: actions/download-artifact@v4
+        with:
+          name: ai-backend-build
+          path: /tmp/ai-backend-build
 
       - name: Setup SSH
         uses: webfactory/ssh-agent@v0.5.3
         with:
-          ssh-private-key: ${{ secrets.EC2_SSH_KEY }}  # Ensure this matches the secret name
+          ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
 
-      - name: Run deployment script
+      - name: Copy builds to EC2
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@www.skillnaav.com << 'EOF'
-            cd /home/ubuntu/
-            ./deploy.sh feature/redis # Pass the branch name directly
-          EOF
+          rsync -avz -e "ssh -o StrictHostKeyChecking=no" /tmp/frontend-build/ ubuntu@www.skillnaav.com:/home/ubuntu/frontend-build/
+          rsync -avz -e "ssh -o StrictHostKeyChecking=no" /tmp/backend-build/ ubuntu@www.skillnaav.com:/home/ubuntu/backend-build/
+          rsync -avz -e "ssh -o StrictHostKeyChecking=no" /tmp/ai-backend-build/ai-backend-build.tar.gz ubuntu@www.skillnaav.com:/home/ubuntu/ai-backend-build/
 
+      - name: Deploy on EC2
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@www.skillnaav.com "
+            echo '🔄 Stopping backend services...'
+            pm2 stop all || echo 'ℹ️ PM2 not running'
+            echo '📦 Deploying frontend...'
+            rm -rf /var/www/skillnaav-frontend
+            cp -r /home/ubuntu/frontend-build /var/www/skillnaav-frontend
+            echo '📦 Deploying backend...'
+            rm -rf /var/www/skillnaav-backend
+            cp -r /home/ubuntu/backend-build /var/www/skillnaav-backend
+            echo '📦 Deploying AI backend...'
+            rm -rf /home/ubuntu/ai-backend
+            tar xzf /home/ubuntu/ai-backend-build/ai-backend-build.tar.gz -C /home/ubuntu/
+            mv /home/ubuntu/ai-backend ai-backend
+            echo '🔁 Restarting all AI backend services...'
+            sudo systemctl restart fastapi
+            sudo systemctl restart partner
+            sudo systemctl restart instructor
+            sudo systemctl restart recommendation
+            echo '🔁 Restarting Node.js backend via PM2...'
+            pm2 restart all
+            echo '🔁 Reloading Nginx...'
+            sudo systemctl reload nginx
+            sudo systemctl restart nginx
+            echo '✅ Deployment completed at $(date)'
+          "

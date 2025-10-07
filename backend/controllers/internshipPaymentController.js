@@ -10,7 +10,7 @@ const axios = require('axios');
 // PayPal Configuration - ✅ Fixed Base URLs
 const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID;
 const PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET;
-const PAYPAL_BASE_URL = process.env.NODE_ENV === 'production' 
+const PAYPAL_BASE_URL = process.env.NODE_ENV === 'production'
   ? 'https://api-m.paypal.com'           // ✅ Fixed: Added -m for production
   : 'https://api-m.sandbox.paypal.com';  // ✅ Fixed: Added -m for sandbox
 
@@ -18,8 +18,8 @@ const PAYPAL_BASE_URL = process.env.NODE_ENV === 'production'
 const getPayPalAccessToken = async () => {
   try {
     const auth = Buffer.from(`${PAYPAL_CLIENT_ID}:${PAYPAL_CLIENT_SECRET}`).toString('base64');
-    
-    const response = await axios.post(`${PAYPAL_BASE_URL}/v1/oauth2/token`, 
+
+    const response = await axios.post(`${PAYPAL_BASE_URL}/v1/oauth2/token`,
       'grant_type=client_credentials',
       {
         headers: {
@@ -28,7 +28,7 @@ const getPayPalAccessToken = async () => {
         },
       }
     );
-    
+
     return response.data.access_token;
   } catch (error) {
     console.error('Error getting PayPal access token:', error.response?.data || error.message);
@@ -163,13 +163,13 @@ const capturePayPalPayment = async (req, res) => {
 
   } catch (error) {
     console.error('Error capturing PayPal payment:', error.response?.data || error.message);
-    
+
     // Update payment status to failed
     if (req.body.orderId) {
       try {
         await Payment.findOneAndUpdate(
           { paypalOrderId: req.body.orderId },
-          { 
+          {
             status: 'FAILED',
             failureReason: error.response?.data?.details?.[0]?.description || error.message,
             failedAt: new Date()
@@ -179,8 +179,8 @@ const capturePayPalPayment = async (req, res) => {
         console.error('Error updating failed payment:', updateError);
       }
     }
-    
-    res.status(500).json({ 
+
+    res.status(500).json({
       error: 'Failed to capture payment',
       details: error.response?.data?.details || error.message
     });
@@ -197,10 +197,8 @@ const getPaymentStatus = async (req, res) => {
       return res.status(400).json({ error: 'Student ID is required' });
     }
 
-    console.log('Checking payment status:', { offerId, studentId });
-
-    const payment = await Payment.findOne({ 
-      offerId, 
+    const payment = await Payment.findOne({
+      offerId,
       studentId,
       status: 'COMPLETED'
     });
@@ -312,29 +310,29 @@ const getPaymentsForPartner = async (req, res) => {
       return res.status(400).json({ error: 'Partner ID is required' });
     }
 
-   const result = await Payment.aggregate([
-  {
-    $match: {
-      partnerId: new mongoose.Types.ObjectId(partnerId),
-      status: 'COMPLETED'
-    }
-  },
-  {
-    $group: {
-      _id: '$partnerId',
-      totalPayments: { $sum: 1 },
-      totalAmount: { $sum: '$amount' }
-    }
-  },
-  {
-    $project: {
-      _id: 0,
-      partnerId: '$_id',
-      totalPayments: 1,
-      totalAmount: 1
-    }
-  }
-]);
+    const result = await Payment.aggregate([
+      {
+        $match: {
+          partnerId: new mongoose.Types.ObjectId(partnerId),
+          status: 'COMPLETED'
+        }
+      },
+      {
+        $group: {
+          _id: '$partnerId',
+          totalPayments: { $sum: 1 },
+          totalAmount: { $sum: '$amount' }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          partnerId: '$_id',
+          totalPayments: 1,
+          totalAmount: 1
+        }
+      }
+    ]);
 
 
     res.json({

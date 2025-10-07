@@ -5,15 +5,28 @@ const TokenModel = require('../models/webapp-models/TokenModel');
 const jwt = require('jsonwebtoken');
 const InternshipScheduleModel = require('../models/webapp-models/InternshipScheduleModel');
 
-const {
-  GOOGLE_CLIENT_ID,
-  GOOGLE_CLIENT_SECRET,
-  GOOGLE_REDIRECT_URI
-} = process.env;
+const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET } = process.env;
 
-// Validate environment variables
-if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !GOOGLE_REDIRECT_URI) {
-  throw new Error("⚠️ Google OAuth environment variables missing or invalid.");
+// ---- Host + Redirect config (purely env-driven) ----
+const stripTrailingSlash = (s = "") => s.replace(/\/+$/, "");
+
+const SERVER_BASE_URL = stripTrailingSlash(process.env.SERVER_BASE_URL || "");
+const FRONTEND_BASE_URL = stripTrailingSlash(process.env.FRONTEND_BASE_URL || "");
+
+// Prefer explicit GOOGLE_REDIRECT_URI; otherwise compose from SERVER_BASE_URL
+const GOOGLE_REDIRECT_URI = stripTrailingSlash(
+  process.env.GOOGLE_REDIRECT_URI || (SERVER_BASE_URL ? `${SERVER_BASE_URL}/api/google/callback` : "")
+);
+
+// (optional; keep only if you use cookie options anywhere)
+const IS_HTTPS = /^https:\/\//i.test(SERVER_BASE_URL);
+
+// Validate environment variables (use computed GOOGLE_REDIRECT_URI)
+if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+  throw new Error("⚠️ GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET missing.");
+}
+if (!GOOGLE_REDIRECT_URI) {
+  throw new Error("⚠️ Missing redirect URI. Set GOOGLE_REDIRECT_URI or SERVER_BASE_URL in .env.");
 }
 
 const googleAuth = (req, res) => {
@@ -25,7 +38,9 @@ const googleAuth = (req, res) => {
   );
 
   // Generate random state for security
-  const state = Math.random().toString(36).substring(2, 15);
+  // Accept caller-provided state (base64 JSON) if present; else random.
+  const incomingState = typeof req.query.state === 'string' ? req.query.state : null;
+  const state = incomingState || Math.random().toString(36).substring(2, 15);
 
   const authUrl = oAuth2Client.generateAuthUrl({
     access_type: 'offline',
@@ -124,21 +139,41 @@ const googleCallback = async (req, res) => {
 
     console.log(`Successfully stored tokens for ${email}`);
 
-        try {
-      const scheduleDoc = await InternshipScheduleModel
-        .findOne({ "timetable.0": { $exists: true } })
-        .sort({ createdAt: -1 });
+    // Decode state (if caller passed internshipId/email through OAuth)
+    let statePayload = null;
+    try {
+      if (state) {
+        statePayload = JSON.parse(Buffer.from(String(state), 'base64').toString('utf8'));
+      }
+    } catch (e) {
+      console.warn('Invalid state payload (ignored):', e.message);
+    }
 
-      if (!scheduleDoc || !scheduleDoc.timetable || scheduleDoc.timetable.length === 0) {
+    try {
+      let scheduleDoc = null;
+
+      if (statePayload?.internshipId) {
+        // Prefer the specific internship the UI asked us to sync
+        scheduleDoc = await InternshipScheduleModel.findOne({
+          internshipId: statePayload.internshipId
+        });
+      } else {
+        // Fallback: latest schedule with any entries
+        scheduleDoc = await InternshipScheduleModel
+          .findOne({ "timetable.0": { $exists: true } })
+          .sort({ createdAt: -1 });
+      }
+
+      if (!scheduleDoc || !Array.isArray(scheduleDoc.timetable) || scheduleDoc.timetable.length === 0) {
         console.warn("⚠️ No internship schedule found to sync.");
       } else {
         console.log(`📅 Found ${scheduleDoc.timetable.length} schedule entries to sync for ${email}`);
 
         const result = await upsertScheduleForStudent({
-          studentEmail: email,
-          internshipId: scheduleDoc.internshipId,            // IMPORTANT: give a real id
+          studentEmail: email, // always use the authenticated Google account
+          internshipId: String(scheduleDoc.internshipId),
           timetable: scheduleDoc.timetable,
-          internshipTitle: 'Internship Schedule',
+          internshipTitle: scheduleDoc.internshipTitle || 'Internship Schedule',
           defaultEventLink: scheduleDoc.defaultEventLink || ''
         });
 
@@ -147,7 +182,6 @@ const googleCallback = async (req, res) => {
     } catch (syncErr) {
       console.error("❌ Error syncing schedule after authentication:", syncErr.message);
     }
-
 
     res.send(`
   <html>
@@ -193,11 +227,11 @@ const googleCallback = async (req, res) => {
 
         // Redirect after brief delay
         setTimeout(() => {  
-          window.location.href = "/user-main-page";
+          window.location.href = "${FRONTEND_BASE_URL}/user-main-page";
         }, 1500);
       } catch (e) {
         console.error("Error restoring session token:", e);
-        window.location.href = "/user-main-page";
+        window.location.href = "${FRONTEND_BASE_URL}/user-main-page";
       }
     </script>
   </body>
@@ -234,7 +268,7 @@ const googleCallback = async (req, res) => {
           <h1 class="error">Authentication Failed</h1>
           <p>${errorMessage}</p>
           <p>Error details: ${err.message}</p>
-          <a href="/api/google/auth">Try Again</a>
+          <a href="${SERVER_BASE_URL}/api/google/auth">Try Again</a>
         </body>
       </html>
     `);
@@ -251,13 +285,13 @@ async function exchangeCodeForTokens(code) {
     client_secret: process.env.GOOGLE_CLIENT_SECRET,
     code: code,
     grant_type: 'authorization_code',
-    redirect_uri: process.env.GOOGLE_REDIRECT_URI
+    redirect_uri: GOOGLE_REDIRECT_URI
   });
 
   console.log("Sending token request to Google with:");
   console.log("Code:", code);
   console.log("Client ID:", process.env.GOOGLE_CLIENT_ID);
-  console.log("Redirect URI:", process.env.GOOGLE_REDIRECT_URI);
+  console.log("Redirect URI:", GOOGLE_REDIRECT_URI);
 
   const options = {
     hostname: 'oauth2.googleapis.com',
@@ -306,7 +340,6 @@ async function exchangeCodeForTokens(code) {
   });
 }
 
-
 // Create a test event immediately after authentication
 const createTestEvent = async (email) => {
   console.log('🧪 Creating test event for:', email);
@@ -333,7 +366,7 @@ const createTestEvent = async (email) => {
     const testEvent = {
       summary: 'Test: Calendar connectivity',   // ← added
       start: { dateTime: startTime.toISOString(), timeZone: 'Asia/Kolkata' },
-      end:   { dateTime: endTime.toISOString(),   timeZone: 'Asia/Kolkata' },
+      end: { dateTime: endTime.toISOString(), timeZone: 'Asia/Kolkata' },
       reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: 10 }] },
       colorId: '1',
       status: 'confirmed',

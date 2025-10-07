@@ -19,3 +19,23 @@ export const googleOAuth = {
 
 export const account = new Account(client);
 export default client;
+
+// ---- API hosts (env-driven; no runtime overrides) ----
+const stripTrailingSlash = (s = "") => s.replace(/\/+$/, "");
+
+// Accept either REACT_APP_API_BASE or REACT_APP_API_BASE_URL
+const rawApiBase =
+  process.env.REACT_APP_API_BASE ||
+  process.env.REACT_APP_API_BASE_URL ||
+  "";
+
+export const API_BASE = stripTrailingSlash(rawApiBase);
+
+// Frontend base: use env if provided, else current origin
+export const FRONTEND_BASE = stripTrailingSlash(
+  process.env.REACT_APP_FRONTEND_BASE_URL ||
+  (typeof window !== "undefined" ? window.location.origin : "")
+);
+
+// Browser navigation URL to your backend auth route
+export const GOOGLE_AUTH_URL = `${API_BASE}/api/google/auth`;

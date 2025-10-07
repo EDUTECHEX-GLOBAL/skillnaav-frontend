@@ -81,6 +81,16 @@ const InstructureManagement = () => {
 
     // ADD near the top inside the component
     const [otpOpen, setOtpOpen] = useState(false);
+
+    // --- helper: safe initials when photo missing ---
+    const avatarInitials = (i) => {
+        const a = [i?.firstName, i?.lastName]
+            .filter(Boolean)
+            .map(s => (s || "").trim()[0]?.toUpperCase())
+            .join("");
+        return a || (i?.email?.[0] || "?").toUpperCase();
+    };
+
     const [otpEmail, setOtpEmail] = useState("");
     const [otpCode, setOtpCode] = useState("");
     const [pendingFormData, setPendingFormData] = useState(null); // holds the prepared FormData
@@ -1073,23 +1083,40 @@ const InstructureManagement = () => {
                     <div className="space-y-3">
                         {filteredInstructors.map((i) => (
                             <div key={i._id || i.id} className="border rounded-xl p-4 flex items-start justify-between gap-4">
-                                <div>
-                                    <div className="font-semibold text-gray-900">
-                                        {i.firstName} {i.lastName}
-                                    </div>
-                                    <div className="text-sm text-gray-600">
-                                        {i.email} • {i.phone}
-                                    </div>
-                                    {i.specializations?.length ? (
-                                        <div className="text-xs text-gray-500 mt-1">
-                                            <span className="font-medium">Specializations:</span> {i.specializations.join(", ")}
+                                <div className="flex items-start gap-3">
+                                    {i?.photo?.url ? (
+                                        <img
+                                            src={i.photo.url}
+                                            alt={`${i.firstName || ""} ${i.lastName || ""}`}
+                                            className="w-12 h-12 rounded-full object-cover border border-gray-200 flex-shrink-0"
+                                            loading="lazy"
+                                        />
+                                    ) : (
+                                        <div className="w-12 h-12 rounded-full bg-gray-200 text-gray-700 flex items-center justify-center font-semibold flex-shrink-0">
+                                            {avatarInitials(i)}
                                         </div>
-                                    ) : null}
-                                    {i.skills?.length ? (
-                                        <div className="text-xs text-gray-500">
-                                            <span className="font-medium">Skills:</span> {i.skills.join(", ")}
+                                    )}
+
+                                    <div>
+                                        <div className="font-semibold text-gray-900">
+                                            {i.firstName} {i.lastName}
                                         </div>
-                                    ) : null}
+                                        <div className="text-sm text-gray-600">
+                                            {i.email}{i.phone ? <> • {i.phone}</> : null}
+                                        </div>
+
+                                        {i.specializations?.length ? (
+                                            <div className="text-xs text-gray-500 mt-1">
+                                                <span className="font-medium">Specializations:</span> {i.specializations.join(", ")}
+                                            </div>
+                                        ) : null}
+
+                                        {i.skills?.length ? (
+                                            <div className="text-xs text-gray-500">
+                                                <span className="font-medium">Skills:</span> {i.skills.join(", ")}
+                                            </div>
+                                        ) : null}
+                                    </div>
                                 </div>
                                 <div className="text-right">
                                     <span
