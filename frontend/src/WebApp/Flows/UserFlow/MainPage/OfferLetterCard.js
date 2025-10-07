@@ -1,18 +1,13 @@
 // OfferLetterCard.jsx
 import React, { useEffect, useState, useRef } from "react";
 import axios from "axios";
-import { toast } from 'react-toastify';
+import { toast } from "react-toastify";
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import CertificateTemplate from "./CertificateTemplate";
-// ADD: import your env-backed bases (correct relative path from this file)
-import { API_BASE, FRONTEND_BASE, GOOGLE_AUTH_URL } from "../../../../config";
-
-// ADD: Set axios base URL once for this module
-if (API_BASE) {
-  axios.defaults.baseURL = API_BASE;
-}
+// env-backed bases (correct relative path)
+import { API_BASE, GOOGLE_AUTH_URL } from "../../../../config";
 
 import {
   faMapMarkerAlt,
@@ -22,7 +17,6 @@ import {
   faClock,
   faCreditCard,
   faDownload,
-
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -32,6 +26,11 @@ import {
   isValid,
   isToday,
 } from "date-fns";
+
+// Set axios base URL once for this module
+if (API_BASE) {
+  axios.defaults.baseURL = API_BASE;
+}
 
 // ─── Google Calendar URL Helper ─────────────────────────────────────────
 function buildGoogleCalendarUrl({

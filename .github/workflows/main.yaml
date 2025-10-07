@@ -15,12 +15,13 @@ jobs:
     env:
       SKIP_PREFLIGHT_CHECK: true
       ESLINT_NO_DEV_ERRORS: true
-      REACT_APP_RAZORPAY_KEY_ID: ${{ secrets.REACT_APP_RAZORPAY_KEY_ID }}
       DANGEROUSLY_DISABLE_HOST_CHECK: true
+      REACT_APP_RAZORPAY_KEY_ID: ${{ secrets.REACT_APP_RAZORPAY_KEY_ID }}
       REACT_APP_PAYPAL_CLIENT_ID: ${{ secrets.REACT_APP_PAYPAL_CLIENT_ID }}
       REACT_APP_SHORTLIST_API_BASE_URL: ${{ secrets.REACT_APP_SHORTLIST_API_BASE_URL }}
       REACT_APP_SKILLGAP_API_BASE_URL: ${{ secrets.REACT_APP_SKILLGAP_API_BASE_URL }}
       REACT_APP_PY_API: ${{ secrets.REACT_APP_PY_API }}
+      REACT_APP_API_BASE: ${{ secrets.REACT_APP_API_BASE }}   # ✅ Added new env
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -55,6 +56,24 @@ jobs:
   build-backend:
     name: Build Backend
     runs-on: ubuntu-latest
+    env:
+      # 🧠 Keep existing envs
+      MONGO_URI: ${{ secrets.MONGO_URI }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+      RAZORPAY_KEY_ID: ${{ secrets.RAZORPAY_KEY_ID }}
+      RAZORPAY_KEY_SECRET: ${{ secrets.RAZORPAY_KEY_SECRET }}
+      PAYPAL_CLIENT_ID: ${{ secrets.PAYPAL_CLIENT_ID }}
+      PAYPAL_CLIENT_SECRET: ${{ secrets.PAYPAL_CLIENT_SECRET }}
+      EMAIL_USER: ${{ secrets.EMAIL_USER }}
+      EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
+      # ✅ Newly added envs
+      SERVER_BASE_URL: ${{ secrets.SERVER_BASE_URL }}
+      FRONTEND_BASE_URL: ${{ secrets.FRONTEND_BASE_URL }}
+      NODE_ENV: ${{ secrets.NODE_ENV }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
