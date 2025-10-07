@@ -17,8 +17,10 @@ const PartnerManagement = () => {
   const [chatMessages, setChatMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
   const [chatError, setChatError] = useState(null);
+  const [sending, setSending] = useState(false);
 
   const messagesEndRef = useRef(null);
+  const messageInputRef = useRef(null);
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -34,6 +36,13 @@ const PartnerManagement = () => {
   // Auto-scroll chat
   const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   useEffect(scrollToBottom, [chatMessages]);
+
+  // Auto-focus message input when modal opens
+  useEffect(() => {
+    if (isModalOpen && messageInputRef.current) {
+      messageInputRef.current.focus();
+    }
+  }, [isModalOpen]);
 
   // Fetch internships
   useEffect(() => {
@@ -93,6 +102,7 @@ const PartnerManagement = () => {
     setChatMessages([]);
     setNewMessage("");
     setChatError(null);
+    setSending(false);
   };
 
   // Fetch chat messages
@@ -108,48 +118,124 @@ const PartnerManagement = () => {
           setChatError(null);
         } else {
           setChatMessages([]);
-          setChatError("No messages yet. Let’s review the internship.");
+          setChatError("No messages yet. Start the conversation to review this internship.");
         }
       } catch (err) {
         setChatMessages([]);
-        setChatError("No messages yet. Let’s review the internship.");
+        setChatError("No messages yet. Start the conversation to review this internship.");
         console.error("Error fetching messages:", err);
       }
     };
     fetchMessages();
   }, [selectedInternship]);
 
-  const handleSendMessage = async () => {
-    if (!newMessage.trim() || !selectedInternship) return;
+  // Enhanced message sending with Enter key support
+const handleSendMessage = async () => {
+  if (!newMessage.trim() || !selectedInternship || sending) return;
 
+  const messageText = newMessage.trim();
+  setNewMessage("");
+  setSending(true);
+
+  // Optimistic UI update
+  const adminInfo = JSON.parse(localStorage.getItem("adminInfo"));
+  
+  if (!adminInfo?.id) {
+    console.error("Admin ID not found");
+    setSending(false);
+    setNewMessage(messageText);
+    return;
+  }
+
+  const optimisticMessage = {
+    sender: adminInfo.id,
+    message: messageText,
+    timestamp: new Date(),
+    _id: Date.now()
+  };
+
+  setChatMessages((prev) => [...prev, optimisticMessage]);
+  setChatError(null);
+
+  try {
+    const messagePayload = {
+      internshipId: selectedInternship._id,
+      senderId: adminInfo.id,
+      receiverId: selectedInternship.partnerId,
+      message: messageText,
+    };
+
+    const response = await axios.post("/api/chats/send", messagePayload);
+
+    // Replace optimistic message with server response
+    setChatMessages((prev) => [
+      ...prev.slice(0, -1),
+      response.data
+    ]);
+
+    // Update internship review status using the correct endpoint
     try {
-      const adminInfo = JSON.parse(localStorage.getItem("adminInfo"));
-      if (!adminInfo?.id) return console.error("Admin ID not found");
+      await axios.post(`/api/interns/${selectedInternship._id}/review`);
+      
+      // Update local state to reflect the review status
+      setSelectedInternship((prev) => ({ ...prev, isAdminReviewed: true, AdminReviewed: true }));
+      setInternships((prev) => 
+        prev.map((intern) => 
+          intern._id === selectedInternship._id 
+            ? { ...intern, isAdminReviewed: true, AdminReviewed: true }
+            : intern
+        )
+      );
+    } catch (reviewError) {
+      console.error("Error marking internship as reviewed:", reviewError);
+      // Continue without failing the message send
+    }
 
-      const messagePayload = {
-        internshipId: selectedInternship._id,
-        senderId: adminInfo.id,
-        receiverId: selectedInternship.partnerId,
-        message: newMessage.trim(),
-      };
+  } catch (err) {
+    console.error("Error sending message:", err.response?.data || err.message);
+    // Remove optimistic message on error
+    setChatMessages((prev) => prev.slice(0, -1));
+    setNewMessage(messageText);
+  } finally {
+    setSending(false);
+    messageInputRef.current?.focus();
+  }
+};
 
-      const response = await axios.post("/api/chats/send", messagePayload);
-
-      setChatMessages((prev) => [
-        ...prev,
-        { sender: adminInfo.id, message: newMessage, timestamp: new Date() },
-      ]);
-      setNewMessage("");
-
-      // Update internship review status
-      await axios.patch(`/api/interns/${selectedInternship._id}/update`, {
-        AdminReviewed: true,
-      });
-      setSelectedInternship((prev) => ({ ...prev, AdminReviewed: true }));
-    } catch (err) {
-      console.error("Error sending message:", err.response?.data || err.message);
+  // Handle Enter key press
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
     }
   };
+
+  // Auto-resize textarea
+  const handleTextareaChange = (e) => {
+    setNewMessage(e.target.value);
+    const textarea = e.target;
+    textarea.style.height = 'auto';
+    textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+  };
+
+  // Enhanced Message Bubble Component
+  const MessageBubble = ({ message, isOwn }) => (
+    <div className={`flex mb-4 ${isOwn ? 'justify-end' : 'justify-start'}`}>
+      <div className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-sm ${
+        isOwn 
+          ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-br-md' 
+          : 'bg-white text-gray-800 border border-gray-200 rounded-bl-md'
+      }`}>
+        <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{message.message}</p>
+        <p className={`text-xs mt-2 ${isOwn ? 'text-blue-100' : 'text-gray-500'}`}>
+          {new Date(message.timestamp).toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit'
+          })}
+        </p>
+      </div>
+    </div>
+  );
 
   // Delete internship
   const handleDeleteClick = (internship) => {
@@ -380,54 +466,107 @@ const PartnerManagement = () => {
         )}
       </Modal>
 
-      {/* Review / Chat Modal */}
+      {/* Enhanced Review / Chat Modal */}
       <Modal
         isOpen={isModalOpen}
         onRequestClose={closeModal}
         overlayClassName="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-[999]"
-        className="bg-white p-6 rounded-lg shadow-lg w-full max-w-2xl z-[1000] overflow-hidden"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] z-[1000] overflow-hidden"
       >
-        <div className="flex flex-col space-y-4">
-          <h2 className="text-2xl font-semibold text-gray-800">
-            Review Internship - <span className="text-blue-600">{selectedInternship?.jobTitle}</span>
-          </h2>
+        <div className="flex flex-col h-[80vh]">
+          {/* Enhanced Header */}
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 rounded-t-2xl">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold">Review Internship</h2>
+                <p className="text-blue-100 text-sm mt-1">{selectedInternship?.jobTitle} at {selectedInternship?.companyName}</p>
+              </div>
+              <button
+                onClick={closeModal}
+                className="p-2 hover:bg-blue-700 rounded-full transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
 
-          {/* Chat Messages */}
-          <div className="overflow-y-auto max-h-[300px] bg-gray-50 p-4 rounded-lg shadow-sm space-y-4">
+          {/* Enhanced Chat Messages Area */}
+          <div className="flex-1 overflow-y-auto p-6 bg-gray-50 space-y-1">
             {chatError ? (
-              <div className="text-center text-gray-500 text-sm">{chatError}</div>
-            ) : (
-              chatMessages.map((msg, idx) => (
-                <div key={idx} className={`flex ${msg.sender === JSON.parse(localStorage.getItem("adminInfo"))?.id ? "justify-end" : "justify-start"}`}>
-                  <div className={`rounded-lg px-4 py-3 max-w-[70%] ${msg.sender === JSON.parse(localStorage.getItem("adminInfo"))?.id ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-700"}`}>
-                    <p className="text-sm">{msg.message}</p>
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-blue-100 rounded-full mx-auto mb-4 flex items-center justify-center">
+                    <svg className="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
                   </div>
+                  <h3 className="text-lg font-medium text-gray-800 mb-2">Start the conversation</h3>
+                  <p className="text-gray-500 text-sm">{chatError}</p>
                 </div>
-              ))
+              </div>
+            ) : (
+              <>
+                {chatMessages.map((msg, idx) => {
+                  const adminInfo = JSON.parse(localStorage.getItem("adminInfo"));
+                  const isOwn = msg.sender === adminInfo?.id;
+                  return (
+                    <MessageBubble
+                      key={msg._id || idx}
+                      message={msg}
+                      isOwn={isOwn}
+                    />
+                  );
+                })}
+                <div ref={messagesEndRef} />
+              </>
             )}
-            <div ref={messagesEndRef} />
           </div>
 
-          {/* Message Input */}
-          <div className="flex items-center space-x-3">
-            <input
-              type="text"
-              placeholder="Type a message..."
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              className="flex-1 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 text-base"
-            />
-            <button
-              onClick={handleSendMessage}
-              className="bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 text-base"
-            >
-              Send
-            </button>
-          </div>
-
-          {/* Close Button */}
-          <div className="text-center mt-4">
-            <button onClick={closeModal} className="text-sm text-blue-600 hover:underline">Close</button>
+          {/* Enhanced Message Input Area */}
+          <div className="bg-white border-t border-gray-200 p-6">
+            <div className="flex items-end space-x-3">
+              <div className="flex-1 relative">
+                <textarea
+                  ref={messageInputRef}
+                  placeholder="Type your review message..."
+                  value={newMessage}
+                  onChange={handleTextareaChange}
+                  onKeyDown={handleKeyPress}
+                  className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none transition-all duration-200 min-h-[48px] max-h-[120px]"
+                  rows={1}
+                  disabled={sending}
+                />
+                <div className="absolute right-3 bottom-3">
+                  <button className="p-1 text-gray-400 hover:text-gray-600 transition-colors">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <button
+                onClick={handleSendMessage}
+                disabled={!newMessage.trim() || sending}
+                className={`p-3 rounded-2xl transition-all duration-200 ${
+                  newMessage.trim() && !sending
+                    ? 'bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:shadow-xl'
+                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                }`}
+              >
+                {sending ? (
+                  <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full"></div>
+                ) : (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                  </svg>
+                )}
+              </button>
+            </div>
+            <div className="mt-2 text-xs text-gray-500 text-center">
+              Press Enter to send • Shift + Enter for new line
+            </div>
           </div>
         </div>
       </Modal>

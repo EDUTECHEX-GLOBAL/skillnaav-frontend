@@ -500,25 +500,39 @@ router.patch("/:id/reject", async (req, res) => {
 
 router.post("/:id/review", async (req, res) => {
   try {
+    console.log("Reviewing internship with ID:", req.params.id); // Debug log
+    
+    // Make sure you're using the correct model name
+    // Replace 'InternshipPosting' with your actual model name
     const internship = await InternshipPosting.findById(req.params.id);
+    
     if (!internship) {
+      console.log("Internship not found with ID:", req.params.id);
       return res.status(404).json({ message: "Internship not found." });
     }
 
+    console.log("Found internship:", internship.jobTitle); // Debug log
+
     // Mark as reviewed
     internship.isAdminReviewed = true; 
-
-    await internship.save();
+    
+    const savedInternship = await internship.save();
+    console.log("Successfully marked as reviewed"); // Debug log
 
     res.status(200).json({
       message: "Internship marked as reviewed.",
-      isAdminReviewed: internship.isAdminReviewed,
+      isAdminReviewed: savedInternship.isAdminReviewed,
     });
   } catch (error) {
-    console.error("Error updating internship:", error);
-    res.status(500).json({ message: "Server error: Unable to update internship.", error: error.message });
+    console.error("Detailed error in review route:", error); // More detailed logging
+    res.status(500).json({ 
+      message: "Server error: Unable to update internship.", 
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
+
 
 module.exports = router;
 

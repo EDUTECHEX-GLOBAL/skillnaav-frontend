@@ -1,7 +1,15 @@
 const SavedJob = require("../models/webapp-models/SavedJobModel");
 const mongoose = require("mongoose");
+const User = require("../models/webapp-models/userModel"); // Import User model to get planType
 
-// ✅ Save a job
+// Plan limits consistent with frontend
+const SAVED_JOB_LIMITS = {
+  Free: 3,
+  "Premium Basic": 25,
+  "Premium Plus": Infinity,
+};
+
+// ✅ Save a job with limit enforcement
 const saveJob = async (req, res) => {
   let { userId, jobId } = req.body;
 
@@ -15,6 +23,22 @@ const saveJob = async (req, res) => {
 
     userId = new mongoose.Types.ObjectId(userId);
     jobId = new mongoose.Types.ObjectId(jobId);
+
+    // Get user plan info
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Get user's max saved job limit based on plan
+    const maxSaves = SAVED_JOB_LIMITS[user.planType] ?? SAVED_JOB_LIMITS.Free;
+
+    // Count current saved jobs
+    const savedCount = await SavedJob.countDocuments({ userId });
+
+    if (savedCount >= maxSaves) {
+      return res.status(403).json({ message: `Save limit reached for plan ${user.planType}`, limitReached: true });
+    }
 
     // Check if the job is already saved
     const existingSavedJob = await SavedJob.findOne({ userId, jobId });
@@ -76,10 +100,10 @@ const removeSavedJob = async (req, res) => {
 
     console.log("✅ Job removed successfully:", savedJob);
     res.status(200).json({ message: "Job removed successfully", deletedJob: savedJob });
-
   } catch (error) {
     console.error("❌ Error removing job:", error);
     res.status(500).json({ message: "Error removing job", error });
   }
 };
+
 module.exports = { saveJob, getSavedJobs, removeSavedJob };

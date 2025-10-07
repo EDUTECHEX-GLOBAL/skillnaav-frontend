@@ -6,12 +6,42 @@ import Check from "../../../../assets/check.svg";
 function PremiumPage() {
   const { skillnaavData } = useSelector((state) => state.root);
   const [alert, setAlert] = useState({ show: false, message: "", type: "" });
-  const [isPremium, setIsPremium] = useState(
-    JSON.parse(localStorage.getItem("userInfo"))?.isPremium || false
-  );
+  const [isPremium, setIsPremium] = useState(false);
+  const [planType, setPlanType] = useState("Free");
   const [sdkReady, setSdkReady] = useState(false);
   const [selectedPlanIndex, setSelectedPlanIndex] = useState(null);
   const [paymentData, setPaymentData] = useState(null);
+
+  // Fetch premium status on mount and sync localStorage & state
+  useEffect(() => {
+    const fetchPremiumStatus = async () => {
+      try {
+        const token = JSON.parse(localStorage.getItem("userToken"));
+        if (!token) return;
+        const { data } = await axios.get("/api/users/premium-status", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        const storedUserInfo = JSON.parse(localStorage.getItem("userInfo")) || {};
+
+        // Update localStorage with fresh premium info
+        const updatedUserInfo = {
+          ...storedUserInfo,
+          isPremium: data.isPremium,
+          planType: data.planType,
+          premiumExpiration: data.premiumExpiration,
+        };
+        localStorage.setItem("userInfo", JSON.stringify(updatedUserInfo));
+
+        setIsPremium(data.isPremium);
+        setPlanType(data.planType || "Free");
+      } catch (err) {
+        console.error("Failed to fetch premium status:", err);
+      }
+    };
+
+    fetchPremiumStatus();
+  }, []);
 
   useEffect(() => {
     if (!process.env.REACT_APP_PAYPAL_CLIENT_ID) {
@@ -85,19 +115,18 @@ function PremiumPage() {
             });
 
             if (verifyRes.data.success) {
-  showAlert("Payment verified successfully!", "success");
+              showAlert("Payment verified successfully!", "success");
 
-  // Save planType too
-  paymentData.userInfo.isPremium = true;
-  paymentData.userInfo.planType = verifyRes.data.user.planType;
-  paymentData.userInfo.premiumExpiration = verifyRes.data.user.premiumExpiration;
+              // Save new premium info in localStorage & state
+              paymentData.userInfo.isPremium = true;
+              paymentData.userInfo.planType = verifyRes.data.user.planType;
+              paymentData.userInfo.premiumExpiration = verifyRes.data.user.premiumExpiration;
 
-  localStorage.setItem("userInfo", JSON.stringify(paymentData.userInfo));
-
-  setIsPremium(true);
-  setSelectedPlanIndex(null);
-}
- else {
+              localStorage.setItem("userInfo", JSON.stringify(paymentData.userInfo));
+              setIsPremium(true);
+              setPlanType(verifyRes.data.user.planType);
+              setSelectedPlanIndex(null);
+            } else {
               showAlert("Payment verification failed.", "error");
             }
           } catch (err) {
@@ -130,39 +159,38 @@ function PremiumPage() {
     setPaymentData({ amount, planType, duration, userInfo });
   };
 
- const pricingcard = [
-  {
-    plantype: "Free",
-    plantypesubhead: "Basic access to explore internships",
-    price: "$0",
-    duration: "1 month",
-    pricebtn: "Start Free",
-    pricepoint1: "Apply to 5 internships",
-    pricepoint2: "Save 3 internships",
-    pricepoint3: "Basic AI suggestions",
-  },
-  {
-    plantype: "Premium Basic",
-    plantypesubhead: "Tools for active internship seekers",
-    price: "$2.99",
-    duration: "2 days",   // changed
-    pricebtn: "Subscribe",
-    pricepoint1: "Apply up to 25 internships",
-    pricepoint2: "Resume builder + career assistant",
-    pricepoint3: "Monthly mentorship + interview tips",
-  },
-  {
-    plantype: "Premium Plus",
-    plantypesubhead: "Everything you need to succeed",
-    price: "$6.99",
-    duration: "7 days",   // changed
-    pricebtn: "Subscribe",
-    pricepoint1: "Unlimited applications & saves",
-    pricepoint2: "Mock AI interviews & resume AI",
-    pricepoint3: "Mentorship + full AI insights",
-  },
-];
-
+  const pricingcard = [
+    {
+      plantype: "Free",
+      plantypesubhead: "Basic access to explore internships",
+      price: "$0",
+      duration: "1 month",
+      pricebtn: "Start Free",
+      pricepoint1: "Apply to 5 internships",
+      pricepoint2: "Save 3 internships",
+      pricepoint3: "Basic AI suggestions",
+    },
+    {
+      plantype: "Premium Basic",
+      plantypesubhead: "Tools for active internship seekers",
+      price: "$2.99",
+      duration: "2 days",
+      pricebtn: "Subscribe",
+      pricepoint1: "Apply up to 25 internships",
+      pricepoint2: "Resume builder + career assistant",
+      pricepoint3: "Monthly mentorship + interview tips",
+    },
+    {
+      plantype: "Premium Plus",
+      plantypesubhead: "Everything you need to succeed",
+      price: "$6.99",
+      duration: "7 days",
+      pricebtn: "Subscribe",
+      pricepoint1: "Unlimited applications & saves",
+      pricepoint2: "Mock AI interviews & resume AI",
+      pricepoint3: "Mentorship + full AI insights",
+    },
+  ];
 
   const colorStyles = [
     {
@@ -207,6 +235,8 @@ function PremiumPage() {
       <div className="flex flex-col gap-6 lg:flex-row flex-wrap justify-center">
         {pricingcard.map((card, index) => {
           const color = colorStyles[index % colorStyles.length];
+          const localUser = JSON.parse(localStorage.getItem("userInfo")) || {};
+          const isCurrentActivePlan = localUser.isPremium && card.plantype === localUser.planType;
 
           return (
             <div
@@ -224,9 +254,9 @@ function PremiumPage() {
                 <h2 className={`pt-4 text-2xl font-medium ${color.text} lg:text-3xl`}>
                   {card.price}
                 </h2>
-               <p className={`pt-2 ${color.subtext} lg:text-lg`}>
-  Duration: {card.duration}
-</p>
+                <p className={`pt-2 ${color.subtext} lg:text-lg`}>
+                  Duration: {card.duration}
+                </p>
 
                 <ul className={`flex flex-col gap-2 pt-4 ${color.subtext}`}>
                   {[card.pricepoint1, card.pricepoint2, card.pricepoint3].map(
@@ -241,16 +271,13 @@ function PremiumPage() {
                 </ul>
               </div>
 
-             <button
-  onClick={() => handlePayment(card.price, card.plantype, card.duration, index)}
-  className={`mt-4 bg-white py-3 text-center ${color.text} font-medium rounded ${color.hoverBg} transition`}
-  disabled={card.plantype === JSON.parse(localStorage.getItem("userInfo"))?.planType}
->
-  {card.plantype === JSON.parse(localStorage.getItem("userInfo"))?.planType
-    ? "Subscribed"
-    : card.pricebtn}
-</button>
-
+              <button
+                onClick={() => handlePayment(card.price, card.plantype, card.duration, index)}
+                className={`mt-4 bg-white py-3 text-center ${color.text} font-medium rounded ${color.hoverBg} transition`}
+                disabled={isCurrentActivePlan}
+              >
+                {isCurrentActivePlan ? "Subscribed" : card.pricebtn}
+              </button>
 
               {selectedPlanIndex === index && (
                 <div id={`paypal-button-container-${index}`} className="mt-4"></div>
