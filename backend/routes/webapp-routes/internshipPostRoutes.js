@@ -347,6 +347,7 @@ router.get("/partner/:partnerId", async (req, res) => {
 
 
 // PUT update an internship posting by ID
+// PUT update an internship posting by ID with cache invalidation
 router.put("/:id", async (req, res) => {
   const {
     jobTitle,
@@ -394,6 +395,21 @@ router.put("/:id", async (req, res) => {
     );
 
     if (updatedInternship) {
+      // Invalidate related Redis cache keys for real-time refresh
+      await redisClient.del("internships:all");
+      await redisClient.del(`internship:${req.params.id}`);
+      if (sector) {
+        await redisClient.del(`internships:approved:isPremium=true:sector=${sector}`);
+        await redisClient.del(`internships:approved:isPremium=false:sector=${sector}`);
+      } else {
+        // Clear general approved internship caches without sector
+        await redisClient.del("internships:approved:isPremium=true:sector=all");
+        await redisClient.del("internships:approved:isPremium=false:sector=all");
+      }
+      if (updatedInternship.partnerId) {
+        await redisClient.del(`partnerInternships:${updatedInternship.partnerId}`);
+      }
+
       res.json(updatedInternship);
     } else {
       res.status(404).json({ message: "Internship not found" });

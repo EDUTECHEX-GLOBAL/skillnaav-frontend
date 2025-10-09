@@ -6,20 +6,20 @@ const JobCard = ({ searchTerm = "", onViewDetails, jobs: propJobs }) => {
   const [jobs, setJobs] = useState(propJobs || []);
   const [loading, setLoading] = useState(!propJobs);
   const [error, setError] = useState(null);
- useEffect(() => {
-    if (propJobs) return; // ✅ Skip fetching if jobs are passed
-    const fetchJobs = async () => {
-      try {
-        const response = await axios.get("/api/interns");
-        setJobs(response.data);
-      } catch (err) {
-        setError("Failed to load jobs.");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchJobs();
-  }, [propJobs]);
+useEffect(() => {
+  if (propJobs) return;
+  const fetchJobs = async () => {
+    try {
+      const response = await axios.get("/api/interns/approved"); // updated path!
+      setJobs(response.data);
+    } catch (err) {
+      setError("Failed to load jobs.");
+    } finally {
+      setLoading(false);
+    }
+  };
+  fetchJobs();
+}, [propJobs]);
 
   const filteredJobs = jobs
     .filter((job) => job.adminApproved)

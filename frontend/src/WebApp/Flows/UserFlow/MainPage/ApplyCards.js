@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import { FaHeart, FaMapMarkerAlt, FaBriefcase, FaDollarSign } from "react-icons/fa";
-import { useTabContext } from "./UserHomePageContext/HomePageContext";
-import SkillAnalysis from "./SkillnaavAnalysis";
+import { FaHeart, FaMapMarkerAlt, FaDollarSign } from "react-icons/fa";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faClock } from "@fortawesome/free-solid-svg-icons";
 import { format } from "date-fns";
+import { useTabContext } from "./UserHomePageContext/HomePageContext";
+import SkillAnalysis from "./SkillnaavAnalysis";
+import AssessmentModal from "./AssessmentModal";
 
 // 🟡 Limit definitions per plan
 const MAX_LIMITS = {
@@ -26,9 +27,14 @@ const ApplyCards = ({ job, onBack }) => {
   const [showSkillAnalysis, setShowSkillAnalysis] = useState(false);
   const [planType, setPlanType] = useState("Free");
   const [schoolAdminId, setSchoolAdminId] = useState(null);
+  const [loadingAssessment, setLoadingAssessment] = useState(false);
+  const [assessment, setAssessment] = useState(null);
+  const [showAssessmentModal, setShowAssessmentModal] = useState(false);
+
 
   const navigate = useNavigate();
 
+  // ✅ Fetch application data
   useEffect(() => {
     const fetchApplicationData = async () => {
       const userInfo = JSON.parse(localStorage.getItem("userInfo"));
@@ -41,10 +47,14 @@ const ApplyCards = ({ job, onBack }) => {
       if (!studentId) return;
 
       try {
-        const { data: appliedData } = await axios.get(`/api/applications/check-applied/${studentId}/${job._id}`);
+        const { data: appliedData } = await axios.get(
+          `/api/applications/check-applied/${studentId}/${job._id}`
+        );
         setIsApplied(appliedData.isApplied);
 
-        const { data: countData } = await axios.get(`/api/applications/count/${studentId}`);
+        const { data: countData } = await axios.get(
+          `/api/applications/count/${studentId}`
+        );
         setApplicationCount(countData.count);
       } catch (error) {
         console.error("Error fetching application data:", error);
@@ -54,12 +64,31 @@ const ApplyCards = ({ job, onBack }) => {
     fetchApplicationData();
   }, [job._id]);
 
+  // ✅ Fetch existing assessment if any
+  useEffect(() => {
+    const fetchAssessment = async () => {
+      const userInfo = JSON.parse(localStorage.getItem("userInfo"));
+      const studentId = userInfo?._id;
+      if (!studentId) return;
+
+      try {
+        const { data } = await axios.get(`/api/assessments/${studentId}/${job._id}`);
+        if (data?.assessment) setAssessment(data.assessment);
+      } catch (error) {
+        console.error("Error fetching existing assessment:", error);
+      }
+    };
+
+    fetchAssessment();
+  }, [job._id]);
+
+  // ✅ File upload handler
   const handleFileChange = (event) => {
     const file = event.target.files[0];
     const allowedTypes = [
       "application/pdf",
       "application/msword",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     ];
 
     if (!file) return;
@@ -69,66 +98,102 @@ const ApplyCards = ({ job, onBack }) => {
     setResume(file);
   };
 
+  // ✅ Apply to internship
   const handleApply = async () => {
-    if (isApplied) return;
-    if (!resume) return setShowResumePopup(true);
+  if (isApplied) return;
 
-    const userInfo = JSON.parse(localStorage.getItem("userInfo"));
-    const studentId = userInfo?._id;
-    const token = userInfo?.token;
+  const userInfo = JSON.parse(localStorage.getItem("userInfo"));
+  const studentId = userInfo?._id;
+  const token = userInfo?.token;
+  if (!studentId || !token) return console.error("Missing user or token.");
 
-    if (!studentId || !token) return console.error("Missing user or token.");
+  // 🔹 Check if stipend internship requires assessment
+  if (job.internshipType === "STIPEND") {
+  // Always fetch fresh assessment
+  let studentAssessment;
+  try {
+    const { data } = await axios.get(`/api/assessments/${studentId}/${job._id}`);
+    studentAssessment = data.assessment;
+    setAssessment(studentAssessment);
+  } catch (error) {
+    console.error("Error fetching assessment:", error);
+  }
 
-    try {
-      const { data: countData } = await axios.get(`/api/applications/count/${studentId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+  if (!studentAssessment) {
+    alert("You must generate and complete the assessment before applying to this stipend internship.");
+    return;
+  }
 
-      const maxApps = MAX_LIMITS[planType]?.applications || 5;
+  // Now fetch their submission for this assessment (this is where fitStatus lives)
+  let submission;
+  try {
+   const { data } = await axios.get(`/api/assessments/submission/${studentId}/${studentAssessment._id}`);
+    submission = data.submission;
+  } catch (error) {
+    submission = null;
+  }
 
-      if (countData.count >= maxApps) {
-        setShowLimitPopup(true);
-        return;
-      }
-    } catch (error) {
-      console.error("Error checking application count:", error);
+  if (!submission || submission.fitStatus !== "fit") {
+    alert("You must pass the assessment to apply for this stipend internship.");
+    return;
+  }
+}
+
+
+  // 🔹 Ensure resume is uploaded
+  if (!resume) return setShowResumePopup(true);
+
+  try {
+    const { data: countData } = await axios.get(`/api/applications/count/${studentId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    const maxApps = MAX_LIMITS[planType]?.applications || 5;
+    if (countData.count >= maxApps) {
+      setShowLimitPopup(true);
       return;
     }
+  } catch (error) {
+    console.error("Error checking application count:", error);
+    return;
+  }
 
-    setIsUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append("studentId", studentId);
-      formData.append("internshipId", job._id);
-      formData.append("resume", resume);
-      if (schoolAdminId) formData.append("schoolAdminId", schoolAdminId);
+  setIsUploading(true);
+  try {
+    const formData = new FormData();
+    formData.append("studentId", studentId);
+    formData.append("internshipId", job._id);
+    formData.append("resume", resume);
+    if (schoolAdminId) formData.append("schoolAdminId", schoolAdminId);
 
-      const apiResponse = await axios.post("/api/applications/apply", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-          Authorization: `Bearer ${token}`,
-        },
+    const apiResponse = await axios.post("/api/applications/apply", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (apiResponse.status === 201) {
+      setIsApplied(true);
+      const { data: updatedCount } = await axios.get(`/api/applications/count/${studentId}`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
-
-      if (apiResponse.status === 201) {
-        setIsApplied(true);
-        const { data: updatedCount } = await axios.get(`/api/applications/count/${studentId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setApplicationCount(updatedCount.count);
-      }
-    } catch (error) {
-      const { status, data } = error.response || {};
-      if (status === 403 || (status === 400 && data?.message?.includes("already applied"))) {
-        setIsApplied(true);
-      } else {
-        alert(data?.message || "An unexpected error occurred.");
-      }
-    } finally {
-      setIsUploading(false);
+      setApplicationCount(updatedCount.count);
     }
-  };
+  } catch (error) {
+    const { status, data } = error.response || {};
+    if (status === 403 || (status === 400 && data?.message?.includes("already applied"))) {
+      setIsApplied(true);
+    } else {
+      alert(data?.message || "An unexpected error occurred.");
+    }
+  } finally {
+    setIsUploading(false);
+  }
+};
 
+
+  // ✅ Save/unsave job
   const toggleSaveJob = () => {
     const alreadySaved = savedJobs.some((savedJob) => savedJob.jobTitle === job.jobTitle);
     const maxSaves = MAX_LIMITS[planType]?.saves || 3;
@@ -141,6 +206,7 @@ const ApplyCards = ({ job, onBack }) => {
     alreadySaved ? removeJob(job) : saveJob(job);
   };
 
+  // ✅ Skill analysis modal
   const handleSkillAnalysis = () => {
     if (!job?.jobDescription || !job?.qualifications?.length) {
       alert("Job details are incomplete for skill analysis.");
@@ -150,6 +216,33 @@ const ApplyCards = ({ job, onBack }) => {
   };
 
   const closeSkillAnalysis = () => setShowSkillAnalysis(false);
+
+  // ✅ Generate AI assessment
+  const handleGenerateAssessment = async () => {
+    const userInfo = JSON.parse(localStorage.getItem("userInfo"));
+    const studentId = userInfo?._id;
+    if (!studentId) return alert("Please log in first.");
+
+    if (assessment) {
+      alert("You already have an assessment for this internship!");
+      return;
+    }
+
+    setLoadingAssessment(true);
+    try {
+      const response = await axios.post("/api/assessments/generate", {
+        internshipId: job._id,
+        studentId,
+      });
+      setAssessment(response.data.assessment);
+      alert("AI Assessment generated successfully!");
+    } catch (error) {
+      console.error("Failed to fetch assessment:", error);
+      alert("Failed to generate assessment. Please try again later.");
+    } finally {
+      setLoadingAssessment(false);
+    }
+  };
 
   const maxAppsDisplay = MAX_LIMITS[planType]?.applications || 5;
 
@@ -174,7 +267,6 @@ const ApplyCards = ({ job, onBack }) => {
             </div>
 
             <div className="flex items-center text-gray-500 mt-2 text-sm md:text-base">
-              {/* <FaBriefcase className="mr-2" /> */}
               <p className="flex items-center">
                 <FontAwesomeIcon icon={faClock} className="mr-2" />
                 {format(new Date(job.startDate), "dd MMM yyyy")} –{" "}
@@ -185,7 +277,6 @@ const ApplyCards = ({ job, onBack }) => {
             <div className="flex items-center text-gray-500 mt-2 text-sm md:text-base">
               <FaDollarSign className="mr-2" />
               <p>
-                {/* <FontAwesomeIcon icon={FaDollarSign} /> */}
                 {job.internshipType === "STIPEND"
                   ? `${job.compensationDetails?.amount} ${job.compensationDetails?.currency} per ${job.compensationDetails?.frequency?.toLowerCase()}`
                   : job.internshipType === "FREE"
@@ -228,12 +319,40 @@ const ApplyCards = ({ job, onBack }) => {
               >
                 Skill Analysis
               </button>
-            </div>
 
+{job.internshipType === "STIPEND" && (
+  <button
+    onClick={async () => {
+      const userInfo = JSON.parse(localStorage.getItem("userInfo"));
+      const studentId = userInfo?._id;
+
+      if (!assessment) {
+        // Generate assessment first
+        await handleGenerateAssessment();
+      }
+      setShowAssessmentModal(true); // Open modal only after button click
+    }}
+    disabled={loadingAssessment}
+    className={`px-4 py-2 rounded-full font-semibold ${
+      assessment
+        ? "bg-green-500 hover:bg-green-600 text-white"
+        : "bg-orange-500 hover:bg-orange-600 text-white"
+    }`}
+  >
+    {assessment
+      ? "Take Assessment"
+      : loadingAssessment
+        ? "Generating..."
+        : "Generate Assessment"}
+  </button>
+)}
+
+
+            </div>
           </div>
         </div>
 
-        {/* Resume Upload Popup */}
+        {/* Popups */}
         {showResumePopup && (
           <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
             <div className="bg-white p-6 rounded-lg shadow-lg text-center">
@@ -249,7 +368,6 @@ const ApplyCards = ({ job, onBack }) => {
           </div>
         )}
 
-        {/* Limit Popup */}
         {showLimitPopup && (
           <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
             <div className="bg-white p-6 rounded-lg shadow-lg max-w-sm text-center">
@@ -264,6 +382,14 @@ const ApplyCards = ({ job, onBack }) => {
               >
                 Close
               </button>
+            </div>
+          </div>
+        )}
+
+        {showSkillAnalysis && (
+          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+            <div className="bg-white rounded-lg shadow-lg max-w-3xl w-full overflow-hidden">
+              <SkillAnalysis job={job} onClose={closeSkillAnalysis} />
             </div>
           </div>
         )}
@@ -296,14 +422,15 @@ const ApplyCards = ({ job, onBack }) => {
         </p>
       </div>
 
-      {/* Skill Analysis Popup */}
-      {showSkillAnalysis && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-          <div className="bg-white rounded-lg shadow-lg max-w-3xl w-full overflow-hidden">
-            <SkillAnalysis job={job} onClose={closeSkillAnalysis} />
-          </div>
-        </div>
-      )}
+      {/* Assessment Modal */}
+      {showAssessmentModal && assessment && (
+  <AssessmentModal
+    assessment={assessment}
+    studentId={JSON.parse(localStorage.getItem("userInfo"))._id}
+    onClose={() => setShowAssessmentModal(false)}
+  />
+)}
+
     </div>
   );
 };

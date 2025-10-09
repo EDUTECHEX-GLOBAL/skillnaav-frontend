@@ -24,11 +24,12 @@ app.use(express.urlencoded({ extended: true }));
 // CORS (allow your frontend domain if you know it)
 app.use(
   cors({
-    origin: "*", // change to your frontend URL in production
-    methods: "GET,POST,PUT,DELETE",
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"], // ✅ This is an array, and PATCH is present
     credentials: true,
   })
 );
+
 
 // Serve uploaded files
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
@@ -71,7 +72,7 @@ const schoolAdminRoutes = require("./routes/webapp-routes/schoolAdmin/schoolAdmi
 const schoolAdminPaymentRoutes = require("./routes/webapp-routes/schoolAdmin/paymentRoutes");
 const schoolAdminLoginSessionRoutes = require("./routes/webapp-routes/schoolAdmin/LoginSessionRoutes");
 const stipendDetailsRoutes = require("./routes/webapp-routes/stipendDetailsRoutes");
-
+const assessmentRoutes = require("./routes/webapp-routes/assessmentRoutes");
 // ------------------- Use routes -------------------
 app.use("/api/upload", uploadRoutes);
 app.use("/api/users", userRoutes);
@@ -104,6 +105,7 @@ app.use("/api/school-admin", schoolAdminRoutes);
 app.use("/api/school-admin/payments", schoolAdminPaymentRoutes);
 app.use("/api/sessions", schoolAdminLoginSessionRoutes);
 app.use("/api/internship/stipend-details", stipendDetailsRoutes);
+app.use("/api/assessments", assessmentRoutes);
 
 // Example: Skill gap analysis proxy
 app.post("/analyze-skills", async (req, res) => {
