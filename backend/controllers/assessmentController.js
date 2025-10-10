@@ -123,41 +123,179 @@ exports.getStudentAssessment = async (req, res) => {
 // Submit Assessment
 exports.submitAssessment = async (req, res) => {
   try {
-    const { studentId, assessmentId, responses, timeTaken } = req.body;
+    const { 
+      studentId, 
+      assessmentId, 
+      responses, 
+      timeTaken,
+      violations = [],
+      violationCount = 0,
+      proctoringData = {},
+      isAutoSubmit = false
+    } = req.body;
 
     if (!studentId || !assessmentId || !responses) {
-      return res.status(400).json({ message: "studentId, assessmentId, and responses are required" });
+      return res.status(400).json({ 
+        message: "studentId, assessmentId, and responses are required" 
+      });
+    }
+
+    // Check if already submitted
+    const existingSubmission = await AssessmentSubmission.findOne({
+      studentId,
+      assessmentId
+    });
+
+    if (existingSubmission) {
+      return res.status(400).json({ 
+        message: "Assessment already submitted",
+        submission: existingSubmission
+      });
     }
 
     // Calculate score & percentage
-    let score = 0, totalMarks = 0;
-    responses.forEach(r => {
-      r.isCorrect = r.studentAnswer === r.correctAnswer;
-      score += r.isCorrect ? r.marks : 0;
-      totalMarks += r.marks;
+    let score = 0;
+    let totalMarks = 0;
+    
+    const processedResponses = responses.map(r => {
+      const isCorrect = r.studentAnswer === r.correctAnswer;
+      const marks = r.marks || 1;
+      
+      if (isCorrect) {
+        score += marks;
+      }
+      
+      totalMarks += marks;
+
+      return {
+        ...r,
+        isCorrect,
+        marks
+      };
     });
 
-    const percentage = (score / totalMarks) * 100;
-    const fitStatus = percentage >= 50 ? "fit" : "not fit"; // Example threshold
+    const percentage = totalMarks > 0 ? (score / totalMarks) * 100 : 0;
+    
+    // Determine fit status based on percentage and violations
+    let fitStatus = "not fit";
+    if (percentage >= 60) {
+      // If too many violations, mark as not fit even if score is good
+      if (violationCount < 5) {
+        fitStatus = "fit";
+      } else {
+        fitStatus = "not fit"; // Failed due to excessive violations
+      }
+    }
+
+    // Process violations to add severity
+    const processedViolations = violations.map(v => ({
+      ...v,
+      severity: v.type === 'TAB_SWITCH' || v.type === 'FULLSCREEN_EXIT' 
+        ? 'high' 
+        : v.type === 'KEYBOARD_ATTEMPT' 
+        ? 'medium' 
+        : 'low'
+    }));
+
+    // Prepare proctoring data
+    const finalProctoringData = {
+      mode: proctoringData.mode || 'real',
+      cameraEnabled: proctoringData.cameraEnabled || false,
+      microphoneEnabled: proctoringData.microphoneEnabled || false,
+      fullscreenEnabled: proctoringData.fullscreenEnabled || false,
+      sessionDuration: timeTaken,
+      startedAt: proctoringData.startedAt || new Date(Date.now() - (timeTaken * 1000)),
+      completedAt: new Date(),
+      wasAutoSubmitted: isAutoSubmit,
+      autoSubmitReason: isAutoSubmit 
+        ? `Exceeded violation limit (${violationCount} violations)` 
+        : null
+    };
 
     const submission = await AssessmentSubmission.create({
       studentId,
       assessmentId,
-      responses,
+      responses: processedResponses,
       score,
       totalMarks,
       percentage,
       timeTaken,
       fitStatus,
+      violations: processedViolations,
+      violationCount,
+      proctoringData: finalProctoringData,
+      submittedAt: new Date()
     });
 
-    res.status(201).json({ message: "Assessment submitted successfully", submission });
+    // Populate student and assessment details for response
+    await submission.populate('studentId', 'name email');
+    await submission.populate('assessmentId', 'internshipId');
+
+    res.status(201).json({ 
+      message: "Assessment submitted successfully", 
+      submission,
+      warnings: violationCount > 0 ? {
+        violationCount,
+        message: violationCount >= 3 
+          ? "⚠️ High violation count detected. This may affect your assessment." 
+          : "Minor violations detected."
+      } : null
+    });
 
   } catch (error) {
     console.error("❌ Error submitting assessment:", error);
-    res.status(500).json({ message: "Failed to submit assessment", error: error.message });
+    res.status(500).json({ 
+      message: "Failed to submit assessment", 
+      error: error.message 
+    });
   }
 };
+
+// Optional: Add a controller to get submission with violation details
+exports.getSubmissionWithViolations = async (req, res) => {
+  try {
+    const { studentId, assessmentId } = req.params;
+
+    const submission = await AssessmentSubmission.findOne({
+      studentId,
+      assessmentId
+    })
+    .populate('studentId', 'name email')
+    .populate('assessmentId', 'internshipId');
+
+    if (!submission) {
+      return res.status(404).json({ 
+        message: "No submission found",
+        submission: null
+      });
+    }
+
+    // Add violation summary
+    const violationSummary = {
+      total: submission.violationCount,
+      byType: submission.violations.reduce((acc, v) => {
+        acc[v.type] = (acc[v.type] || 0) + 1;
+        return acc;
+      }, {}),
+      highSeverity: submission.violations.filter(v => v.severity === 'high').length,
+      mediumSeverity: submission.violations.filter(v => v.severity === 'medium').length,
+      lowSeverity: submission.violations.filter(v => v.severity === 'low').length
+    };
+
+    res.status(200).json({ 
+      submission,
+      violationSummary
+    });
+
+  } catch (error) {
+    console.error("❌ Error fetching submission:", error);
+    res.status(500).json({ 
+      message: "Failed to fetch submission", 
+      error: error.message 
+    });
+  }
+};
+
 
 // Get assessment submission for a student
 exports.getAssessmentSubmission = async (req, res) => {
