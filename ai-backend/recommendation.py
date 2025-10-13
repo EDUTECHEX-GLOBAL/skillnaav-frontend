@@ -7,7 +7,6 @@ from motor.motor_asyncio import AsyncIOMotorClient # type: ignore
 from bson import ObjectId
 from sentence_transformers import SentenceTransformer, util
 from typing import List, Dict, Any, Union
-import redis.asyncio as redis 
 
 # Load environment variables from .env file
 load_dotenv()
@@ -28,8 +27,6 @@ application_collection = db.applications
 user_collection = db.userwebapps
 internship_collection = db.internshippostings
 personality_collection = db.personalityresponses # or whatever your personality results collection is
-
-redis_client = redis.from_url("redis://localhost:6379") 
 
 # Initialize Sentence-Transformer model
 embedder = SentenceTransformer('all-MiniLM-L6-v2')
@@ -207,13 +204,7 @@ async def get_personalized_recommendations(student_id: str, limit: int = 6) -> D
     if not ObjectId.is_valid(student_id):
         raise HTTPException(status_code=400, detail="Invalid student ID")
 
-    cache_key = f"recommendations:{student_id}:{limit}"
-    cached_data = await redis_client.get(cache_key)
-    if cached_data:
-        print("Cache hit for recommendations")
-        return orjson.loads(cached_data)
-
-    print("Cache miss for recommendations")
+    print("Generating fresh recommendations (no cache)")
 
     student_id_obj = ObjectId(student_id)
     student = await user_collection.find_one({'_id': student_id_obj})
@@ -280,8 +271,5 @@ async def get_personalized_recommendations(student_id: str, limit: int = 6) -> D
         final_list = fallback_docs
 
     final_list = convert_object_ids(final_list)
-
-    # Cache the final recommendations for 10 minutes
-    await redis_client.setex(cache_key, 600, orjson.dumps({'recommendations': final_list}))
 
     return {'recommendations': final_list}

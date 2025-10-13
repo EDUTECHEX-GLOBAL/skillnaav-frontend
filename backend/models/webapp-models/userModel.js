@@ -17,10 +17,9 @@ const userwebappSchema = new mongoose.Schema(
     portfolio: { type: String },
     profileImage: { type: String, required: true },
 
-     // NEW: richer signals for recommendations
-  skills: [{ type: String, trim: true }],        // ["Python", "React", "SQL"]
-  interests: [{ type: String, trim: true }],     // ["AI", "Robotics"]
-  preferredLocations: [{ type: String, trim: true }], // ["Hyderabad", "Remote"]
+    skills: [{ type: String, trim: true }],
+    interests: [{ type: String, trim: true }],
+    preferredLocations: [{ type: String, trim: true }],
 
     financialStatus: { type: String },
     state: { type: String },
@@ -29,27 +28,34 @@ const userwebappSchema = new mongoose.Schema(
     postalCode: { type: String },
     currentGrade: { type: String },
     gradePercentage: { type: String },
+        adminApproved: {
+      type: Boolean,
+      default: false
+    },
 
-    adminApproved: { type: Boolean, default: false },
+    // FIX: Replace adminApproved with status field
+    status: {
+      type: String,
+      enum: ["Pending", "Approved", "Rejected"],
+      default: "Pending"
+    },
+    
     isActive: { type: Boolean, default: false },
     isPremium: { type: Boolean, default: false },
     planType: {
-  type: String,
-  enum: ["Free", "Premium Basic", "Premium Plus"],
-  default: "Free"
-},
-
+      type: String,
+      enum: ["Free", "Premium Basic", "Premium Plus"],
+      default: "Free"
+    },
     premiumExpiration: { type: Date, default: null },
-
-    // ✅ New field to track creator
     schoolAdmin: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "SchoolAdmin",
     },
     careerChatUsage: {
-  type: Number,
-  default: 0
-},
+      type: Number,
+      default: 0
+    },
   },
   { timestamps: true }
 );
@@ -61,8 +67,6 @@ userwebappSchema.pre("save", async function (next) {
   this.password = await bcrypt.hash(this.password, salt);
   next();
 });
-
-
 
 // Compare hashed password with entered password
 userwebappSchema.methods.matchPassword = async function (enteredPassword) {

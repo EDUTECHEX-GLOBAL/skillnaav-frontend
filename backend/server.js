@@ -30,7 +30,6 @@ app.use(
   })
 );
 
-
 // Serve uploaded files
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
@@ -73,6 +72,7 @@ const schoolAdminPaymentRoutes = require("./routes/webapp-routes/schoolAdmin/pay
 const schoolAdminLoginSessionRoutes = require("./routes/webapp-routes/schoolAdmin/LoginSessionRoutes");
 const stipendDetailsRoutes = require("./routes/webapp-routes/stipendDetailsRoutes");
 const assessmentRoutes = require("./routes/webapp-routes/assessmentRoutes");
+
 // ------------------- Use routes -------------------
 app.use("/api/upload", uploadRoutes);
 app.use("/api/users", userRoutes);

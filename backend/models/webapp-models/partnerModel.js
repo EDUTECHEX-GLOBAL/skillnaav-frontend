@@ -8,7 +8,17 @@ const partnerwebappSchema = mongoose.Schema(
     password: { type: String, required: true },
     universityName: { type: String, required: true },
     institutionId: { type: String, required: true },
+    
+    // KEEP adminApproved for backward compatibility
     adminApproved: { type: Boolean, default: false },
+    
+    // ADD status field for richer state management
+    status: {
+      type: String,
+      enum: ["Pending", "Approved", "Rejected"],
+      default: "Pending"
+    },
+    
     planType: {
       type: String,
       enum: ["Freemium", "Premium Basic", "Premium Plus"],
@@ -22,7 +32,7 @@ const partnerwebappSchema = mongoose.Schema(
       type: Date,
     },
     active: { type: Boolean, default: false },
-    otp: String, // New field for storing OTP
+    otp: String,
     otpExpiration: Date,
   },
   {
@@ -37,6 +47,7 @@ partnerwebappSchema.pre("save", async function (next) {
   }
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
+  next();
 });
 
 // Compare hashed password with entered password
@@ -45,5 +56,4 @@ partnerwebappSchema.methods.matchPassword = async function (enteredPassword) {
 };
 
 const Partnerwebapp = mongoose.model("Partnerwebapp", partnerwebappSchema);
-
 module.exports = Partnerwebapp;

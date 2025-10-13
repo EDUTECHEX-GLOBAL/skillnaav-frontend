@@ -8,7 +8,7 @@ const notifyUser = require("../utils/notifyUser.js");
 const multer = require("multer"); // Multer for file uploads
 const path = require("path");
 const fs = require("fs");
-const redisClient = require('../utils/redisClient'); // Adjust path as per your project structure
+
 
 
 const upgradeToPremium = async (req, res) => {
@@ -102,18 +102,9 @@ const applyForInternship = async (req, res) => {
 
 const getApplicationCount = async (req, res) => {
   const { studentId } = req.params;
-  const cacheKey = `applicationCount:${studentId}`;
 
   try {
-    const cachedCount = await redisClient.get(cacheKey);
-    if (cachedCount !== null) {
-      console.log('Cache hit for application count:', studentId);
-      return res.status(200).json({ count: parseInt(cachedCount, 10) });
-    }
-    console.log('Cache miss for application count:', studentId);
-
     const applicationCount = await Application.countDocuments({ studentId });
-    await redisClient.setEx(cacheKey, 300, applicationCount.toString());
     res.status(200).json({ count: applicationCount });
   } catch (error) {
     console.error("Error fetching application count:", error.message);
@@ -188,19 +179,10 @@ const getApplicationStatus = async (req, res) => {
 };
 
 const getApplicationsForStudent = async (req, res) => {
-  const cacheKey = `applicationsForStudent:${req.params.studentId}`;
   try {
-    const cached = await redisClient.get(cacheKey);
-    if (cached) {
-      console.log("Cache hit for student applications", req.params.studentId);
-      return res.json(JSON.parse(cached));
-    }
-    console.log("Cache miss for student applications", req.params.studentId);
-
     const applications = await Application.find({ studentId: req.params.studentId })
       .populate('internshipId')
       .populate('studentId', 'userName userEmail');
-    await redisClient.setEx(cacheKey, 300, JSON.stringify({ applications }));
     res.json({ applications });
   } catch (err) {
     console.error("Error fetching applications:", err);
@@ -414,23 +396,14 @@ const getRecommendationsForStudent = async (req, res) => {
   try {
     const studentId = req.query.studentId || req.user._id;
     const limit = Number(req.query.limit) || 10;
-    const cacheKey = `recommendations:${studentId}:${limit}`;
-    const cached = await redisClient.get(cacheKey);
-    if (cached) {
-      console.log("Cache hit for recommendations", studentId, limit);
-      return res.status(200).json({ success: true, recommendations: JSON.parse(cached) });
-    }
-    console.log("Cache miss for recommendations", studentId, limit);
 
     const recs = await getPersonalizedRecommendations(studentId, limit);
-    await redisClient.setEx(cacheKey, 600, JSON.stringify(recs)); // Cache for 10 min
     res.status(200).json({ success: true, recommendations: recs });
   } catch (e) {
     console.error(e);
     res.status(500).json({ success: false, message: "Failed to fetch recommendations" });
   }
 };
-
 
 module.exports = {
   applyForInternship,

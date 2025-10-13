@@ -1,24 +1,12 @@
 const asyncHandler = require("express-async-handler");
 const Userwebapp = require("../models/webapp-models/userModel");
 const generateToken = require("../utils/generateToken");
-const notifyUser = require("../utils/notifyUser"); // Import the notifyUser function
-const { profilePicUpload } = require('../utils/multer'); // Import the profilePicUpload middleware
+const notifyUser = require("../utils/notifyUser");
+const { profilePicUpload } = require('../utils/multer');
 const EmailVerification = require("../models/webapp-models/EmailVerificationModel");
-const redisClient = require("../utils/redisClient");
 
-// In your controller file (e.g., userController.js)
+// Get user profile
 const getUserProfile = asyncHandler(async (req, res) => {
-  const cacheKey = `userProfile:${req.user._id}`;
-
-  // Try fetching cached profile from Redis
- const cachedProfile = await redisClient.get(cacheKey);
-if (cachedProfile) {
-  console.log('Cache hit for user profile:', req.user._id);
-  return res.json(JSON.parse(cachedProfile));
-}
-console.log('Cache miss for user profile:', req.user._id);
-
-
   let user = await Userwebapp.findById(req.user._id);
 
   if (!user) {
@@ -26,7 +14,7 @@ console.log('Cache miss for user profile:', req.user._id);
     throw new Error("User not found");
   }
 
-  // Expiration check and update user premium fields as before
+  // Expiration check and update user premium fields
   if (user.isPremium && user.premiumExpiration && user.premiumExpiration < new Date()) {
     user.isPremium = false;
     user.planType = "Free";
@@ -49,6 +37,7 @@ console.log('Cache miss for user profile:', req.user._id);
     interests: user.interests,
     preferredLocations: user.preferredLocations,
     adminApproved: user.adminApproved,
+    status: user.status,
     financialStatus: user.financialStatus,
     state: user.state,
     country: user.country,
@@ -62,13 +51,8 @@ console.log('Cache miss for user profile:', req.user._id);
     premiumExpiration: user.premiumExpiration,
   };
 
-  // Cache the profile data for 5 minutes (300 seconds)
-  await redisClient.setEx(cacheKey, 300, JSON.stringify(userProfile));
-
   res.json(userProfile);
 });
-
-
 
 // Helper function to check required fields
 const areFieldsFilled = (fields) => fields.every((field) => field);
@@ -81,75 +65,51 @@ const checkIfUserExists = asyncHandler(async (req, res) => {
     throw new Error("Email query parameter is required.");
   }
 
-  const cacheKey = `userExists:${email.toLowerCase()}`;
-
-  // Try getting cached result
-  const cachedExists = await redisClient.get(cacheKey);
-  if (cachedExists !== null) {
-    console.log(`Cache hit for user exists check: ${email}`);
-    return res.json({ exists: cachedExists === 'true' });
-  }
-
-  console.log(`Cache miss for user exists check: ${email}`);
-
-  // Query the database
   const userExists = await Userwebapp.findOne({ email });
-
-  // Cache the result for a short duration (5 minutes)
-  await redisClient.setEx(cacheKey, 300, userExists ? 'true' : 'false');
-
   res.json({ exists: !!userExists });
 });
 
-  // Generate a random OTP
+// Generate a random OTP
 const generateOTP = () => {
-  return Math.floor(100000 + Math.random() * 900000).toString(); // Generates a 6-digit OTP
+  return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
 // Request Password Reset with OTP
 const requestPasswordReset = asyncHandler(async (req, res) => {
   const { email } = req.body;
 
-  // Find the user by email
   const user = await Userwebapp.findOne({ email });
   if (!user) {
-      res.status(404);
-      throw new Error("No account found with that email.");
+    res.status(404);
+    throw new Error("No account found with that email.");
   }
 
-  // Generate an OTP and save it to the user model
   const otp = generateOTP();
   user.otp = otp; 
   user.otpExpiration = Date.now() + 300000; // OTP valid for 5 minutes
   await user.save();
 
-  // Send the OTP to the user's email
   await notifyUser(user.email, "Your OTP for Password Reset", `<p>Your OTP is: ${otp}</p><p>It is valid for 5 minutes.</p>`);
 
   res.status(200).json({ message: "OTP sent to your email." });
 });
 
 // Verify OTP and Reset Password
-
 const verifyOTPAndResetPassword = asyncHandler(async (req, res) => {
   const { email, otp, newPassword } = req.body;
 
-  // Find the user by email and check if the OTP is valid
   const user = await Userwebapp.findOne({
-      email,
-      otp,
-      otpExpiration: { $gt: Date.now() } // Check if the OTP is still valid
+    email,
+    otp,
+    otpExpiration: { $gt: Date.now() }
   });
 
   if (!user) {
-      res.status(400);
-      throw new Error("Invalid or expired OTP.");
+    res.status(400);
+    throw new Error("Invalid or expired OTP.");
   }
 
-  // Set the new password (this will be hashed due to pre-save hook)
   user.password = newPassword;
-  
-  // Clear the OTP fields
   user.otp = undefined;
   user.otpExpiration = undefined;
 
@@ -220,7 +180,7 @@ const registerUser = asyncHandler(async (req, res) => {
   // Get the S3 URL of the uploaded profile picture
   const profilePicUrl = req.file.location;
 
-  // ✅ Clean arrays properly
+  // Clean arrays properly
   const parsedSkills = cleanArray(skills);
   const parsedInterests = cleanArray(interests);
   const parsedLocations = cleanArray(preferredLocations);
@@ -229,7 +189,7 @@ const registerUser = asyncHandler(async (req, res) => {
   const user = await Userwebapp.create({
     name,
     email,
-    password, // hashed by pre-save hook
+    password,
     universityName,
     dob: new Date(dob),
     educationLevel,
@@ -241,6 +201,7 @@ const registerUser = asyncHandler(async (req, res) => {
     interests: parsedInterests,
     preferredLocations: parsedLocations,
     profileImage: profilePicUrl,
+    status: "Pending",
     adminApproved: false,
     premiumExpiration: null,
   });
@@ -263,6 +224,7 @@ const registerUser = asyncHandler(async (req, res) => {
       profileImage: user.profileImage,
       token: generateToken(user._id),
       adminApproved: user.adminApproved,
+      status: user.status,
     });
   } else {
     res.status(400);
@@ -278,14 +240,17 @@ const cleanArray = (arr) =>
     ? arr.split(",").map((x) => x.trim()).filter(Boolean)
     : [];
 
-// Authenticate user (login)
+// Authenticate user (login) - UPDATED VERSION
 const authUser = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
   const user = await Userwebapp.findOne({ email });
 
   if (user && await user.matchPassword(password)) {
-    // ✅ Restriction check
+    // ✅ REMOVED: Rejection check - allow rejected users to login
+    // ✅ REMOVED: Pending approval check - allow pending users to login
+    
+    // Only check for school-admin restrictions
     if (user.schoolAdmin && !user.isActive) {
       res.status(403);
       throw new Error("Your account has been restricted by your school administrator. Please contact them.");
@@ -318,6 +283,9 @@ const authUser = asyncHandler(async (req, res) => {
       premiumExpiration: user.premiumExpiration,
       token,
       adminApproved: user.adminApproved,
+      status: user.status,
+      // Add this field to easily check approval status in frontend
+      isFullyApproved: user.status === "Approved" && user.adminApproved,
     });
   } else {
     res.status(400);
@@ -368,14 +336,10 @@ const updateUserProfile = asyncHandler(async (req, res) => {
   user.profileImage = req.body.profileImage || user.profileImage;
 
   if (req.body.password) {
-    user.password = req.body.password; // will be hashed by pre-save hook
+    user.password = req.body.password;
   }
 
   const updatedUser = await user.save();
-
-  // Invalidate Redis cache after update
-  const cacheKey = `userProfile:${updatedUser._id}`;
-  await redisClient.del(cacheKey);
 
   res.json({
     _id: updatedUser._id,
@@ -404,54 +368,44 @@ const updateUserProfile = asyncHandler(async (req, res) => {
   });
 });
 
-
-
 // Get all users with additional fields
 const getAllUsers = asyncHandler(async (req, res) => {
-  const cacheKey = "allUsers";
-
-  const cachedUsers = await redisClient.get(cacheKey);
-  if (cachedUsers) {
-    console.log("Cache hit for all users");
-    return res.status(200).json(JSON.parse(cachedUsers));
-  }
-  console.log("Cache miss for all users");
-
-  const users = await Userwebapp.find({}, "name email universityName dob educationLevel fieldOfStudy desiredField linkedin adminApproved");
+  const users = await Userwebapp.find({}, "name email universityName dob educationLevel fieldOfStudy desiredField linkedin status adminApproved");
   
   if (!users || users.length === 0) {
     res.status(404);
     throw new Error("No users found.");
   }
 
-  await redisClient.setEx(cacheKey, 300, JSON.stringify(users)); // Cache for 5 minutes
-
   res.status(200).json(users);
 });
 
-
-
 // Admin approve a user
 const approveUser = asyncHandler(async (req, res) => {
-  const { userId } = req.params; // Use the correct parameter name
-  console.log("Approving User ID:", userId); // Log the userId
+  const { userId } = req.params;
+  console.log("Approving User ID:", userId);
 
   const user = await Userwebapp.findById(userId);
   
   if (!user) {
-      res.status(404);
-      throw new Error("User not found.");
+    res.status(404);
+    throw new Error("User not found.");
   }
 
-  // Approve the user
+  // Update status to Approved
+  user.status = "Approved";
   user.adminApproved = true;
+  user.isActive = true;
   
-  await notifyUser(user.email, "Your SkillNaav account has been approved!", "Congratulations! Your SkillNaav account has been approved by the admin.");
+  await user.save();
 
-  
-   await user.save();
+  await notifyUser(
+    user.email, 
+    "Your SkillNaav account has been approved!", 
+    "Congratulations! Your SkillNaav account has been approved by the admin. You can now log in and access all features."
+  );
 
-   res.status(200).json({ message: "User approved successfully." });
+  res.status(200).json({ message: "User approved successfully." });
 });
 
 // Admin rejects a user
@@ -459,41 +413,31 @@ const rejectUser = asyncHandler(async (req, res) => {
   const { userId } = req.params;
   console.log("Rejecting User ID:", userId);
 
-  // Find the user by ID
   const user = await Userwebapp.findById(userId);
   if (!user) {
     res.status(404);
     throw new Error("User not found.");
   }
 
-  // Update the user's admin approval status to false and set status to 'Rejected'
-  user.adminApproved = false;
+  // Update status to Rejected
   user.status = "Rejected";
+  user.adminApproved = false;
+  user.isActive = false;
+  
   await user.save();
 
-  // Notify the user about the rejection
   await notifyUser(
     user.email,
     "Your SkillNaav account has been rejected.",
-    "Your SkillNaav account has been rejected by the admin."
+    "Your SkillNaav account has been rejected by the admin. Please contact support for more information."
   );
 
-  // Send a success response
   res.status(200).json({ message: "User rejected successfully." });
 });
 
+// Get premium status
 const getPremiumStatus = asyncHandler(async (req, res) => {
-  const cacheKey = `premiumStatus:${req.user._id}`;
-
   try {
-    // Try fetching cached data
-    const cachedStatus = await redisClient.get(cacheKey);
-    if (cachedStatus) {
-      console.log('Cache hit for premium status:', req.user._id);
-      return res.status(200).json(JSON.parse(cachedStatus));
-    }
-    console.log('Cache miss for premium status:', req.user._id);
-
     let user = await Userwebapp.findById(req.user._id);
 
     if (!user) {
@@ -507,9 +451,6 @@ const getPremiumStatus = asyncHandler(async (req, res) => {
       user.planType = "Free";
       user.premiumExpiration = null;
       await user.save();
-
-      // Invalidate any cached premium status after update
-      await redisClient.del(cacheKey);
     }
 
     const statusData = {
@@ -518,9 +459,6 @@ const getPremiumStatus = asyncHandler(async (req, res) => {
       premiumExpiration: user.premiumExpiration,
     };
 
-    // Cache the premium status for 5 minutes
-    await redisClient.setEx(cacheKey, 300, JSON.stringify(statusData));
-
     res.status(200).json(statusData);
 
   } catch (error) {
@@ -528,7 +466,6 @@ const getPremiumStatus = asyncHandler(async (req, res) => {
     res.status(500).json({ message: 'Error fetching premium status' });
   }
 });
-
 
 // Send verification code for signup
 const sendSignupVerificationCode = asyncHandler(async (req, res) => {
@@ -564,7 +501,6 @@ const sendSignupVerificationCode = asyncHandler(async (req, res) => {
   res.status(200).json({ message: "Verification code sent to email." });
 });
 
-
 // Verify the signup OTP
 const verifySignupOTP = asyncHandler(async (req, res) => {
   const { email, otp } = req.body;
@@ -576,25 +512,23 @@ const verifySignupOTP = asyncHandler(async (req, res) => {
     throw new Error("Invalid or expired verification code.");
   }
 
-  // Optional: delete record after verification
   await EmailVerification.deleteOne({ email });
 
   res.status(200).json({ success: true, message: "Email verified successfully." });
 });
 
-
 module.exports = { 
-   registerUser, 
-   authUser, 
-   updateUserProfile, 
-   getAllUsers, 
-   approveUser, 
-   rejectUser ,
-   checkIfUserExists, // Exporting the new function to check for existing users.
-   requestPasswordReset,
-   verifyOTPAndResetPassword,
-   getUserProfile,
-   getPremiumStatus,
-   sendSignupVerificationCode,
-   verifySignupOTP,
+  registerUser, 
+  authUser, 
+  updateUserProfile, 
+  getAllUsers, 
+  approveUser, 
+  rejectUser,
+  checkIfUserExists,
+  requestPasswordReset,
+  verifyOTPAndResetPassword,
+  getUserProfile,
+  getPremiumStatus,
+  sendSignupVerificationCode,
+  verifySignupOTP,
 };

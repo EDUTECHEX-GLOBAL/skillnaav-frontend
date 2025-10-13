@@ -5,7 +5,6 @@ const notifyUser = require("../utils/notifyUser");
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const PartnerEmailVerification = require("../models/webapp-models/partnerVerificationModel");
-const redisClient = require("../utils/redisClient");
 
 // Get partner profile
 const getPartnerProfile = asyncHandler(async (req, res) => {
@@ -13,15 +12,6 @@ const getPartnerProfile = asyncHandler(async (req, res) => {
     res.status(401);
     throw new Error("User not authenticated.");
   }
-
-  const cacheKey = `partnerProfile:${req.user._id}`;
-  const cachedProfile = await redisClient.get(cacheKey);
-
-  if (cachedProfile) {
-    console.log('Cache hit for partner profile:', req.user._id);
-    return res.json(JSON.parse(cachedProfile));
-  }
-  console.log('Cache miss for partner profile:', req.user._id);
 
   const partner = await Partnerwebapp.findById(req.user._id);
 
@@ -43,11 +33,8 @@ const getPartnerProfile = asyncHandler(async (req, res) => {
     active: partner.active,
   };
 
-  await redisClient.setEx(cacheKey, 300, JSON.stringify(profileData)); // Cache 5 mins
-
   res.json(profileData);
 });
-
 
 // Helper function to check required fields
 const areFieldsFilled = (fields) => fields.every((field) => field);
@@ -125,77 +112,85 @@ const verifyOTPAndResetPassword = asyncHandler(async (req, res) => {
     res.status(200).json({ message: "Password has been successfully updated." });
 });
 
-// Register a new partner
+// Register a new partner - SET BOTH FIELDS
 const registerPartner = asyncHandler(async (req, res) => {
-    console.log("Request Body:", req.body); // Log the request body
+  console.log("Request Body:", req.body);
 
-    const { name, email, password, confirmPassword, universityName, institutionId } = req.body;
+  const { name, email, password, confirmPassword, universityName, institutionId } = req.body;
 
-    // Check for required fields
-    if (!areFieldsFilled([name, email, password, confirmPassword, universityName, institutionId])) {
-        res.status(400);
-        throw new Error("Please fill all required fields.");
-    }
+  // Check for required fields
+  if (!areFieldsFilled([name, email, password, confirmPassword, universityName, institutionId])) {
+    res.status(400);
+    throw new Error("Please fill all required fields.");
+  }
 
-    // Check if passwords match
-    if (password !== confirmPassword) {
-        res.status(400);
-        throw new Error("Passwords do not match.");
-    }
+  // Check if passwords match
+  if (password !== confirmPassword) {
+    res.status(400);
+    throw new Error("Passwords do not match.");
+  }
 
-    // Create new partner
-    const partner = await Partnerwebapp.create({
-        name,
-        email,
-        password, // Ensure password hashing occurs in the model pre-save hook
-        universityName,
-        institutionId,
-        adminApproved: false, // Default to false
+  // Create new partner - SET BOTH FIELDS
+  const partner = await Partnerwebapp.create({
+    name,
+    email,
+    password,
+    universityName,
+    institutionId,
+    adminApproved: false, // KEEP this
+    status: "Pending",    // ADD this
+  });
+
+  if (partner) {
+    res.status(201).json({
+      _id: partner._id,
+      name: partner.name,
+      email: partner.email,
+      universityName: partner.universityName,
+      institutionId: partner.institutionId,
+      token: generateToken(partner._id),
+      adminApproved: partner.adminApproved, // KEEP for backward compatibility
+      status: partner.status,               // ADD for new frontend
     });
-
-    if (partner) {
-        res.status(201).json({
-            _id: partner._id,
-            name: partner.name,
-            email: partner.email,
-            universityName: partner.universityName,
-            institutionId: partner.institutionId,
-            token: generateToken(partner._id), // Generate token
-            adminApproved: partner.adminApproved, // Include admin approval status
-        });
-    } else {
-        res.status(400);
-        throw new Error("Error occurred while registering partner.");
-    }
+  } else {
+    res.status(400);
+    throw new Error("Error occurred while registering partner.");
+  }
 });
 
-// Authenticate partner (login)
+// Authenticate partner - ALLOW LOGIN REGARDLESS OF APPROVAL STATUS
 const authPartner = asyncHandler(async (req, res) => {
-    const { email, password } = req.body;
+  const { email, password } = req.body;
 
-    const partner = await Partnerwebapp.findOne({ email });
+  const partner = await Partnerwebapp.findOne({ email });
 
-    if (partner && await partner.matchPassword(password)) {
-        // Generate token regardless of admin approval
-        const token = generateToken(partner._id);
+  if (partner && await partner.matchPassword(password)) {
+    // ✅ REMOVE THE APPROVAL CHECK - Allow login regardless of status
+    // if (!partner.adminApproved && partner.status !== "Approved") {
+    //   res.status(403);
+    //   throw new Error("Your partner account is pending approval. Please wait for admin approval.");
+    // }
 
-        res.json({
-            _id: partner._id,
-            name: partner.name,
-            email: partner.email,
-            universityName: partner.universityName,
-            institutionId: partner.institutionId,
-            token, // Generate token here
-            isPremium: partner.isPremium, // ✅
-  planType: partner.planType,   // ✅
-  premiumExpiration: partner.premiumExpiration, // ✅
-            adminApproved: partner.adminApproved, // Include admin approval status
-            active: partner.active // Include active status
-        });
-    } else {
-        res.status(400);
-        throw new Error("Invalid email or password.");
-    }
+    const token = generateToken(partner._id);
+
+    res.json({
+      _id: partner._id,
+      name: partner.name,
+      email: partner.email,
+      universityName: partner.universityName,
+      institutionId: partner.institutionId,
+      token,
+      isPremium: partner.isPremium,
+      planType: partner.planType,
+      premiumExpiration: partner.premiumExpiration,
+      adminApproved: partner.adminApproved, // KEEP for existing logic
+      status: partner.status,               // ADD for new frontend
+      active: partner.active
+    });
+  } else {
+    res.status(400);
+    throw new Error("Invalid email or password.");
+  }
 });
 
 // Update partner profile
@@ -222,10 +217,6 @@ const updatePartnerProfile = asyncHandler(async (req, res) => {
 
   const updatedPartner = await partner.save();
 
-  // Invalidate Redis cache after update
-  const cacheKey = `partnerProfile:${updatedPartner._id}`;
-  await redisClient.del(cacheKey);
-
   res.json({
     _id: updatedPartner._id,
     name: updatedPartner.name,
@@ -240,31 +231,7 @@ const updatePartnerProfile = asyncHandler(async (req, res) => {
   });
 });
 
-
-// Get all partners
-const getAllPartners = asyncHandler(async (req, res) => {
-  const cacheKey = 'allPartners';
-
-  const cachedPartners = await redisClient.get(cacheKey);
-  if (cachedPartners) {
-    console.log("Cache hit for all partners");
-    return res.status(200).json(JSON.parse(cachedPartners));
-  }
-  console.log("Cache miss for all partners");
-
-  const partners = await Partnerwebapp.find({}, "name email universityName institutionId adminApproved");
-
-  if (!partners || partners.length === 0) {
-    res.status(404);
-    throw new Error("No partners found.");
-  }
-
-  await redisClient.setEx(cacheKey, 300, JSON.stringify(partners)); // Cache 5 minutes
-
-  res.status(200).json(partners);
-});
-
-// Admin approve a partner account
+// Admin approve a partner account - UPDATE BOTH FIELDS
 const approvePartner = asyncHandler(async (req, res) => {
   const { partnerId } = req.params;
 
@@ -274,39 +241,60 @@ const approvePartner = asyncHandler(async (req, res) => {
     throw new Error("Partner not found.");
   }
 
+  // UPDATE BOTH FIELDS for consistency
   partner.adminApproved = true;
+  partner.status = "Approved";
   partner.active = true;
   await partner.save();
 
-  await notifyUser(partner.email, "Your SkillNaav account has been approved!", "Congratulations! Your SkillNaav account has been approved by the admin.");
-
-  // Invalidate individual and list cache
-  await redisClient.del(`partnerProfile:${partner._id}`);
-  await redisClient.del('allPartners');
+  await notifyUser(
+    partner.email, 
+    "Your SkillNaav Partner Account has been approved!", 
+    "Congratulations! Your SkillNaav partner account has been approved by the admin. You can now log in and access all features."
+  );
 
   res.status(200).json({ message: "Partner approved successfully." });
 });
 
-
-// Admin reject a partner account
+// Admin reject a partner account - UPDATE BOTH FIELDS
 const rejectPartner = asyncHandler(async (req, res) => {
-    const { partnerId } = req.params;
-    console.log("Rejecting Partner ID:", partnerId);
+  const { partnerId } = req.params;
+  console.log("Rejecting Partner ID:", partnerId);
 
-    const partner = await Partnerwebapp.findById(partnerId);
-    if (!partner) {
-        res.status(404);
-        throw new Error("Partner not found.");
-    }
+  const partner = await Partnerwebapp.findById(partnerId);
+  if (!partner) {
+    res.status(404);
+    throw new Error("Partner not found.");
+  }
 
-    // Reject the account and notify user.
-    const rejectionReason = req.body.reason || "Your SkillNaav account has been rejected by the admin.";
+  // UPDATE BOTH FIELDS for consistency
+  partner.adminApproved = false;
+  partner.status = "Rejected";
+  partner.active = false;
+  await partner.save();
 
-    await notifyUser(partner.email, "Your SkillNaav account has been rejected.", rejectionReason);
+  const rejectionReason = req.body.reason || "Your SkillNaav partner account has been rejected by the admin.";
 
-    await Partnerwebapp.updateOne({ _id: partnerId }, { adminApproved: false });
+  await notifyUser(
+    partner.email, 
+    "Your SkillNaav Partner Account has been rejected.", 
+    rejectionReason
+  );
 
-    res.status(200).json({ message: "Partner rejected successfully." });
+  res.status(200).json({ message: "Partner rejected successfully." });
+});
+
+// Get all partners - RETURN BOTH FIELDS
+const getAllPartners = asyncHandler(async (req, res) => {
+  // RETURN BOTH FIELDS
+  const partners = await Partnerwebapp.find({}, "name email universityName institutionId adminApproved status");
+
+  if (!partners || partners.length === 0) {
+    res.status(404);
+    throw new Error("No partners found.");
+  }
+
+  res.status(200).json(partners);
 });
 
 // Send OTP for partner signup
@@ -342,8 +330,8 @@ const sendPartnerVerificationCode = asyncHandler(async (req, res) => {
 
   res.status(200).json({ message: "Verification code sent to email." });
 });
-// Verify OTP
 
+// Verify OTP
 const verifyPartnerOTP = asyncHandler(async (req, res) => {
   const { email, otp } = req.body;
 
@@ -408,7 +396,7 @@ module.exports = {
     rejectPartner,
     checkEmailExists,
     requestPasswordReset,
-    verifyOTPAndResetPassword, // Exporting verifyOTPAndResetPassword function 
+    verifyOTPAndResetPassword, // Exporting verifyOTPAndResetPassword function
     getPartnerProfile,
     sendPartnerVerificationCode,
     verifyPartnerOTP, // Exporting verifyPartnerOTP function

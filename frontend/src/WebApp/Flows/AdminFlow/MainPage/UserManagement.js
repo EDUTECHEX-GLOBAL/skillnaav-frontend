@@ -161,59 +161,56 @@ const UserManagement = () => {
       <div className="overflow-x-auto">
         <table className="min-w-full table-auto divide-y divide-gray-200">
           <thead className="bg-gray-200">
-            <tr>
-              {["S No.", "Name", "Email", "Status", "Actions"].map((h) => (
-                <th
-                  key={h}
-                  className="px-6 py-3 text-left text-sm font-medium text-gray-600 uppercase"
-                >
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
+  <tr>
+    {["S No.", "Name", "Email", "Actions"].map((h) => ( // Removed "Status"
+      <th
+        key={h}
+        className="px-6 py-3 text-left text-sm font-medium text-gray-600 uppercase"
+      >
+        {h}
+      </th>
+    ))}
+  </tr>
+</thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {current.map((user, i) => (
-              <tr key={user._id} className="hover:bg-gray-50 transition">
-                <td className="px-6 py-4 text-sm text-gray-700">{idxFirst + i + 1}</td>
-                <td className="px-6 py-4 text-sm font-medium text-gray-900">{user.name}</td>
-                <td className="px-6 py-4 text-sm text-gray-700">{user.email}</td>
-                <td className="px-6 py-4">
-                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                    user.status === "Approved"
-                      ? "bg-green-100 text-green-600"
-                      : user.status === "Rejected"
-                      ? "bg-red-100 text-red-600"
-                      : "bg-yellow-100 text-yellow-600"
-                  }`}>
-                    {user.status}
-                  </span>
-                </td>
-                <td className="px-6 py-4 flex space-x-4">
-                  <button
-                    onClick={() => handleApprove(user._id)}
-                    disabled={user.status === "Approved"}
-                    className="px-3 py-1 bg-green-500 text-white text-xs font-bold rounded hover:bg-green-600"
-                  >
-                    Approve
-                  </button>
-                  <button
-                    onClick={() => handleReject(user._id)}
-                    disabled={user.status === "Rejected"}
-                    className="px-3 py-1 bg-red-500 text-white text-xs font-bold rounded hover:bg-red-600"
-                  >
-                    Reject
-                  </button>
-                  <button
-                    onClick={() => handleUserClick(user)}
-                    className="px-3 py-1 bg-blue-500 text-white text-xs font-bold rounded hover:bg-blue-600"
-                  >
-                    Details...
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
+  {current.map((user, i) => (
+    <tr key={user._id} className="hover:bg-gray-50 transition">
+      <td className="px-6 py-4 text-sm text-gray-700">{idxFirst + i + 1}</td>
+      <td className="px-6 py-4 text-sm font-medium text-gray-900">{user.name}</td>
+      <td className="px-6 py-4 text-sm text-gray-700">{user.email}</td>
+      <td className="px-6 py-4 flex space-x-4">
+        <button
+          onClick={() => handleApprove(user._id)}
+          disabled={user.status === "Approved"} // Now this will work correctly
+          className={`px-3 py-1 text-white text-xs font-bold rounded ${
+            user.status === "Approved" 
+              ? "bg-gray-400 cursor-not-allowed" 
+              : "bg-green-500 hover:bg-green-600"
+          }`}
+        >
+          {user.status === "Approved" ? "Approved" : "Approve"}
+        </button>
+        <button
+          onClick={() => handleReject(user._id)}
+          disabled={user.status === "Rejected"}
+          className={`px-3 py-1 text-white text-xs font-bold rounded ${
+            user.status === "Rejected" 
+              ? "bg-gray-400 cursor-not-allowed" 
+              : "bg-red-500 hover:bg-red-600"
+          }`}
+        >
+          {user.status === "Rejected" ? "Rejected" : "Reject"}
+        </button>
+        <button
+          onClick={() => handleUserClick(user)}
+          className="px-3 py-1 bg-blue-500 text-white text-xs font-bold rounded hover:bg-blue-600"
+        >
+          Details...
+        </button>
+      </td>
+    </tr>
+  ))}
+</tbody>
         </table>
       </div>
 

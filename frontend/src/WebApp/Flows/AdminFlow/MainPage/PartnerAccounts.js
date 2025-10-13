@@ -132,56 +132,58 @@ const PartnerManagement = () => {
       </div>
       <div className="overflow-x-auto">
         <table className="min-w-full table-auto divide-y divide-gray-200 shadow-md rounded-lg">
-          <thead className="bg-gray-200">
-            <tr>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">S No.</th>
-              <th className="px-20 py-3 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">University Name</th>
-              <th className="px-20 py-3 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">E-mail</th>
-              <th className="px-6 py-3 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">Status</th>
-              <th className="px-6 py-3 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {currentPartners.map((partner, index) => (
-              <tr key={partner._id} className="hover:bg-gray-50 transition duration-200">
-                <td className="px-4 py-4 text-sm text-gray-700">{indexOfFirstPartner + index + 1}</td>
-                <td className="px-6 py-4 text-sm font-medium text-gray-900">{partner.universityName}</td>
-                <td className="px-6 py-4 text-sm text-gray-700">{partner.email}</td>
-                <td className="px-6 py-4">
-                  <span
-                    className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${partner.status === "Approved" ? "bg-green-100 text-green-600"
-                      : partner.status === "Rejected" ? "bg-red-100 text-red-600"
-                        : "bg-yellow-100 text-yellow-600"
-                      }`}
-                  >
-                    {partner.status}
-                  </span>
-                </td>
-                <td className="px-6 py-4 flex space-x-4">
-                  <button
-                    className="px-3 py-1 bg-blue-500 text-white text-xs font-bold rounded hover:bg-blue-600 transition duration-200"
-                    onClick={() => openModal(partner)}
-                  >
-                    Details...
-                  </button>
-                  <button
-                    className="px-3 py-1 bg-green-500 text-white text-xs font-bold rounded hover:bg-green-600 transition duration-200"
-                    onClick={() => openConfirmationModal(partner._id, "approve")}
-                    disabled={partner.status === "Approved"}
-                  >
-                    Approve
-                  </button>
-                  <button
-                    className="px-3 py-1 bg-red-500 text-white text-xs font-bold rounded hover:bg-red-600 transition duration-200"
-                    onClick={() => openConfirmationModal(partner._id, "reject")}
-                    disabled={partner.status === "Rejected"}
-                  >
-                    Reject
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
+         
+<thead className="bg-gray-200">
+  <tr>
+    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">S No.</th>
+    <th className="px-20 py-3 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">University Name</th>
+    <th className="px-20 py-3 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">E-mail</th>
+    {/* REMOVED: Status column */}
+    <th className="px-6 py-3 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">Actions</th>
+  </tr>
+</thead>
+
+{/* // In your table body, remove the status column and update buttons */}
+
+<tbody className="bg-white divide-y divide-gray-200">
+  {currentPartners.map((partner, index) => (
+    <tr key={partner._id} className="hover:bg-gray-50 transition duration-200">
+      <td className="px-4 py-4 text-sm text-gray-700">{indexOfFirstPartner + index + 1}</td>
+      <td className="px-6 py-4 text-sm font-medium text-gray-900">{partner.universityName}</td>
+      <td className="px-6 py-4 text-sm text-gray-700">{partner.email}</td>
+      <td className="px-6 py-4 flex space-x-4">
+        <button
+          className="px-3 py-1 bg-blue-500 text-white text-xs font-bold rounded hover:bg-blue-600 transition duration-200"
+          onClick={() => openModal(partner)}
+        >
+          Details...
+        </button>
+        <button
+          className={`px-3 py-1 text-white text-xs font-bold rounded transition duration-200 ${
+            partner.status === "Approved" 
+              ? "bg-green-600 cursor-not-allowed" 
+              : "bg-green-500 hover:bg-green-600"
+          }`}
+          onClick={() => openConfirmationModal(partner._id, "approve")}
+          disabled={partner.status === "Approved"}
+        >
+          {partner.status === "Approved" ? "Approved" : "Approve"}
+        </button>
+        <button
+          className={`px-3 py-1 text-white text-xs font-bold rounded transition duration-200 ${
+            partner.status === "Rejected" 
+              ? "bg-red-600 cursor-not-allowed" 
+              : "bg-red-500 hover:bg-red-600"
+          }`}
+          onClick={() => openConfirmationModal(partner._id, "reject")}
+          disabled={partner.status === "Rejected"}
+        >
+          {partner.status === "Rejected" ? "Rejected" : "Reject"}
+        </button>
+      </td>
+    </tr>
+  ))}
+</tbody>
         </table>
       </div>
 
