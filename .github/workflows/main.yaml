@@ -24,4 +24,3 @@ jobs:
             cd /home/ubuntu/
             ./deploy.sh feature/removeredis # Pass the branch name directly
           EOF
-

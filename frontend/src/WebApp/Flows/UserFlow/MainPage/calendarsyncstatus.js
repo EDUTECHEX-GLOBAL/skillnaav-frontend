@@ -76,7 +76,7 @@ export default function CalendarSyncStatus({
             <p>Total: <strong>{total}</strong></p>
             <p>Created: <strong>{summary.created || 0}</strong></p>
             <p>Updated: <strong>{summary.updated || 0}</strong></p>
-            <p>Deleted stale: <strong>{summary.deleted || 0}</strong></p>
+            <p>Deleted Events: <strong>{summary.deleted || 0}</strong></p>
             <button
               onClick={onClose}
               className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"

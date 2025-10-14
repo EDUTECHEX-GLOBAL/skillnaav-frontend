@@ -29,6 +29,9 @@ if (!GOOGLE_REDIRECT_URI) {
   throw new Error("⚠️ Missing redirect URI. Set GOOGLE_REDIRECT_URI or SERVER_BASE_URL in .env.");
 }
 
+// Where to land in the UI after a successful Google auth
+const AFTER_AUTH_PATH = process.env.AFTER_AUTH_PATH || "/user-main-page?tab=offer-letter&gauth=success";
+
 // ── Live Sync Progress (in-memory) ──────────────────────────────
 const syncProgressStore = new Map(); // key: `${internshipId}:${studentEmail}`
 const pk = (internshipId, email) => `${String(internshipId)}:${String(email).toLowerCase()}`;
@@ -157,7 +160,17 @@ const googleCallback = async (req, res) => {
 
     console.log(`Successfully stored tokens for ${email}`);
 
-    // Decode state (if caller passed internshipId/email through OAuth)
+    // Send "Google auth successful" mail (best effort; do not block callback)
+    try {
+      const { sendGoogleAuthSuccessEmail } = require("../utils/googleAuthMailer");
+      // If you store instructor names elsewhere and want to include them, look them up here.
+      await sendGoogleAuthSuccessEmail({ to: email });
+    } catch (e) {
+      console.warn("[googleCallback] success mail failed:", e?.message || e);
+    }
+    // ✅ Do NOT sync here anymore. Only confirm auth and return to UI.
+
+    // (Optional) decode caller state if you need it later
     let statePayload = null;
     try {
       if (state) {
@@ -167,94 +180,10 @@ const googleCallback = async (req, res) => {
       console.warn('Invalid state payload (ignored):', e.message);
     }
 
-    try {
-      let scheduleDoc = null;
-
-      if (statePayload?.internshipId) {
-        // Prefer the specific internship the UI asked us to sync
-        scheduleDoc = await InternshipScheduleModel.findOne({
-          internshipId: statePayload.internshipId
-        });
-      } else {
-        // Fallback: latest schedule with any entries
-        scheduleDoc = await InternshipScheduleModel
-          .findOne({ "timetable.0": { $exists: true } })
-          .sort({ createdAt: -1 });
-      }
-
-      if (!scheduleDoc || !Array.isArray(scheduleDoc.timetable) || scheduleDoc.timetable.length === 0) {
-        console.warn("⚠️ No internship schedule found to sync.");
-      } else {
-        console.log(`📅 Found ${scheduleDoc.timetable.length} schedule entries to sync for ${email}`);
-
-        const result = await upsertScheduleForStudent({
-          studentEmail: email, // always use the authenticated Google account
-          internshipId: String(scheduleDoc.internshipId),
-          timetable: scheduleDoc.timetable,
-          internshipTitle: scheduleDoc.internshipTitle || 'Internship Schedule',
-          defaultEventLink: scheduleDoc.defaultEventLink || ''
-        });
-
-        console.log('📤 Sync result:', result);
-      }
-    } catch (syncErr) {
-      console.error("❌ Error syncing schedule after authentication:", syncErr.message);
-    }
-
-    res.send(`
-  <html>
-  <head>
-    <title>Google Sync Successful</title>
-    <style>
-      body {
-        font-family: Arial, sans-serif;
-        text-align: center;
-        padding: 50px;
-      }
-      .success {
-        color: #28a745;
-      }
-      .info {
-        color: #17a2b8;
-        margin-top: 20px;
-      }
-    </style>
-  </head>
-  <body>
-    <h1 class="success">✅ Google Calendar Sync Successful!</h1>
-    <p>Email: ${email}</p>
-    <div class="info">
-      <p>📅 Internship schedule has been synced to your calendar.</p>
-      <p>🔗 <a href="https://calendar.google.com" target="_blank">Open Google Calendar</a></p>
-    </div>
-    <p>Redirecting to your dashboard...</p>
-
-    <script>
-      // Force restore user session token from sessionStorage
-      try {
-        const token = sessionStorage.getItem('userToken');
-        if (token) {
-          localStorage.setItem('userToken', token);
-          console.log('✅ User token restored to localStorage.');
-        } else {
-          console.warn('⚠️ No user token found in sessionStorage.');
-        }
-
-        // Mark Google sync success
-        localStorage.setItem('googleAuthSuccess', 'true');
-
-        // Redirect after brief delay
-        setTimeout(() => {  
-          window.location.href = "${FRONTEND_BASE_URL}/user-main-page";
-        }, 1500);
-      } catch (e) {
-        console.error("Error restoring session token:", e);
-        window.location.href = "${FRONTEND_BASE_URL}/user-main-page";
-      }
-    </script>
-  </body>
-</html>
-`);
+    // ✅ No interstitial page; go straight back to Offer Letter.
+    // We rely on ?gauth=success in AFTER_AUTH_PATH and the front-end shows the popup.
+    const redirectUrl = `${FRONTEND_BASE_URL}${AFTER_AUTH_PATH}`;
+    return res.redirect(302, redirectUrl);
 
   } catch (err) {
     console.error("Google callback error:", {
@@ -307,8 +236,7 @@ async function exchangeCodeForTokens(code) {
   });
 
   console.log("Sending token request to Google with:");
-  console.log("Code:", code);
-  console.log("Client ID:", process.env.GOOGLE_CLIENT_ID);
+  console.log("Client ID present:", !!process.env.GOOGLE_CLIENT_ID);
   console.log("Redirect URI:", GOOGLE_REDIRECT_URI);
 
   const options = {
@@ -551,9 +479,9 @@ async function upsertScheduleForStudent({
     const errors = [];
 
     // initialize live progress
-setProgress(internshipId, studentEmail, {
-  total: counts.total, created: 0, updated: 0, deleted: 0, synced: 0, phase: "working"
-});
+    setProgress(internshipId, studentEmail, {
+      total: counts.total, created: 0, updated: 0, deleted: 0, synced: 0, phase: "working"
+    });
 
     // 3) Build a window to list existing events (min..max date +-1 day)
     const dates = timetable.map(s => new Date(
@@ -654,6 +582,13 @@ setProgress(internshipId, studentEmail, {
         });
         counts.created += 1;
       }
+      // Publish live progress after this item
+      setProgress(internshipId, studentEmail, {
+        created: counts.created,
+        updated: counts.updated,
+        deleted: counts.deleted,
+        synced: counts.created + counts.updated + counts.deleted
+      });
     }
 
     // 6) Delete stale events
@@ -667,6 +602,17 @@ setProgress(internshipId, studentEmail, {
         }
       }
     }
+
+    // mark as done and schedule cleanup
+    setProgress(internshipId, studentEmail, {
+      total: counts.total,
+      created: counts.created,
+      updated: counts.updated,
+      deleted: counts.deleted,
+      synced: counts.created + counts.updated + counts.deleted,
+      phase: "done"
+    });
+    setTimeout(() => clearProgress(internshipId, studentEmail), 5 * 60 * 1000);
 
     return { success: true, counts, errors };
   } catch (e) {
@@ -887,4 +833,5 @@ module.exports = {
   createTestEvent,
   updateScheduleInGoogleCalendar,
   upsertScheduleForStudent,
+  getSyncStatus,
 };

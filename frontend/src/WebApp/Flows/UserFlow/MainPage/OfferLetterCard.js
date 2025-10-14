@@ -31,6 +31,7 @@ import {
 // Set axios base URL once for this module
 if (API_BASE) {
   axios.defaults.baseURL = API_BASE;
+  axios.defaults.withCredentials = true;
 }
 
 // ─── Google Calendar URL Helper ─────────────────────────────────────────
@@ -101,6 +102,8 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
   const [syncPhase, setSyncPhase] = useState('idle'); // 'starting' | 'working' | 'auth' | 'done' | 'error'
   const [syncSummary, setSyncSummary] = useState({ created: 0, updated: 0, deleted: 0 });
   const [syncErrorMsg, setSyncErrorMsg] = useState('');
+  const [syncTotal, setSyncTotal] = useState(0);
+  const [showAuthLinkedModal, setShowAuthLinkedModal] = useState(false);
 
   // Live progress polling (no backend changes required; updates if /api/google/sync-status exists)
   React.useEffect(() => {
@@ -110,23 +113,20 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
     const interval = setInterval(async () => {
       try {
         const resp = await axios.get('/api/google/sync-status', {
-          params: {
-            internshipId: offer?.internshipId,
-            studentEmail: userInfo?.email,
-          },
+          withCredentials: true,
+          params: { internshipId: offer?.internshipId, studentEmail: userInfo?.email },
         });
-        const p = resp?.data?.progress || resp?.data || null;
+        const p = resp?.data?.progress || null;
         if (!p || isCancelled) return;
 
         // Accept either {synced,total,created,updated,deleted} or {created,updated,deleted}
         const next = {
-          created: Number(p.created) || 0,
-          updated: Number(p.updated) || 0,
-          deleted: Number(p.deleted) || 0,
+          created: Number(p?.created) || 0,
+          updated: Number(p?.updated) || 0,
+          deleted: Number(p?.deleted) || 0,
         };
-        if (typeof p.synced === 'number') {
-          next.synced = Math.max(0, p.synced);
-        }
+        if (typeof p?.synced === 'number') next.synced = Math.max(0, p.synced);
+        if (typeof p?.total === 'number') setSyncTotal(p.total);
         setSyncSummary((prev) => ({ ...prev, ...next }));
       } catch (_e) {
         // ignore polling errors so UI isn't spammy
@@ -145,6 +145,21 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
     currency: "USD",
     intent: "capture",
   };
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const byQuery = params.get("gauth") === "success";
+    const byStorage = localStorage.getItem("googleAuthSuccess") === "true";
+
+    if (byQuery || byStorage) {
+      setShowAuthLinkedModal(true);
+      // Clean up flags and URL noise
+      localStorage.removeItem("googleAuthSuccess");
+      params.delete("gauth");
+      const next = `${window.location.pathname}${params.toString() ? "?" + params.toString() : ""}`;
+      window.history.replaceState({}, "", next);
+    }
+  }, []);
 
   // ─── 1) Fetch internship details ───────────────────────────────────
   useEffect(() => {
@@ -402,6 +417,7 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
     setSyncSummary({ created: 0, updated: 0, deleted: 0 });
     setSyncPhase('starting');
     setSyncModalOpen(true);
+    setSyncTotal(Array.isArray(schedule?.timetable) ? schedule.timetable.length : 0);
 
     setLoading(true); // keep existing loading toggles (won't change button label below)
     try {
@@ -786,6 +802,27 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
                 }}
               />
             </PayPalScriptProvider>
+          </div>
+        </div>
+      )}
+
+      {showAuthLinkedModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <h3 className="text-lg font-semibold text-gray-800 mb-2 text-center">
+              Google authentication to Skillnaav successful ✅
+            </h3>
+            <p className="text-sm text-gray-700 text-center">
+              Now you can sync the internship schedule events to Google Calendar.
+            </p>
+            <div className="mt-6 flex justify-center">
+              <button
+                onClick={() => setShowAuthLinkedModal(false)}
+                className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+              >
+                OK
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1176,9 +1213,9 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
       )}
       <CalendarSyncStatus
         open={syncModalOpen}
-        onClose={() => { setSyncModalOpen(false); setSyncPhase('idle'); }}
+        onClose={() => setSyncModalOpen(false)}
         phase={syncPhase}
-        total={Array.isArray(schedule?.timetable) ? schedule.timetable.length : 0}
+        total={syncTotal}
         summary={syncSummary}
         errorMsg={syncErrorMsg}
       />
