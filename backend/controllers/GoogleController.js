@@ -29,6 +29,24 @@ if (!GOOGLE_REDIRECT_URI) {
   throw new Error("⚠️ Missing redirect URI. Set GOOGLE_REDIRECT_URI or SERVER_BASE_URL in .env.");
 }
 
+// ── Live Sync Progress (in-memory) ──────────────────────────────
+const syncProgressStore = new Map(); // key: `${internshipId}:${studentEmail}`
+const pk = (internshipId, email) => `${String(internshipId)}:${String(email).toLowerCase()}`;
+
+function setProgress(internshipId, email, patch) {
+  const key = pk(internshipId, email);
+  const prev = syncProgressStore.get(key) || {};
+  const next = { ...prev, ...patch, ts: Date.now() };
+  syncProgressStore.set(key, next);
+  return next;
+}
+function getProgress(internshipId, email) {
+  return syncProgressStore.get(pk(internshipId, email)) || null;
+}
+function clearProgress(internshipId, email) {
+  syncProgressStore.delete(pk(internshipId, email));
+}
+
 const googleAuth = (req, res) => {
   // Create new OAuth client per request to avoid shared state
   const oAuth2Client = new google.auth.OAuth2(
@@ -498,14 +516,44 @@ async function upsertScheduleForStudent({
     }
 
     // 1) Auth
-    const oAuth2Client = new google.auth.OAuth2(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI);
+    const oAuth2Client = new google.auth.OAuth2(
+      GOOGLE_CLIENT_ID,
+      GOOGLE_CLIENT_SECRET,
+      GOOGLE_REDIRECT_URI
+    );
     oAuth2Client.setCredentials(studentToken.tokens);
+
+    // 🔄 Persist refreshed tokens automatically
+    oAuth2Client.on('tokens', async (tokens) => {
+      try {
+        if (tokens.access_token || tokens.refresh_token) {
+          await TokenModel.findOneAndUpdate(
+            { email: studentEmail },
+            { tokens: { ...studentToken.tokens, ...tokens }, updatedAt: new Date() },
+            { upsert: true }
+          );
+          console.log('🔄 Tokens refreshed & saved for', studentEmail);
+        }
+      } catch (e) {
+        console.warn('Failed to persist refreshed tokens:', e.message);
+      }
+    });
+
     const calendar = google.calendar({ version: 'v3', auth: oAuth2Client });
 
     // 2) Validate timetable
     if (!Array.isArray(timetable) || timetable.length === 0) {
       return { success: false, message: 'Empty timetable' };
     }
+
+    // Counters and error bag for reporting back to UI
+    const counts = { total: timetable.length, created: 0, updated: 0, deleted: 0 };
+    const errors = [];
+
+    // initialize live progress
+setProgress(internshipId, studentEmail, {
+  total: counts.total, created: 0, updated: 0, deleted: 0, synced: 0, phase: "working"
+});
 
     // 3) Build a window to list existing events (min..max date +-1 day)
     const dates = timetable.map(s => new Date(
@@ -597,12 +645,14 @@ async function upsertScheduleForStudent({
           requestBody: body,
           conferenceDataVersion: body.conferenceData ? 1 : 0,
         });
+        counts.updated += 1;
       } else {
         await calendar.events.insert({
           calendarId: 'primary',
           requestBody: body,
           conferenceDataVersion: body.conferenceData ? 1 : 0,
         });
+        counts.created += 1;
       }
     }
 
@@ -611,13 +661,14 @@ async function upsertScheduleForStudent({
       if (!seenKeys.has(key)) {
         try {
           await calendar.events.delete({ calendarId: 'primary', eventId: ev.id });
+          counts.deleted += 1;
         } catch (e) {
           console.warn('Delete old event failed:', e.message);
         }
       }
     }
 
-    return { success: true };
+    return { success: true, counts, errors };
   } catch (e) {
     console.error('upsertScheduleForStudent error:', e);
     return { success: false, message: e.message };
@@ -766,6 +817,22 @@ const checkAuthStatus = async (studentEmail) => {
   }
 };
 
+// GET /api/google/sync-status?internshipId=...&studentEmail=...
+const getSyncStatus = async (req, res) => {
+  try {
+    const { internshipId, studentEmail } = req.query;
+    if (!internshipId || !studentEmail) {
+      return res.status(400).json({ error: "Missing internshipId or studentEmail" });
+    }
+    const progress = getProgress(internshipId, studentEmail) || {
+      total: 0, created: 0, updated: 0, deleted: 0, synced: 0, phase: "idle"
+    };
+    return res.json({ progress });
+  } catch (e) {
+    return res.status(500).json({ error: "Failed to read progress" });
+  }
+};
+
 // POST /api/google/update-schedule
 const updateScheduleInGoogleCalendar = async (req, res) => {
   try {
@@ -773,6 +840,7 @@ const updateScheduleInGoogleCalendar = async (req, res) => {
 
     const studentToken = await TokenModel.findOne({ email: studentEmail });
     if (!studentToken?.tokens) {
+      // first-time users are not authenticated yet
       return res.status(401).json({ success: false, message: "Student not authenticated with Google" });
     }
 
@@ -789,7 +857,21 @@ const updateScheduleInGoogleCalendar = async (req, res) => {
       defaultEventLink: scheduleDoc.defaultEventLink || ''
     });
 
-    return res.json({ success: result.success, result });
+    // Map auth/invalid token conditions to 401 so the UI can re-auth
+    if (!result.success) {
+      const msg = String(result.message || '');
+      if (/auth|invalid_grant|unauthorized|token|No Google auth/i.test(msg)) {
+        return res.status(401).json({ success: false, message: msg || 'Authentication required' });
+      }
+      return res.status(500).json({ success: false, message: msg || 'Failed to update schedule' });
+    }
+
+    // Success
+    return res.json({
+      success: true,
+      counts: result.counts || null,
+      result
+    });
   } catch (error) {
     console.error("Error updating schedule in calendar:", error);
     return res.status(500).json({ success: false, message: error.message });

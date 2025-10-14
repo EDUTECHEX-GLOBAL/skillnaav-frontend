@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faHome,
@@ -15,6 +15,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { useTabContext } from "./UserHomePageContext/HomePageContext";
 import { useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import axios from "axios";
 
 const Sidebar = ({ isMobile, isOpen, onClose }) => {
@@ -22,6 +23,18 @@ const Sidebar = ({ isMobile, isOpen, onClose }) => {
   const [showSectors, setShowSectors] = useState(false);
   const { handleSelectTab } = useTabContext();
   const navigate = useNavigate();
+
+  const location = useLocation();
+
+  // When URL contains ?tab=..., open that tab automatically
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tabFromUrl = params.get("tab");
+    if (tabFromUrl) {
+      setSelectedTab(tabFromUrl);
+      handleSelectTab(tabFromUrl);
+    }
+  }, [location.search, handleSelectTab]);
 
   const topSectors = [
     { id: "advanced-ai", name: "Advanced AI & Autonomous Systems" },
@@ -100,8 +113,8 @@ const Sidebar = ({ isMobile, isOpen, onClose }) => {
                 key={id}
                 onClick={() => handleTabClick(id)}
                 className={`flex items-center p-3 rounded-lg w-full text-left font-medium ${selectedTab === id
-                    ? "bg-[#F0DEFD] text-[#7520A9]"
-                    : "text-gray-600 hover:bg-gray-100"
+                  ? "bg-[#F0DEFD] text-[#7520A9]"
+                  : "text-gray-600 hover:bg-gray-100"
                   }`}
               >
                 <FontAwesomeIcon icon={icon} className="w-5 h-5 mr-3" />
@@ -144,8 +157,8 @@ const Sidebar = ({ isMobile, isOpen, onClose }) => {
             <button
               onClick={() => handleTabClick("support")}
               className={`flex items-center p-3 rounded-lg w-full text-left font-medium ${selectedTab === "support"
-                  ? "bg-[#F0DEFD] text-[#7520A9]"
-                  : "text-gray-600 hover:bg-gray-100"
+                ? "bg-[#F0DEFD] text-[#7520A9]"
+                : "text-gray-600 hover:bg-gray-100"
                 }`}
             >
               <FontAwesomeIcon icon={faLifeRing} className="w-5 h-5 mr-3" />

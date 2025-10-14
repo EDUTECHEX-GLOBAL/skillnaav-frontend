@@ -21,14 +21,25 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// CORS (allow your frontend domain if you know it)
-app.use(
-  cors({
-    origin: "*",
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"], // ✅ This is an array, and PATCH is present
-    credentials: true,
-  })
-);
+// --- CORS ---
+const FRONTEND_ORIGIN = process.env.FRONTEND_BASE_URL || "http://localhost:3000";
+
+const corsOptions = {
+  origin: FRONTEND_ORIGIN, // do NOT use "*" when credentials:true
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-Requested-With",
+    "X-Razorpay-Signature"
+  ],
+  credentials: true,
+  optionsSuccessStatus: 204
+};
+
+app.use(cors(corsOptions));
+// Ensure preflight is handled for all routes:
+app.options("*", cors(corsOptions));
 
 // Serve uploaded files
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
@@ -72,7 +83,6 @@ const schoolAdminPaymentRoutes = require("./routes/webapp-routes/schoolAdmin/pay
 const schoolAdminLoginSessionRoutes = require("./routes/webapp-routes/schoolAdmin/LoginSessionRoutes");
 const stipendDetailsRoutes = require("./routes/webapp-routes/stipendDetailsRoutes");
 const assessmentRoutes = require("./routes/webapp-routes/assessmentRoutes");
-
 // ------------------- Use routes -------------------
 app.use("/api/upload", uploadRoutes);
 app.use("/api/users", userRoutes);

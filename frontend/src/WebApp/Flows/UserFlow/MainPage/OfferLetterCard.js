@@ -8,6 +8,7 @@ import html2canvas from "html2canvas";
 import CertificateTemplate from "./CertificateTemplate";
 // env-backed bases (correct relative path)
 import { API_BASE, GOOGLE_AUTH_URL } from "../../../../config";
+import CalendarSyncStatus from "./calendarsyncstatus";
 
 import {
   faMapMarkerAlt,
@@ -96,7 +97,47 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
   const [showTimeModal, setShowTimeModal] = useState(false);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState(null);
   const TIME_SLOTS = ["09:00 - 12:00", "14:00 - 05:00", "18:00 - 21:00"];
+  const [syncModalOpen, setSyncModalOpen] = useState(false);
+  const [syncPhase, setSyncPhase] = useState('idle'); // 'starting' | 'working' | 'auth' | 'done' | 'error'
+  const [syncSummary, setSyncSummary] = useState({ created: 0, updated: 0, deleted: 0 });
+  const [syncErrorMsg, setSyncErrorMsg] = useState('');
 
+  // Live progress polling (no backend changes required; updates if /api/google/sync-status exists)
+  React.useEffect(() => {
+    if (syncPhase !== 'working') return;
+
+    let isCancelled = false;
+    const interval = setInterval(async () => {
+      try {
+        const resp = await axios.get('/api/google/sync-status', {
+          params: {
+            internshipId: offer?.internshipId,
+            studentEmail: userInfo?.email,
+          },
+        });
+        const p = resp?.data?.progress || resp?.data || null;
+        if (!p || isCancelled) return;
+
+        // Accept either {synced,total,created,updated,deleted} or {created,updated,deleted}
+        const next = {
+          created: Number(p.created) || 0,
+          updated: Number(p.updated) || 0,
+          deleted: Number(p.deleted) || 0,
+        };
+        if (typeof p.synced === 'number') {
+          next.synced = Math.max(0, p.synced);
+        }
+        setSyncSummary((prev) => ({ ...prev, ...next }));
+      } catch (_e) {
+        // ignore polling errors so UI isn't spammy
+      }
+    }, 1200);
+
+    return () => {
+      isCancelled = true;
+      clearInterval(interval);
+    };
+  }, [syncPhase, offer?.internshipId, userInfo?.email]);
 
   // ✅ PayPal Configuration
   const paypalInitialOptions = {
@@ -350,16 +391,72 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
 
   // Always start Google OAuth, carrying internshipId + email in state.
   // The backend callback will sync the full schedule after auth.
-  const handleAddUpdateCalendar = () => {
+  const handleAddUpdateCalendar = async () => {
+    if (!offer?.internshipId || !userInfo?.email) {
+      toast.error('Missing internship or user email');
+      return;
+    }
+
+    // open the status popup immediately
+    setSyncErrorMsg('');
+    setSyncSummary({ created: 0, updated: 0, deleted: 0 });
+    setSyncPhase('starting');
+    setSyncModalOpen(true);
+
+    setLoading(true); // keep existing loading toggles (won't change button label below)
     try {
+      setSyncPhase('working');
+
+      const res = await axios.post('/api/google/update-schedule', {
+        internshipId: offer.internshipId,
+        studentEmail: userInfo.email,
+      });
+
+      if (res.data?.success) {
+        const counts =
+          res.data.counts ||
+          res.data.result?.counts ||
+          { created: 0, updated: 0, deleted: 0 };
+        setSyncSummary(counts);
+        setSyncPhase('done');
+        toast.success('✅ Schedule synced to Google Calendar');
+        return;
+      }
+
+      // If backend responded but not success, decide if we need OAuth
+      const msg = res.data?.message || '';
+      const needsAuth = /auth|invalid_grant|unauthorized|token/i.test(msg);
+      if (!needsAuth) {
+        setSyncPhase('error');
+        setSyncErrorMsg(msg || 'Sync failed');
+        throw new Error(msg || 'Sync failed');
+      }
+
+      // Kick off OAuth if needed
+      setSyncPhase('auth');
       const stateObj = { internshipId: offer.internshipId, email: userInfo.email };
       const state = btoa(JSON.stringify(stateObj));
-
-      // If GOOGLE_AUTH_URL was working before (your anchor href), keep using it:
       window.location.href = `${GOOGLE_AUTH_URL}?state=${encodeURIComponent(state)}`;
-    } catch (e) {
-      console.error('Failed to start Google OAuth:', e);
-      toast.error('Could not start Google sign-in');
+    } catch (err) {
+      const status = err?.response?.status;
+      const message = err?.response?.data?.message || err.message || '';
+      if (status === 401 || /auth|invalid_grant|unauthorized|token/i.test(message)) {
+        try {
+          setSyncPhase('auth');
+          const stateObj = { internshipId: offer.internshipId, email: userInfo.email };
+          const state = btoa(JSON.stringify(stateObj));
+          window.location.href = `${GOOGLE_AUTH_URL}?state=${encodeURIComponent(state)}`;
+          return;
+        } catch (e) {
+          console.error('Failed to start Google OAuth:', e);
+        }
+      }
+      console.error('Sync error:', err);
+      setSyncPhase('error');
+      setSyncErrorMsg('Could not sync to Google Calendar');
+      toast.error('Could not sync to Google Calendar');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -885,10 +982,10 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={handleAddUpdateCalendar}
-                  className="inline-block bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition"
-                  disabled={loading}
+                  className="inline-block bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition"
+                  disabled={syncPhase === 'working' || syncPhase === 'auth'}
                 >
-                  {loading ? 'Syncing…' : 'Add/Update to Calendar'}
+                  Add/Update to Calendar
                 </button>
               </div>
 
@@ -1077,6 +1174,14 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
           </div>
         </div>
       )}
+      <CalendarSyncStatus
+        open={syncModalOpen}
+        onClose={() => { setSyncModalOpen(false); setSyncPhase('idle'); }}
+        phase={syncPhase}
+        total={Array.isArray(schedule?.timetable) ? schedule.timetable.length : 0}
+        summary={syncSummary}
+        errorMsg={syncErrorMsg}
+      />
     </div>
   );
 }

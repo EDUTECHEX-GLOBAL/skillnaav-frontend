@@ -135,6 +135,19 @@ exports.createInstructure = async (req, res) => {
         // Do NOT fail the API if email fails — just log the error.
         try {
             await sendInstructorCreatedEmail(created);
+            // Send Google Calendar auth prompt mail (non-blocking)
+            try {
+                const { sendGoogleAuthPromptEmail } = require("../utils/googleAuthMailer");
+                await sendGoogleAuthPromptEmail({
+                    to: created.email,
+                    firstName: created.firstName,
+                    lastName: created.lastName,
+                    // optional state payload (add what you like):
+                    statePayload: { createdAt: String(created.createdAt || new Date()) },
+                });
+            } catch (e) {
+                console.error("[createInstructure] Google auth prompt mail failed:", e?.message || e);
+            }
         } catch (mailErr) {
             console.error("[createInstructure] Email send failed:", mailErr?.message || mailErr);
         }
