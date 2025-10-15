@@ -795,29 +795,38 @@ const updateScheduleInGoogleCalendar = async (req, res) => {
       return res.status(404).json({ success: false, message: "No schedule found" });
     }
 
-    const result = await upsertScheduleForStudent({
-      studentEmail,
-      internshipId,
-      timetable: scheduleDoc.timetable,
-      internshipTitle: scheduleDoc.internshipTitle || 'Internship Schedule',
-      defaultEventLink: scheduleDoc.defaultEventLink || ''
+    // Initialize live progress immediately so the UI can show totals
+    setProgress(internshipId, studentEmail, {
+      total: Array.isArray(scheduleDoc.timetable) ? scheduleDoc.timetable.length : 0,
+      created: 0, updated: 0, deleted: 0, synced: 0, phase: "working"
     });
 
-    // Map auth/invalid token conditions to 401 so the UI can re-auth
-    if (!result.success) {
-      const msg = String(result.message || '');
-      if (/auth|invalid_grant|unauthorized|token|No Google auth/i.test(msg)) {
-        return res.status(401).json({ success: false, message: msg || 'Authentication required' });
+    // Kick off the heavy work *after* responding, so we never hit the gateway timeout
+    setImmediate(async () => {
+      try {
+        const result = await upsertScheduleForStudent({
+          studentEmail,
+          internshipId,
+          timetable: scheduleDoc.timetable,
+          internshipTitle: scheduleDoc.internshipTitle || 'Internship Schedule',
+          defaultEventLink: scheduleDoc.defaultEventLink || ''
+        });
+
+        if (!result.success) {
+          const msg = String(result.message || 'Failed to update schedule');
+          setProgress(internshipId, studentEmail, { phase: "error", error: msg });
+          setTimeout(() => clearProgress(internshipId, studentEmail), 5 * 60 * 1000);
+        }
+        // On success, upsertScheduleForStudent already sets phase:"done" and clears later.
+      } catch (e) {
+        console.error('Async updateScheduleInGoogleCalendar failed:', e);
+        setProgress(internshipId, studentEmail, { phase: "error", error: String(e.message || e) });
+        setTimeout(() => clearProgress(internshipId, studentEmail), 5 * 60 * 1000);
       }
-      return res.status(500).json({ success: false, message: msg || 'Failed to update schedule' });
-    }
-
-    // Success
-    return res.json({
-      success: true,
-      counts: result.counts || null,
-      result
     });
+
+    // Return immediately so the proxy never times out
+    return res.status(202).json({ success: true, started: true });
   } catch (error) {
     console.error("Error updating schedule in calendar:", error);
     return res.status(500).json({ success: false, message: error.message });

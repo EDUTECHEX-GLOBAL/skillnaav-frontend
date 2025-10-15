@@ -128,6 +128,17 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
         if (typeof p?.synced === 'number') next.synced = Math.max(0, p.synced);
         if (typeof p?.total === 'number') setSyncTotal(p.total);
         setSyncSummary((prev) => ({ ...prev, ...next }));
+        // ✅ Flip UI phase from polled progress (so we don't depend on the POST reply)
+        if (p.phase === 'done') {
+          setSyncPhase('done');
+          toast.success('✅ Schedule synced to Google Calendar');
+          return;
+        }
+        if (p.phase === 'error') {
+          setSyncPhase('error');
+          setSyncErrorMsg(p.error || 'Sync failed');
+          return;
+        }
       } catch (_e) {
         // ignore polling errors so UI isn't spammy
       }
@@ -426,33 +437,42 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
       const res = await axios.post('/api/google/update-schedule', {
         internshipId: offer.internshipId,
         studentEmail: userInfo.email,
+      }, {
+        withCredentials: true,
+        timeout: 5000 // keep the "starter" call snappy; real work runs in background
       });
 
-      if (res.data?.success) {
-        const counts =
-          res.data.counts ||
-          res.data.result?.counts ||
-          { created: 0, updated: 0, deleted: 0 };
+      // Needs OAuth?
+      if (res.status === 401 || res?.data?.message?.match(/auth|invalid_grant|unauthorized|token/i)) {
+        setSyncPhase('auth');
+        const stateObj = { internshipId: offer.internshipId, email: userInfo.email };
+        const state = btoa(JSON.stringify(stateObj));
+        window.location.href = `${GOOGLE_AUTH_URL}?state=${encodeURIComponent(state)}`;
+        return;
+      }
+
+      // Non-blocking flow: backend returns 202 + { started: true }
+      if (res.status === 202 || res?.data?.started) {
+        toast.info('Sync started…');
+        // Stay in "working"; polling will flip to done/error
+        return;
+      }
+
+      // Legacy synchronous success (if server still returns counts)
+      if (res?.data?.success) {
+        const counts = res.data.counts || res.data.result?.counts || { created: 0, updated: 0, deleted: 0 };
         setSyncSummary(counts);
         setSyncPhase('done');
         toast.success('✅ Schedule synced to Google Calendar');
         return;
       }
 
-      // If backend responded but not success, decide if we need OAuth
-      const msg = res.data?.message || '';
-      const needsAuth = /auth|invalid_grant|unauthorized|token/i.test(msg);
-      if (!needsAuth) {
+      // Any other non-success payload
+      if (res?.data && res?.data.success === false) {
         setSyncPhase('error');
-        setSyncErrorMsg(msg || 'Sync failed');
-        throw new Error(msg || 'Sync failed');
+        setSyncErrorMsg(res.data.message || 'Sync failed');
+        throw new Error(res.data.message || 'Sync failed');
       }
-
-      // Kick off OAuth if needed
-      setSyncPhase('auth');
-      const stateObj = { internshipId: offer.internshipId, email: userInfo.email };
-      const state = btoa(JSON.stringify(stateObj));
-      window.location.href = `${GOOGLE_AUTH_URL}?state=${encodeURIComponent(state)}`;
     } catch (err) {
       const status = err?.response?.status;
       const message = err?.response?.data?.message || err.message || '';
@@ -808,12 +828,14 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
 
       {showAuthLinkedModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
-            <h3 className="text-lg font-semibold text-gray-800 mb-2 text-center">
-              Google authentication to Skillnaav successful ✅
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-6">
+            <h3
+              className="text-lg font-semibold text-gray-800 text-center whitespace-nowrap mb-4"
+            >
+              Your Google-Calendar authentication to Skillnaav is successful ✅
             </h3>
             <p className="text-sm text-gray-700 text-center">
-              Now you can sync the internship schedule events to Google Calendar.
+              Now click on "Add/Update to Calendar" button to sync your Schedule events to your Google Calendar.
             </p>
             <div className="mt-6 flex justify-center">
               <button
