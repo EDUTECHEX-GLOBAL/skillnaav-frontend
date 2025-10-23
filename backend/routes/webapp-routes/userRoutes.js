@@ -44,8 +44,8 @@ router.put("/profile", authenticate, updateUserProfile);
 router.get("/premium-status", authenticate, getPremiumStatus);
 
 // Admin (you might want to gate these behind an admin check later)
-router.get("/users",  getAllUsers);
-router.patch("/approve/:userId",  approveUser);
+router.get("/users", getAllUsers);
+router.patch("/approve/:userId", approveUser);
 router.patch("/reject/:userId", rejectUser);
 
 

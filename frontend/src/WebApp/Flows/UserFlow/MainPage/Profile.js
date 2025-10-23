@@ -63,24 +63,24 @@ const ProfileForm = () => {
           const { data } = await axios.get("/api/users/profile", config);
 
           setUser((prevUser) => ({
-  ...prevUser,
-  ...data,
-  password: "",
-  confirmPassword: "",
-  dob: isValidDate(data.dob)
-    ? new Date(data.dob).toISOString().split("T")[0]
-    : "",
-  profileImage: data.profileImage || prevUser.profileImage,
-  skills: Array.isArray(data.skills) && data.skills.filter(Boolean).length > 0 
-    ? data.skills.join(", ") 
-    : "",
-  interests: Array.isArray(data.interests) && data.interests.filter(Boolean).length > 0 
-    ? data.interests.join(", ") 
-    : "",
-  preferredLocations: Array.isArray(data.preferredLocations) && data.preferredLocations.filter(Boolean).length > 0 
-    ? data.preferredLocations.join(", ") 
-    : "",
-}));
+            ...prevUser,
+            ...data,
+            password: "",
+            confirmPassword: "",
+            dob: isValidDate(data.dob)
+              ? new Date(data.dob).toISOString().split("T")[0]
+              : "",
+            profileImage: data.profileImage || prevUser.profileImage,
+            skills: Array.isArray(data.skills) && data.skills.filter(Boolean).length > 0
+              ? data.skills.join(", ")
+              : "",
+            interests: Array.isArray(data.interests) && data.interests.filter(Boolean).length > 0
+              ? data.interests.join(", ")
+              : "",
+            preferredLocations: Array.isArray(data.preferredLocations) && data.preferredLocations.filter(Boolean).length > 0
+              ? data.preferredLocations.join(", ")
+              : "",
+          }));
 
         }
       } catch (error) {
@@ -134,18 +134,18 @@ const ProfileForm = () => {
         },
       };
 
-     const payload = {
-  ...user,
-  skills: user.skills
-    ? user.skills.split(",").map((s) => s.trim()).filter(Boolean)
-    : [],
-  interests: user.interests
-    ? user.interests.split(",").map((i) => i.trim()).filter(Boolean)
-    : [],
-  preferredLocations: user.preferredLocations
-    ? user.preferredLocations.split(",").map((l) => l.trim()).filter(Boolean)
-    : [],
-};
+      const payload = {
+        ...user,
+        skills: user.skills
+          ? user.skills.split(",").map((s) => s.trim()).filter(Boolean)
+          : [],
+        interests: user.interests
+          ? user.interests.split(",").map((i) => i.trim()).filter(Boolean)
+          : [],
+        preferredLocations: user.preferredLocations
+          ? user.preferredLocations.split(",").map((l) => l.trim()).filter(Boolean)
+          : [],
+      };
 
 
       const { data } = await axios.put("/api/users/profile", payload, config);
@@ -165,7 +165,7 @@ const ProfileForm = () => {
       console.error("Update error:", error);
       setErrorMessage(
         "Failed to update profile. " +
-          (error.response?.data?.message || "Unknown error")
+        (error.response?.data?.message || "Unknown error")
       );
     }
   };
@@ -214,7 +214,7 @@ const ProfileForm = () => {
 
         <form>
           {[{ level: 1, isOpen: isLevel1Open, toggle: setIsLevel1Open, fields: level1Fields },
-            { level: 2, isOpen: isLevel2Open, toggle: setIsLevel2Open, fields: level2Fields }].map(({ level, isOpen, toggle, fields }) => (
+          { level: 2, isOpen: isLevel2Open, toggle: setIsLevel2Open, fields: level2Fields }].map(({ level, isOpen, toggle, fields }) => (
             <div key={level}>
               <div className="flex items-center justify-between mt-6">
                 <h3 className="text-2xl font-semibold text-gray-800">
@@ -239,50 +239,49 @@ const ProfileForm = () => {
                         {label}
                       </label>
 
-       {(name === "password" || name === "confirmPassword") ? (
-  <div className="relative">
-    <input
-      type={
-        name === "password"
-          ? showPassword ? "text" : "password"
-          : showConfirm ? "text" : "password"
-      }
-      id={name}
-      name={name}
-      value={user[name]}
-      onChange={handleChange}
-      placeholder={placeholder}
-      className="px-4 py-2 border rounded-md w-full pr-10 mt-1"
-    />
-    <span
-      onClick={() =>
-        name === "password"
-          ? setShowPassword(!showPassword)
-          : setShowConfirm(!showConfirm)
-      }
-      className="absolute inset-y-0 right-3 flex items-center cursor-pointer"
-    >
-      {name === "password"
-        ? showPassword
-          ? <EyeSlashIcon className="h-5 w-5 text-gray-500" />
-          : <EyeIcon className="h-5 w-5 text-gray-500" />
-        : showConfirm
-        ? <EyeSlashIcon className="h-5 w-5 text-gray-500" />
-        : <EyeIcon className="h-5 w-5 text-gray-500" />}
-    </span>
-  </div>
-) : (
-  <input
-    type={type}
-    id={name}
-    name={name}
-    value={user[name]}
-    onChange={handleChange}
-    placeholder={placeholder}
-    className="px-4 py-2 border rounded-md"
-  />
-)}
-
+                      {(name === "password" || name === "confirmPassword") ? (
+                        <div className="relative">
+                          <input
+                            type={
+                              name === "password"
+                                ? showPassword ? "text" : "password"
+                                : showConfirm ? "text" : "password"
+                            }
+                            id={name}
+                            name={name}
+                            value={user[name]}
+                            onChange={handleChange}
+                            placeholder={placeholder}
+                            className="px-4 py-2 border rounded-md w-full pr-10 mt-1"
+                          />
+                          <span
+                            onClick={() =>
+                              name === "password"
+                                ? setShowPassword(!showPassword)
+                                : setShowConfirm(!showConfirm)
+                            }
+                            className="absolute inset-y-0 right-3 flex items-center cursor-pointer"
+                          >
+                            {name === "password"
+                              ? showPassword
+                                ? <EyeSlashIcon className="h-5 w-5 text-gray-500" />
+                                : <EyeIcon className="h-5 w-5 text-gray-500" />
+                              : showConfirm
+                                ? <EyeSlashIcon className="h-5 w-5 text-gray-500" />
+                                : <EyeIcon className="h-5 w-5 text-gray-500" />}
+                          </span>
+                        </div>
+                      ) : (
+                        <input
+                          type={type}
+                          id={name}
+                          name={name}
+                          value={user[name]}
+                          onChange={handleChange}
+                          placeholder={placeholder}
+                          className="px-4 py-2 border rounded-md"
+                        />
+                      )}
                     </div>
                   ))}
 

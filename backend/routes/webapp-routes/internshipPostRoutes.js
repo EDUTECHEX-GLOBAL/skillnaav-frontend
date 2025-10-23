@@ -73,6 +73,9 @@ router.post("/", async (req, res) => {
       compensationDetails,
       classification,          // 🔹 new field
       applicationOpen = true,
+      country,
+      state,
+      city,
     } = req.body;
 
     const partner = await Partner.findById(partnerId);
@@ -108,10 +111,19 @@ router.post("/", async (req, res) => {
       finalComp.frequency = null;
     }
 
+    // Compose a robust location string if not provided explicitly
+    const composedLocation = (location && location.trim())
+      ? location
+      : [city, state, country].filter(Boolean).join(", ");
+
+
     const newInternship = new InternshipPosting({
       jobTitle,
       companyName,
-      location,
+      location: composedLocation,
+      country,
+      state,
+      city,
       jobDescription,
       startDate,
       endDateOrDuration,
@@ -305,6 +317,9 @@ router.put("/:id", async (req, res) => {
     studentApplied,
     adminApproved,
     partnerId,
+    country,
+    state,
+    city,
     sector,
     classification,            // 🔹 accept new field
     applicationOpen,
@@ -316,7 +331,12 @@ router.put("/:id", async (req, res) => {
       {
         ...(jobTitle && { jobTitle }),
         ...(companyName && { companyName }),
-        ...(location && { location }),
+        ...((location || city || state || country) && {
+          location: (location || [city, state, country].filter(Boolean).join(", "))
+        }),
+        ...(country && { country }),
+        ...(state && { state }),
+        ...(city && { city }),
         ...(jobDescription && { jobDescription }),
         ...(startDate && { startDate }),
         ...(endDateOrDuration && { endDateOrDuration }),
@@ -398,7 +418,7 @@ router.patch("/:id/approve", async (req, res) => {
       } catch (emailError) {
         console.error("Failed to send approval email:", emailError);
       }
-      
+
 
       res.json({ message: "Internship approved successfully", internship });
     } else {
@@ -443,11 +463,11 @@ router.patch("/:id/reject", async (req, res) => {
 router.post("/:id/review", async (req, res) => {
   try {
     console.log("Reviewing internship with ID:", req.params.id); // Debug log
-    
+
     // Make sure you're using the correct model name
     // Replace 'InternshipPosting' with your actual model name
     const internship = await InternshipPosting.findById(req.params.id);
-    
+
     if (!internship) {
       console.log("Internship not found with ID:", req.params.id);
       return res.status(404).json({ message: "Internship not found." });
@@ -456,8 +476,8 @@ router.post("/:id/review", async (req, res) => {
     console.log("Found internship:", internship.jobTitle); // Debug log
 
     // Mark as reviewed
-    internship.isAdminReviewed = true; 
-    
+    internship.isAdminReviewed = true;
+
     const savedInternship = await internship.save();
     console.log("Successfully marked as reviewed"); // Debug log
 
@@ -467,8 +487,8 @@ router.post("/:id/review", async (req, res) => {
     });
   } catch (error) {
     console.error("Detailed error in review route:", error); // More detailed logging
-    res.status(500).json({ 
-      message: "Server error: Unable to update internship.", 
+    res.status(500).json({
+      message: "Server error: Unable to update internship.",
       error: error.message,
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
@@ -477,5 +497,3 @@ router.post("/:id/review", async (req, res) => {
 
 
 module.exports = router;
-
-//routes

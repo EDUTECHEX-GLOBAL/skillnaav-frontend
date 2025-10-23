@@ -43,6 +43,7 @@ const getUserProfile = asyncHandler(async (req, res) => {
     country: user.country,
     city: user.city,
     postalCode: user.postalCode,
+    address: user.address,
     currentGrade: user.currentGrade,
     gradePercentage: user.gradePercentage,
     profileImage: user.profileImage,
@@ -59,7 +60,7 @@ const areFieldsFilled = (fields) => fields.every((field) => field);
 
 // Check if user exists by email
 const checkIfUserExists = asyncHandler(async (req, res) => {
-  const { email } = req.query; 
+  const { email } = req.query;
   if (!email) {
     res.status(400);
     throw new Error("Email query parameter is required.");
@@ -85,7 +86,7 @@ const requestPasswordReset = asyncHandler(async (req, res) => {
   }
 
   const otp = generateOTP();
-  user.otp = otp; 
+  user.otp = otp;
   user.otpExpiration = Date.now() + 300000; // OTP valid for 5 minutes
   await user.save();
 
@@ -137,6 +138,12 @@ const registerUser = asyncHandler(async (req, res) => {
     skills,
     interests,
     preferredLocations,
+    state,
+    country,
+    city,
+    postalCode,
+    zip,        // will map to postalCode if provided
+    address,
   } = req.body;
 
   // Check for required fields
@@ -200,6 +207,11 @@ const registerUser = asyncHandler(async (req, res) => {
     skills: parsedSkills,
     interests: parsedInterests,
     preferredLocations: parsedLocations,
+    state,
+    country,
+    city,
+    postalCode: postalCode || zip || "",
+    address,
     profileImage: profilePicUrl,
     status: "Pending",
     adminApproved: false,
@@ -221,6 +233,11 @@ const registerUser = asyncHandler(async (req, res) => {
       skills: user.skills,
       interests: user.interests,
       preferredLocations: user.preferredLocations,
+      state: user.state,
+      country: user.country,
+      city: user.city,
+      postalCode: user.postalCode,
+      address: user.address,
       profileImage: user.profileImage,
       token: generateToken(user._id),
       adminApproved: user.adminApproved,
@@ -237,8 +254,8 @@ const cleanArray = (arr) =>
   Array.isArray(arr)
     ? arr.map((x) => x.trim()).filter(Boolean)
     : arr && typeof arr === "string"
-    ? arr.split(",").map((x) => x.trim()).filter(Boolean)
-    : [];
+      ? arr.split(",").map((x) => x.trim()).filter(Boolean)
+      : [];
 
 // Authenticate user (login) - UPDATED VERSION
 const authUser = asyncHandler(async (req, res) => {
@@ -249,7 +266,7 @@ const authUser = asyncHandler(async (req, res) => {
   if (user && await user.matchPassword(password)) {
     // ✅ REMOVED: Rejection check - allow rejected users to login
     // ✅ REMOVED: Pending approval check - allow pending users to login
-    
+
     // Only check for school-admin restrictions
     if (user.schoolAdmin && !user.isActive) {
       res.status(403);
@@ -316,7 +333,8 @@ const updateUserProfile = asyncHandler(async (req, res) => {
   user.state = req.body.state || user.state;
   user.country = req.body.country || user.country;
   user.city = req.body.city || user.city;
-  user.postalCode = req.body.postalCode || user.postalCode;
+  user.postalCode = req.body.postalCode || req.body.zip || user.postalCode;
+  user.address = req.body.address || user.address;
   user.currentGrade = req.body.currentGrade || user.currentGrade;
   user.gradePercentage = req.body.gradePercentage || user.gradePercentage;
   user.isPremium = req.body.isPremium || user.isPremium;
@@ -360,6 +378,7 @@ const updateUserProfile = asyncHandler(async (req, res) => {
     country: updatedUser.country,
     city: updatedUser.city,
     postalCode: updatedUser.postalCode,
+    address: updatedUser.address,
     currentGrade: updatedUser.currentGrade,
     gradePercentage: updatedUser.gradePercentage,
     planType: updatedUser.planType,
@@ -371,7 +390,7 @@ const updateUserProfile = asyncHandler(async (req, res) => {
 // Get all users with additional fields
 const getAllUsers = asyncHandler(async (req, res) => {
   const users = await Userwebapp.find({}, "name email universityName dob educationLevel fieldOfStudy desiredField linkedin status adminApproved");
-  
+
   if (!users || users.length === 0) {
     res.status(404);
     throw new Error("No users found.");
@@ -386,7 +405,7 @@ const approveUser = asyncHandler(async (req, res) => {
   console.log("Approving User ID:", userId);
 
   const user = await Userwebapp.findById(userId);
-  
+
   if (!user) {
     res.status(404);
     throw new Error("User not found.");
@@ -396,12 +415,12 @@ const approveUser = asyncHandler(async (req, res) => {
   user.status = "Approved";
   user.adminApproved = true;
   user.isActive = true;
-  
+
   await user.save();
 
   await notifyUser(
-    user.email, 
-    "Your SkillNaav account has been approved!", 
+    user.email,
+    "Your SkillNaav account has been approved!",
     "Congratulations! Your SkillNaav account has been approved by the admin. You can now log in and access all features."
   );
 
@@ -423,7 +442,7 @@ const rejectUser = asyncHandler(async (req, res) => {
   user.status = "Rejected";
   user.adminApproved = false;
   user.isActive = false;
-  
+
   await user.save();
 
   await notifyUser(
@@ -517,12 +536,12 @@ const verifySignupOTP = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, message: "Email verified successfully." });
 });
 
-module.exports = { 
-  registerUser, 
-  authUser, 
-  updateUserProfile, 
-  getAllUsers, 
-  approveUser, 
+module.exports = {
+  registerUser,
+  authUser,
+  updateUserProfile,
+  getAllUsers,
+  approveUser,
   rejectUser,
   checkIfUserExists,
   requestPasswordReset,
@@ -532,3 +551,4 @@ module.exports = {
   sendSignupVerificationCode,
   verifySignupOTP,
 };
+
