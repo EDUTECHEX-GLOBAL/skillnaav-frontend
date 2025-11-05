@@ -236,7 +236,6 @@ const ProfileForm = () => {
                     // For Level 2, skip the "address" item here; we'll insert it right after "postalCode"
                     if (level === 2 && name === "address") return null;
 
-<<<<<<< HEAD
                     return (
                       <React.Fragment key={name}>
                         <div className="flex flex-col relative">
@@ -316,53 +315,6 @@ const ProfileForm = () => {
                       </React.Fragment>
                     );
                   })}
-=======
-                      {(name === "password" || name === "confirmPassword") ? (
-                        <div className="relative">
-                          <input
-                            type={
-                              name === "password"
-                                ? showPassword ? "text" : "password"
-                                : showConfirm ? "text" : "password"
-                            }
-                            id={name}
-                            name={name}
-                            value={user[name]}
-                            onChange={handleChange}
-                            placeholder={placeholder}
-                            className="px-4 py-2 border rounded-md w-full pr-10 mt-1"
-                          />
-                          <span
-                            onClick={() =>
-                              name === "password"
-                                ? setShowPassword(!showPassword)
-                                : setShowConfirm(!showConfirm)
-                            }
-                            className="absolute inset-y-0 right-3 flex items-center cursor-pointer"
-                          >
-                            {name === "password"
-                              ? showPassword
-                                ? <EyeSlashIcon className="h-5 w-5 text-gray-500" />
-                                : <EyeIcon className="h-5 w-5 text-gray-500" />
-                              : showConfirm
-                                ? <EyeSlashIcon className="h-5 w-5 text-gray-500" />
-                                : <EyeIcon className="h-5 w-5 text-gray-500" />}
-                          </span>
-                        </div>
-                      ) : (
-                        <input
-                          type={type}
-                          id={name}
-                          name={name}
-                          value={user[name]}
-                          onChange={handleChange}
-                          placeholder={placeholder}
-                          className="px-4 py-2 border rounded-md"
-                        />
-                      )}
-                    </div>
-                  ))}
->>>>>>> feature/23-10-2025_17-22
 
                   {/* Profile Image upload section */}
                   {level === 1 && (
