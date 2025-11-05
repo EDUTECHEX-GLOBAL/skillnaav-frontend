@@ -1,21 +1,17 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Formik, Form, Field, ErrorMessage } from "formik";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { auth, googleAuthProvider, signInWithPopup } from "../../../../config/Firebase";
 import * as Yup from "yup";
 import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/solid";
-import { Link } from "react-router-dom";
 import createAccountImage from "../../../../assets-webapp/login-image.png";
 import { FcGoogle } from "react-icons/fc";
 import axios from "axios";
 
-// Validation schema
+// ✅ Validation schema
 const validationSchema = Yup.object({
   name: Yup.string().required("Required"),
-  email: Yup.string()
-  .email("Invalid email format")
-  .required("Required"),
-
+  email: Yup.string().email("Invalid email format").required("Required"),
   password: Yup.string()
     .min(6, "Password must be at least 6 characters")
     .matches(/[A-Z]/, "At least one uppercase letter")
@@ -31,14 +27,29 @@ const validationSchema = Yup.object({
 const UserCreateAccount = () => {
   const navigate = useNavigate();
   const [errorMessage, setErrorMessage] = useState("");
-  const [otpSent, setOtpSent] = useState(false); // ⭐
+  const [otpSent, setOtpSent] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [otp, setOtp] = useState(""); // ⭐
+  const [otp, setOtp] = useState("");
+
+  // 🔁 New states for Resend OTP
+  const [resendTimer, setResendTimer] = useState(30);
+  const [resending, setResending] = useState(false);
+  const [canResend, setCanResend] = useState(false);
+
+  // 🕒 Countdown timer for resend
+  useEffect(() => {
+    let timer;
+    if (otpSent && !canResend && resendTimer > 0) {
+      timer = setTimeout(() => setResendTimer((prev) => prev - 1), 1000);
+    } else if (resendTimer === 0) {
+      setCanResend(true);
+    }
+    return () => clearTimeout(timer);
+  }, [otpSent, resendTimer, canResend]);
 
   const handleSubmit = async (values, { setSubmitting }) => {
     try {
-      // Step 1: Check if email already exists
       const response = await axios.get(`/api/users/check-email?email=${values.email}`);
       if (response.data.exists) {
         setErrorMessage("Email already registered.");
@@ -46,22 +57,22 @@ const UserCreateAccount = () => {
         return;
       }
 
-      // Step 2: Send verification OTP
-      await axios.post("/api/users/send-verification-code", {
-        email: values.email,
-      });
+      await axios.post("/api/users/send-verification-code", { email: values.email });
 
-      setOtpSent(true); // ⭐ show OTP input
-      setErrorMessage(""); // Clear old errors
+      setOtpSent(true);
+      setErrorMessage("");
       setSubmitting(false);
-      localStorage.setItem("pendingUserData", JSON.stringify(values)); // save form data
+      localStorage.setItem("pendingUserData", JSON.stringify(values));
+
+      // Reset resend timer when OTP is first sent
+      setResendTimer(30);
+      setCanResend(false);
     } catch (error) {
       setErrorMessage("Failed to send OTP. Try again.");
       setSubmitting(false);
     }
   };
 
-  // ⭐ Handle OTP verification
   const handleVerifyOTP = async () => {
     try {
       const values = JSON.parse(localStorage.getItem("pendingUserData"));
@@ -75,9 +86,28 @@ const UserCreateAccount = () => {
         navigate("/user-profile-form", { state: { userData: values } });
       } else {
         setErrorMessage("Invalid OTP. Try again.");
+        // Optional: Allow immediate resend after failed attempt
+        setCanResend(true);
       }
     } catch (err) {
       setErrorMessage("OTP verification failed.");
+    }
+  };
+
+  // 🔁 Resend OTP
+  const handleResendOTP = async () => {
+    try {
+      setResending(true);
+      const values = JSON.parse(localStorage.getItem("pendingUserData"));
+      await axios.post("/api/users/send-verification-code", { email: values.email });
+
+      setErrorMessage("");
+      setResending(false);
+      setCanResend(false);
+      setResendTimer(30);
+    } catch (err) {
+      setErrorMessage("Failed to resend OTP. Please try again later.");
+      setResending(false);
     }
   };
 
@@ -114,11 +144,10 @@ const UserCreateAccount = () => {
           className="w-full h-full object-cover rounded-lg"
         />
       </div>
+
       <div className="flex flex-col items-center justify-center p-8 w-full lg:w-1/2 bg-white">
         <div className="w-full max-w-md flex flex-col justify-center min-h-screen lg:min-h-full">
-          <h1 className="text-2xl font-semibold mb-6 text-center">
-            Create an account
-          </h1>
+          <h1 className="text-2xl font-semibold mb-6 text-center">Create an account</h1>
 
           {errorMessage && (
             <div className="mb-4 p-4 bg-red-100 text-red-800 border border-red-400 rounded">
@@ -126,7 +155,8 @@ const UserCreateAccount = () => {
             </div>
           )}
 
-          {!otpSent ? ( // ⭐ Step 1: Form before OTP
+          {!otpSent ? (
+            // Step 1: Account Form
             <Formik
               initialValues={{
                 name: "",
@@ -146,7 +176,11 @@ const UserCreateAccount = () => {
                       placeholder="Full Name"
                       className="w-full p-3 border border-gray-300 rounded-lg"
                     />
-                    <ErrorMessage name="name" component="div" className="text-red-500 text-sm mt-1" />
+                    <ErrorMessage
+                      name="name"
+                      component="div"
+                      className="text-red-500 text-sm mt-1"
+                    />
                   </div>
 
                   <div className="mb-4">
@@ -156,7 +190,11 @@ const UserCreateAccount = () => {
                       placeholder="Gmail Address"
                       className="w-full p-3 border border-gray-300 rounded-lg"
                     />
-                    <ErrorMessage name="email" component="div" className="text-red-500 text-sm mt-1" />
+                    <ErrorMessage
+                      name="email"
+                      component="div"
+                      className="text-red-500 text-sm mt-1"
+                    />
                   </div>
 
                   <div className="mb-4 relative">
@@ -171,9 +209,17 @@ const UserCreateAccount = () => {
                       onClick={() => setShowPassword(!showPassword)}
                       className="absolute right-3 top-3"
                     >
-                      {showPassword ? <EyeIcon className="h-5 w-5 mt-4 text-gray-500" /> : <EyeSlashIcon className="h-5 w-5 mt-4 text-gray-500" />}
+                      {showPassword ? (
+                        <EyeIcon className="h-5 w-5 mt-4 text-gray-500" />
+                      ) : (
+                        <EyeSlashIcon className="h-5 w-5 mt-4 text-gray-500" />
+                      )}
                     </button>
-                    <ErrorMessage name="password" component="div" className="text-red-500 text-sm mt-1" />
+                    <ErrorMessage
+                      name="password"
+                      component="div"
+                      className="text-red-500 text-sm mt-1"
+                    />
                   </div>
 
                   <div className="mb-4 relative">
@@ -185,27 +231,44 @@ const UserCreateAccount = () => {
                     />
                     <button
                       type="button"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      onClick={() =>
+                        setShowConfirmPassword(!showConfirmPassword)
+                      }
                       className="absolute right-3 top-3"
                     >
-                      {showConfirmPassword ? <EyeIcon className="h-5 w-5 mt-4 text-gray-500" /> : <EyeSlashIcon className="h-5 w-5 mt-4 text-gray-500" />}
+                      {showConfirmPassword ? (
+                        <EyeIcon className="h-5 w-5 mt-4 text-gray-500" />
+                      ) : (
+                        <EyeSlashIcon className="h-5 w-5 mt-4 text-gray-500" />
+                      )}
                     </button>
-                    <ErrorMessage name="confirmPassword" component="div" className="text-red-500 text-sm mt-1" />
+                    <ErrorMessage
+                      name="confirmPassword"
+                      component="div"
+                      className="text-red-500 text-sm mt-1"
+                    />
                   </div>
 
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className={`w-full bg-purple-${isSubmitting ? "300" : "500"} text-white p-3 rounded-lg hover:bg-purple-${isSubmitting ? "300" : "600"} mb-4`}
+                    className={`w-full bg-purple-${
+                      isSubmitting ? "300" : "500"
+                    } text-white p-3 rounded-lg hover:bg-purple-${
+                      isSubmitting ? "300" : "600"
+                    } mb-4`}
                   >
                     Send OTP
                   </button>
                 </Form>
               )}
             </Formik>
-          ) : ( // ⭐ Step 2: OTP Verification
+          ) : (
+            // Step 2: OTP Verification
             <div>
-              <label className="block mb-2 text-sm font-medium text-gray-700">Enter the 6-digit code sent to your Gmail:</label>
+              <label className="block mb-2 text-sm font-medium text-gray-700">
+                Enter the 6-digit code sent to your Gmail:
+              </label>
               <input
                 type="text"
                 maxLength={6}
@@ -220,12 +283,32 @@ const UserCreateAccount = () => {
               >
                 Verify & Continue
               </button>
-              <button
-                onClick={() => setOtpSent(false)}
-                className="text-blue-500 hover:underline text-sm"
-              >
-                Change Email
-              </button>
+
+              {/* 🔁 Resend OTP Section */}
+              <div className="flex justify-between items-center mb-4">
+                <button
+                  onClick={handleResendOTP}
+                  disabled={!canResend || resending}
+                  className={`text-sm font-medium ${
+                    canResend
+                      ? "text-blue-500 hover:underline"
+                      : "text-gray-400 cursor-not-allowed"
+                  }`}
+                >
+                  {resending
+                    ? "Resending..."
+                    : canResend
+                    ? "Resend OTP"
+                    : `Resend in ${resendTimer}s`}
+                </button>
+
+                <button
+                  onClick={() => setOtpSent(false)}
+                  className="text-sm text-gray-600 hover:text-blue-500"
+                >
+                  Change Email
+                </button>
+              </div>
             </div>
           )}
 

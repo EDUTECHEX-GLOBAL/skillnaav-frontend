@@ -6,6 +6,7 @@ import {
   FaCreditCard,
   FaSignOutAlt,
   FaIdCard,
+   FaBook,
 } from "react-icons/fa";
 
 const SchoolAdminSidebar = ({
@@ -76,6 +77,13 @@ const SchoolAdminSidebar = ({
             active={selectedTab === "profile"}
             onClick={() => setSelectedTab("profile")}
           />
+          <SidebarItem
+  label="Curriculum"
+  icon={<FaBook />}
+  active={selectedTab === "curriculum"}
+  onClick={() => setSelectedTab("curriculum")}
+/>
+
             </nav>
           </div>
 

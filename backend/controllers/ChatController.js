@@ -1,5 +1,8 @@
 const Chat = require("../models/webapp-models/ChatModel");
-const Userwebapp = require("../models/webapp-models/userModel"); // Import User model
+const Userwebapp = require("../models/webapp-models/userModel");
+// Assuming process.env variables are loaded in your entry file (e.g., server.js)
+const ADMIN_RECEIVER_ID = process.env.ADMIN_RECEIVER_ID;
+
 
 /**
  * ✅ Get chat messages between Admin & Partner for a specific internship
@@ -16,10 +19,31 @@ const getChatMessages = async (req, res) => {
         .json({ error: "Internship ID and Partner ID are required." });
     }
 
+    // 🛑 CRITICAL FIX: To ensure ALL messages in the thread are returned,
+    // we must check if the internship ID matches AND the message involves EITHER the partner OR the admin.
+    // If you're confident that all messages for this internship MUST be between the partner/admin, 
+    // the simpler filter below is more reliable.
+
+    // We'll keep the logic that ensures the messages belong to the thread (internship ID) 
+    // and that the calling partner is involved (sender or receiver).
+    // If the Admin's message is not being included, the most likely cause is an ID mismatch 
+    // or an issue with the OR query. We will test the ID mismatch theory.
+
+    const adminId = ADMIN_RECEIVER_ID; // Use the environment variable for the Admin ID in the fetch
+
     const messages = await Chat.find({
       internship: internshipId,
-      $or: [{ sender: partnerId }, { receiver: partnerId }],
+      // Check if the message is from the Partner, to the Partner, or involves the Admin
+      $or: [
+        { sender: partnerId },
+        { receiver: partnerId },
+        { sender: adminId },
+        { receiver: adminId }
+      ],
     }).sort({ createdAt: 1 });
+
+    // 💡 If the simple $or logic was failing, this expanded check should cover all cases.
+    // The previous logic was technically sufficient, so if this STILL fails, the IDs are mismatched.
 
     console.log(`✅ Found ${messages.length} messages for partnerId ${partnerId}`);
 
@@ -33,21 +57,31 @@ const getChatMessages = async (req, res) => {
   }
 };
 
+
 /**
- * ✅ Admin/Partner sends a new message
+ * ✅ Admin/Partner sends a new message (UPDATED: Receiver ID from .env)
  */
 const sendMessage = async (req, res) => {
-  const { internshipId, senderId, receiverId, message } = req.body;
+  // 🛑 Removed receiverId from destructuring. The client no longer sends it.
+  const { internshipId, senderId, message } = req.body;
+
+  // 💡 Server-side receiver resolution
+  const receiverId = ADMIN_RECEIVER_ID;
 
   try {
+    // 🛑 Added check for ADMIN_RECEIVER_ID
     if (!internshipId || !senderId || !receiverId || !message?.trim()) {
-      return res.status(400).json({ error: "All fields are required." });
+      // Log more helpful error if receiverId is missing
+      if (!receiverId) {
+        console.error("❌ ADMIN_RECEIVER_ID is not set in environment variables.");
+      }
+      return res.status(400).json({ error: "Missing one or more required fields (internshipId, senderId, message, or Admin ID)." });
     }
 
     const newMessage = await Chat.create({
       internship: internshipId,
       sender: senderId,
-      receiver: receiverId,
+      receiver: receiverId, // <-- Uses ID from environment variable
       message: message.trim(),
     });
 
@@ -67,22 +101,30 @@ const sendMessage = async (req, res) => {
   }
 };
 
+
 /**
- * ✅ Reply to an existing chat thread
- * (Essentially the same as sendMessage, but kept separate for clarity)
+ * ✅ Reply to an existing chat thread (UPDATED: Receiver ID from .env)
  */
 const sendReply = async (req, res) => {
-  const { internshipId, senderId, receiverId, message } = req.body;
+  // 🛑 Removed receiverId from destructuring.
+  const { internshipId, senderId, message } = req.body;
+
+  // 💡 Server-side receiver resolution
+  const receiverId = ADMIN_RECEIVER_ID;
 
   try {
+    // 🛑 Added check for ADMIN_RECEIVER_ID
     if (!internshipId || !senderId || !receiverId || !message?.trim()) {
-      return res.status(400).json({ error: "All fields are required." });
+      if (!receiverId) {
+        console.error("❌ ADMIN_RECEIVER_ID is not set in environment variables for reply.");
+      }
+      return res.status(400).json({ error: "Missing one or more required fields (internshipId, senderId, message, or Admin ID)." });
     }
 
     const newMessage = await Chat.create({
       internship: internshipId,
       sender: senderId,
-      receiver: receiverId,
+      receiver: receiverId, // <-- Uses ID from environment variable
       message: message.trim(),
     });
 
@@ -100,6 +142,8 @@ const sendReply = async (req, res) => {
       .json({ error: "Failed to send reply", details: err.message });
   }
 };
+
+
 
 /**
  * ✅ Get all messages for a specific internship (no partner filter)

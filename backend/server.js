@@ -83,6 +83,8 @@ const schoolAdminPaymentRoutes = require("./routes/webapp-routes/schoolAdmin/pay
 const schoolAdminLoginSessionRoutes = require("./routes/webapp-routes/schoolAdmin/LoginSessionRoutes");
 const stipendDetailsRoutes = require("./routes/webapp-routes/stipendDetailsRoutes");
 const assessmentRoutes = require("./routes/webapp-routes/assessmentRoutes");
+
+const curriculumRoutes = require("./routes/webapp-routes/schoolAdmin/curriculumRoutes");
 // ------------------- Use routes -------------------
 app.use("/api/upload", uploadRoutes);
 app.use("/api/users", userRoutes);
@@ -116,6 +118,8 @@ app.use("/api/school-admin/payments", schoolAdminPaymentRoutes);
 app.use("/api/sessions", schoolAdminLoginSessionRoutes);
 app.use("/api/internship/stipend-details", stipendDetailsRoutes);
 app.use("/api/assessments", assessmentRoutes);
+
+app.use("/api/curriculum", curriculumRoutes);
 
 // Example: Skill gap analysis proxy
 app.post("/analyze-skills", async (req, res) => {

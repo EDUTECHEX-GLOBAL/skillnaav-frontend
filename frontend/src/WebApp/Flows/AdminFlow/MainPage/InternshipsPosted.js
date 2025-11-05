@@ -91,8 +91,8 @@ const PartnerManagement = () => {
     }
   };
 
-  // Review / Chat
-  const handleReview = (internship) => {
+  // 🛑 RENAMED: Always allows opening the chat modal.
+  const handleOpenChat = (internship) => {
     setSelectedInternship(internship);
     setIsModalOpen(true);
   };
@@ -105,15 +105,40 @@ const PartnerManagement = () => {
     setSending(false);
   };
 
-  // Fetch chat messages
+  // Fetch chat messages (MODIFIED: Cache control for fresh data)
   useEffect(() => {
     const fetchMessages = async () => {
       if (!selectedInternship) return;
 
       try {
-        const response = await axios.get(`/api/chats/internship/${selectedInternship._id}`);
+        const response = await axios.get(`/api/chats/internship/${selectedInternship._id}`, {
+          // Force cache bypass to ensure we don't get 304 Not Modified
+          params: { t: Date.now() }
+        });
         const data = response.data;
+
+        // Find the admin ID from localStorage for isOwn check
+        const adminInfo = JSON.parse(localStorage.getItem("adminInfo"));
+        const adminId = adminInfo?.id;
+
         if (Array.isArray(data) && data.length > 0) {
+
+          // 💡 NEW: Check if the internship has been reviewed via chat history
+          // If the admin has sent at least one message, mark it as reviewed locally
+          const wasAdminSender = data.some(msg => msg.sender === adminId);
+
+          if (wasAdminSender && !selectedInternship.AdminReviewed) {
+            // Update local state to reflect review status based on chat history
+            setSelectedInternship(prev => ({ ...prev, AdminReviewed: true }));
+            setInternships(prev =>
+              prev.map(intern =>
+                intern._id === selectedInternship._id
+                  ? { ...intern, AdminReviewed: true }
+                  : intern
+              )
+            );
+          }
+
           setChatMessages(data);
           setChatError(null);
         } else {
@@ -122,85 +147,95 @@ const PartnerManagement = () => {
         }
       } catch (err) {
         setChatMessages([]);
-        setChatError("No messages yet. Start the conversation to review this internship.");
+        setChatError("Failed to load chat history. Start the conversation to review this internship.");
         console.error("Error fetching messages:", err);
       }
     };
-    fetchMessages();
-  }, [selectedInternship]);
 
-  // Enhanced message sending with Enter key support
-const handleSendMessage = async () => {
-  if (!newMessage.trim() || !selectedInternship || sending) return;
-
-  const messageText = newMessage.trim();
-  setNewMessage("");
-  setSending(true);
-
-  // Optimistic UI update
-  const adminInfo = JSON.parse(localStorage.getItem("adminInfo"));
-  
-  if (!adminInfo?.id) {
-    console.error("Admin ID not found");
-    setSending(false);
-    setNewMessage(messageText);
-    return;
-  }
-
-  const optimisticMessage = {
-    sender: adminInfo.id,
-    message: messageText,
-    timestamp: new Date(),
-    _id: Date.now()
-  };
-
-  setChatMessages((prev) => [...prev, optimisticMessage]);
-  setChatError(null);
-
-  try {
-    const messagePayload = {
-      internshipId: selectedInternship._id,
-      senderId: adminInfo.id,
-      receiverId: selectedInternship.partnerId,
-      message: messageText,
-    };
-
-    const response = await axios.post("/api/chats/send", messagePayload);
-
-    // Replace optimistic message with server response
-    setChatMessages((prev) => [
-      ...prev.slice(0, -1),
-      response.data
-    ]);
-
-    // Update internship review status using the correct endpoint
-    try {
-      await axios.post(`/api/interns/${selectedInternship._id}/review`);
-      
-      // Update local state to reflect the review status
-      setSelectedInternship((prev) => ({ ...prev, isAdminReviewed: true, AdminReviewed: true }));
-      setInternships((prev) => 
-        prev.map((intern) => 
-          intern._id === selectedInternship._id 
-            ? { ...intern, isAdminReviewed: true, AdminReviewed: true }
-            : intern
-        )
-      );
-    } catch (reviewError) {
-      console.error("Error marking internship as reviewed:", reviewError);
-      // Continue without failing the message send
+    // Use polling for near real-time updates (e.g., every 3 seconds)
+    if (isModalOpen) {
+      fetchMessages();
+      const intervalId = setInterval(fetchMessages, 3000);
+      return () => clearInterval(intervalId);
     }
 
-  } catch (err) {
-    console.error("Error sending message:", err.response?.data || err.message);
-    // Remove optimistic message on error
-    setChatMessages((prev) => prev.slice(0, -1));
-    setNewMessage(messageText);
-  } finally {
-    setSending(false);
-    messageInputRef.current?.focus();
-  }
-};
+  }, [selectedInternship, isModalOpen]);
+
+  // Enhanced message sending with Enter key support (MODIFIED: Use server-side receiver logic)
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || !selectedInternship || sending) return;
+
+    const messageText = newMessage.trim();
+    setNewMessage("");
+    setSending(true);
+
+    // Optimistic UI update
+    const adminInfo = JSON.parse(localStorage.getItem("adminInfo"));
+
+    if (!adminInfo?.id) {
+      console.error("Admin ID not found in localStorage. Cannot send message.");
+      setSending(false);
+      setNewMessage(messageText);
+      return;
+    }
+
+    const adminId = adminInfo.id;
+
+    const optimisticMessage = {
+      sender: adminId,
+      message: messageText,
+      timestamp: new Date(),
+      _id: Date.now()
+    };
+
+    setChatMessages((prev) => [...prev, optimisticMessage]);
+    setChatError(null);
+
+    try {
+      const messagePayload = {
+        internshipId: selectedInternship._id,
+        senderId: adminId,
+        receiverId: selectedInternship.partnerId, // Admin knows the receiver is the partner
+        message: messageText,
+      };
+
+      const response = await axios.post("/api/chats/send", messagePayload);
+
+      // Replace optimistic message with server response
+      setChatMessages((prev) => [
+        ...prev.slice(0, -1),
+        response.data
+      ]);
+
+      // 🛑 LOGIC FIX: Always mark as reviewed after sending a message if it hasn't been already.
+      if (!selectedInternship.AdminReviewed) {
+        try {
+          await axios.post(`/api/interns/${selectedInternship._id}/review`);
+
+          // Update local state to reflect the review status
+          setSelectedInternship((prev) => ({ ...prev, isAdminReviewed: true, AdminReviewed: true }));
+          setInternships((prev) =>
+            prev.map((intern) =>
+              intern._id === selectedInternship._id
+                ? { ...intern, isAdminReviewed: true, AdminReviewed: true }
+                : intern
+            )
+          );
+        } catch (reviewError) {
+          console.error("Error marking internship as reviewed:", reviewError);
+          // Continue without failing the message send
+        }
+      }
+    } catch (err) {
+      console.error("Error sending message:", err.response?.data || err.message);
+      // Remove optimistic message on error
+      setChatMessages((prev) => prev.slice(0, -1));
+      setNewMessage(messageText);
+    } finally {
+      setSending(false);
+      messageInputRef.current?.focus();
+    }
+  };
 
   // Handle Enter key press
   const handleKeyPress = (e) => {
@@ -218,14 +253,13 @@ const handleSendMessage = async () => {
     textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
   };
 
-  // Enhanced Message Bubble Component
+  // Enhanced Message Bubble Component (NO CHANGE NEEDED)
   const MessageBubble = ({ message, isOwn }) => (
     <div className={`flex mb-4 ${isOwn ? 'justify-end' : 'justify-start'}`}>
-      <div className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-sm ${
-        isOwn 
-          ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-br-md' 
+      <div className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-sm ${isOwn
+          ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-br-md'
           : 'bg-white text-gray-800 border border-gray-200 rounded-bl-md'
-      }`}>
+        }`}>
         <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{message.message}</p>
         <p className={`text-xs mt-2 ${isOwn ? 'text-blue-100' : 'text-gray-500'}`}>
           {new Date(message.timestamp).toLocaleTimeString([], {
@@ -237,7 +271,7 @@ const handleSendMessage = async () => {
     </div>
   );
 
-  // Delete internship
+  // Delete and Reject Modals (No change needed)
   const handleDeleteClick = (internship) => {
     setInternshipToDelete(internship);
     setIsDeleteModalOpen(true);
@@ -260,21 +294,19 @@ const handleSendMessage = async () => {
     setIsDeleteModalOpen(false);
     setInternshipToDelete(null);
   };
-
   const closeRejectModal = () => {
     setIsRejectModalOpen(false);
     setInternshipToReject(null);
     setComment("");
   };
 
-  // Sorting & Pagination
+  // Sorting & Pagination (No change needed)
   const sortInternships = (list) =>
     list.sort((a, b) => {
       const aValue = a[sortCriteria]?.toLowerCase() || "";
       const bValue = b[sortCriteria]?.toLowerCase() || "";
       return sortDirection === "asc" ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue);
     });
-
   const filteredInternships = internships.filter((i) => {
     const q = searchQuery.toLowerCase();
     return (
@@ -283,7 +315,6 @@ const handleSendMessage = async () => {
       (i.organization && i.organization.toLowerCase().includes(q))
     );
   });
-
   const indexOfLastInternship = currentPage * applicationsPerPage;
   const indexOfFirstInternship = indexOfLastInternship - applicationsPerPage;
   const currentInternships = sortInternships([...filteredInternships]).slice(
@@ -298,7 +329,7 @@ const handleSendMessage = async () => {
         Admin Dashboard - Internship Management
       </h2>
 
-      {/* Search */}
+      {/* Search and Sort... */}
       <div className="mb-4">
         <input
           type="text"
@@ -308,8 +339,6 @@ const handleSendMessage = async () => {
           className="p-2 border rounded-md w-full focus:outline-none focus:ring focus:ring-indigo-400"
         />
       </div>
-
-      {/* Sorting */}
       <div className="flex mb-4 space-x-4">
         <select
           value={sortCriteria}
@@ -368,11 +397,11 @@ const handleSendMessage = async () => {
                   </button>
 
                   <button
-                    className={`px-3 py-1 rounded-md text-white ${internship.AdminReviewed ? "bg-green-500 cursor-not-allowed" : "bg-indigo-500 hover:bg-indigo-700"}`}
-                    onClick={() => !internship.AdminReviewed && handleReview(internship)}
-                    disabled={internship.AdminReviewed}
+                    // 🛑 ALWAYS ENABLED: Allows ongoing chat/review
+                    className={`px-3 py-1 rounded-md text-white ${internship.AdminReviewed ? "bg-green-600 hover:bg-green-700" : "bg-indigo-500 hover:bg-indigo-700"}`}
+                    onClick={() => handleOpenChat(internship)}
                   >
-                    {internship.AdminReviewed ? "Reviewed" : "Review"}
+                    {internship.AdminReviewed ? "Chat (Reviewed)" : "Chat / Review"}
                   </button>
 
                   <button
@@ -395,7 +424,7 @@ const handleSendMessage = async () => {
         </table>
       </div>
 
-      {/* Pagination */}
+      {/* Pagination, Modals... (No changes in this block) */}
       <div className="flex justify-between mt-4">
         <button
           className="bg-gray-300 text-gray-700 rounded-md px-4 py-2 disabled:opacity-50"
@@ -416,7 +445,6 @@ const handleSendMessage = async () => {
         </button>
       </div>
 
-      {/* Modals */}
       {/* Delete Modal */}
       <Modal
         isOpen={isDeleteModalOpen}
@@ -549,11 +577,10 @@ const handleSendMessage = async () => {
               <button
                 onClick={handleSendMessage}
                 disabled={!newMessage.trim() || sending}
-                className={`p-3 rounded-2xl transition-all duration-200 ${
-                  newMessage.trim() && !sending
+                className={`p-3 rounded-2xl transition-all duration-200 ${newMessage.trim() && !sending
                     ? 'bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:shadow-xl'
                     : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                }`}
+                  }`}
               >
                 {sending ? (
                   <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full"></div>

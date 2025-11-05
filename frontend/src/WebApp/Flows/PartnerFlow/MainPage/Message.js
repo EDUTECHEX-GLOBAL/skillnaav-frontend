@@ -29,11 +29,10 @@ const InternshipCard = ({ internshipId, jobTitle, onClick, hasUnread = false }) 
 // Enhanced Message Bubble Component with improved styling
 const MessageBubble = ({ message, isOwn, timestamp }) => (
   <div className={`flex mb-4 ${isOwn ? 'justify-end' : 'justify-start'}`}>
-    <div className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-sm ${
-      isOwn 
-        ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-br-md' 
-        : 'bg-white text-gray-800 border border-gray-200 rounded-bl-md'
-    }`}>
+    <div className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-sm ${isOwn
+      ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-br-md'
+      : 'bg-white text-gray-800 border border-gray-200 rounded-bl-md'
+      }`}>
       <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{message.message}</p>
       <p className={`text-xs mt-2 ${isOwn ? 'text-blue-100' : 'text-gray-500'}`}>
         {new Date(message.timestamp || message.createdAt).toLocaleTimeString([], {
@@ -51,8 +50,8 @@ const TypingIndicator = () => (
     <div className="bg-gray-200 rounded-2xl px-4 py-3 rounded-bl-md">
       <div className="flex space-x-1">
         <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
       </div>
     </div>
   </div>
@@ -66,7 +65,7 @@ const ChatInterface = () => {
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [partnerId, setPartnerId] = useState(null);
-  const [adminId, setAdminId] = useState(null);
+  // Removed adminId state
   const [selectedInternshipId, setSelectedInternshipId] = useState(null);
   const [selectedInternshipTitle, setSelectedInternshipTitle] = useState("");
   const [showChat, setShowChat] = useState(false);
@@ -89,13 +88,11 @@ const ChatInterface = () => {
     }
   }, [showChat]);
 
-  // Load partnerId and adminId from localStorage
+  // Load only partnerId from localStorage
   useEffect(() => {
     const storedPartnerId = localStorage.getItem("partnerId");
-    const adminInfo = JSON.parse(localStorage.getItem("adminInfo"));
-
+    // Removed adminInfo parsing/adminId setting
     if (storedPartnerId) setPartnerId(storedPartnerId);
-    if (adminInfo?.id) setAdminId(adminInfo.id);
   }, []);
 
   // Fetch internships with loading state
@@ -142,7 +139,8 @@ const ChatInterface = () => {
 
   // Enhanced message sending with optimistic UI and better UX feedback
   const handleSend = async () => {
-    if (!input.trim() || !adminId || !partnerId || !selectedInternshipId || sending) return;
+    // 🛑 CRITICAL CHANGE: Only check for required data the client must send
+    if (!input.trim() || !partnerId || !selectedInternshipId || sending) return;
 
     const messageText = input.trim();
     setInput("");
@@ -163,7 +161,7 @@ const ChatInterface = () => {
       const newMessage = {
         internshipId: selectedInternshipId,
         senderId: partnerId,
-        receiverId: adminId,
+        // Removed receiverId: The backend will resolve the Admin ID using the environment variable.
         message: messageText,
       };
 
@@ -306,7 +304,7 @@ const ChatInterface = () => {
               <MessageBubble
                 key={msg._id || idx}
                 message={msg}
-                isOwn={msg.sender === partnerId}
+                isOwn={msg.sender === partnerId} // Correct display logic for P2P chat
                 timestamp={msg.timestamp || msg.createdAt}
               />
             ))}
@@ -339,11 +337,10 @@ const ChatInterface = () => {
             </div>
           </div>
           <button
-            className={`p-3 rounded-2xl transition-all duration-200 ${
-              input.trim() && !sending
-                ? 'bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:shadow-xl'
-                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-            }`}
+            className={`p-3 rounded-2xl transition-all duration-200 ${input.trim() && !sending
+              ? 'bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:shadow-xl'
+              : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              }`}
             onClick={handleSend}
             disabled={!input.trim() || sending}
           >
