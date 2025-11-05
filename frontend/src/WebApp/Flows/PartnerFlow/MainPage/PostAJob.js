@@ -3,6 +3,23 @@ import axios from "axios";
 
 import { useTabContext } from "./UserHomePageContext/HomePageContext";
 
+// --- ADD: US states & Canada provinces/territories ---
+const US_STATES = [
+  "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware",
+  "District of Columbia", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa",
+  "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota",
+  "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire", "New Jersey",
+  "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio", "Oklahoma", "Oregon",
+  "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota", "Tennessee", "Texas", "Utah",
+  "Vermont", "Virginia", "Washington", "West Virginia", "Wisconsin", "Wyoming"
+];
+
+const CA_PROVINCES = [
+  "Alberta", "British Columbia", "Manitoba", "New Brunswick", "Newfoundland and Labrador",
+  "Northwest Territories", "Nova Scotia", "Nunavut", "Ontario", "Prince Edward Island",
+  "Quebec", "Saskatchewan", "Yukon"
+];
+
 const COUNTRY_API_URL = "https://restcountries.com/v3.1/all";
 const CITY_API_URL = "https://wft-geo-db.p.rapidapi.com/v1/geo/cities";
 
@@ -23,14 +40,15 @@ const PostAJob = () => {
     companyName: "",
     sector: topSectors[0].id,
     city: "",
-    country: "",
+    country: "United States", // default to US (internships are US/CA only)
+    state: "",                // 🔸 NEW
     jobType: "Internship",
     jobDescription: "",
     startDate: "",
     endDateOrDuration: "",
     duration: "",
     internshipType: "FREE",
-    classification: "",   // 🔹 new field
+    classification: "",
     compensationDetails: {
       type: "FREE",
       amount: null,
@@ -56,6 +74,9 @@ const PostAJob = () => {
   const [userType, setUserType] = useState("");
   const [partnerInternships, setPartnerInternships] = useState([]);
   const [freemiumAlert, setFreemiumAlert] = useState("");
+  // --- ADD: derived list/labels for State/Province based on selected country ---
+  const stateList = formData.country === "Canada" ? CA_PROVINCES : US_STATES;
+  const stateLabel = formData.country === "Canada" ? "Province / Territory" : "State";
 
   // Load user plan and existing posts
   useEffect(() => {
@@ -103,19 +124,24 @@ const PostAJob = () => {
     async (q) => {
       if (!q) return setCitySuggestions([]);
       try {
+        const countryIds =
+          formData.country === "Canada" ? "CA" :
+            formData.country === "United States" ? "US" :
+              "US,CA";
+
         const resp = await axios.get(CITY_API_URL, {
           headers: {
             "X-RapidAPI-Key": "...",
             "X-RapidAPI-Host": "wft-geo-db.p.rapidapi.com",
           },
-          params: { namePrefix: q, limit: 10, minPopulation: 100000 },
+          params: { namePrefix: q, limit: 10, minPopulation: 100000, countryIds },
         });
         setCitySuggestions(resp.data.data);
       } catch (err) {
         console.error(err);
       }
     },
-    [],
+    [formData.country],
   );
   const handleCityInputChange = (e) => {
     const { value } = e.target;
@@ -237,8 +263,10 @@ const PostAJob = () => {
     setFormData({
       jobTitle: "",
       companyName: "",
+      sector: topSectors[0].id,
       city: "",
       country: "",
+      state: "",
       jobType: "Internship",
       jobDescription: "",
       startDate: "",
@@ -252,15 +280,13 @@ const PostAJob = () => {
         frequency: "MONTHLY",
       },
       qualifications: [],
-      contactInfo: {
-        name: "",
-        email: "",
-        phone: "",
-      },
+      contactInfo: { name: "", email: "", phone: "" },
       imgUrl: "",
       studentApplied: false,
       adminApproved: false,
       applicationOpen: true,
+      classification: "",
+      mode: "Online",
     });
     setPreviewUrl(null);
   };
@@ -274,7 +300,9 @@ const PostAJob = () => {
 
     const payload = {
       ...formData,
-      location: `${formData.city}, ${formData.country}`,
+      location: formData.state
+        ? `${formData.city}, ${formData.state}, ${formData.country}`
+        : `${formData.city}, ${formData.country}`,
       partnerId: pid,
     };
 
@@ -371,41 +399,74 @@ const PostAJob = () => {
           <label className="block text-gray-700 font-medium mb-2">
             Location
           </label>
-          <div className="flex space-x-4">
-            <input
-              type="text"
-              name="country"
-              value={formData.country}
-              onChange={handleCountryInputChange}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring focus:ring-teal-500"
-              placeholder="Start typing country name"
-              list="country-suggestions"
-              required
-            />
-            <datalist id="country-suggestions">
-              {countrySuggestions.map((country) => (
-                <option key={country.cca3} value={country.name.common}>
-                  {country.name.common}
-                </option>
-              ))}
-            </datalist>
 
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Country (US/CA only) */}
+            <div>
+              <label htmlFor="country" className="block text-gray-700 text-sm mb-1">Country *</label>
+              <select
+                id="country"
+                name="country"
+                value={formData.country}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setFormData((p) => ({ ...p, country: value, state: "" }));
+                  setCitySuggestions([]);
+                }}
+                required
+                className="w-full h-12 box-border p-3 border border-gray-300 rounded-lg bg-white text-gray-900
+               focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 focus:ring-offset-white"
+              >
+                <option value="">Select</option>
+                <option value="United States">United States</option>
+                <option value="Canada">Canada</option>
+              </select>
+            </div>
+
+            {/* State / Province */}
+            <div>
+              <label htmlFor="state" className="block text-gray-700 text-sm mb-1">{stateLabel} *</label>
+              <select
+                id="state"
+                name="state"
+                value={formData.state}
+                onChange={handleChange}
+                required
+                className="w-full h-12 box-border p-3 border border-gray-300 rounded-lg bg-white text-gray-900
+               focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 focus:ring-offset-white"
+              >
+                <option value="" disabled>Select</option>
+                {stateList.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* City with suggestions (country-filtered) */}
             <div className="relative">
+              <label htmlFor="city" className="block text-gray-700 text-sm mb-1">City *</label>
               <input
+                id="city"
                 type="text"
                 name="city"
                 value={formData.city}
                 onChange={handleCityInputChange}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring focus:ring-teal-500"
+                autoComplete="address-level2"
+                className="w-full h-12 box-border p-3 border border-gray-300 rounded-lg bg-white text-gray-900
+               focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 focus:ring-offset-white
+               relative z-[15]"
                 placeholder="Start typing city"
                 required
               />
 
               {citySuggestions.length > 0 && (
-                <ul className="absolute z-10 w-full max-h-48 mt-2 overflow-y-auto bg-white border border-gray-300 rounded-lg shadow-lg">
+                <ul
+                  className="absolute z-[20] left-0 top-full w-full mt-2 max-h-48 overflow-y-auto
+                 bg-white border border-gray-300 rounded-lg shadow-lg"
+                >
                   {citySuggestions.map((city) => (
                     <li
-                      key={city.id}
+                      key={city.wikiDataId || city.id || city.name}
                       className="px-4 py-2 cursor-pointer hover:bg-teal-50 hover:text-teal-700"
                       onClick={() => handleCitySelect(city.name)}
                     >

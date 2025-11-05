@@ -26,9 +26,10 @@ const userwebappSchema = new mongoose.Schema(
     country: { type: String },
     city: { type: String },
     postalCode: { type: String },
+    address: { type: String },
     currentGrade: { type: String },
     gradePercentage: { type: String },
-        adminApproved: {
+    adminApproved: {
       type: Boolean,
       default: false
     },
@@ -39,7 +40,7 @@ const userwebappSchema = new mongoose.Schema(
       enum: ["Pending", "Approved", "Rejected"],
       default: "Pending"
     },
-    
+
     isActive: { type: Boolean, default: false },
     isPremium: { type: Boolean, default: false },
     planType: {
