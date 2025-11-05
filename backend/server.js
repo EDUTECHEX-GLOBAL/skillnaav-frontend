@@ -17,6 +17,9 @@ dotenv.config();
 // ------------------- Initialize app -------------------
 const app = express();
 
+// ✅ Razorpay webhook must see the raw body (before JSON parser)
+app.use("/api/payments/razorpay-webhook", express.raw({ type: "application/json" }));
+
 // ------------------- Middleware -------------------
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -98,10 +101,6 @@ app.use("/api/applications", applicationRoutes);
 app.use("/api/savedJobs", savedJobRoutes);
 app.use("/api/personality", personalityRoutes);
 app.use("/api/payments", paymentRoutes);
-app.use(
-  "/api/payments/razorpay-webhook",
-  express.raw({ type: "application/json" })
-);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/google", googleRoutes);
 
@@ -123,13 +122,16 @@ app.use("/api/curriculum", curriculumRoutes);
 
 // Example: Skill gap analysis proxy
 app.post("/analyze-skills", async (req, res) => {
-  console.log("Received request:", req.body);
   try {
-    const response = await axios.post("/analyze-skills", req.body);
-    res.json(response.data);
+    const resp = await axios.post(
+      `${process.env.FASTAPI_BASE_URL}/analyze-skills`, // e.g., http://localhost:8003
+      req.body,
+      { timeout: 30000 }
+    );
+    res.json(resp.data);
   } catch (error) {
     console.error("Error from FastAPI:", error.response?.data || error.message);
-    res.status(500).json({ error: "Internal Server Error" });
+    res.status(502).json({ error: "Upstream service error" });
   }
 });
 
@@ -152,8 +154,9 @@ const server = http.createServer(app);
 // Attach socket.io
 const io = new Server(server, {
   cors: {
-    origin: "*", // put your frontend URL in prod
-    methods: ["GET", "POST"]
+    origin: process.env.FRONTEND_BASE_URL || "http://localhost:3000",
+    methods: ["GET", "POST"],
+    credentials: true
   }
 });
 

@@ -201,6 +201,25 @@ export default function InstructureDetailsView({
                                 <Field label="Start Time" value={item.availableStart} />
                                 <Field label="End Time" value={item.availableEnd} />
                                 <Field label="Timezone" value={item.timezone} />
+
+                                <Field
+                                    label="Preferable Time Slots (24 Hours format)"
+                                    value={
+                                        Array.isArray(item.preferableSlots) && item.preferableSlots.length
+                                            ? (
+                                                <ul className="list-disc list-inside space-y-1">
+                                                    {item.preferableSlots.map((slot, idx) => (
+                                                        <li key={idx}>
+                                                            {slot?.start && slot?.end
+                                                                ? `${slot.start} - ${slot.end}`
+                                                                : (slot?.start || slot?.end || null)}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            )
+                                            : null
+                                    }
+                                />
                             </div>
                         </section>
 
@@ -376,4 +395,4 @@ export default function InstructureDetailsView({
             )}
         </div>
     );
-}
+}   

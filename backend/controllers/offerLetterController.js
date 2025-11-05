@@ -103,6 +103,7 @@ const sendOfferLetter = async (req, res) => {
       name,
       email,
       position,
+      companyName: company,
       startDate: normalizedStart,
       sentDate: new Date(),
       status: 'Sent',

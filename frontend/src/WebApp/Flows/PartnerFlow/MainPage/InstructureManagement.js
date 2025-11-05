@@ -1,9 +1,10 @@
 // InstructureManagement.jsx
 import axios from "axios";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSearch, faPlus, faUserCheck } from "@fortawesome/free-solid-svg-icons";
 import InstructureDetailsView from "./InstructureDetailsView";
+import InstructorManagementedit from "./InstructorManagementedit";
 
 const inputCls =
     "w-full h-11 rounded-lg border border-gray-300 px-3 focus:outline-none focus:ring-2 focus:ring-teal-500 file:mr-3 file:rounded-md file:border-0 file:bg-gray-100 file:px-3 file:py-2.5";
@@ -78,9 +79,21 @@ const InstructureManagement = () => {
     const [payoutMethod, setPayoutMethod] = useState("ACH (US Bank)");
     const [tz, setTz] = useState("America/Los_Angeles");
     const [viewing, setViewing] = useState(null);
+    const [editing, setEditing] = useState(null);
+
+    // ADD: full-photo preview modal state
+    const [photoPreview, setPhotoPreview] = useState({
+        open: false,
+        src: "",
+        alt: "",
+    });
 
     // ADD near the top inside the component
     const [otpOpen, setOtpOpen] = useState(false);
+
+    // ADD: track overall availability times to control +Add Slot button
+    const [availStart, setAvailStart] = useState("");
+    const [availEnd, setAvailEnd] = useState("");
 
     // --- helper: safe initials when photo missing ---
     const avatarInitials = (i) => {
@@ -91,9 +104,34 @@ const InstructureManagement = () => {
         return a || (i?.email?.[0] || "?").toUpperCase();
     };
 
+    // ADD: helpers to open/close the image preview
+    const openPhoto = (src, alt = "") => setPhotoPreview({ open: true, src, alt });
+    const closePhoto = () => setPhotoPreview({ open: false, src: "", alt: "" });
+
     const [otpEmail, setOtpEmail] = useState("");
     const [otpCode, setOtpCode] = useState("");
     const [pendingFormData, setPendingFormData] = useState(null); // holds the prepared FormData
+    // Preferable time slots: array of { start: "HH:MM", end: "HH:MM" }
+    const [prefSlots, setPrefSlots] = useState([]);
+    // Refs for constraint validation bubbles (native, no window alert)
+    const startRef = useRef(null);
+    const endRef = useRef(null);
+    const prefStartRefs = useRef([]); // array of refs for each slot start
+    const prefEndRefs = useRef([]);   // array of refs for each slot end
+
+    const addPrefSlot = () => {
+        setPrefSlots((prev) => [...prev, { start: "", end: "" }]);
+    };
+
+    const updatePrefSlot = (idx, field, value) => {
+        setPrefSlots((prev) =>
+            prev.map((s, i) => (i === idx ? { ...s, [field]: value } : s))
+        );
+    };
+
+    const removePrefSlot = (idx) => {
+        setPrefSlots((prev) => prev.filter((_, i) => i !== idx));
+    };
 
     // Keep payout method valid for the selected country
     useEffect(() => {
@@ -131,6 +169,14 @@ const InstructureManagement = () => {
 
         fetchInstructors();
     }, []);
+
+    // ADD: close preview with Esc key
+    useEffect(() => {
+        if (!photoPreview.open) return;
+        const onKey = (e) => e.key === "Escape" && closePhoto();
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, [photoPreview.open]);
 
     // ADD: computed labels/placeholders
     const stateList =
@@ -170,23 +216,99 @@ const InstructureManagement = () => {
     }
 
     const handleSubmit = async (e) => {
-        e.preventDefault();
         setSubmitting(true);
+        // Let the browser validate required fields first (native popup)
+        const form = e.currentTarget;
+
+        // Clear any old custom validity on the weekday group so native checks don't get stuck
+        [...form.querySelectorAll('input[name="availableDays"]')]
+            .forEach(el => el.setCustomValidity(""));
+
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            setSubmitting(false);
+            return;
+        }
+        // Now stop default submit and proceed with your logic
+        e.preventDefault();
 
         try {
             const fd = new FormData(e.target);
+            // Enforce: at least one weekday must be selected
+            const availableDays = fd.getAll("availableDays");
+            if (availableDays.length === 0) {
+                const firstBox = e.currentTarget.querySelector('input[name="availableDays"]');
+                if (firstBox) {
+                    firstBox.setCustomValidity("Select at least one weekday.");
+                    firstBox.reportValidity();
+                }
+                setSubmitting(false);
+                return;
+            }
+            // Clear any previous custom validity messages
+            startRef.current?.setCustomValidity("");
+            endRef.current?.setCustomValidity("");
+            (prefStartRefs.current || []).forEach(el => el?.setCustomValidity(""));
+            (prefEndRefs.current || []).forEach(el => el?.setCustomValidity(""));
 
             // basic time validation
             const start = fd.get("availableStart");
             const end = fd.get("availableEnd");
             if (start && end && end <= start) {
-                alert("End Time must be after Start Time.");
+                endRef.current?.setCustomValidity("Availability window invalid: End Time must be AFTER Start Time (24-hour HH:MM).");
+                endRef.current?.reportValidity();
                 setSubmitting(false);
                 return;
             }
 
+            // --- NEW: validate preferable time slots ---
+            const cleanedSlots = (prefSlots || [])
+                .filter((s) => s.start && s.end) // only keep complete slots
+                .map((s) => ({ start: s.start, end: s.end }));
+
+            // Each slot: start < end
+            for (let i = 0; i < cleanedSlots.length; i++) {
+                const s = cleanedSlots[i];
+                if (!(s.start < s.end)) {
+                    const endEl = prefEndRefs.current[i];
+                    endEl?.setCustomValidity("End Time must be after Start Time for this slot.");
+                    endEl?.reportValidity();
+                    setSubmitting(false);
+                    return;
+                }
+                if (start && s.start < start) {
+                    const stEl = prefStartRefs.current[i];
+                    stEl?.setCustomValidity(`Slot ${i + 1}: Start Time must be on or AFTER overall Start Time (${start}).`);
+                    stEl?.reportValidity();
+                    setSubmitting(false);
+                    return;
+                }
+                if (end && s.end > end) {
+                    const enEl = prefEndRefs.current[i];
+                    enEl?.setCustomValidity(`Slot ${i + 1}: End Time must be on or BEFORE overall End Time (${end}).`);
+                    enEl?.reportValidity();
+                    setSubmitting(false);
+                    return;
+                }
+            }
+
+            // No overlaps: sort by start, ensure next.start >= prev.end
+            const sortedSlots = [...cleanedSlots].sort((a, b) =>
+                a.start.localeCompare(b.start)
+            );
+            for (let i = 1; i < sortedSlots.length; i++) {
+                if (sortedSlots[i].start < sortedSlots[i - 1].end) {
+                    const laterStart = sortedSlots[i].start;
+                    const laterIdx = cleanedSlots.findIndex(s => s.start === laterStart);
+                    const laterEl = prefStartRefs.current[laterIdx];
+                    laterEl?.setCustomValidity("Preferable Time Slots cannot overlap. Adjust this slot (24-hour HH:MM).");
+                    laterEl?.reportValidity();
+                    setSubmitting(false);
+                    return;
+                }
+            }
+
             // multi-value fields
-            const availableDays = fd.getAll("availableDays");     // ["Mon","Tue",...]
             const certificates = fd.getAll("certificates");       // [File, File, ...]
 
             // files
@@ -229,6 +351,9 @@ const InstructureManagement = () => {
                 availableStart: fd.get("availableStart"),
                 availableEnd: fd.get("availableEnd"),
                 timezone: fd.get("timezone"),
+
+                // --- NEW: include validated preferable slots ---
+                preferableSlots: cleanedSlots,   // <— ADD THIS LINE
 
                 rateType: fd.get("rateType"),
                 expectedRate: fd.get("expectedRate")
@@ -664,19 +789,48 @@ const InstructureManagement = () => {
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
 
                                         {/* Weekdays */}
-                                        <div className="flex flex-col">
+                                        <div className="flex flex-col md:col-span-3">
                                             <div className="relative">
                                                 <div className="absolute -top-2 left-0">
-                                                    <label className={labelCls}>Weekdays</label>
+                                                    <label className={labelCls}>Weekdays *</label>
                                                 </div>
-                                                <div className="mt-4 flex flex-wrap gap-2">
-                                                    {dayOpts.map((d) => (
-                                                        <label
-                                                            key={d}
-                                                            className="inline-flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-lg"
-                                                        >
-                                                            <input type="checkbox" name="availableDays" value={d} />
-                                                            <span className="text-sm">{d}</span>
+
+                                                {/* Full-width, tidy tiles; 2 cols on phones, 4 on small screens, 7 on md+ */}
+                                                <div
+                                                    role="group"
+                                                    aria-label="Weekdays"
+                                                    className="mt-6 grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-3"
+                                                >
+                                                    {dayOpts.map((d, idx) => (
+                                                        <label key={d} className="relative block">
+                                                            {/* real checkbox (accessible) */}
+                                                            <input
+                                                                type="checkbox"
+                                                                name="availableDays"
+                                                                value={d}
+                                                                className="peer absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                                                                onChange={(e) => {
+                                                                    const formEl = e.currentTarget.form;
+                                                                    if (!formEl) return;
+                                                                    const boxes = formEl.querySelectorAll('input[name="availableDays"]');
+                                                                    const anyChecked = Array.from(boxes).some(b => b.checked);
+                                                                    // clear any previous custom validity on all boxes
+                                                                    boxes.forEach(b => b.setCustomValidity(""));
+                                                                    // if user just unchecked the last remaining one, prime the message for submit
+                                                                    if (!anyChecked) {
+                                                                        e.currentTarget.setCustomValidity("Select at least one weekday.");
+                                                                    }
+                                                                }}
+                                                            />
+                                                            {/* visual tile */}
+                                                            <span
+                                                                className="flex h-12 items-center justify-center rounded-xl border border-gray-300 bg-white
+                       px-3 text-sm font-medium text-gray-800
+                       peer-checked:bg-teal-600 peer-checked:text-white peer-checked:border-teal-600
+                       peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-teal-500"
+                                                            >
+                                                                {d}
+                                                            </span>
                                                         </label>
                                                     ))}
                                                 </div>
@@ -684,15 +838,31 @@ const InstructureManagement = () => {
                                         </div>
 
                                         {/* Start Time */}
-                                        <div className="flex flex-col">
+                                        <div className="flex flex-col mt-5">
                                             <div className="relative">
                                                 <div className="absolute -top-2 left-0">
-                                                    <label className={labelCls}>Start Time</label>
+                                                    <label className={labelCls}>
+                                                        Start Time *{" "}
+                                                        <span className="text-sm text-gray-400 font-normal">(24 Hours Format)</span>
+                                                    </label>
                                                 </div>
+
                                                 <input
                                                     type="time"
                                                     name="availableStart"
                                                     className={inputCls + " mt-4"}
+                                                    ref={startRef}
+                                                    step="60"
+                                                    title="Use 24-hour time (HH:MM)"
+                                                    required
+                                                    value={availStart}
+                                                    onChange={(e) => {
+                                                        setAvailStart(e.target.value);
+                                                        // clear any previous errors tied to overall start or slot bounds
+                                                        startRef.current?.setCustomValidity("");
+                                                        (prefStartRefs.current || []).forEach((el) => el?.setCustomValidity(""));
+                                                        (prefEndRefs.current || []).forEach((el) => el?.setCustomValidity(""));
+                                                    }}
                                                 />
                                             </div>
                                         </div>
@@ -701,13 +871,121 @@ const InstructureManagement = () => {
                                         <div className="flex flex-col">
                                             <div className="relative">
                                                 <div className="absolute -top-2 left-0">
-                                                    <label className={labelCls}>End Time</label>
+                                                    <label className={labelCls}>
+                                                        End Time *{" "}
+                                                        <span className="text-sm text-gray-400 font-normal">(24 Hours Format)</span>
+                                                    </label>
                                                 </div>
+
                                                 <input
                                                     type="time"
                                                     name="availableEnd"
                                                     className={inputCls + " mt-4"}
+                                                    ref={endRef}
+                                                    step="60"
+                                                    title="Use 24-hour time (HH:MM)"
+                                                    required
+                                                    value={availEnd}
+                                                    onChange={(e) => {
+                                                        setAvailEnd(e.target.value);
+                                                        // clear any previous errors tied to overall end or slot bounds/overlaps
+                                                        endRef.current?.setCustomValidity("");
+                                                        (prefStartRefs.current || []).forEach((el) => el?.setCustomValidity(""));
+                                                        (prefEndRefs.current || []).forEach((el) => el?.setCustomValidity(""));
+                                                    }}
                                                 />
+                                            </div>
+                                        </div>
+
+                                        {/* Preferable Time Slots (must be within Start–End) */}
+                                        <div className="flex flex-col md:col-span-3 mt-3">
+                                            <div className="flex items-center justify-between">
+                                                <div className={sectionTitleCls}>Preferable Time Slots (optional)</div>
+                                                <button
+                                                    type="button"
+                                                    onClick={addPrefSlot}
+                                                    disabled={!availStart || !availEnd}  // <-- ADD: enable only after both are set
+                                                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-teal-500 to-cyan-600 text-white text-sm font-semibold shadow hover:from-teal-600 hover:to-cyan-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                                                >
+                                                    + Add Slot
+                                                </button>
+                                            </div>
+
+                                            <p className="text-xs text-gray-500 mt-1">
+                                                Add one or more time windows Within your overall <strong>"Start Time"</strong> and <strong>"End Time"</strong> Slots only.
+                                            </p>
+
+                                            <div className="mt-3 space-y-3">
+                                                {prefSlots.length === 0 ? (
+                                                    <div className="text-xs text-gray-500">
+                                                        No preferable slots added yet. Click <strong>Add Slot</strong> to create one. Before adding, ensure you have set both <strong>"Start Time"</strong> and <strong>"End Time"</strong>.
+                                                    </div>
+                                                ) : (
+                                                    prefSlots.map((s, idx) => (
+                                                        <div key={idx} className="grid grid-cols-1 md:grid-cols-7 gap-3 items-end">
+                                                            {/* Slot Start */}
+                                                            <div className="md:col-span-3 mt-4">
+                                                                <div className="relative">
+                                                                    <div className="absolute -top-2 left-0">
+                                                                        <label className={labelCls}>
+                                                                            Slot {idx + 1}: Start Time{" "}
+                                                                            <span className="text-sm text-gray-400 font-normal">(24 Hours Format)</span>
+                                                                        </label>
+                                                                    </div>
+                                                                    <input
+                                                                        type="time"
+                                                                        value={s.start}
+                                                                        onChange={(e) => {
+                                                                            (prefStartRefs.current[idx])?.setCustomValidity("");
+                                                                            (prefEndRefs.current[idx])?.setCustomValidity("");
+                                                                            updatePrefSlot(idx, "start", e.target.value);
+                                                                        }}
+                                                                        className={inputCls + " mt-4"}
+                                                                        ref={(el) => (prefStartRefs.current[idx] = el)}
+                                                                        step="60"
+                                                                        title="Use 24-hour time (HH:MM)"
+                                                                    />
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Slot End */}
+                                                            <div className="md:col-span-3">
+                                                                <div className="relative">
+                                                                    <div className="absolute -top-2 left-0">
+                                                                        <label className={labelCls}>
+                                                                            Slot {idx + 1}: End Time{" "}
+                                                                            <span className="text-sm text-gray-400 font-normal">(24 Hours Format)</span>
+                                                                        </label>
+                                                                    </div>
+                                                                    <input
+                                                                        type="time"
+                                                                        value={s.end}
+                                                                        onChange={(e) => {
+                                                                            (prefEndRefs.current[idx])?.setCustomValidity("");
+                                                                            (prefStartRefs.current[idx])?.setCustomValidity("");
+                                                                            updatePrefSlot(idx, "end", e.target.value);
+                                                                        }}
+                                                                        className={inputCls + " mt-4"}
+                                                                        ref={(el) => (prefEndRefs.current[idx] = el)}
+                                                                        step="60"
+                                                                        title="Use 24-hour time (HH:MM)"
+                                                                    />
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Remove */}
+                                                            <div className="md:col-span-1">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => removePrefSlot(idx)}
+                                                                    className="w-full px-3 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+                                                                >
+                                                                    Remove
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ))
+                                                )}
                                             </div>
                                         </div>
 
@@ -1025,6 +1303,7 @@ const InstructureManagement = () => {
                                         setOtpOpen(false);
                                         setOtpCode("");
                                         setPendingFormData(null);
+                                        setPrefSlots([]);
 
                                         alert("Instructor created successfully.");
                                     } catch (err) {
@@ -1054,6 +1333,59 @@ const InstructureManagement = () => {
                                 Resend code
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* EDIT Instructor Modal */}
+            {editing && (
+                <InstructorManagementedit
+                    open={Boolean(editing)}
+                    item={editing}
+                    onClose={() => setEditing(null)}
+                    onSaved={(updated) => {
+                        // Normalize id and update list in-place
+                        const updatedId = updated?._id || updated?.id;
+                        if (!updatedId) {
+                            setEditing(null);
+                            return;
+                        }
+                        setInstructors((prev) =>
+                            prev.map((x) =>
+                                ((x._id || x.id) === updatedId) ? { ...x, ...updated } : x
+                            )
+                        );
+                        setEditing(null);
+                        alert("Instructor updated successfully.");
+                    }}
+                />
+            )}
+
+            {/* ADD: Full-photo preview modal */}
+            {photoPreview.open && (
+                <div
+                    className="fixed inset-0 z-[70] bg-black/70 flex items-center justify-center p-4"
+                    onClick={closePhoto}
+                    role="dialog"
+                    aria-modal="true"
+                >
+                    <div
+                        className="relative max-w-5xl w-full"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <button
+                            type="button"
+                            onClick={closePhoto}
+                            className="absolute -top-10 right-0 text-white text-3xl leading-none"
+                            aria-label="Close image preview"
+                        >
+                            ×
+                        </button>
+                        <img
+                            src={photoPreview.src}
+                            alt={photoPreview.alt || "Instructor photo"}
+                            className="w-full max-h-[85vh] object-contain rounded-xl shadow-2xl bg-black"
+                        />
                     </div>
                 </div>
             )}
@@ -1088,8 +1420,18 @@ const InstructureManagement = () => {
                                         <img
                                             src={i.photo.url}
                                             alt={`${i.firstName || ""} ${i.lastName || ""}`}
-                                            className="w-12 h-12 rounded-full object-cover border border-gray-200 flex-shrink-0"
+                                            className="w-12 h-12 rounded-full object-cover border border-gray-200 flex-shrink-0 cursor-zoom-in"
                                             loading="lazy"
+                                            title="Click to enlarge"
+                                            role="button"
+                                            tabIndex={0}
+                                            onClick={() =>
+                                                openPhoto(i.photo.url, `${i.firstName || ""} ${i.lastName || ""}`)
+                                            }
+                                            onKeyDown={(e) => {
+                                                if (e.key === "Enter" || e.key === " ")
+                                                    openPhoto(i.photo.url, `${i.firstName || ""} ${i.lastName || ""}`);
+                                            }}
                                         />
                                     ) : (
                                         <div className="w-12 h-12 rounded-full bg-gray-200 text-gray-700 flex items-center justify-center font-semibold flex-shrink-0">
@@ -1124,6 +1466,15 @@ const InstructureManagement = () => {
                                         className="text-sm font-semibold text-blue-600 hover:underline cursor-pointer">
                                         View details
                                     </span>
+
+                                    {/* EDIT DETAILS button */}
+                                    <button
+                                        type="button"
+                                        onClick={() => { setIsAddOpen(false); setViewing(null); setEditing(i); }}
+                                        className="mt-1 block text-sm font-semibold text-amber-600 hover:underline"
+                                    >
+                                        Edit Details
+                                    </button>
 
                                     {/* NEW: red delete link in the list row */}
                                     <button

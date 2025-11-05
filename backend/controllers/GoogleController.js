@@ -65,16 +65,17 @@ const googleAuth = (req, res) => {
 
   const authUrl = oAuth2Client.generateAuthUrl({
     access_type: 'offline',
-    scope: [
-      'https://www.googleapis.com/auth/userinfo.email',
-      'https://www.googleapis.com/auth/calendar',
-      'https://www.googleapis.com/auth/calendar.events',
-      'openid'
-    ],
     prompt: 'consent',
     include_granted_scopes: true,
-    state: state,
-    response_type: 'code'
+    scope: [
+      'openid',
+      'https://www.googleapis.com/auth/userinfo.email',
+      'https://www.googleapis.com/auth/calendar',
+      'https://www.googleapis.com/auth/calendar.events'
+    ],
+    state,
+    response_type: 'code',
+    redirect_uri: GOOGLE_REDIRECT_URI
   });
 
   console.log('Generated auth URL with state:', state);
@@ -148,13 +149,24 @@ const googleCallback = async (req, res) => {
       throw new Error("Failed to retrieve user email from Google");
     }
 
-    // Store tokens with email
+    // Store tokens with email (preserve old refresh_token if Google didn't send one)
+    // Also stamp which OAuth client minted these tokens
+    const setFields = {
+      'tokens.access_token': tokens.access_token,
+      'tokens.expiry_date': tokens.expiry_date,
+      'tokens.scope': tokens.scope,
+      'tokens.token_type': tokens.token_type,
+      'tokens.id_token': tokens.id_token,
+      'tokens.client_id': GOOGLE_CLIENT_ID,
+      updatedAt: new Date()
+    };
+    if (tokens.refresh_token) {
+      setFields['tokens.refresh_token'] = tokens.refresh_token;
+    }
+
     const tokenDoc = await TokenModel.findOneAndUpdate(
       { email },
-      {
-        tokens,
-        updatedAt: new Date()
-      },
+      { $set: setFields },
       { upsert: true, new: true }
     );
 
@@ -225,6 +237,34 @@ const googleCallback = async (req, res) => {
 // Manual token exchange function
 const https = require('https');
 const querystring = require('querystring');
+
+// --- Transient error backoff helper ---
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function withRetry(op, { retries = 3, baseMs = 400 } = {}) {
+  let attempt = 0;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    try {
+      return await op();
+    } catch (e) {
+      const status = e?.code || e?.response?.status;
+      const reason =
+        e?.response?.data?.error?.errors?.[0]?.reason ||
+        e?.errors?.[0]?.reason ||
+        "";
+
+      const transient =
+        [429, 500, 502, 503, 504].includes(status) ||
+        /rateLimitExceeded|userRateLimitExceeded|backendError|internalError|timeout/i.test(String(reason));
+
+      if (!transient || attempt >= retries) throw e;
+
+      await sleep(Math.pow(2, attempt) * baseMs);
+      attempt++;
+    }
+  }
+}
 
 async function exchangeCodeForTokens(code) {
   const postData = querystring.stringify({
@@ -320,7 +360,7 @@ const createTestEvent = async (email) => {
 
     const response = await calendar.events.insert({
       calendarId: 'primary',
-      resource: testEvent
+      requestBody: testEvent
     });
 
     return {
@@ -443,27 +483,57 @@ async function upsertScheduleForStudent({
       return { success: false, message: `No Google auth for ${studentEmail}` };
     }
 
+    // Require a refresh token; without it we can’t refresh -> force re-link (and wipe stale token)
+    if (!studentToken.tokens.refresh_token) {
+      await TokenModel.deleteOne({ email: studentEmail }).catch(() => { });
+      setProgress(internshipId, studentEmail, {
+        phase: 'error',
+        code: 'NEED_REAUTH',
+        error: 'Missing refresh token. Please re-link Google Calendar.'
+      });
+      setTimeout(() => clearProgress(internshipId, studentEmail), 5 * 60 * 1000);
+      return { success: false, message: 'NEED_REAUTH' };
+    }
+
+    // If the stored token was minted by another OAuth client (e.g. OAuth Playground), force re-auth once
+    if (studentToken.tokens.client_id && studentToken.tokens.client_id !== GOOGLE_CLIENT_ID) {
+      await TokenModel.deleteOne({ _id: studentToken._id }).catch(() => { });
+      return { success: false, message: 'NEED_REAUTH: Token belongs to another OAuth client. Please re-link.' };
+    }
+
     // 1) Auth
     const oAuth2Client = new google.auth.OAuth2(
       GOOGLE_CLIENT_ID,
       GOOGLE_CLIENT_SECRET,
       GOOGLE_REDIRECT_URI
     );
-    oAuth2Client.setCredentials(studentToken.tokens);
+    oAuth2Client.setCredentials({
+      access_token: studentToken.tokens.access_token,
+      refresh_token: studentToken.tokens.refresh_token,
+      expiry_date: studentToken.tokens.expiry_date
+    });
 
-    // 🔄 Persist refreshed tokens automatically
+    // 🔄 Persist refreshed tokens automatically (never drop refresh_token if Google omits it)
     oAuth2Client.on('tokens', async (tokens) => {
       try {
-        if (tokens.access_token || tokens.refresh_token) {
-          await TokenModel.findOneAndUpdate(
-            { email: studentEmail },
-            { tokens: { ...studentToken.tokens, ...tokens }, updatedAt: new Date() },
-            { upsert: true }
-          );
-          console.log('🔄 Tokens refreshed & saved for', studentEmail);
-        }
+        const setFields = {
+          'tokens.client_id': GOOGLE_CLIENT_ID
+        };
+        if (tokens.access_token) setFields['tokens.access_token'] = tokens.access_token;
+        if (typeof tokens.expiry_date !== 'undefined') setFields['tokens.expiry_date'] = tokens.expiry_date;
+        if (tokens.scope) setFields['tokens.scope'] = tokens.scope;
+        if (tokens.token_type) setFields['tokens.token_type'] = tokens.token_type;
+        if (tokens.id_token) setFields['tokens.id_token'] = tokens.id_token;
+        // Only update refresh_token if Google actually sent one
+        if (tokens.refresh_token) setFields['tokens.refresh_token'] = tokens.refresh_token;
+
+        await TokenModel.updateOne(
+          { email: studentEmail },
+          { $set: setFields },
+          { upsert: true }
+        );
       } catch (e) {
-        console.warn('Failed to persist refreshed tokens:', e.message);
+        console.error('Token upsert error:', e);
       }
     });
 
@@ -496,7 +566,7 @@ async function upsertScheduleForStudent({
     const existing = [];
     let pageToken;
     do {
-      const resp = await calendar.events.list({
+      const resp = await withRetry(() => calendar.events.list({
         calendarId: 'primary',
         privateExtendedProperty: `internshipId=${String(internshipId)}`,
         timeMin: timeMin.toISOString(),
@@ -504,7 +574,7 @@ async function upsertScheduleForStudent({
         singleEvents: true,
         maxResults: 2500,
         pageToken,
-      });
+      }));
       existing.push(...(resp.data.items || []));
       pageToken = resp.data.nextPageToken;
     } while (pageToken);
@@ -529,7 +599,18 @@ async function upsertScheduleForStudent({
       } else if (typeof slot.date === 'string') {
         dateStr = slot.date.includes('T') ? slot.date.split('T')[0] : slot.date;
       } else {
-        throw new Error(`Invalid slot.date: ${slot.date}`);
+        errors.push({ key, code: 'BAD_INPUT', message: `Invalid slot.date: ${slot.date}` });
+        continue;
+      }
+
+      // Preflight validation to avoid throwing mid-run
+      if (!isValidDate(dateStr) || !isValidTime(slot.startTime) || !isValidTime(slot.endTime)) {
+        errors.push({
+          key,
+          code: 'BAD_INPUT',
+          message: `Invalid date/time for ${dateStr} ${slot.startTime}-${slot.endTime}`,
+        });
+        continue;
       }
 
       const startDateTime = createISTDateTime(dateStr, slot.startTime);
@@ -564,24 +645,58 @@ async function upsertScheduleForStudent({
 
       const body = withExtendedProps(baseEvent, { internshipId, slot });
 
-      // PATCH if exists; otherwise INSERT
+      // PATCH if exists; otherwise INSERT — with retry & Meet fallback
       const existingEvent = existingBySlotKey.get(key);
-      if (existingEvent) {
-        await calendar.events.patch({
-          calendarId: 'primary',
-          eventId: existingEvent.id,
-          requestBody: body,
-          conferenceDataVersion: body.conferenceData ? 1 : 0,
-        });
-        counts.updated += 1;
-      } else {
-        await calendar.events.insert({
-          calendarId: 'primary',
-          requestBody: body,
-          conferenceDataVersion: body.conferenceData ? 1 : 0,
-        });
-        counts.created += 1;
+
+      try {
+        if (existingEvent) {
+          // PATCH with retry; if Meet creation is blocked, retry without conferenceData
+          try {
+            const patchParams = { calendarId: 'primary', eventId: existingEvent.id, requestBody: body };
+            if (body.conferenceData) patchParams.conferenceDataVersion = 1;
+            await withRetry(() => calendar.events.patch(patchParams));
+          } catch (e) {
+            const msg = e?.response?.data?.error?.message || e.message || '';
+            if (/conferenceData|forbidden/i.test(msg) && body.conferenceData) {
+              const bodyNoConf = { ...body };
+              delete bodyNoConf.conferenceData;
+              await withRetry(() => calendar.events.patch({
+                calendarId: 'primary',
+                eventId: existingEvent.id,
+                requestBody: bodyNoConf,
+                // no conferenceDataVersion when not sending conferenceData
+              }));
+            } else {
+              throw e;
+            }
+          }
+          counts.updated += 1;
+        } else {
+          // INSERT with retry; Meet fallback if blocked
+          try {
+            const insertParams = { calendarId: 'primary', requestBody: body };
+            if (body.conferenceData) insertParams.conferenceDataVersion = 1;
+            await withRetry(() => calendar.events.insert(insertParams));
+          } catch (e) {
+            const msg = e?.response?.data?.error?.message || e.message || '';
+            if (/conferenceData|forbidden/i.test(msg) && body.conferenceData) {
+              const bodyNoConf = { ...body };
+              delete bodyNoConf.conferenceData;
+              await withRetry(() => calendar.events.insert({
+                calendarId: 'primary',
+                requestBody: bodyNoConf,
+                // no conferenceDataVersion when not sending conferenceData
+              }));
+            } else {
+              throw e;
+            }
+          }
+          counts.created += 1;
+        }
+      } catch (e) {
+        errors.push({ key, code: 'UPSERT_FAILED', message: e.message || String(e) });
       }
+
       // Publish live progress after this item
       setProgress(internshipId, studentEmail, {
         created: counts.created,
@@ -595,10 +710,11 @@ async function upsertScheduleForStudent({
     for (const [key, ev] of existingBySlotKey.entries()) {
       if (!seenKeys.has(key)) {
         try {
-          await calendar.events.delete({ calendarId: 'primary', eventId: ev.id });
+          await withRetry(() => calendar.events.delete({ calendarId: 'primary', eventId: ev.id }));
           counts.deleted += 1;
         } catch (e) {
-          console.warn('Delete old event failed:', e.message);
+          errors.push({ key, code: 'DELETE_FAILED', message: e.message || String(e) });
+          // keep going
         }
       }
     }
@@ -613,9 +729,34 @@ async function upsertScheduleForStudent({
       phase: "done"
     });
     setTimeout(() => clearProgress(internshipId, studentEmail), 5 * 60 * 1000);
-
     return { success: true, counts, errors };
+
   } catch (e) {
+    const resp = e?.response;
+    const status = resp?.status || e?.code;
+    const payload = `${resp?.data?.error || ''} ${resp?.data?.error_description || ''} ${e?.message || ''}`;
+
+    const isInvalidGrant =
+      (status === 400 && (/invalid[_-]grant/i.test(payload))) ||
+      /invalid[_-]grant/i.test(String(e));
+
+    const tokenAuthFail =
+      isInvalidGrant ||
+      status === 401 ||
+      /invalid[_-]?credentials|unauthorized|insufficient.*permissions/i.test(payload);
+
+    if (tokenAuthFail) {
+      // Wipe the bad token so the next attempt forces a clean re-auth
+      await TokenModel.deleteOne({ email: studentEmail }).catch(() => { });
+      setProgress(internshipId, studentEmail, {
+        phase: 'error',
+        code: 'NEED_REAUTH',
+        error: 'Google authorization expired or was revoked. Please re-link Google Calendar.'
+      });
+      setTimeout(() => clearProgress(internshipId, studentEmail), 5 * 60 * 1000);
+      return { success: false, message: 'NEED_REAUTH' };
+    }
+
     console.error('upsertScheduleForStudent error:', e);
     return { success: false, message: e.message };
   }
@@ -746,6 +887,10 @@ const checkAuthStatus = async (studentEmail) => {
         message: 'Authentication valid'
       };
     } catch (apiErr) {
+      // If token-based failure, wipe tokens so next attempt forces re-auth
+      if (apiErr?.code === 401 || apiErr?.response?.status === 401) {
+        await TokenModel.deleteOne({ email: studentEmail }).catch(() => { });
+      }
       return {
         authenticated: false,
         message: 'Authentication expired or invalid',
@@ -795,29 +940,38 @@ const updateScheduleInGoogleCalendar = async (req, res) => {
       return res.status(404).json({ success: false, message: "No schedule found" });
     }
 
-    const result = await upsertScheduleForStudent({
-      studentEmail,
-      internshipId,
-      timetable: scheduleDoc.timetable,
-      internshipTitle: scheduleDoc.internshipTitle || 'Internship Schedule',
-      defaultEventLink: scheduleDoc.defaultEventLink || ''
+    // Initialize live progress immediately so the UI can show totals
+    setProgress(internshipId, studentEmail, {
+      total: Array.isArray(scheduleDoc.timetable) ? scheduleDoc.timetable.length : 0,
+      created: 0, updated: 0, deleted: 0, synced: 0, phase: "working"
     });
 
-    // Map auth/invalid token conditions to 401 so the UI can re-auth
-    if (!result.success) {
-      const msg = String(result.message || '');
-      if (/auth|invalid_grant|unauthorized|token|No Google auth/i.test(msg)) {
-        return res.status(401).json({ success: false, message: msg || 'Authentication required' });
+    // Kick off the heavy work *after* responding, so we never hit the gateway timeout
+    setImmediate(async () => {
+      try {
+        const result = await upsertScheduleForStudent({
+          studentEmail,
+          internshipId,
+          timetable: scheduleDoc.timetable,
+          internshipTitle: scheduleDoc.internshipTitle || 'Internship Schedule',
+          defaultEventLink: scheduleDoc.defaultEventLink || ''
+        });
+
+        if (!result.success) {
+          const msg = String(result.message || 'Failed to update schedule');
+          setProgress(internshipId, studentEmail, { phase: "error", error: msg });
+          setTimeout(() => clearProgress(internshipId, studentEmail), 5 * 60 * 1000);
+        }
+        // On success, upsertScheduleForStudent already sets phase:"done" and clears later.
+      } catch (e) {
+        console.error('Async updateScheduleInGoogleCalendar failed:', e);
+        setProgress(internshipId, studentEmail, { phase: "error", error: String(e.message || e) });
+        setTimeout(() => clearProgress(internshipId, studentEmail), 5 * 60 * 1000);
       }
-      return res.status(500).json({ success: false, message: msg || 'Failed to update schedule' });
-    }
-
-    // Success
-    return res.json({
-      success: true,
-      counts: result.counts || null,
-      result
     });
+
+    // Return immediately so the proxy never times out
+    return res.status(202).json({ success: true, started: true });
   } catch (error) {
     console.error("Error updating schedule in calendar:", error);
     return res.status(500).json({ success: false, message: error.message });

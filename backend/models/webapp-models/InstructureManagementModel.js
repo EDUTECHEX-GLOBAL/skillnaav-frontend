@@ -1,4 +1,4 @@
-    // backend/models/webapp-models/InstructureManagementModel.js
+// backend/models/webapp-models/InstructureManagementModel.js
 const mongoose = require("mongoose");
 
 const fileSchema = new mongoose.Schema(
@@ -7,6 +7,24 @@ const fileSchema = new mongoose.Schema(
         originalName: String,
         mimeType: String,
         size: Number,
+    },
+    { _id: false }
+);
+
+// ADD: Sub-schema to store preferable time slots as 24-hour HH:MM strings
+const timeSlotSchema = new mongoose.Schema(
+    {
+        start: {
+            type: String,
+            trim: true,
+            // 24-hour "HH:MM"
+            match: [/^([01]\d|2[0-3]):[0-5]\d$/, "Use 24-hour time HH:MM"],
+        },
+        end: {
+            type: String,
+            trim: true,
+            match: [/^([01]\d|2[0-3]):[0-5]\d$/, "Use 24-hour time HH:MM"],
+        },
     },
     { _id: false }
 );
@@ -41,6 +59,10 @@ const InstructureSchema = new mongoose.Schema(
         availableDays: [{ type: String, trim: true }],
         availableStart: { type: String, trim: true }, // "HH:mm"
         availableEnd: { type: String, trim: true }, // "HH:mm"
+
+        // ADD: Preferable slots array
+        preferableSlots: { type: [timeSlotSchema], default: [] },
+
         timezone: { type: String, trim: true },
 
         // Compensation / Payout

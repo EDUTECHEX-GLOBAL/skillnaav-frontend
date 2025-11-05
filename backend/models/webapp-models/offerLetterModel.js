@@ -10,13 +10,13 @@ const offerLetterSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true },
   position: { type: String, required: true },
+  companyName: { type: String },
   startDate: { type: Date, required: true },
   internshipId: {
     type: mongoose.Schema.Types.ObjectId,
     required: true,
     ref: "Internship"
   },
-  companyName: String,
   location: String,
   duration: String,
   stipend: {
@@ -51,7 +51,7 @@ const offerLetterSchema = new mongoose.Schema({
     ref: "SchoolAdmin",
     default: null
   }
-  
+
 }, {
   timestamps: true // adds createdAt and updatedAt
 });
@@ -70,15 +70,15 @@ offerLetterSchema.virtual('paymentInfo', {
 });
 
 // ✅ Method to check if offer requires payment
-offerLetterSchema.methods.requiresPayment = async function() {
+offerLetterSchema.methods.requiresPayment = async function () {
   await this.populate('internshipId', 'internshipType compensationDetails');
   return this.internshipId?.internshipType === 'PAID';
 };
 
 // ✅ Method to check if payment is completed
-offerLetterSchema.methods.isPaymentCompleted = async function() {
+offerLetterSchema.methods.isPaymentCompleted = async function () {
   if (!this.paymentId) return false;
-  
+
   await this.populate('paymentId', 'status');
   return this.paymentId?.status === 'COMPLETED';
 };

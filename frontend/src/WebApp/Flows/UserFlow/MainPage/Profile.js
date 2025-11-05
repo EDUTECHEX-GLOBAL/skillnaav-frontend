@@ -22,6 +22,7 @@ const ProfileForm = () => {
     country: "",
     city: "",
     postalCode: "",
+    address: "",
     currentGrade: "",
     gradePercentage: "",
     profileImage: "",
@@ -63,24 +64,24 @@ const ProfileForm = () => {
           const { data } = await axios.get("/api/users/profile", config);
 
           setUser((prevUser) => ({
-  ...prevUser,
-  ...data,
-  password: "",
-  confirmPassword: "",
-  dob: isValidDate(data.dob)
-    ? new Date(data.dob).toISOString().split("T")[0]
-    : "",
-  profileImage: data.profileImage || prevUser.profileImage,
-  skills: Array.isArray(data.skills) && data.skills.filter(Boolean).length > 0 
-    ? data.skills.join(", ") 
-    : "",
-  interests: Array.isArray(data.interests) && data.interests.filter(Boolean).length > 0 
-    ? data.interests.join(", ") 
-    : "",
-  preferredLocations: Array.isArray(data.preferredLocations) && data.preferredLocations.filter(Boolean).length > 0 
-    ? data.preferredLocations.join(", ") 
-    : "",
-}));
+            ...prevUser,
+            ...data,
+            password: "",
+            confirmPassword: "",
+            dob: isValidDate(data.dob)
+              ? new Date(data.dob).toISOString().split("T")[0]
+              : "",
+            profileImage: data.profileImage || prevUser.profileImage,
+            skills: Array.isArray(data.skills) && data.skills.filter(Boolean).length > 0
+              ? data.skills.join(", ")
+              : "",
+            interests: Array.isArray(data.interests) && data.interests.filter(Boolean).length > 0
+              ? data.interests.join(", ")
+              : "",
+            preferredLocations: Array.isArray(data.preferredLocations) && data.preferredLocations.filter(Boolean).length > 0
+              ? data.preferredLocations.join(", ")
+              : "",
+          }));
 
         }
       } catch (error) {
@@ -134,18 +135,18 @@ const ProfileForm = () => {
         },
       };
 
-     const payload = {
-  ...user,
-  skills: user.skills
-    ? user.skills.split(",").map((s) => s.trim()).filter(Boolean)
-    : [],
-  interests: user.interests
-    ? user.interests.split(",").map((i) => i.trim()).filter(Boolean)
-    : [],
-  preferredLocations: user.preferredLocations
-    ? user.preferredLocations.split(",").map((l) => l.trim()).filter(Boolean)
-    : [],
-};
+      const payload = {
+        ...user,
+        skills: user.skills
+          ? user.skills.split(",").map((s) => s.trim()).filter(Boolean)
+          : [],
+        interests: user.interests
+          ? user.interests.split(",").map((i) => i.trim()).filter(Boolean)
+          : [],
+        preferredLocations: user.preferredLocations
+          ? user.preferredLocations.split(",").map((l) => l.trim()).filter(Boolean)
+          : [],
+      };
 
 
       const { data } = await axios.put("/api/users/profile", payload, config);
@@ -165,7 +166,7 @@ const ProfileForm = () => {
       console.error("Update error:", error);
       setErrorMessage(
         "Failed to update profile. " +
-          (error.response?.data?.message || "Unknown error")
+        (error.response?.data?.message || "Unknown error")
       );
     }
   };
@@ -193,6 +194,7 @@ const ProfileForm = () => {
     { label: "State", name: "state", type: "text" },
     { label: "City", name: "city", type: "text" },
     { label: "Postal Code", name: "postalCode", type: "text" },
+    { label: "Address", name: "address", type: "text" },
     { label: "Current Grade", name: "currentGrade", type: "text" },
     { label: "Grade Percentage", name: "gradePercentage", type: "text" },
   ];
@@ -214,7 +216,7 @@ const ProfileForm = () => {
 
         <form>
           {[{ level: 1, isOpen: isLevel1Open, toggle: setIsLevel1Open, fields: level1Fields },
-            { level: 2, isOpen: isLevel2Open, toggle: setIsLevel2Open, fields: level2Fields }].map(({ level, isOpen, toggle, fields }) => (
+          { level: 2, isOpen: isLevel2Open, toggle: setIsLevel2Open, fields: level2Fields }].map(({ level, isOpen, toggle, fields }) => (
             <div key={level}>
               <div className="flex items-center justify-between mt-6">
                 <h3 className="text-2xl font-semibold text-gray-800">
@@ -230,61 +232,89 @@ const ProfileForm = () => {
               </div>
               {isOpen && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-4">
-                  {fields.map(({ label, name, type, placeholder }) => (
-                    <div className="flex flex-col relative" key={name}>
-                      <label
-                        htmlFor={name}
-                        className="text-sm font-medium text-gray-600 mb-2"
-                      >
-                        {label}
-                      </label>
+                  {fields.map(({ label, name, type, placeholder }) => {
+                    // For Level 2, skip the "address" item here; we'll insert it right after "postalCode"
+                    if (level === 2 && name === "address") return null;
 
-       {(name === "password" || name === "confirmPassword") ? (
-  <div className="relative">
-    <input
-      type={
-        name === "password"
-          ? showPassword ? "text" : "password"
-          : showConfirm ? "text" : "password"
-      }
-      id={name}
-      name={name}
-      value={user[name]}
-      onChange={handleChange}
-      placeholder={placeholder}
-      className="px-4 py-2 border rounded-md w-full pr-10 mt-1"
-    />
-    <span
-      onClick={() =>
-        name === "password"
-          ? setShowPassword(!showPassword)
-          : setShowConfirm(!showConfirm)
-      }
-      className="absolute inset-y-0 right-3 flex items-center cursor-pointer"
-    >
-      {name === "password"
-        ? showPassword
-          ? <EyeSlashIcon className="h-5 w-5 text-gray-500" />
-          : <EyeIcon className="h-5 w-5 text-gray-500" />
-        : showConfirm
-        ? <EyeSlashIcon className="h-5 w-5 text-gray-500" />
-        : <EyeIcon className="h-5 w-5 text-gray-500" />}
-    </span>
-  </div>
-) : (
-  <input
-    type={type}
-    id={name}
-    name={name}
-    value={user[name]}
-    onChange={handleChange}
-    placeholder={placeholder}
-    className="px-4 py-2 border rounded-md"
-  />
-)}
+                    return (
+                      <React.Fragment key={name}>
+                        <div className="flex flex-col relative">
+                          <label
+                            htmlFor={name}
+                            className="text-sm font-medium text-gray-600 mb-2"
+                          >
+                            {label}
+                          </label>
 
-                    </div>
-                  ))}
+                          {(name === "password" || name === "confirmPassword") ? (
+                            <div className="relative">
+                              <input
+                                type={
+                                  name === "password"
+                                    ? (showPassword ? "text" : "password")
+                                    : (showConfirm ? "text" : "password")
+                                }
+                                id={name}
+                                name={name}
+                                value={user[name]}
+                                onChange={handleChange}
+                                placeholder={placeholder}
+                                className="px-4 py-2 border rounded-md w-full pr-10 mt-1"
+                              />
+                              <span
+                                onClick={() =>
+                                  name === "password"
+                                    ? setShowPassword(!showPassword)
+                                    : setShowConfirm(!showConfirm)
+                                }
+                                className="absolute inset-y-0 right-3 flex items-center cursor-pointer"
+                              >
+                                {name === "password"
+                                  ? (showPassword
+                                    ? <EyeSlashIcon className="h-5 w-5 text-gray-500" />
+                                    : <EyeIcon className="h-5 w-5 text-gray-500" />)
+                                  : (showConfirm
+                                    ? <EyeSlashIcon className="h-5 w-5 text-gray-500" />
+                                    : <EyeIcon className="h-5 w-5 text-gray-500" />)}
+                              </span>
+                            </div>
+                          ) : (
+                            <input
+                              type={type}
+                              id={name}
+                              name={name}
+                              value={user[name]}
+                              onChange={handleChange}
+                              placeholder={placeholder}
+                              className="px-4 py-2 border rounded-md"
+                            />
+                          )}
+                        </div>
+
+                        {/* ⬇️ Insert Address immediately after Postal Code for Level 2 */}
+                        {level === 2 && name === "postalCode" && (
+                          <div className="flex flex-col relative">
+                            <label
+                              htmlFor="address"
+                              className="text-sm font-medium text-gray-600 mb-2"
+                            >
+                              Address
+                            </label>
+                            <input
+                              type="text"
+                              id="address"
+                              name="address"
+                              value={user.address}
+                              onChange={handleChange}
+                              placeholder="Street address, Apt/Suite"
+                              className="px-4 py-2 border rounded-md"
+                              autoComplete="street-address"
+                            />
+                          </div>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
 
                   {/* Profile Image upload section */}
                   {level === 1 && (
