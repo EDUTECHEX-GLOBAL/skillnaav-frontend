@@ -21,6 +21,7 @@ const UserMainPageContent = () => {
   const [showUpgradePopup, setShowUpgradePopup] = useState(false);
   const [showPricingModal, setShowPricingModal] = useState(false);
   const [showChatbot, setShowChatbot] = useState(false);
+  const [assistDockOpen, setAssistDockOpen] = useState(false); // controls the half-cylinder dock reveal
 
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -165,6 +166,7 @@ const UserMainPageContent = () => {
       </Modal>
 
       {showChatbot ? (
+        /* EXPANDED CHATBOT: unchanged */
         <div className="fixed bottom-5 right-5 w-[360px] max-h-[80vh] z-50 shadow-xl rounded-lg bg-white border">
           <div className="flex items-center justify-between bg-red-600 text-white p-3 rounded-t-lg">
             <span className="font-semibold">Career Assistance</span>
@@ -180,16 +182,43 @@ const UserMainPageContent = () => {
           </div>
         </div>
       ) : (
-        <div
-          onClick={() => setShowChatbot(true)}
-          className="fixed bottom-5 right-5 z-50 cursor-pointer flex items-center gap-2 bg-white border shadow-md rounded-full px-4 py-2 hover:shadow-lg"
-        >
-          <div className="text-sm font-semibold text-red-600 leading-tight">
-            Career Assistance
+        <>
+          {/* HALF-CYLINDER DOCK: stuck to bottom-right edge */}
+          <button
+            type="button"
+            onClick={() => setAssistDockOpen((v) => !v)}
+            className="fixed bottom-5 right-0 z-50 h-14 w-12 bg-white border border-gray-300 border-r-0 shadow-md rounded-l-full flex items-center justify-center hover:shadow-lg"
+            aria-label={assistDockOpen ? "Hide Career Assistance" : "Show Career Assistance"}
+            title={assistDockOpen ? "Hide Career Assistance" : "Show Career Assistance"}
+          >
+            <span
+              className={`text-xl leading-none transition-transform ${assistDockOpen ? "" : "rotate-180"}`}
+              aria-hidden="true"
+            >
+              ❯
+            </span>
+          </button>
+
+          {/* CAREER ASSISTANCE PILL: slides out from the HALF-CYLINDER DOCK */}
+          <div
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowChatbot(true);
+              setAssistDockOpen(false);
+            }}
+            aria-hidden={!assistDockOpen}
+            className={`fixed bottom-5 right-16 z-50 cursor-pointer flex items-center gap-2 bg-white border shadow-md rounded-full h-14 px-4 py-2 hover:shadow-lg
+              transform-gpu transition-all duration-300 ease-out
+              ${assistDockOpen ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-20 pointer-events-none'}`}
+          >
+            <div className="text-sm font-semibold text-red-600 leading-tight">
+              Career Assistance
+            </div>
+            <img src={chatBotImage} alt="Bot Avatar" className="w-10 h-10 rounded-full border" />
           </div>
-          <img src={chatBotImage} alt="Bot Avatar" className="w-10 h-10 rounded-full border" />
-        </div>
+        </>
       )}
+
     </>
   );
 };
