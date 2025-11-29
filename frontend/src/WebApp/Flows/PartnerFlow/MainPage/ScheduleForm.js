@@ -302,6 +302,11 @@ const ScheduleForm = ({ internshipId, onClose }) => {
       return setError('Fill both start date and end date');
     }
 
+    // 🔴 NEW VALIDATION: end date cannot be before start date
+    if (endDate < startDate) {
+      return setError('End date cannot be before start date');
+    }
+
     if (!workHours || workHours.trim() === '') {
       return setError('Fill work hours before generating schedule');
     }

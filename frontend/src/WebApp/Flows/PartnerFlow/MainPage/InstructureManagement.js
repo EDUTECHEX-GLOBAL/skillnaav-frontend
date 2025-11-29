@@ -1415,12 +1415,12 @@ const InstructureManagement = () => {
                     <div className="space-y-3">
                         {filteredInstructors.map((i) => (
                             <div key={i._id || i.id} className="border rounded-xl p-4 flex items-start justify-between gap-4">
-                                <div className="flex items-start gap-3">
+                                <div className="flex items-start gap-3 self-stretch">
                                     {i?.photo?.url ? (
                                         <img
                                             src={i.photo.url}
                                             alt={`${i.firstName || ""} ${i.lastName || ""}`}
-                                            className="w-12 h-12 rounded-full object-cover border border-gray-200 flex-shrink-0 cursor-zoom-in"
+                                            className="w-12 h-12 rounded-full object-cover border border-gray-200 flex-shrink-0 cursor-zoom-in self-center"
                                             loading="lazy"
                                             title="Click to enlarge"
                                             role="button"
@@ -1434,7 +1434,7 @@ const InstructureManagement = () => {
                                             }}
                                         />
                                     ) : (
-                                        <div className="w-12 h-12 rounded-full bg-gray-200 text-gray-700 flex items-center justify-center font-semibold flex-shrink-0">
+                                        <div className="w-12 h-12 rounded-full bg-gray-200 text-gray-700 flex items-center justify-center font-semibold flex-shrink-0 self-center">
                                             {avatarInitials(i)}
                                         </div>
                                     )}
@@ -1460,30 +1460,31 @@ const InstructureManagement = () => {
                                         ) : null}
                                     </div>
                                 </div>
-                                <div className="text-right">
+                                <div className="flex flex-col items-end text-right gap-1">
                                     <span
                                         onClick={() => { setIsAddOpen(false); setViewing(i); }}
-                                        className="text-sm font-semibold text-blue-600 hover:underline cursor-pointer">
+                                        className="text-sm font-semibold text-blue-600 hover:underline cursor-pointer"
+                                    >
                                         View details
                                     </span>
 
-                                    {/* EDIT DETAILS button */}
                                     <button
                                         type="button"
                                         onClick={() => { setIsAddOpen(false); setViewing(null); setEditing(i); }}
-                                        className="mt-1 block text-sm font-semibold text-amber-600 hover:underline"
+                                        className="text-sm font-semibold text-amber-600 hover:underline"
                                     >
                                         Edit Details
                                     </button>
 
-                                    {/* NEW: red delete link in the list row */}
                                     <button
                                         type="button"
                                         onClick={() => { setIsAddOpen(false); setViewing({ ...i, __askDelete: true, __confirmOnly: true }); }}
-                                        className="mt-1 block text-sm font-semibold text-red-600 hover:underline">
+                                        className="text-sm font-semibold text-red-600 hover:underline"
+                                    >
                                         Delete Instructor
                                     </button>
                                 </div>
+
                             </div>
                         ))}
                     </div>
