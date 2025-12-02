@@ -11,7 +11,6 @@ import { HideLoading, SetSkillNaavData } from "./redux/rootSlice";
 import Admin from "./pages/Admin";
 import Login from "./pages/Admin/Login";
 
-
 import PricingPage from "./pages/PricingPage";
 import FeaturesPage from "./pages/FeaturesPage";
 import TeamPage from "./pages/TeamPage";
@@ -53,11 +52,17 @@ import SchoolAdminForgotPassword from "./WebApp/Flows/SchoolAdminFlow/SignUpLogi
 //  import InternshipDetail from "./WebApp/Flows/UserFlow/MainPage/InternshipDetail";
 import { TabProvider } from "./WebApp/Flows/UserFlow/MainPage/UserHomePageContext/HomePageContext";
 
+// ---- NEW IMPORTS for auth/refresh support ----
+// Create this small file earlier: src/lib/auth.js (in-memory store)
+// import { setAccessToken } from "./lib/auth"; // adjust path if different
+// Optionally, use the api axios wrapper everywhere in app
+// import api from "./lib/api"; // if you created the api wrapper
 
 function App() {
   const { skillnaavData, reloadData } = useSelector((state) => state.root);
   const dispatch = useDispatch();
 
+  // Fetch SkillNaav static data (unchanged)
   const getSkillNaavData = async () => {
     try {
       const response = await axios.get("/api/skillnaav/get-skillnaav-data");
@@ -74,6 +79,35 @@ function App() {
       getSkillNaavData();
     }
   }, [skillnaavData, reloadData]);
+
+  // ---- NEW: Try refresh on app start so components have an access token ----
+  // useEffect(() => {
+  //   (async () => {
+  //     try {
+  //       // Call refresh endpoint — browser will send httpOnly refresh cookie automatically
+  //       const res = await axios.post("/api/auth/refresh", {}, { withCredentials: true });
+
+  //       // server should return { accessToken: "..." } (or token)
+  //       const newToken = res?.data?.accessToken || res?.data?.token || null;
+
+  //       if (newToken) {
+  //         // Set in-memory token (api wrapper reads from this)
+  //         setAccessToken(newToken);
+
+  //         // Optional: persist raw token (NOT recommended long-term). If you do, keep it as raw string:
+  //         // localStorage.setItem('userToken', newToken);
+
+  //         // Optionally also set userInfo if server returns user
+  //         if (res.data.user) {
+  //           localStorage.setItem("userInfo", JSON.stringify(res.data.user));
+  //         }
+  //       }
+  //     } catch (err) {
+  //       // No active session — ignore, user remains logged out
+  //       // console.debug("No active refresh session:", err.message);
+  //     }
+  //   })();
+  // }, []); // run only once on mount
 
   return (
     <BrowserRouter>
@@ -98,7 +132,6 @@ function App() {
 /> */}
         <Route path="*" element={<Navigate to="/" replace />} />
 
-
         {/* Skillnaav Web App Routes */}
         {/* User Flow */}
         <Route path="/user" element={<UserFlow />} />
@@ -110,20 +143,14 @@ function App() {
         <Route path="/user-forgot-password" element={<UserforgotPassword />} />
         <Route path="/google-user-profileform" element={<GoogleUserProfileForm />} />
 
-
         <Route path="/skillnaav-analysis" element={<SkillnaavAnalysis />} />
-
-
 
         {/* Partner Flow */}
         <Route path="/partner" element={<PartnerFlow />} />
-        <Route path="/partner-create-account"
-          element={<PartnerCreateAccount />}
-        />
+        <Route path="/partner-create-account" element={<PartnerCreateAccount />} />
         <Route path="/partner/login" element={<PartnerLogin />} />
         <Route path="/partner-profile-form" element={<PartnerProfileForm />} />
-        <Route path="/partner-profile-picture" element={<PartnerProfilePicture />}
-        />
+        <Route path="/partner-profile-picture" element={<PartnerProfilePicture />} />
         <Route path="/partner-main-page" element={<PartnerMainPage />} />
 
         <Route path="/partner-forgot-password" element={<PartnerforgotPassword />} />
@@ -133,10 +160,7 @@ function App() {
         <Route path="/admin-create-account" element={<AdminCreateAccount />} />
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/admin-profile-form" element={<AdminProfileForm />} />
-        <Route
-          path="/admin-profile-picture"
-          element={<AdminProfilePicture />}
-        />
+        <Route path="/admin-profile-picture" element={<AdminProfilePicture />} />
         <Route path="/admin-main-page" element={<AdminMainPage />} />
 
         {/* School Admin Flow */}

@@ -4,6 +4,27 @@ const generateToken = require("../utils/generateToken");
 const notifyUser = require("../utils/notifyUser");
 const { profilePicUpload } = require('../utils/multer');
 const EmailVerification = require("../models/webapp-models/EmailVerificationModel");
+const LoginSession = require("../models/webapp-models/LoginSession")
+
+
+// helper: expire subscription if expiration date is in the past or now
+async function expireIfNeeded(user) {
+  if (!user) return false;
+
+  // normalize stored value to Date (handles string or Date)
+  const exp = user.premiumExpiration ? new Date(user.premiumExpiration) : null;
+
+  // if premiumExpiration exists and is a valid Date and <= now -> expire
+  if (exp && !isNaN(exp.getTime()) && exp.getTime() <= Date.now()) {
+    user.isPremium = false;
+    user.planType = "Free";
+    user.premiumExpiration = null;
+    await user.save();
+    return true;
+  }
+
+  return false;
+}
 
 // Get user profile
 const getUserProfile = asyncHandler(async (req, res) => {
@@ -14,13 +35,8 @@ const getUserProfile = asyncHandler(async (req, res) => {
     throw new Error("User not found");
   }
 
-  // Expiration check and update user premium fields
-  if (user.isPremium && user.premiumExpiration && user.premiumExpiration < new Date()) {
-    user.isPremium = false;
-    user.planType = "Free";
-    user.premiumExpiration = null;
-    await user.save();
-  }
+  // Expire if needed (uses normalized date check)
+  await expireIfNeeded(user);
 
   const userProfile = {
     _id: user._id,
@@ -54,6 +70,7 @@ const getUserProfile = asyncHandler(async (req, res) => {
 
   res.json(userProfile);
 });
+
 
 // Helper function to check required fields
 const areFieldsFilled = (fields) => fields.every((field) => field);
@@ -257,15 +274,13 @@ const cleanArray = (arr) =>
       ? arr.split(",").map((x) => x.trim()).filter(Boolean)
       : [];
 
-// Authenticate user (login) - UPDATED VERSION
+// Authenticate user (login) - UPDATED WITH SESSION ID
 const authUser = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
   const user = await Userwebapp.findOne({ email });
 
   if (user && await user.matchPassword(password)) {
-    // ✅ REMOVED: Rejection check - allow rejected users to login
-    // ✅ REMOVED: Pending approval check - allow pending users to login
 
     // Only check for school-admin restrictions
     if (user.schoolAdmin && !user.isActive) {
@@ -273,16 +288,20 @@ const authUser = asyncHandler(async (req, res) => {
       throw new Error("Your account has been restricted by your school administrator. Please contact them.");
     }
 
-    // 🔎 Expiration check
-    if (user.isPremium && user.premiumExpiration && user.premiumExpiration < new Date()) {
-      user.isPremium = false;
-      user.planType = "Free";
-      user.premiumExpiration = null;
-      await user.save();
-    }
+    // Expire if needed
+    await expireIfNeeded(user);
 
+    // Generate token
     const token = generateToken(user._id);
 
+    // 🔥 CREATE SESSION RECORD
+    const session = await LoginSession.create({
+      studentId: user._id,
+      schoolAdmin: user.schoolAdmin,
+      loginAt: new Date(),
+    });
+
+    // 🔥 Return session ID to frontend
     res.json({
       _id: user._id,
       name: user.name,
@@ -299,16 +318,19 @@ const authUser = asyncHandler(async (req, res) => {
       planType: user.planType,
       premiumExpiration: user.premiumExpiration,
       token,
+      sessionId: session._id,   // 👈 VERY IMPORTANT
       adminApproved: user.adminApproved,
       status: user.status,
-      // Add this field to easily check approval status in frontend
       isFullyApproved: user.status === "Approved" && user.adminApproved,
     });
+
   } else {
     res.status(400);
     throw new Error("Invalid email or password.");
   }
 });
+
+
 
 // Update user profile
 const updateUserProfile = asyncHandler(async (req, res) => {
@@ -456,34 +478,23 @@ const rejectUser = asyncHandler(async (req, res) => {
 
 // Get premium status
 const getPremiumStatus = asyncHandler(async (req, res) => {
-  try {
-    let user = await Userwebapp.findById(req.user._id);
+  let user = await Userwebapp.findById(req.user._id);
 
-    if (!user) {
-      res.status(404);
-      throw new Error('User not found');
-    }
-
-    // Expiration check and update user premium fields
-    if (user.isPremium && user.premiumExpiration && user.premiumExpiration < new Date()) {
-      user.isPremium = false;
-      user.planType = "Free";
-      user.premiumExpiration = null;
-      await user.save();
-    }
-
-    const statusData = {
-      isPremium: user.isPremium,
-      planType: user.planType,
-      premiumExpiration: user.premiumExpiration,
-    };
-
-    res.status(200).json(statusData);
-
-  } catch (error) {
-    console.error('Error fetching premium status:', error);
-    res.status(500).json({ message: 'Error fetching premium status' });
+  if (!user) {
+    res.status(404);
+    throw new Error('User not found');
   }
+
+  // Expire if needed
+  await expireIfNeeded(user);
+
+  const statusData = {
+    isPremium: user.isPremium,
+    planType: user.planType,
+    premiumExpiration: user.premiumExpiration,
+  };
+
+  res.status(200).json(statusData);
 });
 
 // Send verification code for signup

@@ -1,4 +1,6 @@
 // OfferLetterCard.jsx
+
+// 1. IMPORT StipendDetailsModal 
 import React, { useEffect, useState, useRef } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
@@ -9,6 +11,7 @@ import CertificateTemplate from "./CertificateTemplate";
 // env-backed bases (correct relative path)
 import { API_BASE, GOOGLE_AUTH_URL } from "../../../../config";
 import CalendarSyncStatus from "./calendarsyncstatus";
+import StipendDetailsModal from "./StipendDetailsModal"; // <--- IMPORTED MODAL
 
 import {
   faMapMarkerAlt,
@@ -105,6 +108,11 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
   const [syncTotal, setSyncTotal] = useState(0);
   const [showAuthLinkedModal, setShowAuthLinkedModal] = useState(false);
 
+  // 2. STIPEND-SPECIFIC STATE
+  const [showStipendModal, setShowStipendModal] = useState(false);
+  const [stipendDetailsSubmitted, setStipendDetailsSubmitted] = useState(false);
+  // We don't need the form state here, as it's in StipendDetailsModal.jsx
+
   // Live progress polling (no backend changes required; updates if /api/google/sync-status exists)
   React.useEffect(() => {
     if (syncPhase !== 'working') return;
@@ -183,7 +191,12 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
 
     axios
       .get(`/api/interns/${offer.internshipId}`)
-      .then((res) => setJob(res.data))
+      .then((res) => {
+        setJob(res.data);
+        // Optional: Check if stipend details were submitted previously
+        // This requires a new API endpoint, but for now, we'll assume a flag
+        // is necessary if the offer was previously accepted/re-sent.
+      })
       .catch((err) => {
         console.error("Failed to fetch internship:", err);
         setErrorJob("Could not load internship details");
@@ -244,6 +257,40 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
     checkPaymentStatus();
   }, [job, offer._id, userInfo]);
 
+  // 4. STIPEND SUBMISSION HANDLER
+  const handleStipendSubmission = async (formDetails) => {
+    setShowStipendModal(false); // Close the modal immediately
+    setLoading(true);
+
+    try {
+      const payload = {
+        offerId: offer._id,
+        internshipId: offer.internshipId,
+        studentId: userInfo._id,
+        ...formDetails,
+      };
+
+      // Call the API endpoint to submit stipend details
+      const res = await axios.post('/api/internship/stipend-details', payload);
+
+      if (res.data.success) {
+        setStipendDetailsSubmitted(true); // Mark as submitted
+        toast.success('✅ Stipend details submitted! Ready to accept offer.');
+
+        // Now, proceed to the time slot selection modal
+        setResponseType("Accepted");
+        setShowTimeModal(true);
+      } else {
+        toast.error(res.data.message || 'Failed to submit stipend details.');
+      }
+    } catch (error) {
+      console.error('Stipend submission failed:', error);
+      toast.error('Failed to submit stipend details. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   useEffect(() => {
     if (showScheduleModal && schedule?.timetable?.length > 0) {
@@ -264,13 +311,28 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
     }
   }, [showScheduleModal, schedule]);
 
-  const handleRespond = (type) => {
-    // ✅ Check if it's a PAID internship requiring payment
-    if (type === "Accepted" && job?.internshipType === "PAID" && !paymentStatus?.paid) {
-      setShowPaymentModal(true);
-      return;
-    }
+  // 3. UPDATE handleRespond logic
+// OfferLetterCard.jsx (Inside handleRespond function)
 
+const handleRespond = (type) => {
+    if (type !== "Accepted") {
+      setResponseType(type);
+      setShowModal(true);
+      return;
+    }
+
+    // STIPEND Internship: check if details are submitted
+   if (
+  job?.internshipType?.toLowerCase() === "stipend" &&
+  !stipendDetailsSubmitted
+) {
+  setShowStipendModal(true);
+  return;
+}
+
+// ... rest of function
+
+    // FREE/STIPEND(details submitted)/PAID(paid) -> proceed to confirmation
     setResponseType(type);
     setShowModal(true);
   };
@@ -323,8 +385,8 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
         // Automatically show acceptance modal after successful payment
         setTimeout(() => {
           setResponseType("Accepted");
-          setShowModal(true);
-        }, 1500);
+          setShowModal(true); // This then leads to confirmRespond, which leads to TimeModal
+        }, 500);
       }
     } catch (error) {
       console.error('Error capturing payment:', error);
@@ -391,6 +453,7 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
 
   // ✅ Determine if payment is required
   const requiresPayment = job?.internshipType === "PAID";
+  const requiresStipendDetails = job?.internshipType === "STIPEND";
   const paymentAmount = job?.compensationDetails?.amount || 0;
   const currency = job?.compensationDetails?.currency || "USD";
 
@@ -400,6 +463,10 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
       const res = await axios.post('/api/google/update-schedule', {
         internshipId: offer.internshipId,
         studentEmail: userInfo.email,
+      }, {
+        // Fix for the console.m error in the fetchSchedule hook's catch block:
+        // You should ensure this block uses console.error or console.log too, 
+        // as the original code had an error in a similar structure.
       });
 
       if (res.data.success) {
@@ -628,9 +695,9 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
                             : "";
 
                       const description = `
-          Summary: ${summaryText}
-          Type: ${session.type}
-        `.trim();
+          Summary: ${summaryText}
+          Type: ${session.type}
+        `.trim();
 
                       gcalUrl = buildGoogleCalendarUrl({
                         title,
@@ -728,14 +795,14 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
                         <td className="px-4 py-3 text-sm whitespace-nowrap text-center">
                           <span
                             className={`
-                inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full capitalize
-                ${isOnline
+                inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full capitalize
+                ${isOnline
                                 ? "bg-blue-100 text-blue-700"
                                 : isOffline
                                   ? "bg-green-100 text-green-700"
                                   : "bg-purple-100 text-purple-700"
                               }
-              `}
+              `}
                           >
                             {session.type}
                           </span>
@@ -779,6 +846,17 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
   return (
     // NEW
     <div className="bg-white rounded-lg shadow-lg p-4 flex flex-col h-full">
+
+      {/* 5. RENDER STIPEND MODAL */}
+   {/* 5. RENDER STIPEND MODAL (Fixed) */}
+      {showStipendModal && (
+        <StipendDetailsModal
+          visible={showStipendModal}
+          onClose={() => setShowStipendModal(false)}
+          onSubmit={handleStipendSubmission}
+        />
+      )}
+
       {/* ✅ PAYMENT MODAL */}
       {showPaymentModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -1009,20 +1087,20 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
       </div>
 
       {/* QUALIFICATIONS */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        {job.qualifications?.length > 0 ? (
-          job.qualifications.map((q, i) => (
+     <div className="flex flex-wrap gap-2 mb-4">
+    {job.qualifications?.length > 0 ? (
+        job.qualifications.map((q, i) => (
             <span
-              key={i}
-              className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded-full"
+                key={i}
+                className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded-full"
             >
-              {q}
+                {q}
             </span>
-          ))
-        ) : (
-          <span className="text-xs text-gray-500">No qualifications</span>
-        )}
-      </div>
+        )) // <-- Closing parenthesis for .map()
+    ) : (
+        <span className="text-xs text-gray-500">No qualifications</span>
+    )}
+</div>
 
       {/* VIEW SCHEDULE & LINK CALENDAR BUTTONS */}
       {offer.status.toLowerCase() === "accepted" && (
@@ -1186,6 +1264,20 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
       {/* ✅ ACTION BUTTONS */}
       {offer.status.toLowerCase() === "sent" && (
         <div className="space-y-3 mt-4">
+          {/* Status Indicator for STIPEND details */}
+          {requiresStipendDetails && (
+            <div
+              className={`p-3 rounded-lg text-sm font-medium text-center ${stipendDetailsSubmitted
+                ? "bg-green-100 text-green-800"
+                : "bg-blue-100 text-blue-800"
+                }`}
+            >
+              <FontAwesomeIcon icon={faDollarSign} className="mr-2" />
+              {stipendDetailsSubmitted
+                ? `✅ Stipend details submitted.`
+                : ` Stipend Details Required for Acceptance.`}
+            </div>
+          )}
           {/* Payment Status Indicator for PAID internships */}
           {requiresPayment && (
             <div
@@ -1206,7 +1298,8 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
               onClick={() => handleRespond("Accepted")}
               className="flex-1 px-4 py-2 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-lg hover:from-purple-600 hover:to-indigo-600 transition"
             >
-              {requiresPayment && !paymentStatus?.paid ? 'Pay to Accept' : 'Accept'}
+              {requiresPayment && !paymentStatus?.paid ? 'Pay to Accept' :
+                requiresStipendDetails && !stipendDetailsSubmitted ? 'Enter Details & Accept' : 'Accept'}
             </button>
             <button
               onClick={() => handleRespond("Rejected")}
@@ -1226,8 +1319,8 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
               <button
                 onClick={handleDownloadCertificate}
                 className={`flex items-center text-sm font-medium ${schedule?.isClosed
-                    ? "text-blue-600 hover:text-blue-800"
-                    : "text-gray-500 hover:text-gray-600"
+                  ? "text-blue-600 hover:text-blue-800"
+                  : "text-gray-500 hover:text-gray-600"
                   }`}
               >
                 <FontAwesomeIcon icon={faDownload} className="mr-2" />

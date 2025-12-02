@@ -7,7 +7,7 @@ import Loading from "../../../Warnings/Loading/Loading";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
 import { FcGoogle } from "react-icons/fc";
-import ForgotPasswordModal from "../SignUpLogin/UserforgotPassword"; 
+import ForgotPasswordModal from "../SignUpLogin/UserforgotPassword";
 import { auth, googleAuthProvider } from "../../../../config/Firebase"; // Firebase setup
 import { signInWithPopup } from "firebase/auth";
 import axios from "axios";
@@ -30,21 +30,21 @@ const UserLogin = () => {
     try {
       // Ensure account selection by setting `prompt`
       googleAuthProvider.setCustomParameters({ prompt: "select_account" });
-  
+
       // Open the Google sign-in popup
       const result = await signInWithPopup(auth, googleAuthProvider);
       const user = result.user;
-  
+
       // Obtain user token
       const token = await user.getIdToken();
-  
+
       // Store token and user info in localStorage
       localStorage.setItem("userToken", JSON.stringify(token));
       localStorage.setItem("userInfo", JSON.stringify(user));
       sessionStorage.setItem("userToken", JSON.stringify(token));
-  
+
       console.log("Google user:", user);
-  
+
       // Navigate to the main page
       navigate("/user-main-page");
     } catch (err) {
@@ -54,66 +54,60 @@ const UserLogin = () => {
       setLoading(false);
     }
   };
-  
 
-const handleSubmit = async (values, { setSubmitting }) => {
-  setError("");
-  setLoading(true);
-  try {
-    const config = {
-      headers: {
-        "Content-type": "application/json",
-      },
-    };
 
-    const { data } = await axios.post("/api/users/login", values, config);
-
-    if (!data || !data.token) {
-      throw new Error("Invalid response from server");
-    }
-
-    // 🧹 Clear any existing localStorage
-    localStorage.clear();
-
-    // 💾 Store auth data
-    localStorage.setItem("userToken", JSON.stringify(data.token));
-    localStorage.setItem("userInfo", JSON.stringify(data));
-
-    // ✅ Store schoolAdminId if present
-    if (data.schoolAdminId) {
-      localStorage.setItem("schoolAdminId", data.schoolAdminId);
-    }
-
-    // 🛠 Start login session
-    const sessionRes = await axios.post(
-      "/api/sessions/login",
-      {},
-      {
+  const handleSubmit = async (values, { setSubmitting }) => {
+    setError("");
+    setLoading(true);
+    try {
+      const config = {
         headers: {
-          Authorization: `Bearer ${data.token}`,
+          "Content-type": "application/json",
         },
+      };
+
+      const { data } = await axios.post("/api/users/login", values, config);
+
+      if (!data || !data.token) {
+        throw new Error("Invalid response from server");
       }
-    );
 
-    if (sessionRes?.data?.sessionId) {
-      localStorage.setItem("sessionId", sessionRes.data.sessionId);
+      // 🧹 Clear any existing localStorage
+      localStorage.clear();
+
+      // 💾 Store auth data
+      localStorage.setItem("userToken", JSON.stringify(data.token));
+      localStorage.setItem("userInfo", JSON.stringify(data));
+
+      // ✅ Store schoolAdminId if present
+      if (data.schoolAdminId) {
+        localStorage.setItem("schoolAdminId", data.schoolAdminId);
+      }
+
+      // 🛠 Start login session
+      const sessionRes = await axios.post(
+        "/api/sessions/login",
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${data.token}`,
+          },
+        }
+      );
+
+      if (sessionRes?.data?.sessionId) {
+        localStorage.setItem("sessionId", sessionRes.data.sessionId);
+      }
+
+      setLoading(false);
+      navigate("/user-main-page");
+    } catch (err) {
+      console.error("Login error:", err.response || err.message);
+      setError(err.response?.data?.message || "Something went wrong");
+      setLoading(false);
+      setSubmitting(false);
     }
-
-    setLoading(false);
-    navigate("/user-main-page");
-  } catch (err) {
-    console.error("Login error:", err.response || err.message);
-    setError(err.response?.data?.message || "Something went wrong");
-    setLoading(false);
-    setSubmitting(false);
-  }
-};
-
-
-
-  
-  
-
+  };
   return (
     <div className="flex flex-col lg:flex-row min-h-screen font-poppins">
       {/* Left Section (Image) */}

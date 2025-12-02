@@ -8,7 +8,7 @@ import SchoolAdminProfile from "./pages/SchoolAdminProfile";
 import SchoolAdminNavbar from "./pages/SchoolAdminNavbar";
 import SchoolAdminSidebar from "./pages/SchoolAdminSidebar";
 import UploadStudents from "./pages/UploadStudents";
-import CurriculumSetup from "./pages/CurriculumSetup";
+// import CurriculumSetup from "./pages/CurriculumSetup";
 
 
 const SchoolAdminDashboard = () => {
@@ -36,8 +36,8 @@ const SchoolAdminDashboard = () => {
         return <SchoolAdminProfile />;
       default:
         return <DashboardHome />;
-      case "curriculum":
-        return <CurriculumSetup />;
+      // case "curriculum":
+      //   return <CurriculumSetup />;
     }
   };
 

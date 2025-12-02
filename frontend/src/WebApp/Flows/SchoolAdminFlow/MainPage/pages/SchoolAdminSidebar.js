@@ -77,12 +77,12 @@ const SchoolAdminSidebar = ({
             active={selectedTab === "profile"}
             onClick={() => setSelectedTab("profile")}
           />
-          <SidebarItem
+          {/* <SidebarItem
   label="Curriculum"
   icon={<FaBook />}
   active={selectedTab === "curriculum"}
   onClick={() => setSelectedTab("curriculum")}
-/>
+/> */}
 
             </nav>
           </div>

@@ -3,27 +3,33 @@ const User = require("../models/webapp-models/userModel");
 
 cron.schedule("0 0 * * *", async () => {
   try {
-    const currentDate = new Date();
+    const now = new Date();
 
-    // Find users whose premiumExpiration date has passed
+    // Find ALL users whose premium has expired
     const expiredUsers = await User.find({
-      isPremium: true,
-      premiumExpiration: { $lte: currentDate }, // Check if expiration date is less than or equal to current date
+      premiumExpiration: { $lte: now }   // Only expiration date matters
     });
 
-    // Update isPremium to false for expired users
     if (expiredUsers.length > 0) {
-      const userIds = expiredUsers.map((user) => user._id);
+      const userIds = expiredUsers.map((u) => u._id);
+
       await User.updateMany(
         { _id: { $in: userIds } },
-        { isPremium: false, premiumExpiration: null } // Reset premium status and expiration date
+        {
+          $set: {
+            isPremium: false,
+            planType: "Free",
+            premiumExpiration: null
+          }
+        }
       );
 
-      console.log(`Updated ${expiredUsers.length} users' premium status to false.`);
+      console.log(`✔ Cron: Expired premium cleared for ${expiredUsers.length} users.`);
     } else {
-      console.log("No users with expired subscriptions found.");
+      console.log("✔ Cron: No expired users found.");
     }
+
   } catch (error) {
-    console.error("Error updating premium status:", error);
+    console.error("❌ Cron Error:", error);
   }
 });

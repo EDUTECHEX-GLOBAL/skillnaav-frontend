@@ -3,43 +3,57 @@ const asyncHandler = require("express-async-handler");
 const Userwebapp = require("../models/webapp-models/userModel");
 const Partnerwebapp = require("../models/webapp-models/partnerModel");
 
-// Middleware to authenticate both users and partners
 const authenticate = asyncHandler(async (req, res, next) => {
   let token;
 
   if (req.headers.authorization && req.headers.authorization.startsWith("Bearer")) {
+    token = req.headers.authorization.split(" ")[1];
+
     try {
-      // Get token from header
-      token = req.headers.authorization.split(" ")[1];
+      let decoded;
+      try {
+        decoded = jwt.verify(token, process.env.JWT_SECRET);
+      } catch (err) {
+        // Explicitly handle expired token
+        if (err.name === "TokenExpiredError") {
+          return res.status(401).json({
+            success: false,
+            message: "Token expired",
+            code: "TOKEN_EXPIRED",
+            expiredAt: err.expiredAt,
+          });
+        }
+        // Other JWT errors
+        return res.status(401).json({
+          success: false,
+          message: "Not authorized, token invalid",
+          code: "TOKEN_INVALID",
+        });
+      }
 
-      // Verify token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-      // Try to find user first
+      // Try find user first
       let user = await Userwebapp.findById(decoded.id).select("-password");
-      
-      // If not a user, try to find partner
+
+      // If not a user, try partner
+      let isPartner = false;
       if (!user) {
         user = await Partnerwebapp.findById(decoded.id).select("-password");
-        if (user) {
-          req.isPartner = true; // Flag to indicate this is a partner
-        }
+        if (user) isPartner = true;
       }
 
       if (!user) {
-        return res.status(401).json({ message: "Not authorized" });
+        return res.status(401).json({ success: false, message: "Not authorized", code: "NOT_FOUND" });
       }
 
       req.user = user;
+      req.isPartner = isPartner;
       next();
     } catch (error) {
-      console.error(error);
-      res.status(401).json({ message: "Not authorized, token failed" });
+      console.error("Auth middleware error:", error);
+      return res.status(401).json({ success: false, message: "Not authorized", code: "AUTH_ERROR" });
     }
-  }
-
-  if (!token) {
-    res.status(401).json({ message: "Not authorized, no token" });
+  } else {
+    return res.status(401).json({ success: false, message: "Not authorized, no token", code: "NO_TOKEN" });
   }
 });
 
