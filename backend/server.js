@@ -86,6 +86,8 @@ const schoolAdminPaymentRoutes = require("./routes/webapp-routes/schoolAdmin/pay
 const schoolAdminLoginSessionRoutes = require("./routes/webapp-routes/schoolAdmin/LoginSessionRoutes");
 const stipendDetailsRoutes = require("./routes/webapp-routes/stipendDetailsRoutes");
 const assessmentRoutes = require("./routes/webapp-routes/assessmentRoutes");
+const feedback = require("./routes/webapp-routes/feedbackRoutes");
+const feedbackSummary = require('./routes/webapp-routes/feedbackSummary');
 
 const curriculumRoutes = require("./routes/webapp-routes/schoolAdmin/curriculumRoutes");
 // ------------------- Use routes -------------------
@@ -117,6 +119,9 @@ app.use("/api/school-admin/payments", schoolAdminPaymentRoutes);
 app.use("/api/sessions", schoolAdminLoginSessionRoutes);
 app.use("/api/internship/stipend-details", stipendDetailsRoutes);
 app.use("/api/assessments", assessmentRoutes);
+app.use("/api/feedback", feedback);
+app.use('/api/feedback', feedbackSummary);
+
 
 app.use("/api/curriculum", curriculumRoutes);
 

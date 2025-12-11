@@ -43,6 +43,9 @@ const UserLogin = () => {
       localStorage.setItem("userInfo", JSON.stringify(user));
       sessionStorage.setItem("userToken", JSON.stringify(token));
 
+      // --- RECORD LOGIN TIME (used by feedback gating) ---
+      localStorage.setItem("loginTime", Date.now());
+
       console.log("Google user:", user);
 
       // Navigate to the main page
@@ -54,7 +57,6 @@ const UserLogin = () => {
       setLoading(false);
     }
   };
-
 
   const handleSubmit = async (values, { setSubmitting }) => {
     setError("");
@@ -98,6 +100,9 @@ const UserLogin = () => {
       if (sessionRes?.data?.sessionId) {
         localStorage.setItem("sessionId", sessionRes.data.sessionId);
       }
+
+      // --- RECORD LOGIN TIME (used by feedback gating) ---
+      localStorage.setItem("loginTime", Date.now());
 
       setLoading(false);
       navigate("/user-main-page");
@@ -209,14 +214,6 @@ const UserLogin = () => {
             <span className="px-3 text-gray-500">OR</span>
             <hr className="w-full border-gray-300" />
           </div>
-          {/* Google Sign-In Button
-          <button
-            onClick={() => login()}
-            className="w-full bg-red-500 text-white p-3 rounded-lg hover:bg-red-600 mb-4 flex items-center justify-center space-x-2"
-          >
-            <FcGoogle className="text-xl" />
-            <span>Sign in with Google</span>
-          </button> */}
 
           {/* Google Sign-In Button */}
           <button

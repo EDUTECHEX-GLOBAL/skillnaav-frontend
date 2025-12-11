@@ -8,21 +8,118 @@ import {
   faEnvelope,
   faSignOutAlt,
   faFileAlt,
-  faMoneyBillWave, // ✅ New Icon for Stipend
-  faUsers,        // ✅ New Icon for Instructors
+  faMoneyBillWave,
+  faUsers,
 } from "@fortawesome/free-solid-svg-icons";
 import { useTabContext } from "./UserHomePageContext/HomePageContext";
 import { useNavigate } from "react-router-dom";
+import { useFeedback } from "../../../../context/FeedbackContext";
+import { partnerFlowQuestions } from "../../../../components/FeedbackModal/questionSets";
+
+import axios from "axios";
 
 const Sidebar = ({ isOpen, onClose }) => {
   const { handleSelectTab } = useTabContext();
   const navigate = useNavigate();
   const [selectedTab, setSelectedTab] = React.useState("your-job-posts");
 
+  // Feedback context (partner flow)
+  const { openFeedback } = useFeedback();
+
+  // performLogout declared first (avoids TDZ)
+  const performLogout = async () => {
+    const sessionId = localStorage.getItem("sessionId");
+    const token = (() => {
+      try {
+        return JSON.parse(localStorage.getItem("userToken"));
+      } catch {
+        return null;
+      }
+    })();
+
+    if (sessionId && token) {
+      try {
+        await axios.post(
+          "/api/sessions/logout",
+          { sessionId },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      } catch (err) {
+        console.warn("Logout session API failed:", err?.response?.data || err?.message || err);
+        // continue with client-side cleanup
+      }
+    }
+
+    try {
+      localStorage.removeItem("sessionId");
+      localStorage.removeItem("userToken");
+      localStorage.removeItem("userInfo");
+      localStorage.removeItem("token"); // in case partner login saved `token`
+      localStorage.removeItem("partnerId");
+      localStorage.removeItem("adminApproved");
+      // keep other app-wide keys intact
+    } catch (err) {
+      console.warn("LocalStorage cleanup error:", err);
+    }
+
+    navigate("/partner/login");
+  };
+
+  // logout flow with 1-minute gating + feedback check (partner)
+ // make sure partnerFlowQuestions is imported at top
+const handleLogoutTrigger = async () => {
+  // --- NEW: enforce 1 minute since login before showing feedback modal ---
+  const loginTime = Number(localStorage.getItem("loginTime"));
+  const oneMinutePassed = !isNaN(loginTime) && (Date.now() - loginTime >= 60000);
+
+  if (!oneMinutePassed) {
+    // Less than 1 minute since login → skip feedback and logout immediately
+    return performLogout();
+  }
+  // --- END login gating ---
+
+  const sessionUser = JSON.parse(localStorage.getItem("userInfo")) || null;
+  const userId = sessionUser?._id;
+
+  // If userId missing, open feedback with null user and perform logout in callback
+  if (!userId) {
+    openFeedback({
+      flow: "partner",
+      questions: partnerFlowQuestions,
+      triggerInfo: { type: "logout", page: window.location.pathname },
+      user: null,
+      postSubmitCallback: () => performLogout(),
+    });
+    return;
+  }
+
+  try {
+    const resp = await axios.get("/api/feedback/check", {
+      params: { userId, flow: "partner" },
+    });
+
+    if (resp.data?.alreadySubmitted) {
+      performLogout();
+      return;
+    }
+  } catch (err) {
+    console.warn("Feedback check failed, opening modal");
+  }
+
+  openFeedback({
+    flow: "partner",
+    questions: partnerFlowQuestions,
+    triggerInfo: { type: "logout", page: window.location.pathname },
+    user: sessionUser,
+    postSubmitCallback: () => performLogout(),
+  });
+};
+
+
+
   const handleTabClick = (tab) => {
     if (tab === "logout") {
-      localStorage.removeItem("userInfo");
-      navigate("/partner/login");
+      handleLogoutTrigger();
     } else {
       setSelectedTab(tab);
       handleSelectTab(tab);
@@ -36,9 +133,9 @@ const Sidebar = ({ isOpen, onClose }) => {
     { id: "post-a-job", label: "Post An Internship", icon: faPlus },
     { id: "messages", label: "Messages", icon: faEnvelope },
     { id: "applications", label: "Applications", icon: faFileAlt },
-    { id: "instructors", label: "Instructor Management", icon: faUsers }, // ✅ NEW
+    { id: "instructors", label: "Instructor Management", icon: faUsers },
     { id: "offer-templates", label: "Offer Templates", icon: faFileAlt },
-    { id: "stipend-details", label: "Stipend Details", icon: faMoneyBillWave }, // ✅ NEW
+    { id: "stipend-details", label: "Stipend Details", icon: faMoneyBillWave },
     { id: "profile", label: "Profile", icon: faUser },
   ];
 

@@ -18,6 +18,8 @@ import logo from "../../../../assets-webapp/Skillnaav-logo.png";
 import { useTabContext } from "./UserHomePageContext/HomePageContext";
 import { useNavigate } from "react-router-dom";
 
+
+
 const navItems = [
   { key: "home", icon: faHome, label: "Dashboard" },
   { key: "user-management", icon: faUsers, label: "User Management" },
@@ -31,6 +33,7 @@ const Sidebar = ({ isSidebarOpen, setSidebarOpen }) => {
   const [tab, setTab] = useState("home");
   const [partnerOpen, setPartnerOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false); // ✅ New state
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const { handleSelectTab } = useTabContext();
   const nav = useNavigate();
 
@@ -162,6 +165,80 @@ const Sidebar = ({ isSidebarOpen, setSidebarOpen }) => {
                 </ul>
               )}
             </li>
+
+            {/* ✅ Feedback Management */}
+<li>
+  <button
+    onClick={() => setFeedbackOpen((v) => !v)}
+    className="flex items-center justify-between w-full p-2 rounded-lg text-gray-700 hover:bg-gray-100"
+  >
+    <span className="flex items-center">
+      <FontAwesomeIcon icon={faClipboardList} className="w-5 h-5 mr-3" />
+      <p className="font-medium">Feedback Management</p>
+    </span>
+    <FontAwesomeIcon
+      icon={faChevronDown}
+      className={`${feedbackOpen ? "rotate-180" : ""} transform`}
+    />
+  </button>
+
+  {feedbackOpen && (
+    <ul className="ml-6 mt-1 space-y-2">
+      <li>
+        <button
+          onClick={() => clickTab("feedback-list")}
+          className={`flex items-center w-full p-2 rounded-lg font-medium ${
+            tab === "feedback-list"
+              ? "bg-blue-100 text-blue-600"
+              : "text-gray-700 hover:bg-gray-100"
+          }`}
+        >
+          All Feedback
+        </button>
+      </li>
+
+      <li>
+        <button
+          onClick={() => clickTab("user-feedback")}
+          className={`flex items-center w-full p-2 rounded-lg font-medium ${
+            tab === "user-feedback"
+              ? "bg-blue-100 text-blue-600"
+              : "text-gray-700 hover:bg-gray-100"
+          }`}
+        >
+          User Feedback
+        </button>
+      </li>
+
+      <li>
+        <button
+          onClick={() => clickTab("partner-feedback")}
+          className={`flex items-center w-full p-2 rounded-lg font-medium ${
+            tab === "partner-feedback"
+              ? "bg-blue-100 text-blue-600"
+              : "text-gray-700 hover:bg-gray-100"
+          }`}
+        >
+          Partner Feedback
+        </button>
+      </li>
+
+      <li>
+        <button
+          onClick={() => clickTab("school-feedback")}
+          className={`flex items-center w-full p-2 rounded-lg font-medium ${
+            tab === "school-feedback"
+              ? "bg-blue-100 text-blue-600"
+              : "text-gray-700 hover:bg-gray-100"
+          }`}
+        >
+          School Admin Feedback
+        </button>
+      </li>
+    </ul>
+  )}
+</li>
+
 
             {/* Remaining Nav Items */}
             {navItems.slice(2).map(({ key, icon, label }) => (

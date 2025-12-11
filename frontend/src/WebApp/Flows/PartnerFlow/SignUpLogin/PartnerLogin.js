@@ -38,8 +38,11 @@ const PartnerLogin = () => {
       localStorage.setItem("partnerId", data._id);
       console.log("Partner ID:", data._id);
       localStorage.setItem("userInfo", JSON.stringify(data));
+
+      // --- RECORD LOGIN TIME (used by feedback gating) ---
+      localStorage.setItem("loginTime", Date.now().toString());
+      // ---------------------------------------------------
       
-  
       setLoading(false);
       navigate("/partner-main-page");
     } catch (err) {
@@ -53,9 +56,6 @@ const PartnerLogin = () => {
     }
   };
   
-  
-  
-
   return (
     <div className="flex flex-col lg:flex-row min-h-screen font-poppins">
       {/* Left Section */}

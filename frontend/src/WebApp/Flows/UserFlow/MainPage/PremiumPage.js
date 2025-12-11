@@ -14,31 +14,37 @@ function PremiumPage() {
 
   // Fetch premium status on mount and sync localStorage & state
   useEffect(() => {
-    const fetchPremiumStatus = async () => {
-      try {
-        const token = JSON.parse(localStorage.getItem("userToken"));
-        if (!token) return;
-        const { data } = await axios.get("/api/users/premium-status", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+   const fetchPremiumStatus = async () => {
+  try {
+    const token = JSON.parse(localStorage.getItem("userToken"));
+    if (!token) return;
 
-        const storedUserInfo = JSON.parse(localStorage.getItem("userInfo")) || {};
+    const { data } = await axios.get("/api/users/premium-status", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
 
-        // Update localStorage with fresh premium info
-        const updatedUserInfo = {
-          ...storedUserInfo,
-          isPremium: data.isPremium,
-          planType: data.planType,
-          premiumExpiration: data.premiumExpiration,
-        };
-        localStorage.setItem("userInfo", JSON.stringify(updatedUserInfo));
+    if (data.success && data.user) {
+      const storedUserInfo = JSON.parse(localStorage.getItem("userInfo")) || {};
 
-        setIsPremium(data.isPremium);
-        setPlanType(data.planType || "Free");
-      } catch (err) {
-        console.error("Failed to fetch premium status:", err);
-      }
-    };
+      const updatedUser = {
+        ...storedUserInfo,
+        isPremium: data.user.isPremium,
+        planType: data.user.planType,
+        premiumExpiration: data.user.premiumExpiration,
+      };
+
+      localStorage.setItem("userInfo", JSON.stringify(updatedUser));
+      setIsPremium(data.user.isPremium);
+      setPlanType(data.user.planType);
+    } else {
+      setIsPremium(false);
+      setPlanType("Free");
+    }
+  } catch (err) {
+    console.error("Failed to fetch premium status:", err);
+  }
+};
+
 
     fetchPremiumStatus();
   }, []);

@@ -1,26 +1,35 @@
-import React, { useState, useRef, useEffect } from "react";
+// Navbar.jsx (updated & cleaned)
+import React, { useEffect, useRef, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faUser,
   faSignOutAlt,
   faBell,
   faBars,
-  faCrown,
-  faAt,
+  faCrown
 } from "@fortawesome/free-solid-svg-icons";
 import logo from "../../../../assets-webapp/Skillnaav-logo.png";
 import { useTabContext } from "./UserHomePageContext/HomePageContext";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
+// Feedback Context (clean: removed feedbackOpen)
+import { useFeedback } from "../../../../context/FeedbackContext";
+import { userFlowQuestions } from "../../../../components/FeedbackModal/questionSets";
+
 const Navbar = ({ onToggleSidebar }) => {
   const { handleSelectTab } = useTabContext();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
+
   const [userInfo, setUserInfo] = useState({ name: "", email: "", profileImage: "" });
   const [planType, setPlanType] = useState("Free");
   const [unreadCount, setUnreadCount] = useState(0);
+  const [isPremium, setIsPremium] = useState(false);
+
+  // From Feedback Context
+  const { openFeedback } = useFeedback();
 
   useEffect(() => {
     const storedUserInfo = JSON.parse(localStorage.getItem("userInfo"));
@@ -30,11 +39,11 @@ const Navbar = ({ onToggleSidebar }) => {
 
       const studentId = storedUserInfo._id;
 
-      // Fetch Notifications
+      /* Fetch Notifications */
       const fetchNotifications = async () => {
         try {
           const { data } = await axios.get(`/api/notifications/${studentId}`);
-          if (data.success) {
+          if (data?.success) {
             const unread = data.notifications.filter((n) => !n.isRead).length;
             setUnreadCount(unread);
           }
@@ -43,23 +52,31 @@ const Navbar = ({ onToggleSidebar }) => {
         }
       };
 
-      // Fetch Latest Premium Status
+      /* Fetch Premium Status */
       const fetchPremiumStatus = async () => {
         try {
           const token = JSON.parse(localStorage.getItem("userToken"));
-          const { data } = await axios.get(`/api/users/premium-status`, {
+          if (!token) return;
+
+          const { data } = await axios.get("/api/users/premium-status", {
             headers: { Authorization: `Bearer ${token}` },
           });
 
-          // After fetching premium-status
-          setPlanType(data.isPremium ? data.planType : "Free"); // Only show if actually premium
+          if (!data?.user) return;
 
-          // Update localStorage correctly
-          localStorage.setItem(
-            "userInfo",
-            JSON.stringify({ ...storedUserInfo, isPremium: data.isPremium, planType: data.planType, premiumExpiration: data.premiumExpiration })
-          );
+          const storedUser = JSON.parse(localStorage.getItem("userInfo")) || {};
 
+          const updatedUser = {
+            ...storedUser,
+            isPremium: data.user.isPremium,
+            planType: data.user.planType,
+            premiumExpiration: data.user.premiumExpiration,
+          };
+
+          localStorage.setItem("userInfo", JSON.stringify(updatedUser));
+
+          setIsPremium(data.user.isPremium);
+          setPlanType(data.user.planType);
         } catch (err) {
           console.error("Failed to fetch premium status:", err);
         }
@@ -70,10 +87,10 @@ const Navbar = ({ onToggleSidebar }) => {
     }
   }, []);
 
-
   const handleUserClick = () => setIsDropdownOpen(!isDropdownOpen);
 
-  const handleLogout = async () => {
+  /* ---- performLogout declared first (prevents TDZ) ---- */
+  const performLogout = async () => {
     const sessionId = localStorage.getItem("sessionId");
     const token = JSON.parse(localStorage.getItem("userToken"));
 
@@ -83,10 +100,7 @@ const Navbar = ({ onToggleSidebar }) => {
           "/api/sessions/logout",
           { sessionId },
           {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
+            headers: { Authorization: `Bearer ${token}` },
           }
         );
       } catch (error) {
@@ -98,13 +112,61 @@ const Navbar = ({ onToggleSidebar }) => {
     navigate("/user/login");
   };
 
+  /* Logout flow with Feedback (now includes 1-minute gating + safe callback) */
+ const handleLogoutTrigger = async () => {
+    // --- NEW: enforce 1 minute since login before showing feedback modal ---
+    const loginTime = Number(localStorage.getItem("loginTime"));
+    const oneMinutePassed = !isNaN(loginTime) && (Date.now() - loginTime >= 60000);
+
+    if (!oneMinutePassed) {
+      // Less than 1 minute since login → skip feedback and logout immediately
+      return performLogout();
+    }
+    // --- END login gating ---
+
+    const sessionUser = JSON.parse(localStorage.getItem("userInfo")) || null;
+    const userId = sessionUser?._1d || sessionUser?._id; // attempt safe read for different shapes
+
+    // If userId missing, open feedback with null user and perform logout in callback
+    if (!userId) {
+      openFeedback({
+        flow: "user",
+        questions: userFlowQuestions,
+        triggerInfo: { type: "logout", page: window.location.pathname },
+        user: null,
+        postSubmitCallback: () => performLogout(),
+      });
+      return;
+    }
+
+    try {
+      const resp = await axios.get("/api/feedback/check", {
+        params: { userId, flow: "user" },
+      });
+
+      if (resp.data?.alreadySubmitted) {
+        performLogout();
+        return;
+      }
+    } catch (err) {
+      console.warn("Feedback check failed, opening modal");
+    }
+
+    openFeedback({
+      flow: "user",
+      questions: userFlowQuestions,
+      triggerInfo: { type: "logout", page: window.location.pathname },
+      user: sessionUser,
+      postSubmitCallback: () => performLogout(),
+    });
+  };
+
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setIsDropdownOpen(false);
       }
     };
-
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
@@ -118,52 +180,38 @@ const Navbar = ({ onToggleSidebar }) => {
   return (
     <div className="bg-white font-poppins border-b border-gray-200 sticky top-0 z-50 w-full">
       <div className="flex items-center justify-between px-4 sm:px-6 py-4">
-        {/* Left: Logo & Toggle */}
         <div className="flex items-center space-x-4">
-          <button onClick={onToggleSidebar} className="text-gray-700 md:hidden focus:outline-none">
+          <button onClick={onToggleSidebar} className="text-gray-700 md:hidden">
             <FontAwesomeIcon icon={faBars} className="text-xl" />
           </button>
           <img src={logo} alt="Skillnaav Logo" className="h-12" />
         </div>
 
-        {/* Right: Notification, Profile, Plan */}
         <div className="relative flex items-center space-x-5">
-          {/* Notification Icon */}
           <div
             className="relative cursor-pointer group"
             onClick={() => handleSelectTab("notifications")}
           >
-            <FontAwesomeIcon icon={faBell} className="w-5 h-5 text-gray-700 hover:text-purple-600 transition" />
+            <FontAwesomeIcon icon={faBell} className="w-5 h-5 text-gray-700 hover:text-purple-600" />
             {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+              <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded-full">
                 {unreadCount}
               </span>
             )}
-            <span className="absolute top-6 -left-3 text-xs bg-black text-white px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition">
-              Notifications
-            </span>
           </div>
 
-          {/* Profile Image */}
-          <div
-            className="relative"
-            onClick={handleUserClick}
-          >
+          <div className="relative" onClick={handleUserClick}>
             {userInfo.profileImage ? (
               <img
                 src={userInfo.profileImage}
                 alt="Profile"
-                className="w-9 h-9 rounded-full object-cover cursor-pointer shadow-md border-2 border-purple-300 hover:scale-105 transition-transform"
+                className="w-9 h-9 rounded-full object-cover cursor-pointer shadow-md border-2 border-purple-300 hover:scale-105"
               />
             ) : (
-              <FontAwesomeIcon
-                icon={faUser}
-                className="w-8 h-8 text-gray-800 cursor-pointer"
-              />
+              <FontAwesomeIcon icon={faUser} className="w-8 h-8 text-gray-800 cursor-pointer" />
             )}
           </div>
 
-          {/* Name & Plan */}
           <div className="hidden sm:flex flex-col items-start">
             <span className="text-gray-800 text-sm font-semibold">{userInfo.name}</span>
             <span className={`text-xs font-semibold rounded-full px-2 py-0.5 mt-1 flex items-center gap-1 ${planStyles[planType]}`}>
@@ -172,40 +220,27 @@ const Navbar = ({ onToggleSidebar }) => {
             </span>
           </div>
 
-          {/* Dropdown */}
           {isDropdownOpen && (
             <div
               ref={dropdownRef}
-              className="absolute right-0 top-16 mt-2 bg-white shadow-xl rounded-xl border border-gray-200 z-50 w-auto min-w-[20rem] max-w-[90vw]"
+              className="absolute right-0 top-16 mt-2 bg-white shadow-xl rounded-xl border border-gray-200 z-50 w-auto min-w-[20rem]"
             >
-              {/* Email header styled like the reference */}
-              <div className="px-4 py-3 border-b rounded-t-xl bg-white">
+              <div className="px-4 py-3 border-b rounded-t-xl">
                 <div className="flex items-center gap-2 text-black">
-                  <div className="h-6 w-6 rounded-full bg-gray-200 flex items-center justify-center">
-                    <img
-                      src={require("../../../../assets-webapp/user-logo.svg").default}
-                      alt="User Logo"
-                      className="h-7 w-7"
-                    />
-                  </div>
-                  <span
-                    className="block text-sm font-medium whitespace-nowrap"
-                    title={userInfo.email}
-                  >
-                    {userInfo.email}
-                  </span>
+                  <img
+                    src={require("../../../../assets-webapp/user-logo.svg").default}
+                    alt="User Logo"
+                    className="h-7 w-7"
+                  />
+                  <span className="text-sm font-medium">{userInfo.email}</span>
                 </div>
               </div>
 
-              {/* Logout */}
               <button
-                onClick={handleLogout}
-                className="w-full flex items-center gap-2 px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition rounded-b-xl"
+                onClick={handleLogoutTrigger}
+                className="w-full flex items-center gap-2 px-4 py-3 text-sm text-red-600 hover:bg-red-50 rounded-b-xl"
               >
-                {/* fixed icon slot = w-6 h-6 just like the email row */}
-                <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center">
-                  <FontAwesomeIcon icon={faSignOutAlt} className="w-5 h-5" />
-                </div>
+                <FontAwesomeIcon icon={faSignOutAlt} className="w-5 h-5" />
                 <span>Logout</span>
               </button>
             </div>

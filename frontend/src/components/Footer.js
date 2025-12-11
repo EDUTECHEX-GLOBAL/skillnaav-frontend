@@ -19,10 +19,11 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 items-start">
           {/* Footer Logo */}
           <div className="flex items-start justify-center md:justify-start md:col-span-1">
-            <a href="#">
+            {/* link to home (valid href) */}
+            <a href="/" aria-label="SkillNaav home">
               <img
                 src={SkillNaavLogo}
-                alt="SkillNaav Logo"
+                alt="SkillNaav logo"
                 width={150}
                 height={50}
               />
@@ -48,22 +49,22 @@ export default function Footer() {
             <h5 className="font-semibold mb-4">Useful Links</h5>
             <ul className="space-y-2">
               <li>
-                <a href="#" className="hover:text-gray-600">
+                <a href="/about" className="hover:text-gray-600">
                   About SkillNaav
                 </a>
               </li>
               <li>
-                <a href="#" className="hover:text-gray-600">
+                <a href="/visa" className="hover:text-gray-600">
                   Visa Information
                 </a>
               </li>
               <li>
-                <a href="#" className="hover:text-gray-600">
+                <a href="/immigration-faq" className="hover:text-gray-600">
                   Immigration FAQ
                 </a>
               </li>
               <li>
-                <a href="#" className="hover:text-gray-600">
+                <a href="/contact" className="hover:text-gray-600">
                   Contact Us
                 </a>
               </li>
@@ -81,10 +82,12 @@ export default function Footer() {
                 placeholder="Your email address"
                 className="py-2 px-3 text-sm text-gray-800 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
+                aria-label="Email address for newsletter subscription"
               />
               <button
                 type="submit"
                 className="px-6 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 text-center"
+                aria-pressed={isSubscribed}
               >
                 {isSubscribed ? "Subscribed" : "Subscribe"}
               </button>
@@ -95,36 +98,40 @@ export default function Footer() {
         {/* Social Media Links */}
         <div className="flex justify-center mt-8 space-x-4">
           <a
-            href="https://facebook.com"
+            href="https://www.facebook.com/skillnaav"
             target="_blank"
             rel="noopener noreferrer"
             className="text-gray-600 hover:text-gray-800 transition duration-300"
+            aria-label="SkillNaav on Facebook (opens in a new tab)"
           >
-            <img src={FacebookIcon} alt="Facebook" width={24} height={24} />
+            <img src={FacebookIcon} alt="Facebook — SkillNaav" width={24} height={24} />
           </a>
           <a
-            href="https://twitter.com"
+            href="https://twitter.com/skillnaav"
             target="_blank"
             rel="noopener noreferrer"
             className="text-gray-600 hover:text-gray-800 transition duration-300"
+            aria-label="SkillNaav on X (Twitter) (opens in a new tab)"
           >
-            <img src={TwitterIcon} alt="Twitter" width={24} height={24} />
+            <img src={TwitterIcon} alt="X (Twitter) — SkillNaav" width={24} height={24} />
           </a>
           <a
-            href="https://rss.com"
+            href="https://www.youtube.com/skillnaav"
             target="_blank"
             rel="noopener noreferrer"
             className="text-gray-600 hover:text-gray-800 transition duration-300"
+            aria-label="SkillNaav on YouTube (opens in a new tab)"
           >
-            <img src={FeedIcon} alt="Feed" width={24} height={24} />
+            <img src={FeedIcon} alt="YouTube — SkillNaav" width={24} height={24} />
           </a>
           <a
-            href="https://linkedin.com"
+            href="https://www.linkedin.com/company/skillnaav"
             target="_blank"
             rel="noopener noreferrer"
             className="text-gray-600 hover:text-gray-800 transition duration-300"
+            aria-label="SkillNaav on LinkedIn (opens in a new tab)"
           >
-            <img src={LinkedinIcon} alt="Linkedin" width={24} height={24} />
+            <img src={LinkedinIcon} alt="LinkedIn — SkillNaav" width={24} height={24} />
           </a>
         </div>
 
@@ -132,11 +139,11 @@ export default function Footer() {
         <div className="mt-8 text-center text-sm text-gray-800">
           <p>&copy; 2024 SkillNaav. All Rights Reserved</p>
           <p>
-            <a href="#" className="hover:text-gray-600">
+            <a href="/privacy" className="hover:text-gray-600">
               Privacy Policy
             </a>
             <span className="mx-1">|</span>
-            <a href="#" className="hover:text-gray-600">
+            <a href="/terms" className="hover:text-gray-600">
               Terms and Conditions
             </a>
           </p>

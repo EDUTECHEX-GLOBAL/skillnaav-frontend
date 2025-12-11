@@ -1,3 +1,4 @@
+// Sidebar.jsx
 import React, { useState, useEffect } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -18,6 +19,10 @@ import { useNavigate } from "react-router-dom";
 import { useLocation } from "react-router-dom";
 import axios from "axios";
 
+// Feedback context + questions snapshot
+import { useFeedback } from "../../../../context/FeedbackContext";
+import { userFlowQuestions } from "../../../../components/FeedbackModal/questionSets";
+
 const Sidebar = ({ isMobile, isOpen, onClose }) => {
   const [selectedTab, setSelectedTab] = useState("home");
   const [showSectors, setShowSectors] = useState(false);
@@ -25,6 +30,9 @@ const Sidebar = ({ isMobile, isOpen, onClose }) => {
   const navigate = useNavigate();
 
   const location = useLocation();
+
+  // Feedback context
+  const { openFeedback } = useFeedback();
 
   // When URL contains ?tab=..., open that tab automatically
   useEffect(() => {
@@ -46,7 +54,7 @@ const Sidebar = ({ isMobile, isOpen, onClose }) => {
 
   const handleTabClick = async (tab) => {
     if (tab === "logout") {
-      await handleLogout();
+      await handleLogoutTrigger();
     } else {
       setSelectedTab(tab);
       handleSelectTab(tab);
@@ -54,26 +62,84 @@ const Sidebar = ({ isMobile, isOpen, onClose }) => {
     }
   };
 
-  const handleLogout = async () => {
+  /* ---- performLogout is declared first to avoid TDZ/runtime error ---- */
+  const performLogout = async () => {
     const sessionId = localStorage.getItem("sessionId");
-    const token = JSON.parse(localStorage.getItem("userToken"));
+    const token = JSON.parse(localStorage.getItem("userToken") || "null");
+
     if (sessionId && token) {
       try {
-        await axios.post("/api/sessions/logout", { sessionId }, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        });
+        await axios.post(
+          "/api/sessions/logout",
+          { sessionId },
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
       } catch (error) {
-        console.error("Logout failed:", error.response?.data || error.message);
+        // don't block logout for session errors
+        console.error("Logout session error:", error?.response?.data || error?.message);
       }
     }
 
-    localStorage.removeItem("sessionId");
-    localStorage.removeItem("userToken");
-    localStorage.removeItem("userInfo");
+    // clear only relevant keys (avoid wiping unrelated app data)
+    try {
+      localStorage.clear();
+    } catch (err) {
+      console.warn("LocalStorage clear failed:", err);
+    }
+
     navigate("/user/login");
+  };
+
+  // When user clicks logout, check if they already submitted feedback.
+  // If not, open feedback modal; after submit, perform logout.
+  const handleLogoutTrigger = async () => {
+    // --- NEW: enforce 1 minute since login before showing feedback modal ---
+    const loginTime = Number(localStorage.getItem("loginTime"));
+    const oneMinutePassed = !isNaN(loginTime) && (Date.now() - loginTime >= 60000);
+
+    if (!oneMinutePassed) {
+      // Less than 1 minute since login → skip feedback and logout immediately
+      return performLogout();
+    }
+    // --- END login gating ---
+
+    const sessionUser = JSON.parse(localStorage.getItem("userInfo")) || null;
+    const userId = sessionUser?._1d || sessionUser?._id; // attempt safe read for different shapes
+
+    // If userId missing, open feedback with null user and perform logout in callback
+    if (!userId) {
+      openFeedback({
+        flow: "user",
+        questions: userFlowQuestions,
+        triggerInfo: { type: "logout", page: window.location.pathname },
+        user: null,
+        postSubmitCallback: () => performLogout(),
+      });
+      return;
+    }
+
+    try {
+      const resp = await axios.get("/api/feedback/check", {
+        params: { userId, flow: "user" },
+      });
+
+      if (resp.data?.alreadySubmitted) {
+        performLogout();
+        return;
+      }
+    } catch (err) {
+      console.warn("Feedback check failed, opening modal");
+    }
+
+    openFeedback({
+      flow: "user",
+      questions: userFlowQuestions,
+      triggerInfo: { type: "logout", page: window.location.pathname },
+      user: sessionUser,
+      postSubmitCallback: () => performLogout(),
+    });
   };
 
   return (
@@ -95,9 +161,7 @@ const Sidebar = ({ isMobile, isOpen, onClose }) => {
         ${isMobile ? (isOpen ? "translate-x-0" : "-translate-x-full") : "translate-x-0"}
       `}
       >
-        {/* Sidebar Content */}
         <div className="h-[calc(100%-5rem)] overflow-y-auto px-4 pt-4 pb-6 hide-scrollbar">
-          {/* Navigation items */}
           <nav className="space-y-2">
             {[
               { id: "home", icon: faHome, label: "HomePage" },
@@ -146,7 +210,6 @@ const Sidebar = ({ isMobile, isOpen, onClose }) => {
                       • {sector.name}
                     </li>
                   ))}
-
                 </ul>
               )}
             </div>

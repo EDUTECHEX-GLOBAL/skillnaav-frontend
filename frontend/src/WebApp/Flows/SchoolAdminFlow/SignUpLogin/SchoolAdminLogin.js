@@ -46,6 +46,8 @@ const handleLogin = async (e) => {
       localStorage.setItem("schoolAdminToken", data.token);
       localStorage.setItem("schoolAdminId", data._id); // ✅ Required for fetching school-specific applications
       localStorage.setItem("schoolAdminProfile", JSON.stringify(data));
+      localStorage.setItem("loginTime", Date.now());
+
 
       navigate("/schooladmin/dashboard");
     } else {

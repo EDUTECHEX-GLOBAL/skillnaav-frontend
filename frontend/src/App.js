@@ -1,11 +1,10 @@
-import React from "react";
+import React, { useEffect, useCallback } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import "@fontsource/inter/400.css";
 import "@fontsource/inter/600.css";
 import "@fontsource/inter/700.css";
 import Home from "./pages/Home";
 import axios from "axios";
-import { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { HideLoading, SetSkillNaavData } from "./redux/rootSlice";
 import Admin from "./pages/Admin";
@@ -26,8 +25,7 @@ import UserProfileForm from "./WebApp/Flows/UserFlow/SignUpLogin/UserProfileBuil
 import UserProfilePicture from "./WebApp/Flows/UserFlow/SignUpLogin/UserProfileBuilding/UserProfilePicture";
 import UserforgotPassword from "./WebApp/Flows/UserFlow/SignUpLogin/UserforgotPassword";
 import GoogleUserProfileForm from "./WebApp/Flows/UserFlow/SignUpLogin/UserProfileBuilding/GoogleUserProfileForm";
-import GoogleUserProfilePicture from "./WebApp/Flows/UserFlow/SignUpLogin/UserProfileBuilding/GoogleUserProfilePicture";
-import PremiumPage from "./WebApp/Flows/UserFlow/MainPage/PremiumPage";
+// import GoogleUserProfilePicture from "./WebApp/Flows/UserFlow/SignUpLogin/UserProfileBuilding/GoogleUserProfilePicture";
 import SkillnaavAnalysis from "./WebApp/Flows/UserFlow/MainPage/SkillnaavAnalysis";
 
 import PartnerFlow from "./WebApp/Flows/PartnerFlow/PartnerFlow";
@@ -49,9 +47,12 @@ import SchoolAdminFlow from "./WebApp/Flows/SchoolAdminFlow/SchoolAdminFlow";
 import SchoolAdminResetPassword from "./WebApp/Flows/SchoolAdminFlow/SignUpLogin/SchoolAdminResetPassword";
 import SchoolAdminForgotPassword from "./WebApp/Flows/SchoolAdminFlow/SignUpLogin/SchoolAdminForgotPassword";
 
-//  import InternshipDetail from "./WebApp/Flows/UserFlow/MainPage/InternshipDetail";
-import { TabProvider } from "./WebApp/Flows/UserFlow/MainPage/UserHomePageContext/HomePageContext";
+// ---------- NEW IMPORTS ----------
+import { FeedbackProvider } from "./context/FeedbackContext";
+import FeedbackModal from "./components/FeedbackModal/FeedbackModal";
+// ---------- END NEW IMPORTS ----------
 
+//  import InternshipDetail from "./WebApp/Flows/UserFlow/MainPage/InternshipDetail";
 // ---- NEW IMPORTS for auth/refresh support ----
 // Create this small file earlier: src/lib/auth.js (in-memory store)
 // import { setAccessToken } from "./lib/auth"; // adjust path if different
@@ -62,8 +63,8 @@ function App() {
   const { skillnaavData, reloadData } = useSelector((state) => state.root);
   const dispatch = useDispatch();
 
-  // Fetch SkillNaav static data (unchanged)
-  const getSkillNaavData = async () => {
+  // Fetch SkillNaav static data (unchanged) — memoized to satisfy hook lint rule
+  const getSkillNaavData = useCallback(async () => {
     try {
       const response = await axios.get("/api/skillnaav/get-skillnaav-data");
       dispatch(SetSkillNaavData(response.data));
@@ -72,13 +73,13 @@ function App() {
       console.error("Error fetching SkillNaav data:", error);
       dispatch(HideLoading());
     }
-  };
+  }, [dispatch]);
 
   useEffect(() => {
     if (!skillnaavData || reloadData) {
       getSkillNaavData();
     }
-  }, [skillnaavData, reloadData]);
+  }, [skillnaavData, reloadData, getSkillNaavData]);
 
   // ---- NEW: Try refresh on app start so components have an access token ----
   // useEffect(() => {
@@ -110,68 +111,74 @@ function App() {
   // }, []); // run only once on mount
 
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* Skillnaav Website Routes */}
-        <Route path="/" element={<Home />} />
-        <Route path="/admin" element={<Admin />} />
-        <Route path="/admin-login" element={<Login />} />
-        <Route path="/features" element={<FeaturesPage />} />
-        <Route path="/team" element={<TeamPage />} />
-        <Route path="/pricing" element={<PricingPage />} />
-        <Route path="/faqs" element={<FaqPage />} />
-        <Route path="/contact" element={<ContactPage />} />
-        <Route path="/vision" element={<VisionPage />} />
-        {/* <Route
-  path="/internship/:id"
-  element={
-    <TabProvider>
-      <InternshipDetail />
-    </TabProvider>
-  }
-/> */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+    /* Wrap the app in FeedbackProvider so any component can open the modal via useFeedback() */
+    <FeedbackProvider>
+      <BrowserRouter>
+        <Routes>
+          {/* Skillnaav Website Routes */}
+          <Route path="/" element={<Home />} />
+          <Route path="/admin" element={<Admin />} />
+          <Route path="/admin-login" element={<Login />} />
+          <Route path="/features" element={<FeaturesPage />} />
+          <Route path="/team" element={<TeamPage />} />
+          <Route path="/pricing" element={<PricingPage />} />
+          <Route path="/faqs" element={<FaqPage />} />
+          <Route path="/contact" element={<ContactPage />} />
+          <Route path="/vision" element={<VisionPage />} />
+          {/* <Route
+    path="/internship/:id"
+    element={
+      <TabProvider>
+        <InternshipDetail />
+      </TabProvider>
+    }
+  /> */}
+          <Route path="*" element={<Navigate to="/" replace />} />
 
-        {/* Skillnaav Web App Routes */}
-        {/* User Flow */}
-        <Route path="/user" element={<UserFlow />} />
-        <Route path="/user-create-account" element={<UserCreateAccount />} />
-        <Route path="/user/login" element={<UserLogin />} />
-        <Route path="/user-profile-form" element={<UserProfileForm />} />
-        <Route path="/user-profile-picture" element={<UserProfilePicture />} />
-        <Route path="/user-main-page" element={<UserMainPage />} />
-        <Route path="/user-forgot-password" element={<UserforgotPassword />} />
-        <Route path="/google-user-profileform" element={<GoogleUserProfileForm />} />
+          {/* Skillnaav Web App Routes */}
+          {/* User Flow */}
+          <Route path="/user" element={<UserFlow />} />
+          <Route path="/user-create-account" element={<UserCreateAccount />} />
+          <Route path="/user/login" element={<UserLogin />} />
+          <Route path="/user-profile-form" element={<UserProfileForm />} />
+          <Route path="/user-profile-picture" element={<UserProfilePicture />} />
+          <Route path="/user-main-page" element={<UserMainPage />} />
+          <Route path="/user-forgot-password" element={<UserforgotPassword />} />
+          <Route path="/google-user-profileform" element={<GoogleUserProfileForm />} />
 
-        <Route path="/skillnaav-analysis" element={<SkillnaavAnalysis />} />
+          <Route path="/skillnaav-analysis" element={<SkillnaavAnalysis />} />
 
-        {/* Partner Flow */}
-        <Route path="/partner" element={<PartnerFlow />} />
-        <Route path="/partner-create-account" element={<PartnerCreateAccount />} />
-        <Route path="/partner/login" element={<PartnerLogin />} />
-        <Route path="/partner-profile-form" element={<PartnerProfileForm />} />
-        <Route path="/partner-profile-picture" element={<PartnerProfilePicture />} />
-        <Route path="/partner-main-page" element={<PartnerMainPage />} />
+          {/* Partner Flow */}
+          <Route path="/partner" element={<PartnerFlow />} />
+          <Route path="/partner-create-account" element={<PartnerCreateAccount />} />
+          <Route path="/partner/login" element={<PartnerLogin />} />
+          <Route path="/partner-profile-form" element={<PartnerProfileForm />} />
+          <Route path="/partner-profile-picture" element={<PartnerProfilePicture />} />
+          <Route path="/partner-main-page" element={<PartnerMainPage />} />
 
-        <Route path="/partner-forgot-password" element={<PartnerforgotPassword />} />
+          <Route path="/partner-forgot-password" element={<PartnerforgotPassword />} />
 
-        {/* Admin Flow */}
-        {/* <Route path="/admin-account" element={<AdminFlow />} /> */}
-        <Route path="/admin-create-account" element={<AdminCreateAccount />} />
-        <Route path="/admin/login" element={<AdminLogin />} />
-        <Route path="/admin-profile-form" element={<AdminProfileForm />} />
-        <Route path="/admin-profile-picture" element={<AdminProfilePicture />} />
-        <Route path="/admin-main-page" element={<AdminMainPage />} />
+          {/* Admin Flow */}
+          {/* <Route path="/admin-account" element={<AdminFlow />} /> */}
+          <Route path="/admin-create-account" element={<AdminCreateAccount />} />
+          <Route path="/admin/login" element={<AdminLogin />} />
+          <Route path="/admin-profile-form" element={<AdminProfileForm />} />
+          <Route path="/admin-profile-picture" element={<AdminProfilePicture />} />
+          <Route path="/admin-main-page" element={<AdminMainPage />} />
 
-        {/* School Admin Flow */}
-        <Route path="/schooladmin/*" element={<SchoolAdminFlow />} />
-        <Route path="/schooladmin/reset-password/:token" element={<SchoolAdminResetPassword />} />
-        <Route path="/schooladmin/forgot-password" element={<SchoolAdminForgotPassword />} />
+          {/* School Admin Flow */}
+          <Route path="/schooladmin/*" element={<SchoolAdminFlow />} />
+          <Route path="/schooladmin/reset-password/:token" element={<SchoolAdminResetPassword />} />
+          <Route path="/schooladmin/forgot-password" element={<SchoolAdminForgotPassword />} />
 
-        {/* Try for free */}
-        <Route path="/choose-role" element={<TryforFree />} />
-      </Routes>
-    </BrowserRouter>
+          {/* Try for free */}
+          <Route path="/choose-role" element={<TryforFree />} />
+        </Routes>
+
+        {/* Mount the FeedbackModal once (it reads its state from FeedbackContext) */}
+        <FeedbackModal />
+      </BrowserRouter>
+    </FeedbackProvider>
   );
 }
 
