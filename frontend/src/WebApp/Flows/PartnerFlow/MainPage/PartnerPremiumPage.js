@@ -27,10 +27,12 @@ const plans = [
     bg: "bg-gray-50",
     border: "border-gray-200",
   },
+
+  // ⭐ UPDATED DURATION: 2 DAYS
   {
     title: "Premium Basic",
     price: "9.99",
-    duration: 1,
+    duration: 2, // <-- changed from 1 month to 2 days
     features: [
       "Unlimited internship postings",
       "Free, Stipend-Based & Paid internships",
@@ -47,10 +49,12 @@ const plans = [
     bg: "bg-purple-50",
     border: "border-purple-300",
   },
+
+  // ⭐ UPDATED DURATION: 5 DAYS
   {
     title: "Premium Plus",
     price: "19.99",
-    duration: 1,
+    duration: 5, // <-- changed from 1 month to 5 days
     features: [
       "All Premium Basic features",
       "Advanced AI-powered shortlisting",
@@ -69,6 +73,7 @@ const plans = [
     border: "border-orange-300",
   },
 ];
+
 
 export default function PartnerPremiumPage() {
   const [sdkReady, setSdkReady] = useState(false);
@@ -137,35 +142,52 @@ useEffect(() => {
           }
         },
         onApprove: async (data) => {
-          try {
-            const { data: verify } = await axios.post("/api/partner/payments/paypal/verify", {
-              orderID: data.orderID,
-              partnerId: paymentData.partner._id,
-              planType: paymentData.planType,
-              amount: paymentData.amount,
-              email: paymentData.partner.email,
-              duration: paymentData.duration,
-            });
-            if (verify.success) {
-              setAlert({ type: "success", message: "Payment verified successfully!" });
-              // update localStorage so UI reflects premium status
-              const updated = {
-                ...paymentData.partner,
-                isPremium: true,
-                planType: verify.partner.planType,
-                premiumExpiration: verify.partner.premiumExpiration,
-              };
-              localStorage.setItem("userInfo", JSON.stringify(updated));
-            } else {
-              setAlert({ type: "error", message: "Payment verification failed." });
-            }
-          } catch (err) {
-            console.error("Verification failed:", err);
-            setAlert({ type: "error", message: "Payment verification error." });
-          } finally {
-            setSelectedIndex(null);
-          }
-        },
+  try {
+    const { data: verify } = await axios.post("/api/partner/payments/paypal/verify", {
+      orderID: data.orderID,
+      partnerId: paymentData.partner._id,
+      planType: paymentData.planType,
+      amount: paymentData.amount,
+      email: paymentData.partner.email,
+      duration: paymentData.duration,
+    });
+
+    if (verify.success) {
+      setAlert({ type: "success", message: "Payment verified successfully!" });
+      // update localStorage so UI reflects premium status
+      const updated = {
+        ...paymentData.partner,
+        isPremium: true,
+        planType: verify.partner.planType,
+        premiumExpiration: verify.partner.premiumExpiration,
+      };
+      localStorage.setItem("userInfo", JSON.stringify(updated));
+      // optionally update Redux store if you use it
+    } else if (verify.retry) {
+      // Payment instrument declined: ask user to try another funding source
+      setAlert({ type: "error", message: verify.message || "Payment was declined. Try another payment method." });
+      // keep selectedIndex the same so PayPal Buttons remain available to retry
+    } else {
+      setAlert({ type: "error", message: verify.message || "Payment verification failed." });
+    }
+  } catch (err) {
+    console.error("Verification failed:", err);
+    // If backend returned structured response inside err.response.data
+    const info = err.response?.data;
+    if (info?.retry) {
+      setAlert({ type: "error", message: info.message || "Payment declined. Try another funding source." });
+      // keep selectedIndex to allow retry
+      return;
+    }
+    setAlert({ type: "error", message: "Payment verification error." });
+  } finally {
+    // only hide PayPal button if success — otherwise leave to allow retry
+    if (localStorage.getItem("userInfo")?.isPremium) {
+      setSelectedIndex(null);
+    }
+  }
+},
+
         onCancel: () => {
           console.log("User canceled the payment");
           setSelectedIndex(null);
@@ -224,7 +246,7 @@ useEffect(() => {
         )}
         <p className="text-2xl font-bold text-orange-600 mb-1">${plan.price}</p>
         <p className="text-sm text-gray-600 mb-4">
-          Duration: {plan.duration ? `${plan.duration} month` : "Unlimited"}
+          Duration: {plan.duration ? `${plan.duration} Days` : "Unlimited"}
         </p>
         <ul className="space-y-2 text-sm text-gray-700 mb-4">
           {plan.features.map((f, i) => (

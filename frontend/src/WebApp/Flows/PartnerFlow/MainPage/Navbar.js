@@ -6,6 +6,7 @@ import logo from "../../../../assets-webapp/Skillnaav-logo.png";
 import { useTabContext } from "./UserHomePageContext/HomePageContext";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { io as ioClient } from "socket.io-client";
 
 // Feedback
 import { useFeedback } from "../../../../context/FeedbackContext";
@@ -71,7 +72,8 @@ const Navbar = ({ onToggleSidebar }) => {
     }
   }, []);
 
-  // Sync on mount, on focus (useful after payment redirect), and when localStorage changes (other tabs or flows)
+  // Sync on mount, on focus (useful after payment redirect), when localStorage changes (other tabs or flows),
+  // and listen for custom 'partnerUpdated' events dispatched by socket handler.
   useEffect(() => {
     fetchPremiumStatus();
 
@@ -94,11 +96,76 @@ const Navbar = ({ onToggleSidebar }) => {
     };
     window.addEventListener("storage", onStorage);
 
+    // Listen for custom partnerUpdated events (dispatched by socket handler on same tab)
+    const onPartnerUpdatedEvent = (e) => {
+      try {
+        const updated = e?.detail;
+        if (updated) setUserInfo((prev) => ({ ...prev, ...updated }));
+      } catch (err) {
+        // ignore
+      }
+    };
+    window.addEventListener("partnerUpdated", onPartnerUpdatedEvent);
+
     return () => {
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("storage", onStorage);
+      window.removeEventListener("partnerUpdated", onPartnerUpdatedEvent);
     };
   }, [fetchPremiumStatus]);
+
+  // ----------------------------
+  // Real-time partner downgrade listener (Socket.IO)
+  // ----------------------------
+  useEffect(() => {
+    // Get partner id from stored userInfo
+    const stored = (() => {
+      try { return JSON.parse(localStorage.getItem("userInfo")); } catch { return null; }
+    })();
+    const partnerId = stored?._id;
+    if (!partnerId) return; // no partner logged in
+
+    // Prefer explicit env variable; fallback to same-origin with port 5000
+    const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || `http://localhost:5000`;
+
+    const socket = ioClient(SOCKET_URL, { withCredentials: true });
+
+    const handleConnect = () => {
+      socket.emit("joinPartnerRoom", { partnerId });
+    };
+
+    const onPartnerUpdated = (payload) => {
+      try {
+        if (!payload || payload.partnerId !== partnerId) return;
+
+        // Merge with existing userInfo
+        const existing = (() => { try { return JSON.parse(localStorage.getItem("userInfo")) || {}; } catch { return {}; } })();
+        const updated = {
+          ...existing,
+          isPremium: payload.isPremium,
+          planType: payload.planType,
+          premiumExpiration: payload.premiumExpiration,
+        };
+
+        // Persist + update state + notify other listeners
+        localStorage.setItem("userInfo", JSON.stringify(updated));
+        setUserInfo(updated);
+        window.dispatchEvent(new CustomEvent("partnerUpdated", { detail: updated }));
+      } catch (err) {
+        console.error("Error handling partner:updated payload", err);
+      }
+    };
+
+    socket.on("connect", handleConnect);
+    socket.on("partner:updated", onPartnerUpdated);
+
+    // cleanup on unmount
+    return () => {
+      socket.off("connect", handleConnect);
+      socket.off("partner:updated", onPartnerUpdated);
+      socket.disconnect();
+    };
+  }, []);
 
   const handleUserClick = () => {
     setIsDropdownOpen(!isDropdownOpen);
@@ -135,52 +202,52 @@ const Navbar = ({ onToggleSidebar }) => {
 
   // When logout clicked: check feedback and open modal if required (partner flow)
   const handleLogoutTrigger = async () => {
-  // --- NEW: enforce 1 minute since login before showing feedback modal ---
-  const loginTime = Number(localStorage.getItem("loginTime"));
-  const oneMinutePassed = !isNaN(loginTime) && (Date.now() - loginTime >= 60000);
+    // --- NEW: enforce 1 minute since login before showing feedback modal ---
+    const loginTime = Number(localStorage.getItem("loginTime"));
+    const oneMinutePassed = !isNaN(loginTime) && (Date.now() - loginTime >= 60000);
 
-  if (!oneMinutePassed) {
-    // Less than 1 minute since login → skip feedback and logout immediately
-    return performLogout();
-  }
-  // --- END login gating ---
+    if (!oneMinutePassed) {
+      // Less than 1 minute since login → skip feedback and logout immediately
+      return performLogout();
+    }
+    // --- END login gating ---
 
-  const sessionUser = JSON.parse(localStorage.getItem("userInfo")) || null;
-  const userId = sessionUser?._id;
+    const sessionUser = JSON.parse(localStorage.getItem("userInfo")) || null;
+    const userId = sessionUser?._id;
 
-  // If userId missing, open feedback with null user and perform logout in callback
-  if (!userId) {
+    // If userId missing, open feedback with null user and perform logout in callback
+    if (!userId) {
+      openFeedback({
+        flow: "partner",
+        questions: partnerFlowQuestions,
+        triggerInfo: { type: "logout", page: window.location.pathname },
+        user: null,
+        postSubmitCallback: () => performLogout(),
+      });
+      return;
+    }
+
+    try {
+      const resp = await axios.get("/api/feedback/check", {
+        params: { userId, flow: "partner" },
+      });
+
+      if (resp.data?.alreadySubmitted) {
+        performLogout();
+        return;
+      }
+    } catch (err) {
+      console.warn("Feedback check failed, opening modal");
+    }
+
     openFeedback({
       flow: "partner",
       questions: partnerFlowQuestions,
       triggerInfo: { type: "logout", page: window.location.pathname },
-      user: null,
+      user: sessionUser,
       postSubmitCallback: () => performLogout(),
     });
-    return;
-  }
-
-  try {
-    const resp = await axios.get("/api/feedback/check", {
-      params: { userId, flow: "partner" },
-    });
-
-    if (resp.data?.alreadySubmitted) {
-      performLogout();
-      return;
-    }
-  } catch (err) {
-    console.warn("Feedback check failed, opening modal");
-  }
-
-  openFeedback({
-    flow: "partner",
-    questions: partnerFlowQuestions,
-    triggerInfo: { type: "logout", page: window.location.pathname },
-    user: sessionUser,
-    postSubmitCallback: () => performLogout(),
-  });
-};
+  };
 
 
   // Close dropdown if clicking outside
