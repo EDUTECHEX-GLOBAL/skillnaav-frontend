@@ -196,34 +196,18 @@ const InstructureManagement = () => {
                 const normalized = items.map((d) => ({ id: d._id || d.id, ...d }));
                 setInstructors(normalized);
             } catch (err) {
-                console.error("createInstructure error:", err);
+                console.error("fetchInstructors error:", err);
 
-                // ✅ Duplicate instructor (partnerId + email unique index)
-                if (err?.code === 11000) {
-                    return res.status(409).json({
-                        message: "Instructor already exists with this email for your account.",
-                    });
-                }
+                const status = err?.response?.status;
+                const msg =
+                    err?.response?.data?.message ||
+                    (status === 401
+                        ? "Session expired. Please login again."
+                        : status === 403
+                            ? "You don't have permission to view instructors."
+                            : "Failed to load instructors.");
 
-                // ✅ Mongoose validation error
-                if (err?.name === "ValidationError") {
-                    return res.status(400).json({ message: err.message });
-                }
-
-                // ✅ Multer / multipart errors (boundary issues)
-                if (
-                    err?.name === "MulterError" ||
-                    String(err?.message || "").toLowerCase().includes("boundary")
-                ) {
-                    return res.status(400).json({
-                        message:
-                            "Invalid multipart/form-data. On frontend, remove manual 'Content-Type: multipart/form-data' header for FormData.",
-                    });
-                }
-
-                return res.status(500).json({
-                    message: err?.message || "Failed to create instructure.",
-                });
+                alert(msg);
             }
         };
 
