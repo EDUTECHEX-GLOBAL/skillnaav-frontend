@@ -7,6 +7,7 @@ import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/solid";
 import { FcGoogle } from "react-icons/fc";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import loginImage from "../../../../assets-webapp/login-image.png";
 // NOTE: You'll need to define your Firebase config and imports here
 // import { auth, googleAuthProvider, signInWithPopup } from "../../../../config/Firebase"; 
 
@@ -43,7 +44,7 @@ const UnifiedUserRegistration = () => {
   const [otp, setOtp] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  
+
   // States for OTP resend logic (from UserCreateAccount.js)
   const [resendTimer, setResendTimer] = useState(30);
   const [resending, setResending] = useState(false);
@@ -86,7 +87,7 @@ const UnifiedUserRegistration = () => {
       if (cityAbortRef.current) cityAbortRef.current.abort();
     };
   }, []);
-  
+
   // Function to update any field in the unified state
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -168,8 +169,8 @@ const UnifiedUserRegistration = () => {
 
   const handleVerifyOTP = async () => {
     if (!otp) {
-        setErrorMessage("Please enter the OTP.");
-        return;
+      setErrorMessage("Please enter the OTP.");
+      return;
     }
     try {
       const verifyRes = await axios.post("/api/users/verify-code", {
@@ -188,7 +189,7 @@ const UnifiedUserRegistration = () => {
       setErrorMessage("OTP verification failed.");
     }
   };
-  
+
   const handleResendOTP = async () => {
     try {
       setResending(true);
@@ -221,23 +222,23 @@ const UnifiedUserRegistration = () => {
   };
 
   // --- Step 3: Professional/Picture Submission (Modified from UserProfilePicture.js) ---
-// File: UnifiedUserRegistration.js
+  // File: UnifiedUserRegistration.js
 
-// ... (existing imports and component definition)
+  // ... (existing imports and component definition)
 
-// --- Step 3: Professional/Picture Submission (Updated) ---
+  // --- Step 3: Professional/Picture Submission (Updated) ---
 
-const validateStep3 = () => {
+  const validateStep3 = () => {
     // Only validate the fields introduced in Step 3 that are REQUIRED
     const { desiredField, linkedin, profilePic } = formData;
     return Boolean(desiredField && linkedin && profilePic);
-};
+  };
 
-const handleStep3Submit = async () => {
+  const handleStep3Submit = async () => {
     // 1. Client-side validation for Step 3 fields
     if (!validateStep3()) {
-        setErrorMessage("Please fill the desired field, LinkedIn URL, and upload a profile picture.");
-        return;
+      setErrorMessage("Please fill the desired field, LinkedIn URL, and upload a profile picture.");
+      return;
     }
 
     setErrorMessage(""); // Clear previous errors
@@ -245,88 +246,88 @@ const handleStep3Submit = async () => {
     // setLoading(true); 
 
     try {
-        const formDataToSend = new FormData();
+      const formDataToSend = new FormData();
 
-        // 2. Critical Fields Check (Before submission, for robust UI)
-        const requiredFieldsForAPI = [
-            "name", "email", "password", "universityName", "dob",
-            "educationLevel", "fieldOfStudy", "country", "state", "city", "zip", "address",
-            "desiredField", "linkedin",
-        ];
-        
-        if (!requiredFieldsForAPI.every((field) => Boolean(formData[field]))) {
-             setErrorMessage("Internal data error: Missing critical information from previous steps. Please go back and review.");
-             // setLoading(false);
-             return;
-        }
+      // 2. Critical Fields Check (Before submission, for robust UI)
+      const requiredFieldsForAPI = [
+        "name", "email", "password", "universityName", "dob",
+        "educationLevel", "fieldOfStudy", "country", "state", "city", "zip", "address",
+        "desiredField", "linkedin",
+      ];
 
-
-        // 3. Append all fields to FormData
-        Object.entries(formData).forEach(([key, value]) => {
-            // Skip the file handle (will be appended separately)
-            if (key === "profilePic") return; 
-            
-            // Handle Date of Birth: Convert Date object to ISO string
-            if (key === "dob" && value instanceof Date) {
-                formDataToSend.append(key, value.toISOString());
-                return;
-            }
-
-            // Handle comma-separated string fields
-            if (["skills", "interests", "preferredLocations"].includes(key)) {
-                const normalizedValue = (value || "").split(",")
-                                                    .map((v) => v.trim())
-                                                    .filter(v => v)
-                                                    .join(",");
-                formDataToSend.append(key, normalizedValue);
-                return;
-            }
-            
-            // Handle all other fields (name, email, password, location, education, etc.)
-            // IMPORTANT: This block includes 'password' and 'confirmPassword'.
-            // If the backend at line 165 checks for confirmPassword, we must send it here.
-            if (value !== null && value !== undefined) {
-                formDataToSend.append(key, value);
-            }
-        });
-        
-        // --- NOTE on 'confirmPassword' ---
-        // Since we removed the specific exclusion for 'confirmPassword' from the loop 
-        // (i.e., we let it be appended like any other field), the backend will now
-        // receive it, satisfying the requirement at line 165 of the controller.
-        // The check below is now redundant but kept for demonstration:
-        
-        /* // BACKEND SPECIFIC HACK (REDUNDANT BUT SHOWN FOR CONTEXT):
-        // If you were manually removing 'confirmPassword' earlier, this explicit append 
-        // would be necessary to satisfy the server's validation check before it's hashed.
-        if (!formDataToSend.has("confirmPassword") && formData.confirmPassword) {
-             formDataToSend.append("confirmPassword", formData.confirmPassword);
-        }
-        */
-
-
-        // 4. Append profile picture separately
-        formDataToSend.append("profileImage", formData.profilePic);
-
-        // 5. API Call
-        const response = await axios.post("/api/users/register", formDataToSend, {
-            headers: { "Content-Type": "multipart/form-data" },
-        });
-
-        // 6. Success Action
-        if (response.status === 201) {
-            // setLoading(false);
-            // After successful registration, navigate to the login page
-            navigate("/user/login"); 
-        }
-    } catch (error) {
-        console.error("Registration error:", error);
+      if (!requiredFieldsForAPI.every((field) => Boolean(formData[field]))) {
+        setErrorMessage("Internal data error: Missing critical information from previous steps. Please go back and review.");
         // setLoading(false);
-        setErrorMessage(
-            error.response?.data?.error || "Registration failed. Please check your inputs and try again."
-        );
+        return;
+      }
+
+
+      // 3. Append all fields to FormData
+      Object.entries(formData).forEach(([key, value]) => {
+        // Skip the file handle (will be appended separately)
+        if (key === "profilePic") return;
+
+        // Handle Date of Birth: Convert Date object to ISO string
+        if (key === "dob" && value instanceof Date) {
+          formDataToSend.append(key, value.toISOString());
+          return;
+        }
+
+        // Handle comma-separated string fields
+        if (["skills", "interests", "preferredLocations"].includes(key)) {
+          const normalizedValue = (value || "").split(",")
+            .map((v) => v.trim())
+            .filter(v => v)
+            .join(",");
+          formDataToSend.append(key, normalizedValue);
+          return;
+        }
+
+        // Handle all other fields (name, email, password, location, education, etc.)
+        // IMPORTANT: This block includes 'password' and 'confirmPassword'.
+        // If the backend at line 165 checks for confirmPassword, we must send it here.
+        if (value !== null && value !== undefined) {
+          formDataToSend.append(key, value);
+        }
+      });
+
+      // --- NOTE on 'confirmPassword' ---
+      // Since we removed the specific exclusion for 'confirmPassword' from the loop 
+      // (i.e., we let it be appended like any other field), the backend will now
+      // receive it, satisfying the requirement at line 165 of the controller.
+      // The check below is now redundant but kept for demonstration:
+
+      /* // BACKEND SPECIFIC HACK (REDUNDANT BUT SHOWN FOR CONTEXT):
+      // If you were manually removing 'confirmPassword' earlier, this explicit append 
+      // would be necessary to satisfy the server's validation check before it's hashed.
+      if (!formDataToSend.has("confirmPassword") && formData.confirmPassword) {
+           formDataToSend.append("confirmPassword", formData.confirmPassword);
+      }
+      */
+
+
+      // 4. Append profile picture separately
+      formDataToSend.append("profileImage", formData.profilePic);
+
+      // 5. API Call
+      const response = await axios.post("/api/users/register", formDataToSend, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      // 6. Success Action
+      if (response.status === 201) {
+        // setLoading(false);
+        // After successful registration, navigate to the login page
+        navigate("/user/login");
+      }
+    } catch (error) {
+      console.error("Registration error:", error);
+      // setLoading(false);
+      setErrorMessage(
+        error.response?.data?.error || "Registration failed. Please check your inputs and try again."
+      );
     }
-};
+  };
 
   // --- Location/City Logic (from UserProfileForm.js) ---
   const stateList =
@@ -410,7 +411,7 @@ const handleStep3Submit = async () => {
     }));
     setCitySuggestions([]);
   };
-  
+
   // Placeholder for Google Sign-In (requires Firebase setup)
   const handleGoogleSignIn = async () => {
     setErrorMessage("Google Sign-In functionality needs to be integrated with this single component's flow.");
@@ -451,7 +452,7 @@ const handleStep3Submit = async () => {
         </>
       );
     }
-    
+
     // Step 1.5: OTP Verification
     if (currentStep === 1.5) {
       return (
@@ -564,7 +565,7 @@ const handleStep3Submit = async () => {
                 </div>
               </div>
             </div>
-            
+
             {/* EDUCATIONAL INFORMATION */}
             <div className="w-full h-12 p-3 bg-[#F9F0FF] border-b border-[#E6C4FB]">
               <h2 className="text-lg font-bold text-gray-700">EDUCATIONAL INFORMATION</h2>
@@ -684,16 +685,19 @@ const handleStep3Submit = async () => {
     <div className="flex flex-col lg:flex-row min-h-screen font-poppins bg-gray-100 lg:bg-white">
       {/* Side Image (only visible on step 1/1.5, similar to original UserCreateAccount.js) */}
       {(currentStep === 1 || currentStep === 1.5) && (
-        <div className="hidden lg:flex lg:w-1/2 items-center justify-center">
-          {/* Replace with actual image path or placeholder */}
-          <div className="w-full h-full bg-purple-50 flex items-center justify-center">
-                       </div>
+        <div className="hidden lg:flex lg:w-1/2 items-center justify-center bg-purple-50">
+          <img
+            src={loginImage}
+            alt="Skillnaav Login Illustration"
+            className="max-w-[90%] max-h-[90%] object-contain"
+          />
         </div>
       )}
 
+
       <div className="flex flex-col items-center justify-center p-8 w-full lg:w-1/2 bg-white mx-auto">
         <div className={`w-full max-w-md ${currentStep !== 1 && currentStep !== 1.5 ? 'max-w-xl' : ''} flex flex-col justify-center min-h-screen lg:min-h-full`}>
-          
+
           {errorMessage && (
             <div className="mb-4 p-4 bg-red-100 text-red-800 border border-red-400 rounded">
               {errorMessage}
@@ -701,7 +705,7 @@ const handleStep3Submit = async () => {
           )}
 
           {renderStep()}
-          
+
           {(currentStep === 1 || currentStep === 1.5) && (
             <>
               <button

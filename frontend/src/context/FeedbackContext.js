@@ -1,27 +1,23 @@
 // src/context/FeedbackContext.js
 import React, { createContext, useContext, useState } from "react";
 
-const FeedbackContext = createContext();
+const FeedbackContext = createContext(null);
 
-export function FeedbackProvider({ children }) {
+export default function FeedbackProvider({ children }) {
   const [open, setOpen] = useState(false);
   const [flow, setFlow] = useState("user");
   const [questions, setQuestions] = useState([]);
   const [triggerInfo, setTriggerInfo] = useState({});
   const [userObj, setUserObj] = useState(null);
 
-  // external snapshot fields (explicit)
+  // explicit snapshot fields
   const [externalUserId, setExternalUserId] = useState(null);
   const [externalUserName, setExternalUserName] = useState(null);
   const [externalUserEmail, setExternalUserEmail] = useState(null);
 
-  // callback called after submit/cancel
+  // callback after submit/cancel
   const [postSubmitCallback, setPostSubmitCallback] = useState(null);
 
-  /**
-   * openFeedback accepts:
-   * { flow, questions, triggerInfo, user, userId, userName, userEmail, postSubmitCallback }
-   */
   const openFeedback = ({
     flow = "user",
     questions = [],
@@ -37,10 +33,15 @@ export function FeedbackProvider({ children }) {
     setTriggerInfo(triggerInfo);
     setUserObj(user || null);
 
-    // set explicit snapshots (these will be read by the modal)
-    setExternalUserId(userId || (user && (user._id || user.id || user.userId)) || null);
-    setExternalUserName(userName || (user && (user.name || user.schoolName || user.displayName)) || null);
-    setExternalUserEmail(userEmail || (user && (user.email || user.schoolEmail || user.contactEmail)) || null);
+    setExternalUserId(
+      userId || (user && (user._id || user.id || user.userId)) || null
+    );
+    setExternalUserName(
+      userName || (user && (user.name || user.schoolName || user.displayName)) || null
+    );
+    setExternalUserEmail(
+      userEmail || (user && (user.email || user.schoolEmail || user.contactEmail)) || null
+    );
 
     setPostSubmitCallback(() => postSubmitCallback);
     setOpen(true);
@@ -58,24 +59,30 @@ export function FeedbackProvider({ children }) {
   };
 
   return (
-    <FeedbackContext.Provider value={{
-      open,
-      openFeedback,
-      closeFeedback,
-      flow,
-      questions,
-      triggerInfo,
-      userObj,
-      postSubmitCallback,
-
-      // expose explicit fields the modal expects:
-      externalUserId,
-      externalUserName,
-      externalUserEmail
-    }}>
+    <FeedbackContext.Provider
+      value={{
+        open,
+        openFeedback,
+        closeFeedback,
+        flow,
+        questions,
+        triggerInfo,
+        userObj,
+        postSubmitCallback,
+        externalUserId,
+        externalUserName,
+        externalUserEmail
+      }}
+    >
       {children}
     </FeedbackContext.Provider>
   );
 }
 
-export const useFeedback = () => useContext(FeedbackContext);
+export function useFeedback() {
+  const ctx = useContext(FeedbackContext);
+  if (!ctx) {
+    throw new Error("useFeedback must be used inside FeedbackProvider");
+  }
+  return ctx;
+}

@@ -1,22 +1,22 @@
-import React, { useEffect,  useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useFeedback } from "../../context/FeedbackContext";
 import "../../index.css"; // ensure Poppins is globally loaded
 
 export default function FeedbackModal() {
-const {
-  open,
-  closeFeedback,
-  questions,
-  flow,
-  triggerInfo,
-  userObj,
-  postSubmitCallback,
+  const {
+    open,
+    closeFeedback,
+    questions,
+    flow,
+    triggerInfo,
+    userObj,
+    postSubmitCallback,
 
-  // 🔥 ADD THESE
-  externalUserId,
-  externalUserName,
-  externalUserEmail
-} = useFeedback();
+    // 🔥 ADD THESE
+    externalUserId,
+    externalUserName,
+    externalUserEmail
+  } = useFeedback();
 
 
   const [answers, setAnswers] = useState({});
@@ -140,8 +140,11 @@ const {
     if (Object.keys(newErrors).length > 0) {
       setTimeout(() => {
         const firstKey = Object.keys(newErrors)[0];
-        const el = document.querySelector(`[name="${firstKey}"]`);
-        if (el) el.focus();
+        if (typeof document !== "undefined") {
+          const el = document.querySelector(`[name="${firstKey}"]`);
+          if (el) el.focus();
+        }
+
       }, 50);
     }
 
@@ -177,13 +180,13 @@ const {
 
     const questionMeta = Array.isArray(questions)
       ? questions.map((q) => ({
-          id: q.id,
-          label: q.label,
-          type: q.type || "text",
-          required: !!q.required,
-          validation: q.validation || null,
-          options: Array.isArray(q.options) ? q.options : undefined
-        }))
+        id: q.id,
+        label: q.label,
+        type: q.type || "text",
+        required: !!q.required,
+        validation: q.validation || null,
+        options: Array.isArray(q.options) ? q.options : undefined
+      }))
       : undefined;
 
     // Resolve user fields: explicit external fields first, then userObj, then answers
@@ -191,26 +194,27 @@ const {
     // const resolvedUserName = externalUserName || (userObj && (userObj.name || userObj.schoolName || userObj.displayName)) || (answers.contactName || null);
     // const resolvedUserEmail = externalUserEmail || (userObj && (userObj.email || userObj.schoolEmail || userObj.contactEmail)) || (answers.contactEmail || null);
 
-   const payload = {
-  flow,
+    const payload = {
+      flow,
 
-  // 🔥 Always use snapshots from context (not userObj)
-  userId: externalUserId || null,
-  userName: externalUserName || null,
-  userEmail: externalUserEmail || null,
+      // 🔥 Always use snapshots from context (not userObj)
+      userId: externalUserId || null,
+      userName: externalUserName || null,
+      userEmail: externalUserEmail || null,
 
-  // Optional full user object — safe to keep
-  user: userObj || null,
+      // Optional full user object — safe to keep
+      user: userObj || null,
 
-  triggeredBy: triggerInfo?.type,
-  page: triggerInfo?.page,
-  answers,
-  questionMeta,
-  meta: {
-    userAgent: navigator.userAgent,
-    path: window.location.pathname
-  }
-};
+      triggeredBy: triggerInfo?.type,
+      page: triggerInfo?.page,
+      answers,
+      questionMeta,
+      meta: {
+        userAgent: typeof navigator !== "undefined" ? navigator.userAgent : null,
+        path: typeof window !== "undefined" ? window.location.pathname : null
+      }
+
+    };
 
 
     // Debug during dev:
@@ -274,7 +278,7 @@ const {
 
                 {q.type === "rating" && (
                   <div className="flex gap-3 mt-2">
-                    {[1,2,3,4,5].map(n => (
+                    {[1, 2, 3, 4, 5].map(n => (
                       <button
                         key={n}
                         type="button"
@@ -296,7 +300,7 @@ const {
 
                 {q.type === "yesno" && (
                   <div className="flex gap-4 mt-2">
-                    {["yes","no"].map(opt => (
+                    {["yes", "no"].map(opt => (
                       <button key={opt} type="button" name={q.id} onClick={() => handleChange(q.id, opt)}
                         className={`px-4 py-2 rounded-lg border capitalize ${value === opt ? "bg-blue-600 text-white border-blue-600" : "bg-gray-100 border-gray-300 hover:bg-gray-200"}`}>
                         {opt}

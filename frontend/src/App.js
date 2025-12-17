@@ -48,7 +48,7 @@ import SchoolAdminResetPassword from "./WebApp/Flows/SchoolAdminFlow/SignUpLogin
 import SchoolAdminForgotPassword from "./WebApp/Flows/SchoolAdminFlow/SignUpLogin/SchoolAdminForgotPassword";
 
 // ---------- NEW IMPORTS ----------
-import { FeedbackProvider } from "./context/FeedbackContext";
+import FeedbackProvider from "./context/FeedbackContext";
 import FeedbackModal from "./components/FeedbackModal/FeedbackModal";
 // ---------- END NEW IMPORTS ----------
 
