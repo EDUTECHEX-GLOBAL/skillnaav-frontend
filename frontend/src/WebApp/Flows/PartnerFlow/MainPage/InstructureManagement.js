@@ -66,6 +66,37 @@ const TIMEZONES_US_MX = [
     "America/Iqaluit"
 ];
 
+// ✅ ADD: helper to read partner JWT from localStorage (supports multiple key styles)
+const getPartnerToken = () => {
+    // common direct keys
+    const direct =
+        localStorage.getItem("partnerToken") ||
+        localStorage.getItem("token") ||
+        localStorage.getItem("partnerJwt");
+
+    if (direct) return direct;
+
+    // common "partnerInfo" object patterns
+    try {
+        const raw =
+            localStorage.getItem("partnerInfo") ||
+            localStorage.getItem("partner") ||
+            localStorage.getItem("partnerData");
+
+        if (!raw) return null;
+
+        const obj = JSON.parse(raw);
+        return obj?.token || obj?.partnerToken || obj?.jwt || null;
+    } catch {
+        return null;
+    }
+};
+
+const authHeaders = () => {
+    const token = getPartnerToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 const InstructureManagement = () => {
     const [submitting, setSubmitting] = useState(false);
     // add right after: const [submitting, setSubmitting] = useState(false);
@@ -150,7 +181,10 @@ const InstructureManagement = () => {
     useEffect(() => {
         const fetchInstructors = async () => {
             try {
-                const { data } = await axios.get("/api/instructors", { params: { limit: 200 } });
+                const { data } = await axios.get("/api/instructors", {
+                    params: { limit: 200 },
+                    headers: authHeaders(),
+                });
 
                 const raw = Array.isArray(data)
                     ? data
@@ -162,8 +196,34 @@ const InstructureManagement = () => {
                 const normalized = items.map((d) => ({ id: d._id || d.id, ...d }));
                 setInstructors(normalized);
             } catch (err) {
-                console.error("Failed to fetch instructors:", err);
-                setInstructors([]);
+                console.error("createInstructure error:", err);
+
+                // ✅ Duplicate instructor (partnerId + email unique index)
+                if (err?.code === 11000) {
+                    return res.status(409).json({
+                        message: "Instructor already exists with this email for your account.",
+                    });
+                }
+
+                // ✅ Mongoose validation error
+                if (err?.name === "ValidationError") {
+                    return res.status(400).json({ message: err.message });
+                }
+
+                // ✅ Multer / multipart errors (boundary issues)
+                if (
+                    err?.name === "MulterError" ||
+                    String(err?.message || "").toLowerCase().includes("boundary")
+                ) {
+                    return res.status(400).json({
+                        message:
+                            "Invalid multipart/form-data. On frontend, remove manual 'Content-Type: multipart/form-data' header for FormData.",
+                    });
+                }
+
+                return res.status(500).json({
+                    message: err?.message || "Failed to create instructure.",
+                });
             }
         };
 
@@ -210,7 +270,10 @@ const InstructureManagement = () => {
     // --- ADD: helper to do the actual create POST (same endpoint you already use) ---
     async function createInstructorWithFormData(fd) {
         const { data } = await axios.post("/api/instructors", fd, {
-            headers: { "Content-Type": "multipart/form-data" },
+            headers: {
+                ...authHeaders(), // ✅ keep auth
+                // ✅ DO NOT set Content-Type manually for FormData
+            },
         });
         return data;
     }
@@ -388,7 +451,7 @@ const InstructureManagement = () => {
                 }
 
                 // 1) Ask backend to send OTP
-                await axios.post("/api/instructors/otp/start", { email });
+                await axios.post("/api/instructors/otp/start", { email }, { headers: authHeaders() });
 
                 // 2) Freeze the exact payload being verified, then open OTP modal
                 setPendingFormData(formData);
@@ -1286,10 +1349,11 @@ const InstructureManagement = () => {
                                 onClick={async () => {
                                     try {
                                         // 1) Verify OTP
-                                        await axios.post("/api/instructors/otp/verify", {
-                                            email: otpEmail,
-                                            otp: otpCode,
-                                        });
+                                        await axios.post(
+                                            "/api/instructors/otp/verify",
+                                            { email: otpEmail, otp: otpCode },
+                                            { headers: authHeaders() }
+                                        );
 
                                         // 2) Create with frozen FormData
                                         const data = await createInstructorWithFormData(pendingFormData);
@@ -1323,7 +1387,11 @@ const InstructureManagement = () => {
                                 className="text-sm text-teal-700 underline"
                                 onClick={async () => {
                                     try {
-                                        await axios.post("/api/instructors/otp/start", { email: otpEmail });
+                                        await axios.post(
+                                            "/api/instructors/otp/start",
+                                            { email: otpEmail },
+                                            { headers: authHeaders() }
+                                        );
                                         alert("OTP resent.");
                                     } catch (e) {
                                         alert("Failed to resend OTP.");
@@ -1460,18 +1528,20 @@ const InstructureManagement = () => {
                                         ) : null}
                                     </div>
                                 </div>
-                                <div className="flex flex-col items-end text-right gap-1">
-                                    <span
+
+                                <div className="flex items-center gap-3 self-center whitespace-nowrap">
+                                    <button
+                                        type="button"
                                         onClick={() => { setIsAddOpen(false); setViewing(i); }}
-                                        className="text-sm font-semibold text-blue-600 hover:underline cursor-pointer"
+                                        className="px-1.5 py-0.5 rounded-full text-sm font-semibold bg-blue-200 text-blue-700 hover:bg-blue-300"
                                     >
                                         View details
-                                    </span>
+                                    </button>
 
                                     <button
                                         type="button"
                                         onClick={() => { setIsAddOpen(false); setViewing(null); setEditing(i); }}
-                                        className="text-sm font-semibold text-amber-600 hover:underline"
+                                        className="px-1.5 py-0.5 rounded-full text-sm font-semibold bg-amber-200 text-amber-700 hover:bg-amber-300"
                                     >
                                         Edit Details
                                     </button>
@@ -1479,7 +1549,7 @@ const InstructureManagement = () => {
                                     <button
                                         type="button"
                                         onClick={() => { setIsAddOpen(false); setViewing({ ...i, __askDelete: true, __confirmOnly: true }); }}
-                                        className="text-sm font-semibold text-red-600 hover:underline"
+                                        className="px-1.5 py-0.5 rounded-full text-sm font-semibold bg-red-200 text-red-700 hover:bg-red-300"
                                     >
                                         Delete Instructor
                                     </button>

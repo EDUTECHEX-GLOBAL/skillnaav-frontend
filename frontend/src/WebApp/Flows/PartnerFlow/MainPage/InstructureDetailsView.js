@@ -2,6 +2,35 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 
+// ✅ ADD: helper to read partner JWT from localStorage (same logic as InstructureManagement.jsx)
+const getPartnerToken = () => {
+    const direct =
+        localStorage.getItem("partnerToken") ||
+        localStorage.getItem("token") ||
+        localStorage.getItem("partnerJwt");
+
+    if (direct) return direct;
+
+    try {
+        const raw =
+            localStorage.getItem("partnerInfo") ||
+            localStorage.getItem("partner") ||
+            localStorage.getItem("partnerData");
+
+        if (!raw) return null;
+
+        const obj = JSON.parse(raw);
+        return obj?.token || obj?.partnerToken || obj?.jwt || null;
+    } catch {
+        return null;
+    }
+};
+
+const authHeaders = () => {
+    const token = getPartnerToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 const sectionTitleCls = "text-sm font-semibold text-gray-900 uppercase";
 
 const toUrl = (f) => {
@@ -85,9 +114,22 @@ export default function InstructureDetailsView({
             alert("Missing instructor id.");
             return;
         }
+
+        // ✅ ADD: token check before calling API
+        const token = getPartnerToken();
+        if (!token) {
+            alert("Session expired. Please login again.");
+            return;
+        }
+
         try {
             setDeleting(true);
-            await axios.delete(`/api/instructors/${id}`);
+
+            // ✅ FIX: send Authorization header
+            await axios.delete(`/api/instructors/${id}`, {
+                headers: authHeaders(),
+            });
+
             setDeleting(false);
             setConfirmStage(0);
             onDeleted?.(id);
@@ -96,7 +138,14 @@ export default function InstructureDetailsView({
         } catch (err) {
             console.error("Delete failed:", err);
             setDeleting(false);
-            alert("Failed to delete instructor.");
+
+            // ✅ Better message for 401
+            if (err?.response?.status === 401) {
+                alert("Unauthorized. Please login again (token missing/expired).");
+                return;
+            }
+
+            alert(err?.response?.data?.message || "Failed to delete instructor.");
         }
     };
     if (!open || !item) return null;
