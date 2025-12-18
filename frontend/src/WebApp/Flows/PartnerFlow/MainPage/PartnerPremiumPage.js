@@ -224,6 +224,59 @@ useEffect(() => {
         </div>
       )}
       <h2 className="text-2xl font-semibold text-center mb-8">Choose Your Partner Plan</h2>
+
+      {/* 🌟 Partner Premium Status Banner */}
+{partner.isPremium && (() => {
+  const exp = partner.premiumExpiration ? new Date(partner.premiumExpiration) : null;
+  const now = new Date();
+
+  let remainingText = "Expired";
+  if (exp && exp > now) {
+    const diff = exp - now;
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+    remainingText = `${days}d ${hours}h ${mins}m`;
+  }
+
+  return (
+    <div className="max-w-2xl mx-auto mb-6 p-5 rounded-lg shadow-md border-l-4 border-indigo-500 bg-indigo-50">
+      <h3 className="text-lg font-semibold text-indigo-800 flex items-center gap-2">
+        ⭐ Partner Premium Active — {partner.planType}
+      </h3>
+
+      <p className="text-indigo-700 mt-1">
+        Expires on:{" "}
+        <span className="font-semibold">
+          {exp
+            ? exp.toLocaleString("en-IN", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })
+            : "N/A"}
+        </span>
+      </p>
+
+      <p className="text-indigo-600 mt-1 font-medium">
+        Time Left: {remainingText}
+      </p>
+
+      {exp && exp < now && (
+        <button
+          className="mt-3 bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 transition"
+          onClick={() => setSelectedIndex(null)}
+        >
+          Renew Partner Premium
+        </button>
+      )}
+    </div>
+  );
+})()}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
        {plans.map((plan, idx) => {
   const isCurrentPlan =

@@ -14,36 +14,36 @@ function PremiumPage() {
 
   // Fetch premium status on mount and sync localStorage & state
   useEffect(() => {
-   const fetchPremiumStatus = async () => {
-  try {
-    const token = JSON.parse(localStorage.getItem("userToken"));
-    if (!token) return;
+    const fetchPremiumStatus = async () => {
+      try {
+        const token = JSON.parse(localStorage.getItem("userToken"));
+        if (!token) return;
 
-    const { data } = await axios.get("/api/users/premium-status", {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+        const { data } = await axios.get("/api/users/premium-status", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
-    if (data.success && data.user) {
-      const storedUserInfo = JSON.parse(localStorage.getItem("userInfo")) || {};
+        if (data.success && data.user) {
+          const storedUserInfo = JSON.parse(localStorage.getItem("userInfo")) || {};
 
-      const updatedUser = {
-        ...storedUserInfo,
-        isPremium: data.user.isPremium,
-        planType: data.user.planType,
-        premiumExpiration: data.user.premiumExpiration,
-      };
+          const updatedUser = {
+            ...storedUserInfo,
+            isPremium: data.user.isPremium,
+            planType: data.user.planType,
+            premiumExpiration: data.user.premiumExpiration,
+          };
 
-      localStorage.setItem("userInfo", JSON.stringify(updatedUser));
-      setIsPremium(data.user.isPremium);
-      setPlanType(data.user.planType);
-    } else {
-      setIsPremium(false);
-      setPlanType("Free");
-    }
-  } catch (err) {
-    console.error("Failed to fetch premium status:", err);
-  }
-};
+          localStorage.setItem("userInfo", JSON.stringify(updatedUser));
+          setIsPremium(data.user.isPremium);
+          setPlanType(data.user.planType);
+        } else {
+          setIsPremium(false);
+          setPlanType("Free");
+        }
+      } catch (err) {
+        console.error("Failed to fetch premium status:", err);
+      }
+    };
 
 
     fetchPremiumStatus();
@@ -109,7 +109,7 @@ function PremiumPage() {
             showAlert("Unable to create PayPal order.", "error");
           }
         },
-        onApprove: async (data) => {
+        onApprove: async (data, actions) => {
           try {
             const verifyRes = await axios.post("/api/payments/paypal/verify", {
               orderID: data.orderID,
@@ -123,27 +123,33 @@ function PremiumPage() {
             if (verifyRes.data.success) {
               showAlert("Payment verified successfully!", "success");
 
-              // Save new premium info in localStorage & state
-              paymentData.userInfo.isPremium = true;
-              paymentData.userInfo.planType = verifyRes.data.user.planType;
-              paymentData.userInfo.premiumExpiration = verifyRes.data.user.premiumExpiration;
+              const updatedUser = {
+                ...paymentData.userInfo,
+                isPremium: true,
+                planType: verifyRes.data.user.planType,
+                premiumExpiration: verifyRes.data.user.premiumExpiration,
+              };
 
-              localStorage.setItem("userInfo", JSON.stringify(paymentData.userInfo));
+              localStorage.setItem("userInfo", JSON.stringify(updatedUser));
               setIsPremium(true);
-              setPlanType(verifyRes.data.user.planType);
+              setPlanType(updatedUser.planType);
               setSelectedPlanIndex(null);
             } else {
               showAlert("Payment verification failed.", "error");
             }
           } catch (err) {
+            const issue = err.response?.data?.details?.details?.[0]?.issue;
+
+            // 🔥 THIS FIXES INSTRUMENT_DECLINED
+            if (issue === "INSTRUMENT_DECLINED") {
+              return actions.restart();
+            }
+
             console.error("Verify failed:", err);
-            showAlert("Payment verification error.", "error");
+            showAlert("Payment failed. Please try again.", "error");
           }
-        },
-        onError: (err) => {
-          console.error("PayPal error:", err);
-          showAlert("Payment failed. Try again.", "error");
-        },
+        }
+
       })
       .render(`#${containerId}`);
   }, [selectedPlanIndex, paymentData, sdkReady]);
@@ -223,11 +229,10 @@ function PremiumPage() {
     <div id="pricing" className="py-12 my-12 pb-12 lg:py-16 relative">
       {alert.show && (
         <div
-          className={`fixed top-4 right-4 border-l-4 p-4 ${
-            alert.type === "success"
+          className={`fixed top-4 right-4 border-l-4 p-4 ${alert.type === "success"
               ? "bg-green-100 border-green-400 text-green-700"
               : "bg-red-100 border-red-400 text-red-700"
-          } rounded-lg shadow-lg z-50`}
+            } rounded-lg shadow-lg z-50`}
           role="alert"
         >
           <p className="font-medium">{alert.message}</p>
@@ -237,6 +242,60 @@ function PremiumPage() {
       <h1 className="text-center font-medium text-2xl lg:text-4xl text-gray-900 mb-6">
         Choose Your Plan
       </h1>
+
+      {isPremium && (() => {
+  const userInfo = JSON.parse(localStorage.getItem("userInfo")) || {};
+  const expDate = userInfo.premiumExpiration ? new Date(userInfo.premiumExpiration) : null;
+  const now = new Date();
+
+  let timeLeftText = "Expired";
+  if (expDate && expDate > now) {
+    const diff = expDate - now;
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    timeLeftText = `${days}d ${hours}h ${mins}m`;
+  }
+
+  return (
+    <div className="max-w-xl mx-auto p-4 mb-8 rounded-lg shadow-md bg-gradient-to-r from-yellow-100 to-yellow-200 border-l-4 border-yellow-500">
+
+      <h2 className="text-lg font-semibold text-yellow-900 flex items-center gap-2">
+        🌟 Premium Active — {planType}
+      </h2>
+
+      <p className="text-yellow-800 mt-1">
+        Expires on:{" "}
+        <span className="font-semibold">
+          {expDate
+            ? expDate.toLocaleString("en-IN", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })
+            : "N/A"}
+        </span>
+      </p>
+
+      <p className="text-yellow-700 mt-1">
+        Time left: <span className="font-medium">{timeLeftText}</span>
+      </p>
+
+      {/* Show renew button if expired */}
+      {expDate && expDate < now && (
+        <button
+          onClick={() => setSelectedPlanIndex(null)}
+          className="mt-3 bg-yellow-600 hover:bg-yellow-700 text-white py-2 px-4 rounded-md shadow font-medium"
+        >
+          Renew Premium
+        </button>
+      )}
+    </div>
+  );
+})()}
+
 
       <div className="flex flex-col gap-6 lg:flex-row flex-wrap justify-center">
         {pricingcard.map((card, index) => {

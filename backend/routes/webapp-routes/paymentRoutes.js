@@ -119,21 +119,25 @@ router.post("/paypal/verify", async (req, res) => {
     // Return consistent wrapper: { user: ... }
     return res.json({ success: true, user: updatedUser });
   } catch (err) {
-    if (err.response) {
-      console.error("❌ FULL ERROR in /paypal/verify:", err.response.data);
-      return res.status(500).json({
-        success: false,
-        message: err.message,
-        details: err.response.data,
-      });
-    }
-    console.error("❌ Error in /paypal/verify:", err);
-    return res.status(500).json({
+  const issue = err.response?.data?.details?.[0]?.issue;
+
+  // 🔥 REQUIRED BY PAYPAL
+  if (issue === "INSTRUMENT_DECLINED") {
+    return res.status(400).json({
       success: false,
-      message: err.message,
-      details: null,
+      retry: true,
+      details: err.response.data,
     });
   }
+
+  console.error("❌ FULL ERROR in /paypal/verify:", err.response?.data || err);
+
+  return res.status(500).json({
+    success: false,
+    message: "PayPal capture failed",
+    details: err.response?.data || null,
+  });
+}
 });
 
 

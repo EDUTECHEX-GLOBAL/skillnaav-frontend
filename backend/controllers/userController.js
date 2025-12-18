@@ -477,24 +477,30 @@ const rejectUser = asyncHandler(async (req, res) => {
 });
 
 // Get premium status
+// Get premium status
 const getPremiumStatus = asyncHandler(async (req, res) => {
-  // find user (no password)
+
   let user = await Userwebapp.findById(req.user._id).select("-password");
 
   if (!user) {
-    res.status(404);
-    throw new Error("User not found");
+    return res.status(404).json({
+      success: false,
+      message: "User not found",
+    });
   }
 
-  // Expire if needed (your helper)
+  // Automatically expire premium if needed
   await expireIfNeeded(user);
 
-  // Re-fetch to get the latest persisted values after expireIfNeeded
+  // Fetch updated values after expiration logic
   const freshUser = await Userwebapp.findById(req.user._id).select("-password");
 
-  // Return a consistent wrapper (frontend expects { user: ... })
-  return res.status(200).json({ user: freshUser });
+  return res.status(200).json({
+    success: true,               // 🔥 REQUIRED FOR FRONTEND
+    user: freshUser              // 🔥 Must remain as "user"
+  });
 });
+
 
 // Send verification code for signup
 const sendSignupVerificationCode = asyncHandler(async (req, res) => {
