@@ -413,11 +413,11 @@ const updateUserProfile = asyncHandler(async (req, res) => {
     user.profileImage = req.file.location;
   }
 
-  if (user.isGoogleUser) {
-    user.adminApproved = true;
-    user.status = "Approved";
-    user.isActive = true;
-  }
+  // if (user.isGoogleUser) {
+  //   user.adminApproved = true;
+  //  user.status = "Approved";
+  //  user.isActive = true;
+  // }
 
   const updatedUser = await user.save();
 
