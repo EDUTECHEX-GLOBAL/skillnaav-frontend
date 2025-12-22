@@ -100,98 +100,113 @@ const ApplyCards = ({ job, onBack }) => {
   };
 
   // ✅ Apply to internship
-  const handleApply = async () => {
-    if (isApplied) return;
+ const handleApply = async () => {
+  if (isApplied) return;
 
-    const userInfo = JSON.parse(localStorage.getItem("userInfo"));
-    const studentId = userInfo?._id;
-    const token = userInfo?.token;
-    if (!studentId || !token) return console.error("Missing user or token.");
+  const userInfo = JSON.parse(localStorage.getItem("userInfo"));
+  const studentId = userInfo?._id;
+  const token = localStorage.getItem("userToken");
 
-    // 🔹 Check if stipend internship requires assessment
-    if (job.internshipType === "STIPEND") {
-      // Always fetch fresh assessment
-      let studentAssessment;
-      try {
-        const { data } = await axios.get(`/api/assessments/${studentId}/${job._id}`);
-        studentAssessment = data.assessment;
-        setAssessment(studentAssessment);
-      } catch (error) {
-        console.error("Error fetching assessment:", error);
-      }
+  if (!studentId || !token) {
+    console.error("Missing user or token.");
+    alert("Session expired. Please log in again.");
+    return;
+  }
 
-      if (!studentAssessment) {
-        alert("You must generate and complete the assessment before applying to this stipend internship.");
-        return;
-      }
-
-      // Now fetch their submission for this assessment (this is where fitStatus lives)
-      let submission;
-      try {
-        const { data } = await axios.get(`/api/assessments/submission/${studentId}/${studentAssessment._id}`);
-        submission = data.submission;
-      } catch (error) {
-        submission = null;
-      }
-
-      if (!submission || submission.fitStatus !== "fit") {
-        alert("You must pass the assessment to apply for this stipend internship.");
-        return;
-      }
-    }
-
-
-    // 🔹 Ensure resume is uploaded
-    if (!resume) return setShowResumePopup(true);
+  // 🔹 Check if stipend internship requires assessment
+  if (job.internshipType === "STIPEND") {
+    let studentAssessment;
 
     try {
-      const { data: countData } = await axios.get(`/api/applications/count/${studentId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      const maxApps = MAX_LIMITS[planType]?.applications || 5;
-      if (countData.count >= maxApps) {
-        setShowLimitPopup(true);
-        return;
-      }
+      const { data } = await axios.get(
+        `/api/assessments/${studentId}/${job._id}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      studentAssessment = data.assessment;
+      setAssessment(studentAssessment);
     } catch (error) {
-      console.error("Error checking application count:", error);
+      console.error("Error fetching assessment:", error);
+    }
+
+    if (!studentAssessment) {
+      alert("You must generate and complete the assessment before applying.");
       return;
     }
 
-    setIsUploading(true);
+    let submission;
     try {
-      const formData = new FormData();
-      formData.append("studentId", studentId);
-      formData.append("internshipId", job._id);
-      formData.append("resume", resume);
-      if (schoolAdminId) formData.append("schoolAdminId", schoolAdminId);
-
-      const apiResponse = await axios.post("/api/applications/apply", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (apiResponse.status === 201) {
-        setIsApplied(true);
-        const { data: updatedCount } = await axios.get(`/api/applications/count/${studentId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setApplicationCount(updatedCount.count);
-      }
-    } catch (error) {
-      const { status, data } = error.response || {};
-      if (status === 403 || (status === 400 && data?.message?.includes("already applied"))) {
-        setIsApplied(true);
-      } else {
-        alert(data?.message || "An unexpected error occurred.");
-      }
-    } finally {
-      setIsUploading(false);
+      const { data } = await axios.get(
+        `/api/assessments/submission/${studentId}/${studentAssessment._id}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      submission = data.submission;
+    } catch {
+      submission = null;
     }
-  };
+
+    if (!submission || submission.fitStatus !== "fit") {
+      alert("You must pass the assessment to apply.");
+      return;
+    }
+  }
+
+  if (!resume) {
+    setShowResumePopup(true);
+    return;
+  }
+
+  // 🔹 Check application limit
+  try {
+    const { data: countData } = await axios.get(
+      `/api/applications/count/${studentId}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+
+    const maxApps = MAX_LIMITS[planType]?.applications || 5;
+    if (countData.count >= maxApps) {
+      setShowLimitPopup(true);
+      return;
+    }
+  } catch (error) {
+    console.error("Error checking application count:", error);
+    return;
+  }
+
+  // 🔹 Apply
+  setIsUploading(true);
+  try {
+    const formData = new FormData();
+    formData.append("studentId", studentId);
+    formData.append("internshipId", job._id);
+    formData.append("resume", resume);
+    if (schoolAdminId) formData.append("schoolAdminId", schoolAdminId);
+
+    const res = await axios.post("/api/applications/apply", formData, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "multipart/form-data",
+      },
+    });
+
+    if (res.status === 201) {
+      setIsApplied(true);
+      const { data } = await axios.get(
+        `/api/applications/count/${studentId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setApplicationCount(data.count);
+    }
+  } catch (error) {
+    const { status, data } = error.response || {};
+    if (status === 403 || data?.message?.includes("already applied")) {
+      setIsApplied(true);
+    } else {
+      alert(data?.message || "Something went wrong.");
+    }
+  } finally {
+    setIsUploading(false);
+  }
+};
 
 
   // ✅ Save/unsave job

@@ -8,8 +8,9 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
 import { FcGoogle } from "react-icons/fc";
 import ForgotPasswordModal from "../SignUpLogin/UserforgotPassword";
-import { auth, googleAuthProvider } from "../../../../config/Firebase"; // Firebase setup
-import { signInWithPopup } from "firebase/auth";
+// import { auth, googleAuthProvider } from "../../../../config/Firebase"; // Firebase setup
+// import { signInWithPopup } from "firebase/auth";
+import { GoogleLogin } from "@react-oauth/google";
 import axios from "axios";
 
 const validationSchema = Yup.object({
@@ -24,39 +25,39 @@ const UserLogin = () => {
   const [error, setError] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const handleGoogleSignIn = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      // Ensure account selection by setting `prompt`
-      googleAuthProvider.setCustomParameters({ prompt: "select_account" });
+  // const handleGoogleSignIn = async () => {
+  //   setLoading(true);
+  //   setError("");
+  //   try {
+  //     // Ensure account selection by setting `prompt`
+  //     googleAuthProvider.setCustomParameters({ prompt: "select_account" });
 
-      // Open the Google sign-in popup
-      const result = await signInWithPopup(auth, googleAuthProvider);
-      const user = result.user;
+  //     // Open the Google sign-in popup
+  //     const result = await signInWithPopup(auth, googleAuthProvider);
+  //     const user = result.user;
 
-      // Obtain user token
-      const token = await user.getIdToken();
+  //     // Obtain user token
+  //     const token = await user.getIdToken();
 
-      // Store token and user info in localStorage
-      localStorage.setItem("userToken", JSON.stringify(token));
-      localStorage.setItem("userInfo", JSON.stringify(user));
-      sessionStorage.setItem("userToken", JSON.stringify(token));
+  //     // Store token and user info in localStorage
+  //     localStorage.setItem("userToken", JSON.stringify(token));
+  //     localStorage.setItem("userInfo", JSON.stringify(user));
+  //     sessionStorage.setItem("userToken", JSON.stringify(token));
 
-      // --- RECORD LOGIN TIME (used by feedback gating) ---
-      localStorage.setItem("loginTime", Date.now());
+  //     // --- RECORD LOGIN TIME (used by feedback gating) ---
+  //     localStorage.setItem("loginTime", Date.now());
 
-      console.log("Google user:", user);
+  //     console.log("Google user:", user);
 
-      // Navigate to the main page
-      navigate("/user-main-page");
-    } catch (err) {
-      console.error("Google sign-in error:", err);
-      setError("Google sign-in failed. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  //     // Navigate to the main page
+  //     navigate("/user-main-page");
+  //   } catch (err) {
+  //     console.error("Google sign-in error:", err);
+  //     setError("Google sign-in failed. Please try again.");
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
 
   const handleSubmit = async (values, { setSubmitting }) => {
     setError("");
@@ -77,9 +78,20 @@ const UserLogin = () => {
       // 🧹 Clear any existing localStorage
       localStorage.clear();
 
-      // 💾 Store auth data
-      localStorage.setItem("userToken", JSON.stringify(data.token));
-      localStorage.setItem("userInfo", JSON.stringify(data));
+   // 💾 Store token as STRING (VERY IMPORTANT)
+localStorage.setItem("userToken", data.token);
+
+// 💾 Store only profile info (no token duplication)
+localStorage.setItem("userInfo", JSON.stringify({
+  _id: data._id,
+  name: data.name,
+  email: data.email,
+  profileImage: data.profileImage,
+  isPremium: data.isPremium,
+  planType: data.planType,
+  adminApproved: data.adminApproved,
+  status: data.status,
+}));
 
       // ✅ Store schoolAdminId if present
       if (data.schoolAdminId) {
@@ -215,14 +227,47 @@ const UserLogin = () => {
             <hr className="w-full border-gray-300" />
           </div>
 
-          {/* Google Sign-In Button */}
-          <button
-            onClick={handleGoogleSignIn}
-            className="w-full bg-red-500 text-white p-3 rounded-lg hover:bg-red-600 mb-4 flex items-center justify-center space-x-2"
-          >
-            <FcGoogle className="text-xl" />
-            <span>Sign in with Google</span>
-          </button>
+  <GoogleLogin
+  onSuccess={async (credentialResponse) => {
+    try {
+      const idToken = credentialResponse.credential;
+
+      const res = await axios.post("/api/users/google-auth", { idToken });
+
+      // ✅ STORE TOKEN AS STRING (NO JSON.parse EVER)
+      localStorage.setItem("userToken", res.data.token);
+
+      // ✅ STORE USER INFO AS JSON
+      localStorage.setItem("userInfo", JSON.stringify({
+        _id: res.data._id,
+        name: res.data.name,
+        email: res.data.email,
+        profileImage: res.data.profileImage,
+        isGoogleUser: res.data.isGoogleUser,
+        planType: "Free"
+      }));
+
+      // record login time
+      localStorage.setItem("loginTime", Date.now());
+
+      // ✅ NAVIGATION (THIS WORKS)
+      if (res.data.needsProfileCompletion) {
+        navigate("/user/complete-profile");
+      } else {
+        navigate("/user-main-page");
+      }
+
+    } catch (err) {
+      console.error(err);
+      setError("Google login failed. Try again.");
+    }
+  }}
+  onError={() => setError("Google login failed")}
+ />
+
+
+
+
 
           {/* Sign Up Button */}
           <div className="flex justify-center mt-4">

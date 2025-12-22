@@ -6,13 +6,18 @@ import reportWebVitals from "./reportWebVitals";
 import { Provider } from "react-redux";
 import store from "./redux/store";
 
-// Firebase is already initialized in firebase.js, no need to do it here again.
+import { GoogleOAuthProvider } from "@react-oauth/google";  // ⭐ REQUIRED FOR GOOGLE SIGN-IN
+
+// Replace with your actual Google Client ID from Google console
+const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID;
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(
-  <Provider store={store}>
-    <App />
-  </Provider>
+  <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+    <Provider store={store}>
+      <App />
+    </Provider>
+  </GoogleOAuthProvider>
 );
 
 reportWebVitals();

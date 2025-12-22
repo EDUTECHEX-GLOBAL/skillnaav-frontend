@@ -31,68 +31,77 @@ const Navbar = ({ onToggleSidebar }) => {
   // From Feedback Context
   const { openFeedback } = useFeedback();
 
-  useEffect(() => {
-    const storedUserInfo = JSON.parse(localStorage.getItem("userInfo"));
-    if (storedUserInfo) {
-      setUserInfo(storedUserInfo);
-      setPlanType(storedUserInfo.planType || "Free");
+ useEffect(() => {
+  const rawUserInfo = localStorage.getItem("userInfo");
+  if (!rawUserInfo) return;
 
-      const studentId = storedUserInfo._id;
+  let storedUserInfo;
+  try {
+    storedUserInfo = JSON.parse(rawUserInfo);
+  } catch (err) {
+    console.error("Invalid userInfo in storage");
+    return;
+  }
 
-      /* Fetch Notifications */
-      const fetchNotifications = async () => {
-        try {
-          const { data } = await axios.get(`/api/notifications/${studentId}`);
-          if (data?.success) {
-            const unread = data.notifications.filter((n) => !n.isRead).length;
-            setUnreadCount(unread);
-          }
-        } catch (err) {
-          console.error("Failed to fetch notifications:", err);
-        }
-      };
+  if (!storedUserInfo?._id) return;
 
-      /* Fetch Premium Status */
-      const fetchPremiumStatus = async () => {
-        try {
-          const token = JSON.parse(localStorage.getItem("userToken"));
-          if (!token) return;
+  setUserInfo(storedUserInfo);
+  setPlanType(storedUserInfo.planType || "Free");
 
-          const { data } = await axios.get("/api/users/premium-status", {
-            headers: { Authorization: `Bearer ${token}` },
-          });
+  const studentId = storedUserInfo._id;
 
-          if (!data?.user) return;
-
-          const storedUser = JSON.parse(localStorage.getItem("userInfo")) || {};
-
-          const updatedUser = {
-            ...storedUser,
-            isPremium: data.user.isPremium,
-            planType: data.user.planType,
-            premiumExpiration: data.user.premiumExpiration,
-          };
-
-          localStorage.setItem("userInfo", JSON.stringify(updatedUser));
-
-          setIsPremium(data.user.isPremium);
-          setPlanType(data.user.planType);
-        } catch (err) {
-          console.error("Failed to fetch premium status:", err);
-        }
-      };
-
-      fetchNotifications();
-      fetchPremiumStatus();
+  // 🔔 Notifications
+  const fetchNotifications = async () => {
+    try {
+      const { data } = await axios.get(`/api/notifications/${studentId}`);
+      if (data?.success) {
+        const unread = data.notifications.filter(n => !n.isRead).length;
+        setUnreadCount(unread);
+      }
+    } catch (err) {
+      console.error("Failed to fetch notifications:", err);
     }
-  }, []);
+  };
+
+  // 💎 Premium status
+  const fetchPremiumStatus = async () => {
+    try {
+      const token = localStorage.getItem("userToken");
+      if (!token) return;
+
+      const { data } = await axios.get("/api/users/premium-status", {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!data?.user) return;
+
+      const updatedUser = {
+        ...storedUserInfo,
+        isPremium: data.user.isPremium,
+        planType: data.user.planType,
+        premiumExpiration: data.user.premiumExpiration
+      };
+
+      localStorage.setItem("userInfo", JSON.stringify(updatedUser));
+      setIsPremium(data.user.isPremium);
+      setPlanType(data.user.planType);
+    } catch (err) {
+      console.error("Failed to fetch premium status:", err);
+    }
+  };
+
+  fetchNotifications();
+  fetchPremiumStatus();
+}, []);
+
 
   const handleUserClick = () => setIsDropdownOpen(!isDropdownOpen);
 
   /* ---- performLogout declared first (prevents TDZ) ---- */
   const performLogout = async () => {
     const sessionId = localStorage.getItem("sessionId");
-    const token = JSON.parse(localStorage.getItem("userToken"));
+   const token = localStorage.getItem("userToken");
+
 
     if (sessionId && token) {
       try {

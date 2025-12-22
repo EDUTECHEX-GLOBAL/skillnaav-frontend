@@ -34,50 +34,48 @@ const UserMainPageContent = () => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  useEffect(() => {
-    const fetchUserInfo = async () => {
-      try {
-        let token = localStorage.getItem("userToken");
-        if (!token) {
-          token = sessionStorage.getItem("userToken");
-          if (token) localStorage.setItem("userToken", token);
-        }
+useEffect(() => {
+  const fetchUserInfo = async () => {
+    try {
+      // ✅ READ TOKEN AS STRING (NO JSON.parse)
+      let token = localStorage.getItem("userToken");
 
-        if (token) {
-          const parsedToken = JSON.parse(token);
-          const response = await axios.get("/api/users/profile", {
-            headers: { Authorization: `Bearer ${parsedToken}` },
-          });
-          setUserInfo(response.data);
-          setIsApproved(response.data.adminApproved);
-
-          // Handle query params after fetching user info
-          const openTab = searchParams.get("openTab");
-          const openRec = searchParams.get("openRec");
-          if (openTab) {
-            handleSelectTab(openTab);
-            // Optionally handle openRec inside the tab content component
-          }
-        } else {
-          const openTab = searchParams.get("openTab");
-          const openRec = searchParams.get("openRec");
-          if (openTab) {
-            const nextPath = `/user-main-page?openTab=${openTab}${openRec ? `&openRec=${openRec}` : ""}`;
-            navigate(`/user/login?next=${encodeURIComponent(nextPath)}`, { replace: true });
-          } else {
-            navigate("/user/login");
-          }
-        }
-      } catch (error) {
-        console.error("Failed to fetch user info:", error);
-        navigate("/user/login");
-      } finally {
-        setLoading(false);
+      if (!token) {
+        token = sessionStorage.getItem("userToken");
+        if (token) localStorage.setItem("userToken", token);
       }
-    };
 
-    fetchUserInfo();
-  }, [searchParams, navigate, handleSelectTab]);
+      if (!token) {
+        navigate("/user/login");
+        return;
+      }
+
+      // ✅ API CALL
+      const response = await axios.get("/api/users/profile", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      setUserInfo(response.data);
+      setIsApproved(response.data.adminApproved);
+
+      // Handle query params
+      const openTab = searchParams.get("openTab");
+      if (openTab) handleSelectTab(openTab);
+
+    } catch (error) {
+      console.error("Failed to fetch user info:", error);
+      localStorage.clear();
+      navigate("/user/login");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchUserInfo();
+}, [searchParams, navigate, handleSelectTab]);
+
 
   useEffect(() => {
     if (userInfo && !userInfo.isPremium) {

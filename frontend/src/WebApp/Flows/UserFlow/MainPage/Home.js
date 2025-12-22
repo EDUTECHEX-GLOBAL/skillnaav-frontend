@@ -79,25 +79,37 @@ const Home = () => {
       window.scrollTo(0, parseInt(savedPosition, 10)); // Restore scroll position
     }
 
-    const fetchUserProfile = async () => {
-      try {
-        const userInfo = JSON.parse(localStorage.getItem("userInfo"));
-        const token = userInfo?.token;
-        if (!token) return console.error("No token found in userInfo");
+   const fetchUserProfile = async () => {
+  try {
+    // ✅ READ TOKEN CORRECTLY
+    const token = localStorage.getItem("userToken");
+    if (!token) {
+      console.error("No token found in localStorage");
+      return;
+    }
 
-        const { data } = await axios.get("/api/users/profile", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setIsPremium(data.isPremium);
-        setPlanType(data.planType || "Freemium");
+    // ✅ API CALL
+    const { data } = await axios.get("/api/users/profile", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
 
+    setIsPremium(data.isPremium);
+    setPlanType(data.planType || "Freemium");
 
-        const { data: countData } = await axios.get(`/api/applications/count/${userInfo._id}`);
-        setApplicationCount(countData.count);
-      } catch (error) {
-        console.error("Error fetching user profile or application count:", error);
-      }
-    };
+    // ✅ application count
+    const userInfo = JSON.parse(localStorage.getItem("userInfo")) || {};
+    if (userInfo._id) {
+      const { data: countData } = await axios.get(
+        `/api/applications/count/${userInfo._id}`
+      );
+      setApplicationCount(countData.count);
+    }
+
+  } catch (error) {
+    console.error("Error fetching user profile or application count:", error);
+  }
+};
+
 
     fetchJobData();
     fetchUserProfile();

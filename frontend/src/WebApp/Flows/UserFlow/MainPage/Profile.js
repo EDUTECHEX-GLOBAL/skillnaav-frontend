@@ -50,48 +50,45 @@ const ProfileForm = () => {
     return !isNaN(parsed.getTime());
   };
 
-  useEffect(() => {
-    const fetchUserProfile = async () => {
-      try {
-        const userInfo = JSON.parse(localStorage.getItem("userInfo"));
-        const token = userInfo?.token;
+useEffect(() => {
+  const fetchUserProfile = async () => {
+    try {
+      // ✅ CORRECT TOKEN SOURCE
+      const token = localStorage.getItem("userToken");
 
-        if (token) {
-          const config = {
-            headers: { Authorization: `Bearer ${token}` },
-          };
-
-          const { data } = await axios.get("/api/users/profile", config);
-
-          setUser((prevUser) => ({
-            ...prevUser,
-            ...data,
-            password: "",
-            confirmPassword: "",
-            dob: isValidDate(data.dob)
-              ? new Date(data.dob).toISOString().split("T")[0]
-              : "",
-            profileImage: data.profileImage || prevUser.profileImage,
-            skills: Array.isArray(data.skills) && data.skills.filter(Boolean).length > 0
-              ? data.skills.join(", ")
-              : "",
-            interests: Array.isArray(data.interests) && data.interests.filter(Boolean).length > 0
-              ? data.interests.join(", ")
-              : "",
-            preferredLocations: Array.isArray(data.preferredLocations) && data.preferredLocations.filter(Boolean).length > 0
-              ? data.preferredLocations.join(", ")
-              : "",
-          }));
-
-        }
-      } catch (error) {
-        console.error("Error fetching profile:", error);
-        setErrorMessage("Failed to load profile data.");
+      if (!token) {
+        setErrorMessage("No token found. Please log in again.");
+        return;
       }
-    };
 
-    fetchUserProfile();
-  }, []);
+      const { data } = await axios.get("/api/users/profile", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      setUser((prevUser) => ({
+        ...prevUser,
+        ...data,
+        password: "",
+        confirmPassword: "",
+        dob: isValidDate(data.dob)
+          ? new Date(data.dob).toISOString().split("T")[0]
+          : "",
+        profileImage: data.profileImage || prevUser.profileImage,
+        skills: Array.isArray(data.skills) ? data.skills.join(", ") : "",
+        interests: Array.isArray(data.interests) ? data.interests.join(", ") : "",
+        preferredLocations: Array.isArray(data.preferredLocations)
+          ? data.preferredLocations.join(", ")
+          : "",
+      }));
+    } catch (error) {
+      console.error("Error fetching profile:", error);
+      setErrorMessage("Failed to load profile data.");
+    }
+  };
+
+  fetchUserProfile();
+}, []);
+
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -115,61 +112,62 @@ const ProfileForm = () => {
     }
   };
 
-  const handleUpdateProfile = async () => {
-    setErrorMessage(null);
-    setSuccessMessage("");
+ const handleUpdateProfile = async () => {
+  setErrorMessage(null);
+  setSuccessMessage("");
 
-    try {
-      const userInfo = JSON.parse(localStorage.getItem("userInfo"));
-      const token = userInfo?.token;
+  try {
+    // ✅ CORRECT TOKEN SOURCE
+    const token = localStorage.getItem("userToken");
 
-      if (!token) {
-        setErrorMessage("No token found. Please log in again.");
-        return;
-      }
-
-      const config = {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      };
-
-      const payload = {
-        ...user,
-        skills: user.skills
-          ? user.skills.split(",").map((s) => s.trim()).filter(Boolean)
-          : [],
-        interests: user.interests
-          ? user.interests.split(",").map((i) => i.trim()).filter(Boolean)
-          : [],
-        preferredLocations: user.preferredLocations
-          ? user.preferredLocations.split(",").map((l) => l.trim()).filter(Boolean)
-          : [],
-      };
-
-
-      const { data } = await axios.put("/api/users/profile", payload, config);
-
-      if (data) {
-        localStorage.setItem("userInfo", JSON.stringify({ ...data, token }));
-        setSuccessMessage("Profile updated successfully!");
-
-        setUser((prevUser) => ({
-          ...prevUser,
-          password: "",
-          confirmPassword: "",
-          profileImage: data.profileImage || prevUser.profileImage,
-        }));
-      }
-    } catch (error) {
-      console.error("Update error:", error);
-      setErrorMessage(
-        "Failed to update profile. " +
-        (error.response?.data?.message || "Unknown error")
-      );
+    if (!token) {
+      setErrorMessage("No token found. Please log in again.");
+      return;
     }
-  };
+
+    const payload = {
+      ...user,
+      skills: user.skills
+        ? user.skills.split(",").map((s) => s.trim()).filter(Boolean)
+        : [],
+      interests: user.interests
+        ? user.interests.split(",").map((i) => i.trim()).filter(Boolean)
+        : [],
+      preferredLocations: user.preferredLocations
+        ? user.preferredLocations.split(",").map((l) => l.trim()).filter(Boolean)
+        : [],
+    };
+
+    const { data } = await axios.put("/api/users/profile", payload, {
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    setSuccessMessage("Profile updated successfully!");
+
+    // 🔄 update userInfo WITHOUT token
+    const storedUser = JSON.parse(localStorage.getItem("userInfo")) || {};
+    localStorage.setItem(
+      "userInfo",
+      JSON.stringify({ ...storedUser, ...data })
+    );
+
+    setUser((prev) => ({
+      ...prev,
+      password: "",
+      confirmPassword: "",
+      profileImage: data.profileImage || prev.profileImage,
+    }));
+  } catch (error) {
+    console.error("Update error:", error);
+    setErrorMessage(
+      "Failed to update profile. " +
+        (error.response?.data?.message || "Unknown error")
+    );
+  }
+};
 
   const level1Fields = [
     { label: "Full name", name: "name", type: "text" },

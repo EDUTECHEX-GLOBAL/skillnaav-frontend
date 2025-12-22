@@ -31,7 +31,7 @@ import SkillnaavAnalysis from "./WebApp/Flows/UserFlow/MainPage/SkillnaavAnalysi
 import PartnerFlow from "./WebApp/Flows/PartnerFlow/PartnerFlow";
 import PartnerCreateAccount from "./WebApp/Flows/PartnerFlow/SignUpLogin/PartnerCreateAccount";
 import PartnerLogin from "./WebApp/Flows/PartnerFlow/SignUpLogin/PartnerLogin";
-import PartnerProfileForm from "./WebApp/Flows/PartnerFlow/SignUpLogin/UserProfileBuilding/PartnerProfileForm";
+// import PartnerProfileForm from "./WebApp/Flows/PartnerFlow/SignUpLogin/UserProfileBuilding/PartnerProfileForm";
 import PartnerProfilePicture from "./WebApp/Flows/PartnerFlow/SignUpLogin/UserProfileBuilding/PartnerProfilePicture";
 import PartnerMainPage from "./WebApp/Flows/PartnerFlow/MainPage/PartnerMainPage";
 import PartnerforgotPassword from "./WebApp/Flows/PartnerFlow/SignUpLogin/PartnerforgotPassword";
@@ -152,7 +152,7 @@ function App() {
           <Route path="/partner" element={<PartnerFlow />} />
           <Route path="/partner-create-account" element={<PartnerCreateAccount />} />
           <Route path="/partner/login" element={<PartnerLogin />} />
-          <Route path="/partner-profile-form" element={<PartnerProfileForm />} />
+          {/* <Route path="/partner-profile-form" element={<PartnerProfileForm />} /> */}
           <Route path="/partner-profile-picture" element={<PartnerProfilePicture />} />
           <Route path="/partner-main-page" element={<PartnerMainPage />} />
 

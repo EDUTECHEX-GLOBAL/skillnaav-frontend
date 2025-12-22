@@ -8,6 +8,8 @@ import { FcGoogle } from "react-icons/fc";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import loginImage from "../../../../assets-webapp/login-image.png";
+import { GoogleLogin } from "@react-oauth/google";
+
 // NOTE: You'll need to define your Firebase config and imports here
 // import { auth, googleAuthProvider, signInWithPopup } from "../../../../config/Firebase"; 
 
@@ -167,28 +169,32 @@ const UnifiedUserRegistration = () => {
     }
   };
 
-  const handleVerifyOTP = async () => {
-    if (!otp) {
-      setErrorMessage("Please enter the OTP.");
-      return;
-    }
-    try {
-      const verifyRes = await axios.post("/api/users/verify-code", {
-        email: formData.email,
-        otp,
-      });
+ const handleVerifyOTP = async () => {
+  if (!otp) {
+    setErrorMessage("Please enter the OTP.");
+    return;
+  }
 
-      if (verifyRes.data.success) {
-        setCurrentStep(2); // Move to Profile Form
-        setErrorMessage("");
-      } else {
-        setErrorMessage("Invalid OTP. Try again.");
-        setCanResend(true); // Optional: Allow immediate resend after failed attempt
-      }
-    } catch (err) {
-      setErrorMessage("OTP verification failed.");
+  try {
+    const verifyRes = await axios.post("/api/users/verify-code", {
+      email: formData.email,
+      otp,
+      password: formData.password, 
+    });
+
+    if (verifyRes.data.success) {
+      localStorage.setItem("userToken", verifyRes.data.token);
+      setErrorMessage("");
+      setCurrentStep(2);
+    } else {
+      setErrorMessage("Invalid OTP. Try again.");
+      setCanResend(true);
     }
-  };
+  } catch (err) {
+    setErrorMessage("OTP verification failed.");
+  }
+};
+
 
   const handleResendOTP = async () => {
     try {
@@ -234,100 +240,69 @@ const UnifiedUserRegistration = () => {
     return Boolean(desiredField && linkedin && profilePic);
   };
 
-  const handleStep3Submit = async () => {
-    // 1. Client-side validation for Step 3 fields
-    if (!validateStep3()) {
-      setErrorMessage("Please fill the desired field, LinkedIn URL, and upload a profile picture.");
-      return;
-    }
+const handleStep3Submit = async () => {
+  if (!validateStep3()) {
+    setErrorMessage("Please fill the required fields.");
+    return;
+  }
 
-    setErrorMessage(""); // Clear previous errors
-    // Assuming you have a setLoading state in your component
-    // setLoading(true); 
+  try {
+    const fd = new FormData();
 
-    try {
-      const formDataToSend = new FormData();
-
-      // 2. Critical Fields Check (Before submission, for robust UI)
-      const requiredFieldsForAPI = [
-        "name", "email", "password", "universityName", "dob",
-        "educationLevel", "fieldOfStudy", "country", "state", "city", "zip", "address",
-        "desiredField", "linkedin",
-      ];
-
-      if (!requiredFieldsForAPI.every((field) => Boolean(formData[field]))) {
-        setErrorMessage("Internal data error: Missing critical information from previous steps. Please go back and review.");
-        // setLoading(false);
+    Object.entries(formData).forEach(([key, value]) => {
+      // Skip passwords for Google signup
+      if ((key === "password" || key === "confirmPassword") && !value) {
         return;
       }
 
-
-      // 3. Append all fields to FormData
-      Object.entries(formData).forEach(([key, value]) => {
-        // Skip the file handle (will be appended separately)
-        if (key === "profilePic") return;
-
-        // Handle Date of Birth: Convert Date object to ISO string
-        if (key === "dob" && value instanceof Date) {
-          formDataToSend.append(key, value.toISOString());
-          return;
-        }
-
-        // Handle comma-separated string fields
-        if (["skills", "interests", "preferredLocations"].includes(key)) {
-          const normalizedValue = (value || "").split(",")
-            .map((v) => v.trim())
-            .filter(v => v)
-            .join(",");
-          formDataToSend.append(key, normalizedValue);
-          return;
-        }
-
-        // Handle all other fields (name, email, password, location, education, etc.)
-        // IMPORTANT: This block includes 'password' and 'confirmPassword'.
-        // If the backend at line 165 checks for confirmPassword, we must send it here.
-        if (value !== null && value !== undefined) {
-          formDataToSend.append(key, value);
-        }
-      });
-
-      // --- NOTE on 'confirmPassword' ---
-      // Since we removed the specific exclusion for 'confirmPassword' from the loop 
-      // (i.e., we let it be appended like any other field), the backend will now
-      // receive it, satisfying the requirement at line 165 of the controller.
-      // The check below is now redundant but kept for demonstration:
-
-      /* // BACKEND SPECIFIC HACK (REDUNDANT BUT SHOWN FOR CONTEXT):
-      // If you were manually removing 'confirmPassword' earlier, this explicit append 
-      // would be necessary to satisfy the server's validation check before it's hashed.
-      if (!formDataToSend.has("confirmPassword") && formData.confirmPassword) {
-           formDataToSend.append("confirmPassword", formData.confirmPassword);
+      // DOB → ISO string
+      if (key === "dob" && value instanceof Date) {
+        fd.append("dob", value.toISOString());
+        return;
       }
-      */
 
-
-      // 4. Append profile picture separately
-      formDataToSend.append("profileImage", formData.profilePic);
-
-      // 5. API Call
-      const response = await axios.post("/api/users/register", formDataToSend, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-
-      // 6. Success Action
-      if (response.status === 201) {
-        // setLoading(false);
-        // After successful registration, navigate to the login page
-        navigate("/user/login");
+      // FIXED: Send comma-separated text instead of JSON array
+      if (["skills", "interests", "preferredLocations"].includes(key)) {
+        const list = value
+          .split(",")
+          .map((v) => v.trim())
+          .filter(Boolean);
+        fd.append(key, list.join(",")); // <-- FIXED
+        return;
       }
-    } catch (error) {
-      console.error("Registration error:", error);
-      // setLoading(false);
-      setErrorMessage(
-        error.response?.data?.error || "Registration failed. Please check your inputs and try again."
-      );
+
+      // zip → postalCode
+      if (key === "zip") {
+        fd.append("postalCode", value);
+        return;
+      }
+
+      // Skip raw file field
+      if (key !== "profilePic") {
+        fd.append(key, value);
+      }
+    });
+
+    // File field
+    if (formData.profilePic) {
+      fd.append("profileImage", formData.profilePic);
     }
-  };
+
+    const res = await axios.put("/api/users/profile", fd, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+        Authorization: `Bearer ${localStorage.getItem("userToken")}`,
+      },
+    });
+
+    navigate("/user-main-page");
+  } catch (err) {
+    console.error(err);
+    setErrorMessage("Registration failed. Try again.");
+  }
+};
+
+
 
   // --- Location/City Logic (from UserProfileForm.js) ---
   const stateList =
@@ -708,13 +683,40 @@ const UnifiedUserRegistration = () => {
 
           {(currentStep === 1 || currentStep === 1.5) && (
             <>
-              <button
-                onClick={handleGoogleSignIn}
-                className="w-full bg-red-500 text-white p-3 rounded-lg hover:bg-red-600 mb-4 flex items-center justify-center space-x-2"
-              >
-                <FcGoogle className="h-5 w-5" />
-                <span>Sign up with Google</span>
-              </button>
+            <GoogleLogin
+  onSuccess={async (credentialResponse) => {
+    try {
+      const idToken = credentialResponse.credential;
+
+      const res = await axios.post("/api/users/google-auth", { idToken });
+
+      // store in correct key
+      localStorage.setItem("userToken", res.data.token);
+
+      // If profile already completed → go directly
+      if (!res.data.needsProfileCompletion) {
+        navigate("/user-main-page");
+        return;
+      }
+
+      // Prefill fields for step 2
+      setFormData((prev) => ({
+        ...prev,
+        name: res.data.name,
+        email: res.data.email,
+      }));
+
+      // Go to step 2
+      setCurrentStep(2);
+
+    } catch (error) {
+      console.error(error);
+      setErrorMessage("Google Sign-In failed.");
+    }
+  }}
+/>
+
+
               <p className="text-center text-gray-500 font-medium text-base">
                 Already have an account?{" "}
                 <Link to="/user/login" className="text-blue-500 hover:underline">
