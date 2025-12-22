@@ -19,37 +19,49 @@ const Recommendations = () => {
   // Fetch recommendations list (uses your Node endpoint)
   useEffect(() => {
     let mounted = true;
-    const fetchRecommendations = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const token =
-          JSON.parse(localStorage.getItem("token")) ||
-          JSON.parse(localStorage.getItem("userToken")) ||
-          null;
+  const fetchRecommendations = async () => {
+  setLoading(true);
+  setError(null);
 
-        const response = await axios.get("/api/applications/recommendations", {
-          headers: {
-            Authorization: token ? `Bearer ${token}` : undefined,
-          },
-        });
+  try {
+    const token = localStorage.getItem("userToken");
 
-        // support multiple shapes
-        const recs =
-          response.data?.recommendations ??
-          (Array.isArray(response.data) ? response.data : []);
+    if (!token) {
+      setError("Please log in to view recommendations.");
+      setLoading(false);
+      return;
+    }
 
-        if (mounted) setJobSummaries(Array.isArray(recs) ? recs : []);
-      } catch (err) {
-        console.error("Failed to fetch recommendations", err);
-        if (mounted) {
-          setError("Failed to fetch recommendations");
-          setJobSummaries([]);
-        }
-      } finally {
-        if (mounted) setLoading(false);
+    const response = await axios.get(
+      "/api/applications/recommendations",
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       }
-    };
+    );
+
+    const recs =
+      response.data?.recommendations ??
+      (Array.isArray(response.data) ? response.data : []);
+
+    setJobSummaries(Array.isArray(recs) ? recs : []);
+  } catch (err) {
+    console.error("Failed to fetch recommendations", err);
+
+    if (err.response?.status === 401) {
+      setError("Session expired. Please log in again.");
+      localStorage.removeItem("userToken");
+    } else {
+      setError("Failed to fetch recommendations");
+    }
+
+    setJobSummaries([]);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
     fetchRecommendations();
     return () => {

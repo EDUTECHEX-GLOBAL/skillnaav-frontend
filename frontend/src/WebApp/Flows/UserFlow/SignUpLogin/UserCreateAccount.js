@@ -295,7 +295,10 @@ const handleStep3Submit = async () => {
       },
     });
 
-    navigate("/user-main-page");
+    navigate("/user/login", {
+  state: { message: "Registration successful. Please log in." }
+});
+
   } catch (err) {
     console.error(err);
     setErrorMessage("Registration failed. Try again.");
@@ -694,10 +697,11 @@ const handleStep3Submit = async () => {
       localStorage.setItem("userToken", res.data.token);
 
       // If profile already completed → go directly
-      if (!res.data.needsProfileCompletion) {
-        navigate("/user-main-page");
-        return;
-      }
+     if (!res.data.needsProfileCompletion) {
+  navigate("/user/login");
+  return;
+}
+
 
       // Prefill fields for step 2
       setFormData((prev) => ({
