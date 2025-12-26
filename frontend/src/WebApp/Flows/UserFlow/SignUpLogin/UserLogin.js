@@ -78,20 +78,20 @@ const UserLogin = () => {
       // 🧹 Clear any existing localStorage
       localStorage.clear();
 
-   // 💾 Store token as STRING (VERY IMPORTANT)
-localStorage.setItem("userToken", data.token);
+      // 💾 Store token as STRING (VERY IMPORTANT)
+      localStorage.setItem("userToken", data.token);
 
-// 💾 Store only profile info (no token duplication)
-localStorage.setItem("userInfo", JSON.stringify({
-  _id: data._id,
-  name: data.name,
-  email: data.email,
-  profileImage: data.profileImage,
-  isPremium: data.isPremium,
-  planType: data.planType,
-  adminApproved: data.adminApproved,
-  status: data.status,
-}));
+      // 💾 Store only profile info (no token duplication)
+      localStorage.setItem("userInfo", JSON.stringify({
+        _id: data._id,
+        name: data.name,
+        email: data.email,
+        profileImage: data.profileImage,
+        isPremium: data.isPremium,
+        planType: data.planType,
+        adminApproved: data.adminApproved,
+        status: data.status,
+      }));
 
       // ✅ Store schoolAdminId if present
       if (data.schoolAdminId) {
@@ -227,43 +227,43 @@ localStorage.setItem("userInfo", JSON.stringify({
             <hr className="w-full border-gray-300" />
           </div>
 
-  <GoogleLogin
-  onSuccess={async (credentialResponse) => {
-    try {
-      const idToken = credentialResponse.credential;
+          <GoogleLogin
+            onSuccess={async (credentialResponse) => {
+              try {
+                const idToken = credentialResponse.credential;
 
-      const res = await axios.post("/api/users/google-auth", { idToken });
+                const res = await axios.post("/api/users/google-auth", { idToken });
 
-      // ✅ STORE TOKEN AS STRING (NO JSON.parse EVER)
-      localStorage.setItem("userToken", res.data.token);
+                // ✅ STORE TOKEN AS STRING (NO JSON.parse EVER)
+                localStorage.setItem("userToken", res.data.token);
 
-      // ✅ STORE USER INFO AS JSON
-      localStorage.setItem("userInfo", JSON.stringify({
-        _id: res.data._id,
-        name: res.data.name,
-        email: res.data.email,
-        profileImage: res.data.profileImage,
-        isGoogleUser: res.data.isGoogleUser,
-        planType: "Free"
-      }));
+                // ✅ STORE USER INFO AS JSON
+                localStorage.setItem("userInfo", JSON.stringify({
+                  _id: res.data._id,
+                  name: res.data.name,
+                  email: res.data.email,
+                  profileImage: res.data.profileImage,
+                  isGoogleUser: res.data.isGoogleUser,
+                  planType: "Free"
+                }));
 
-      // record login time
-      localStorage.setItem("loginTime", Date.now());
+                // record login time
+                localStorage.setItem("loginTime", Date.now());
 
-      // ✅ NAVIGATION (THIS WORKS)
-      if (res.data.needsProfileCompletion) {
-        navigate("/user/complete-profile");
-      } else {
-        navigate("/user-main-page");
-      }
+                // ✅ NAVIGATION (THIS WORKS)
+                if (res.data.needsProfileCompletion) {
+                  navigate("/user/complete-profile");
+                } else {
+                  navigate("/user-main-page");
+                }
 
-    } catch (err) {
-      console.error(err);
-      setError("Google login failed. Try again.");
-    }
-  }}
-  onError={() => setError("Google login failed")}
- />
+              } catch (err) {
+                console.error(err);
+                setError("Google login failed. Try again.");
+              }
+            }}
+            onError={() => setError("Google login failed")}
+          />
 
 
 

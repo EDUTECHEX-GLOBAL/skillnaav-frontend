@@ -29,30 +29,30 @@ const dayOpts = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 // === Regions & Timezones (kept same constants/names as Add form) ===
 const US_STATES = [
-  "Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut","Delaware",
-  "District of Columbia","Florida","Georgia","Hawaii","Idaho","Illinois","Indiana","Iowa",
-  "Kansas","Kentucky","Louisiana","Maine","Maryland","Massachusetts","Michigan","Minnesota",
-  "Mississippi","Missouri","Montana","Nebraska","Nevada","New Hampshire","New Jersey",
-  "New Mexico","New York","North Carolina","North Dakota","Ohio","Oklahoma","Oregon",
-  "Pennsylvania","Rhode Island","South Carolina","South Dakota","Tennessee","Texas","Utah",
-  "Vermont","Virginia","Washington","West Virginia","Wisconsin","Wyoming"
+  "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware",
+  "District of Columbia", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa",
+  "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota",
+  "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire", "New Jersey",
+  "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio", "Oklahoma", "Oregon",
+  "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota", "Tennessee", "Texas", "Utah",
+  "Vermont", "Virginia", "Washington", "West Virginia", "Wisconsin", "Wyoming"
 ];
 
 const CA_PROVINCES = [
-  "Alberta","British Columbia","Manitoba","New Brunswick","Newfoundland and Labrador",
-  "Northwest Territories","Nova Scotia","Nunavut","Ontario","Prince Edward Island",
-  "Quebec","Saskatchewan","Yukon"
+  "Alberta", "British Columbia", "Manitoba", "New Brunswick", "Newfoundland and Labrador",
+  "Northwest Territories", "Nova Scotia", "Nunavut", "Ontario", "Prince Edward Island",
+  "Quebec", "Saskatchewan", "Yukon"
 ];
 
 // Note: The Add form named this TIMEZONES_US_MX, keep the same name for parity.
 const TIMEZONES_US_MX = [
   // US
-  "America/New_York","America/Chicago","America/Denver","America/Los_Angeles",
-  "America/Phoenix","America/Anchorage","America/Honolulu",
+  "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles",
+  "America/Phoenix", "America/Anchorage", "America/Honolulu",
   // CA
-  "America/Toronto","America/Vancouver","America/Edmonton","America/Winnipeg",
-  "America/Halifax","America/St_Johns","America/Regina","America/Whitehorse",
-  "America/Yellowknife","America/Iqaluit"
+  "America/Toronto", "America/Vancouver", "America/Edmonton", "America/Winnipeg",
+  "America/Halifax", "America/St_Johns", "America/Regina", "America/Whitehorse",
+  "America/Yellowknife", "America/Iqaluit"
 ];
 
 export default function InstructorManagementedit({ open, item, onClose, onSaved }) {
@@ -131,12 +131,12 @@ export default function InstructorManagementedit({ open, item, onClose, onSaved 
     payoutMethod === "ACH (US Bank)"
       ? "Routing & last-4 (e.g., 111000025 | ****1234)"
       : payoutMethod === "Zelle"
-      ? "Zelle email or phone"
-      : payoutMethod === "EFT (CA Bank)"
-      ? "Transit|Institution|Account (e.g., 12345|004|0012345)"
-      : payoutMethod === "Interac e-Transfer"
-      ? "Email or mobile number"
-      : "PayPal email";
+        ? "Zelle email or phone"
+        : payoutMethod === "EFT (CA Bank)"
+          ? "Transit|Institution|Account (e.g., 12345|004|0012345)"
+          : payoutMethod === "Interac e-Transfer"
+            ? "Email or mobile number"
+            : "PayPal email";
 
   // CSV helpers to pre-fill text inputs for arrays
   const toCSV = (arr) => Array.isArray(arr) ? arr.join(", ") : (typeof arr === "string" ? arr : "");
@@ -359,36 +359,42 @@ export default function InstructorManagementedit({ open, item, onClose, onSaved 
             <div className="space-y-3">
               <div className={`${sectionTitleCls} mb-7`}>Personal & Contact</div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+
                 <div className="flex flex-col">
                   <div className="relative">
                     <div className="absolute -top-2 left-0"><label className={labelCls}>First Name *</label></div>
                     <input name="firstName" required className={inputCls + " mt-4"} defaultValue={item?.firstName || ""} placeholder="e.g., Priya" />
                   </div>
                 </div>
+
                 <div className="flex flex-col">
                   <div className="relative">
                     <div className="absolute -top-2 left-0"><label className={labelCls}>Last Name *</label></div>
                     <input name="lastName" required className={inputCls + " mt-4"} defaultValue={item?.lastName || ""} placeholder="e.g., Sharma" />
                   </div>
                 </div>
+
                 <div className="flex flex-col">
                   <div className="relative">
                     <div className="absolute -top-2 left-0"><label className={labelCls}>Email *</label></div>
                     <input type="email" name="email" required className={inputCls + " mt-4"} defaultValue={item?.email || ""} placeholder="name@example.com" />
                   </div>
                 </div>
+
                 <div className="flex flex-col mt-4">
                   <div className="relative">
                     <div className="absolute -top-2 left-0"><label className={labelCls}>Mobile *</label></div>
                     <input name="phone" required className={inputCls + " mt-4"} defaultValue={item?.phone || ""} placeholder={phonePlaceholder} />
                   </div>
                 </div>
+
                 <div className="flex flex-col">
                   <div className="relative">
                     <div className="absolute -top-2 left-0"><label className={labelCls}>Alternate Phone</label></div>
                     <input name="altPhone" className={inputCls + " mt-4"} defaultValue={item?.altPhone || ""} placeholder={phonePlaceholder} />
                   </div>
                 </div>
+
                 <div className="flex flex-col">
                   <div className="relative">
                     <div className="absolute -top-2 left-0"><label className={labelCls}>Country *</label></div>
@@ -404,38 +410,44 @@ export default function InstructorManagementedit({ open, item, onClose, onSaved 
                     </select>
                   </div>
                 </div>
+
                 <div className="flex flex-col mt-4">
                   <div className="relative">
-                    <div className="absolute -top-2 left-0"><label className={labelCls}>{stateLabel}</label></div>
+                    <div className="absolute -top-2 left-0">
+                      <label className={labelCls}>{stateLabel} *</label>
+                    </div>
                     <select
                       name="state"
                       className={inputCls + " mt-4"}
                       value={stateProv}
                       onChange={(e) => setStateProv(e.target.value)}
                     >
-                      <option value="">Select</option>
                       {stateList.map((s) => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </div>
                 </div>
+
                 <div className="flex flex-col">
                   <div className="relative">
                     <div className="absolute -top-2 left-0"><label className={labelCls}>City</label></div>
                     <input name="city" className={inputCls + " mt-4"} defaultValue={item?.city || ""} placeholder={cityPlaceholder} />
                   </div>
                 </div>
+
                 <div className="flex flex-col">
                   <div className="relative">
                     <div className="absolute -top-2 left-0"><label className={labelCls}>{postalLabel}</label></div>
                     <input name="postalCode" className={inputCls + " mt-4"} defaultValue={item?.postalCode || ""} placeholder={country === "Canada" ? "M5V 3L9" : "95113"} />
                   </div>
                 </div>
+
                 <div className="flex flex-col mt-4">
                   <div className="relative">
                     <div className="absolute -top-2 left-0"><label className={labelCls}>Address Line 1</label></div>
                     <input name="address1" className={inputCls + " mt-4"} defaultValue={item?.address1 || ""} placeholder={address1Placeholder} />
                   </div>
                 </div>
+
                 <div className="flex flex-col">
                   <div className="relative">
                     <div className="absolute -top-2 left-0"><label className={labelCls}>Address Line 2</label></div>

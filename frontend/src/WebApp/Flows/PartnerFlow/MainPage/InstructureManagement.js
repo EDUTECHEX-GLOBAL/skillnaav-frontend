@@ -103,14 +103,19 @@ const InstructureManagement = () => {
     const [isAddOpen, setIsAddOpen] = useState(false);
     const [instructors, setInstructors] = useState([]);   // local display list
     const [search, setSearch] = useState("");             // search box control
+    const [rateType, setRateType] = useState("");
+    const [currency, setCurrency] = useState("");
 
     // ADD: minimal UI state for US/MX behavior
-    const [country, setCountry] = useState("United States");
+    const [country, setCountry] = useState("");
     const [stateProv, setStateProv] = useState("");
     const [payoutMethod, setPayoutMethod] = useState("ACH (US Bank)");
-    const [tz, setTz] = useState("America/Los_Angeles");
+    const [tz, setTz] = useState("");
     const [viewing, setViewing] = useState(null);
     const [editing, setEditing] = useState(null);
+    const [qualification, setQualification] = useState("");
+    const [teachingMode, setTeachingMode] = useState("");
+    const [backgroundCheck, setBackgroundCheck] = useState("");
 
     // ADD: full-photo preview modal state
     const [photoPreview, setPhotoPreview] = useState({
@@ -149,6 +154,11 @@ const InstructureManagement = () => {
     const endRef = useRef(null);
     const prefStartRefs = useRef([]); // array of refs for each slot start
     const prefEndRefs = useRef([]);   // array of refs for each slot end
+    // NEW refs to clear fields on country change
+    const cityRef = useRef(null);
+    const postalRef = useRef(null);
+    const address1Ref = useRef(null);
+    const address2Ref = useRef(null);
 
     const addPrefSlot = () => {
         setPrefSlots((prev) => [...prev, { start: "", end: "" }]);
@@ -410,7 +420,7 @@ const InstructureManagement = () => {
                 payoutMethod: fd.get("payoutMethod"),
                 payoutIdentifier: fd.get("payoutIdentifier"),
 
-                backgroundCheck: fd.get("backgroundCheck"),
+                backgroundCheck: fd.get("backgroundCheck") || "Pending",
                 ndaSigned,
                 agreeToTerms,
 
@@ -501,7 +511,17 @@ const InstructureManagement = () => {
                     {/* UPDATED COLORS */}
                     <button
                         type="button"
-                        onClick={() => { setViewing(null); setIsAddOpen(true); }}
+                        onClick={() => {
+                            setViewing(null);
+                            setCountry("");
+                            setStateProv("");
+                            setQualification("");
+                            setTeachingMode("");
+                            setRateType("");
+                            setCurrency("");
+                            setBackgroundCheck("");
+                            setIsAddOpen(true);
+                        }}
                         className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-semibold shadow hover:from-indigo-700 hover:to-blue-700"
                     >
                         <FontAwesomeIcon icon={faPlus} />
@@ -637,9 +657,24 @@ const InstructureManagement = () => {
                                                     required
                                                     className={inputCls + " mt-4"}
                                                     value={country}
-                                                    onChange={(e) => { setCountry(e.target.value); setStateProv(""); }}>
-                                                    <option>United States</option>
-                                                    <option>Canada</option>
+                                                    onChange={(e) => {
+                                                        const nextCountry = e.target.value;
+
+                                                        setCountry(nextCountry);
+
+                                                        // reset State/Province to Select
+                                                        setStateProv("");
+
+                                                        // clear dependent fields
+                                                        if (cityRef.current) cityRef.current.value = "";
+                                                        if (postalRef.current) postalRef.current.value = "";
+                                                        if (address1Ref.current) address1Ref.current.value = "";
+                                                        if (address2Ref.current) address2Ref.current.value = "";
+                                                    }}
+                                                >
+                                                    <option value="" disabled={country !== ""}>Select</option>
+                                                    <option value="United States">United States</option>
+                                                    <option value="Canada">Canada</option>
                                                 </select>
                                             </div>
                                         </div>
@@ -647,14 +682,18 @@ const InstructureManagement = () => {
                                         <div className="flex flex-col mt-4">
                                             <div className="relative">
                                                 <div className="absolute -top-2 left-0">
-                                                    <label className={labelCls}>{stateLabel}</label>
+                                                    <label className={labelCls}>{stateLabel} *</label>
                                                 </div>
                                                 <select
                                                     name="state"
+                                                    required
+                                                    disabled={!country}
                                                     className={inputCls + " mt-4"}
                                                     value={stateProv}
-                                                    onChange={(e) => setStateProv(e.target.value)}>
-                                                    <option value="">Select</option>
+                                                    onChange={(e) => setStateProv(e.target.value)}
+                                                >
+                                                    <option value="" disabled hidden>Select</option>
+
                                                     {stateList.map((s) => (
                                                         <option key={s} value={s}>{s}</option>
                                                     ))}
@@ -665,30 +704,45 @@ const InstructureManagement = () => {
                                         <div className="flex flex-col">
                                             <div className="relative">
                                                 <div className="absolute -top-2 left-0">
-                                                    <label className={labelCls}>City</label>
+                                                    <label className={labelCls}>City *</label>
                                                 </div>
-                                                <input name="city" className={inputCls + " mt-4"} placeholder={cityPlaceholder} />
+                                                <input
+                                                    name="city"
+                                                    required
+                                                    ref={cityRef}
+                                                    className={inputCls + " mt-4"}
+                                                    placeholder={cityPlaceholder}
+                                                />
                                             </div>
                                         </div>
 
                                         <div className="flex flex-col">
                                             <div className="relative">
                                                 <div className="absolute -top-2 left-0">
-                                                    <label className={labelCls}>{postalLabel}</label>
+                                                    <label className={labelCls}>{postalLabel} *</label>
                                                 </div>
                                                 <input
                                                     name="postalCode"
+                                                    required
+                                                    ref={postalRef}
                                                     className={inputCls + " mt-4"}
-                                                    placeholder={country === "Canada" ? "M5V 3L9" : "95113"} />
+                                                    placeholder={country === "Canada" ? "M5V 3L9" : "95113"}
+                                                />
                                             </div>
                                         </div>
 
                                         <div className="flex flex-col mt-4">
                                             <div className="relative">
                                                 <div className="absolute -top-2 left-0">
-                                                    <label className={labelCls}>Address Line 1</label>
+                                                    <label className={labelCls}>Address Line 1 *</label>
                                                 </div>
-                                                <input name="address1" className={inputCls + " mt-4"} placeholder={address1Placeholder} />
+                                                <input
+                                                    name="address1"
+                                                    required
+                                                    ref={address1Ref}
+                                                    className={inputCls + " mt-4"}
+                                                    placeholder={address1Placeholder}
+                                                />
                                             </div>
                                         </div>
 
@@ -697,7 +751,12 @@ const InstructureManagement = () => {
                                                 <div className="absolute -top-2 left-0">
                                                     <label className={labelCls}>Address Line 2</label>
                                                 </div>
-                                                <input name="address2" className={inputCls + " mt-4"} placeholder="Optional" />
+                                                <input
+                                                    name="address2"
+                                                    ref={address2Ref}
+                                                    className={inputCls + " mt-4"}
+                                                    placeholder="Optional"
+                                                />
                                             </div>
                                         </div>
                                     </div>
@@ -714,13 +773,18 @@ const InstructureManagement = () => {
                                                 <div className="absolute -top-2 left-0">
                                                     <label className={labelCls}>Highest Qualification</label>
                                                 </div>
-                                                <select name="qualification" className={inputCls + " mt-4"} defaultValue="">
-                                                    <option value="" disabled>Select</option>
-                                                    <option>Diploma</option>
-                                                    <option>Bachelor</option>
-                                                    <option>Master</option>
-                                                    <option>PhD</option>
-                                                    <option>Other</option>
+                                                <select
+                                                    name="qualification"
+                                                    className={inputCls + " mt-4"}
+                                                    value={qualification}
+                                                    onChange={(e) => setQualification(e.target.value)}
+                                                >
+                                                    <option value="" disabled={qualification !== ""}>Select</option>
+                                                    <option value="Diploma">Diploma</option>
+                                                    <option value="Bachelor">Bachelor</option>
+                                                    <option value="Master">Master</option>
+                                                    <option value="PhD">PhD</option>
+                                                    <option value="Other">Other</option>
                                                 </select>
                                             </div>
                                         </div>
@@ -805,10 +869,16 @@ const InstructureManagement = () => {
                                                 <div className="absolute -top-2 left-0">
                                                     <label className={labelCls}>Teaching Mode</label>
                                                 </div>
-                                                <select name="teachingMode" className={inputCls + " mt-4"} defaultValue="Online">
-                                                    <option>Online</option>
-                                                    <option>Offline</option>
-                                                    <option>Hybrid</option>
+                                                <select
+                                                    name="teachingMode"
+                                                    className={inputCls + " mt-4"}
+                                                    value={teachingMode}
+                                                    onChange={(e) => setTeachingMode(e.target.value)}
+                                                >
+                                                    <option value="" disabled={teachingMode !== ""}>Select</option>
+                                                    <option value="Online">Online</option>
+                                                    <option value="Offline">Offline</option>
+                                                    <option value="Hybrid">Hybrid</option>
                                                 </select>
                                             </div>
                                         </div>
@@ -1048,6 +1118,8 @@ const InstructureManagement = () => {
                                                     value={tz}
                                                     onChange={(e) => setTz(e.target.value)}
                                                 >
+                                                    <option value="" disabled={tz !== ""}>Select</option>
+
                                                     {TIMEZONES_US_MX.map((z) => (
                                                         <option key={z} value={z}>{z}</option>
                                                     ))}
@@ -1068,10 +1140,16 @@ const InstructureManagement = () => {
                                                 <div className="absolute -top-2 left-0">
                                                     <label className={labelCls}>Rate Type</label>
                                                 </div>
-                                                <select name="rateType" className={inputCls + " mt-4"} defaultValue="Hourly">
-                                                    <option>Hourly</option>
-                                                    <option>Per Session</option>
-                                                    <option>Fixed</option>
+                                                <select
+                                                    name="rateType"
+                                                    className={inputCls + " mt-4"}
+                                                    value={rateType}
+                                                    onChange={(e) => setRateType(e.target.value)}
+                                                >
+                                                    <option value="" disabled={rateType !== ""}>Select</option>
+                                                    <option value="Hourly">Hourly</option>
+                                                    <option value="Per Session">Per Session</option>
+                                                    <option value="Fixed">Fixed</option>
                                                 </select>
                                             </div>
                                         </div>
@@ -1102,10 +1180,13 @@ const InstructureManagement = () => {
                                                 <select
                                                     name="currency"
                                                     className={inputCls + " mt-4"}
-                                                    defaultValue={country === "Canada" ? "CAD" : "USD"}>
-                                                    <option>USD</option>
-                                                    <option>CAD</option>
-                                                    <option>EUR</option>
+                                                    value={currency}
+                                                    onChange={(e) => setCurrency(e.target.value)}
+                                                >
+                                                    <option value="" disabled={currency !== ""}>Select</option>
+                                                    <option value="USD">USD</option>
+                                                    <option value="CAD">CAD</option>
+                                                    <option value="EUR">EUR</option>
                                                 </select>
 
                                             </div>
@@ -1224,11 +1305,13 @@ const InstructureManagement = () => {
                                                 <select
                                                     name="backgroundCheck"
                                                     className={inputCls + " mt-4"}
-                                                    defaultValue="Pending"
+                                                    value={backgroundCheck}
+                                                    onChange={(e) => setBackgroundCheck(e.target.value)}
                                                 >
-                                                    <option>Pending</option>
-                                                    <option>Cleared</option>
-                                                    <option>Not Required</option>
+                                                    <option value="" disabled={backgroundCheck !== ""}>Select</option>
+                                                    <option value="Pending">Pending</option>
+                                                    <option value="Cleared">Cleared</option>
+                                                    <option value="Not Required">Not Required</option>
                                                 </select>
                                             </div>
                                         </div>

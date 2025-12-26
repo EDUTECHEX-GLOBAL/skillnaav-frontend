@@ -3,6 +3,36 @@ import axios from "axios";
 import { FiMessageCircle, FiX } from "react-icons/fi";
 import ReactMarkdown from "react-markdown";
 
+const INSTRUCTOR_FEATURE = {
+  key: "instructor-management",
+  label: "Instructor Management",
+  description:
+    "Create, view, edit, and delete instructors. New instructor creation requires Email OTP verification and Resume upload; Photo/Certificates optional. Manage availability (days/time) and preferable time slots.",
+};
+
+const ensureInstructorFeature = (featureIndex) => {
+  const list = Array.isArray(featureIndex) ? featureIndex : [];
+
+  const hasInstructor = list.some((it) => {
+    const key = String(it?.key || "").toLowerCase();
+    const label = String(it?.label || "").toLowerCase();
+    return key === "instructor-management" || label.includes("instructor");
+  });
+
+  if (hasInstructor) return list;
+
+  // Insert before Offer Templates if it exists, else append at end
+  const offerIdx = list.findIndex(
+    (it) => String(it?.key || "").toLowerCase() === "offer-templates"
+  );
+
+  if (offerIdx >= 0) {
+    return [...list.slice(0, offerIdx), INSTRUCTOR_FEATURE, ...list.slice(offerIdx)];
+  }
+
+  return [...list, INSTRUCTOR_FEATURE];
+};
+
 const Chatbot = ({ featureIndex = [] }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([]);
@@ -17,33 +47,33 @@ const Chatbot = ({ featureIndex = [] }) => {
   }, [messages]);
 
   const sendMessage = async () => {
-  const text = input.trim();
-  if (!text) return;
+    const text = input.trim();
+    if (!text) return;
 
-  // Add the user message and clear the input RIGHT AWAY
-  const userMessage = { sender: "user", text };
-  setMessages((prev) => [...prev, userMessage]);
-  setInput("");
+    // Add the user message and clear the input RIGHT AWAY
+    const userMessage = { sender: "user", text };
+    setMessages((prev) => [...prev, userMessage]);
+    setInput("");
 
-  try {
-    const partnerId = localStorage.getItem("partnerId");
+    try {
+      const partnerId = localStorage.getItem("partnerId");
 
-    const res = await axios.post("/api/chatbot", {
-      message: text,          // use the captured text
-      partnerId,
-      featureIndex,           // keep passing your sidebar features
-    });
+      const res = await axios.post("/api/chatbot", {
+        message: text,          // use the captured text
+        partnerId,
+        featureIndex: ensureInstructorFeature(featureIndex), // ✅ ensure Instructor Management is included
+      }); 
 
-    const botMessage = { sender: "bot", text: res.data.reply };
-    setMessages((prev) => [...prev, botMessage]);
-  } catch (err) {
-    const errorMessage = {
-      sender: "bot",
-      text: "Something went wrong. Try again.",
-    };
-    setMessages((prev) => [...prev, errorMessage]);
-  }
-};
+      const botMessage = { sender: "bot", text: res.data.reply };
+      setMessages((prev) => [...prev, botMessage]);
+    } catch (err) {
+      const errorMessage = {
+        sender: "bot",
+        text: "Something went wrong. Try again.",
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    }
+  };
 
   return (
     <div className="fixed bottom-6 right-6 z-50">
