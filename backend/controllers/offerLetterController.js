@@ -8,6 +8,7 @@ const InternshipSchedule = require('../models/webapp-models/InternshipScheduleMo
 const Partnerwebapp = require('../models/webapp-models/partnerModel'); // Import partner model if needed
 const OfferTemplate = require('../models/webapp-models/OfferTemplateModel'); // Import OfferTemplate model
 const Payment = require('../models/webapp-models/internshipPaymentModel'); // Import payment model
+const Internship = require('../models/webapp-models/internshipPostModel');
 
 const sendOfferLetter = async (req, res) => {
   try {
@@ -171,146 +172,143 @@ const getOfferLetterByStudent = async (req, res) => {
 const updateOfferStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, paymentId } = req.body;
+    const { status, paymentId, preferredTimeSlot } = req.body;
 
-    console.log('Updating offer status:', { id, status, paymentId }); // ✅ Debug log
+    console.log('Updating offer status:', { id, status, paymentId });
 
-    // ✅ Validate ObjectId format
+    // 1️⃣ Validate Offer ID
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ error: 'Invalid offer ID format' });
     }
 
-    // ✅ Validate status
+    // 2️⃣ Validate status
     if (!['Accepted', 'Rejected'].includes(status)) {
       return res.status(400).json({ error: 'Status must be Accepted or Rejected' });
     }
 
-    // ✅ For PAID internships, verify payment before acceptance
-    if (status === 'Accepted' && paymentId) {
-      console.log('Verifying payment:', paymentId); // ✅ Debug log
-
-      // ✅ Validate payment ID format
-      if (!mongoose.Types.ObjectId.isValid(paymentId)) {
-        return res.status(400).json({ error: 'Invalid payment ID format' });
-      }
-
-      try {
-        const payment = await Payment.findById(paymentId);
-        console.log('Payment found:', payment); // ✅ Debug log
-
-        if (!payment) {
-          return res.status(404).json({ error: 'Payment record not found' });
-        }
-
-        if (payment.status !== 'COMPLETED') {
-          return res.status(400).json({
-            error: 'Payment verification failed',
-            details: `Payment status is ${payment.status}, expected COMPLETED`
-          });
-        }
-      } catch (paymentError) {
-        console.error('Payment verification error:', paymentError);
-        return res.status(500).json({
-          error: 'Payment verification failed',
-          details: paymentError.message
-        });
-      }
-    }
-
-    // ✅ Prepare update data
-    const updateData = { status };
-    if (paymentId) {
-      updateData.paymentId = paymentId;
-    }
-
-    console.log('Updating offer with data:', updateData); // ✅ Debug log
-
-    // ✅ Update offer letter
-    const offer = await OfferLetter.findByIdAndUpdate(
-      id,
-      updateData,
-      {
-        new: true,
-        runValidators: true // ✅ Run schema validation
-      }
-    );
-
+    // 3️⃣ Fetch offer
+    const offer = await OfferLetter.findById(id);
     if (!offer) {
       return res.status(404).json({ error: 'Offer letter not found' });
     }
 
-    console.log('Offer updated successfully:', offer); // ✅ Debug log
+    // 4️⃣ Fetch internship
+    const internship = await Internship.findById(offer.internshipId);
+    if (!internship) {
+      return res.status(404).json({ error: 'Internship not found' });
+    }
 
-    // ✅ If a schedule already exists, email THIS student their schedule
+    let resolvedPaymentId = null;
+
+    // 5️⃣ PAID internship → payment verification
+    if (status === 'Accepted' && internship.internshipType === 'PAID') {
+      if (!paymentId) {
+        return res.status(400).json({
+          error: 'Payment required before accepting this offer'
+        });
+      }
+
+      // PayPal ID OR Mongo ID → normalize to Mongo ID
+      const paymentDoc = mongoose.Types.ObjectId.isValid(paymentId)
+        ? await Payment.findById(paymentId)
+        : await Payment.findOne({ paypalPaymentId: paymentId });
+
+      if (!paymentDoc) {
+        return res.status(404).json({
+          error: 'Payment record not found'
+        });
+      }
+
+      if (paymentDoc.status !== 'COMPLETED') {
+        return res.status(400).json({
+          error: 'Payment not completed',
+          details: `Current status: ${paymentDoc.status}`
+        });
+      }
+
+      resolvedPaymentId = paymentDoc._id; // ✅ ALWAYS ObjectId
+    }
+
+    // 6️⃣ Build update payload (schema-safe)
+    const updateData = {
+      status,
+      ...(resolvedPaymentId && { paymentId: resolvedPaymentId }),
+      ...(preferredTimeSlot && { preferredTimeSlot })
+    };
+
+    console.log('Updating offer with:', updateData);
+
+    // 7️⃣ Update offer
+    const updatedOffer = await OfferLetter.findByIdAndUpdate(
+      id,
+      updateData,
+      { new: true, runValidators: true }
+    );
+
+    // 8️⃣ Post-accept notifications
     if (status === 'Accepted') {
       try {
         const schedule = await InternshipSchedule
-          .findOne({ internshipId: offer.internshipId })
+          .findOne({ internshipId: updatedOffer.internshipId })
           .lean();
 
-        if (schedule && (schedule.timetable || []).length) {
+        if (schedule?.timetable?.length) {
           const upcoming = schedule.timetable.find(s => {
-            const d = new Date(s.date); const today = new Date();
-            d.setHours(0, 0, 0, 0); today.setHours(0, 0, 0, 0);
+            const d = new Date(s.date);
+            const today = new Date();
+            d.setHours(0, 0, 0, 0);
+            today.setHours(0, 0, 0, 0);
             return d >= today;
           });
 
-          // Send users to the public login page
-          const appUrl = (process.env.WEBAPP_BASE_URL || 'https://www.skillnaav.com') + '/user/login';
+          const appUrl =
+            (process.env.WEBAPP_BASE_URL || 'https://www.skillnaav.com') +
+            '/user/login';
+
           const previewHtml = upcoming
-            ? `<p><b>Next session:</b> ${new Date(upcoming.date).toLocaleDateString('en-IN')} ${upcoming.startTime}–${upcoming.endTime} (${upcoming.type || 'online'})</p>`
+            ? `<p><b>Next session:</b> ${new Date(upcoming.date).toLocaleDateString('en-IN')} ${upcoming.startTime}–${upcoming.endTime}</p>`
             : '';
 
           await notifyUser(
-            offer.email,
+            updatedOffer.email,
             'Your internship schedule is available',
             `
-            <p>Hi ${offer.name || 'there'},</p>
-            <p>Your internship schedule is now available.</p>
-            ${previewHtml}
-            <p><a href="${appUrl}">Open your dashboard</a> to review all sessions.</p>
-            <p>— Skillnaav Team</p>
+              <p>Hi ${updatedOffer.name || 'there'},</p>
+              <p>Your internship schedule is now available.</p>
+              ${previewHtml}
+              <p><a href="${appUrl}">Open your dashboard</a></p>
+              <p>— Skillnaav Team</p>
             `
-          ).catch(err => console.error('Schedule email (accept) failed:', offer.email, err));
+          ).catch(() => {});
 
-          // Optional in-app ping
           await sendNotification({
-            studentId: offer.studentId,
+            studentId: updatedOffer.studentId,
             title: 'Schedule available',
             message: 'Tap to view your sessions.',
             link: appUrl
-          }).catch(() => { });
+          }).catch(() => {});
         }
       } catch (e) {
-        console.error('Post-accept schedule notify failed:', e);
+        console.error('Post-accept notification error:', e);
       }
     }
 
     return res.status(200).json({
       success: true,
       message: `Offer ${status.toLowerCase()} successfully`,
-      offer
+      offer: updatedOffer
     });
 
   } catch (err) {
-    // ✅ Enhanced error logging
-    console.error('Update offer status error:', {
-      message: err.message,
-      stack: err.stack,
-      params: req.params,
-      body: req.body
-    });
+    console.error('Update offer status error:', err);
 
-    // ✅ Return detailed error for debugging
     return res.status(500).json({
       error: 'Failed to update offer status',
       details: err.message,
-      // ✅ Only include stack in development
       ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
     });
   }
 };
-
 
 const getOffersByInternship = async (req, res) => {
   const { internshipId } = req.params;
@@ -327,7 +325,6 @@ const getOffersByInternship = async (req, res) => {
 };
 
 // Add this function to your offerLetterController.js
-
 const getOfferStatusesForInternship = async (req, res) => {
   try {
     const { internshipId } = req.params;

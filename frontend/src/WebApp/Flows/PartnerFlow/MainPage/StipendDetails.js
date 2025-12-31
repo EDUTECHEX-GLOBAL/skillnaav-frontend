@@ -31,7 +31,7 @@ const formatDateRange = (start, end) => {
 const StipendDetails = () => {
   const [internships, setInternships] = useState([]);
   const [stipends, setStipends] = useState([]);
-  const [loadingInternships, setLoadingInternships] = useState(true);
+const [loading, setLoading] = useState(false);
   const [loadingStipends, setLoadingStipends] = useState(false);
   const [modalIsOpen, setModalIsOpen] = useState(false);
   const [error, setError] = useState(null);
@@ -44,25 +44,22 @@ const StipendDetails = () => {
   const partnerId = localStorage.getItem("partnerId");
 
   useEffect(() => {
-    const fetchInternships = async () => {
-      setLoadingInternships(true);
-      setError(null);
-      try {
-        if (partnerId) {
-          const response = await axios.get(`/api/interns/partner/${partnerId}`);
-          const stipendInternships = response.data.filter(
-            (i) => i.internshipType === "STIPEND"
-          );
-          setInternships(stipendInternships);
-        } else {
-          setError("Partner ID not found in localStorage");
-        }
-      } catch (err) {
-        setError("Error fetching internships: " + err.message);
-      } finally {
-        setLoadingInternships(false);
-      }
-    };
+   const fetchInternships = async () => {
+    if (!partnerId) return;
+
+    setLoading(true);
+    try {
+      const response = await axios.get(`/api/interns/partner/${partnerId}`);
+
+      // ✅ FIX: extract array correctly
+      setInternships(response.data.data || []);
+    } catch (err) {
+      console.error("Error fetching internships:", err);
+      setInternships([]); // safety fallback
+    } finally {
+      setLoading(false);
+    }
+  };
     fetchInternships();
   }, [partnerId]);
 
@@ -112,7 +109,7 @@ const StipendDetails = () => {
     currentPage * stipendPerPage
   );
 
-  if (loadingInternships)
+  if (loading)
     return (
       <div className="flex justify-center items-center p-10">
         <ClipLoader size={50} color="#14b8a6" />

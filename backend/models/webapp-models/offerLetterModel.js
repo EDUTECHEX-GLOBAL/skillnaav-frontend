@@ -26,6 +26,12 @@ const offerLetterSchema = new mongoose.Schema({
   },
   jobDescription: String,
   qualifications: [String],
+  preferredTimeSlot: {
+  type: String,
+  enum: ["09:00 - 12:00", "14:00 - 05:00", "18:00 - 21:00"],
+  default: null
+},
+
   contactInfo: {
     name: String,
     email: String,

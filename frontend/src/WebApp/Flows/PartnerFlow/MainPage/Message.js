@@ -96,23 +96,27 @@ const ChatInterface = () => {
   }, []);
 
   // Fetch internships with loading state
-  useEffect(() => {
-    const fetchInternships = async () => {
-      if (!partnerId) return;
+useEffect(() => {
+  const fetchInternships = async () => {
+    if (!partnerId) return;
 
-      setLoading(true);
-      try {
-        const response = await axios.get(`/api/interns/partner/${partnerId}`);
-        setInternships(response.data || []);
-      } catch (err) {
-        console.error("Error fetching internships:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
+    setLoading(true);
+    try {
+      const response = await axios.get(`/api/interns/partner/${partnerId}`);
 
-    fetchInternships();
-  }, [partnerId]);
+      // ✅ FIX: extract array correctly
+      setInternships(response.data.data || []);
+    } catch (err) {
+      console.error("Error fetching internships:", err);
+      setInternships([]); // safety fallback
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchInternships();
+}, [partnerId]);
+
 
   // Enhanced message fetching with better UX
   const fetchMessages = async (internshipId) => {

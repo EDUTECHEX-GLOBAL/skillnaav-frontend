@@ -33,6 +33,24 @@ const BodyContent = () => {
   const selectedTab =
     tabCtx?.selectedTab ?? tabCtx?.tab ?? tabCtx?.currentTab ?? "home";
 
+    // 🔒 Force HOME tab on every page reload
+useEffect(() => {
+  if (typeof tabCtx?.setSelectedTab === "function") {
+    tabCtx.setSelectedTab("home");
+    return;
+  }
+
+  if (typeof tabCtx?.setTab === "function") {
+    tabCtx.setTab("home");
+    return;
+  }
+
+  if (typeof tabCtx?.dispatch === "function") {
+    tabCtx.dispatch({ type: "SET_TAB", tab: "home" });
+  }
+}, []); // 👈 runs ONLY on reload
+
+
   // Sync URL when tab changes so address bar always matches tab
   useEffect(() => {
     try {
@@ -44,6 +62,7 @@ const BodyContent = () => {
     }
   }, [selectedTab, navigate]);
 
+  
   // Listen for openTab events from Notifications or other parts of the app
   useEffect(() => {
     const handler = (e) => {

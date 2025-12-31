@@ -733,4 +733,215 @@ router.get("/export", async (req, res) => {
   }
 });
 
+// Add this route to your feedback.js file
+router.get("/summary", async (req, res) => {
+  try {
+    const { flow, timeRange = "30d" } = req.query;
+    
+    // Calculate date range
+    const now = new Date();
+    let startDate = new Date();
+    
+    switch (timeRange) {
+      case "7d":
+        startDate.setDate(now.getDate() - 7);
+        break;
+      case "30d":
+        startDate.setDate(now.getDate() - 30);
+        break;
+      case "90d":
+        startDate.setDate(now.getDate() - 90);
+        break;
+      case "1y":
+        startDate.setFullYear(now.getFullYear() - 1);
+        break;
+      default:
+        startDate.setDate(now.getDate() - 30);
+    }
+    
+    // Build filter
+    const filter = { createdAt: { $gte: startDate } };
+    if (flow && flow !== "all") filter.flow = flow;
+    
+    // Get feedback data
+    const feedbackItems = await Feedback.find(filter).lean();
+    
+    // Calculate basic metrics
+    const total = feedbackItems.length;
+    
+    // Calculate average overall rating
+    const validRatings = feedbackItems
+      .map(f => {
+        const overall = f.answers?.overall || 
+                       f.answers?.overall_partner || 
+                       f.answers?.overall_school;
+        return typeof overall === 'number' ? overall : null;
+      })
+      .filter(r => r !== null);
+    
+    const avgOverall = validRatings.length > 0 
+      ? validRatings.reduce((a, b) => a + b, 0) / validRatings.length 
+      : 0;
+    
+    // Calculate NPS
+    const npsScores = feedbackItems
+      .map(f => f.answers?.nps)
+      .filter(nps => typeof nps === 'number');
+    
+    const avgNps = npsScores.length > 0 
+      ? npsScores.reduce((a, b) => a + b, 0) / npsScores.length 
+      : 0;
+    
+    // Calculate rating distribution (1-5 stars)
+    const ratingCounts = [0, 0, 0, 0, 0];
+    feedbackItems.forEach(f => {
+      const overall = f.answers?.overall || 
+                     f.answers?.overall_partner || 
+                     f.answers?.overall_school;
+      if (typeof overall === 'number' && overall >= 1 && overall <= 5) {
+        ratingCounts[Math.floor(overall) - 1]++;
+      }
+    });
+    
+    // Group by flow
+    const byFlow = {};
+    feedbackItems.forEach(f => {
+      const flowType = f.flow || 'user';
+      if (!byFlow[flowType]) {
+        byFlow[flowType] = {
+          count: 0,
+          ratings: [],
+          npsScores: []
+        };
+      }
+      
+      byFlow[flowType].count++;
+      
+      const rating = f.answers?.overall || 
+                    f.answers?.overall_partner || 
+                    f.answers?.overall_school;
+      if (typeof rating === 'number') {
+        byFlow[flowType].ratings.push(rating);
+      }
+      
+      const nps = f.answers?.nps;
+      if (typeof nps === 'number') {
+        byFlow[flowType].npsScores.push(nps);
+      }
+    });
+    
+    // Format byFlow for frontend
+    const byFlowFormatted = Object.entries(byFlow).map(([flowType, data]) => ({
+      _id: flowType,
+      count: data.count,
+      avgOverall: data.ratings.length > 0 
+        ? data.ratings.reduce((a, b) => a + b, 0) / data.ratings.length 
+        : 0,
+      avgNps: data.npsScores.length > 0 
+        ? data.npsScores.reduce((a, b) => a + b, 0) / data.npsScores.length 
+        : 0
+    }));
+    
+    // Extract issues from text fields
+    const issuesByFlow = {};
+    
+    feedbackItems.forEach(f => {
+      const flowType = f.flow || 'user';
+      if (!issuesByFlow[flowType]) {
+        issuesByFlow[flowType] = [];
+      }
+      
+      // Check various text fields for issues
+      const textFields = {
+        issueDesc: f.answers?.issueDesc,
+        issueDesc_partner: f.answers?.issueDesc_partner,
+        issueDesc_school: f.answers?.issueDesc_school,
+        confusing: f.answers?.confusing,
+        suggestions: f.answers?.suggestions,
+        improvements_partner: f.answers?.improvements_partner,
+        suggestions_school: f.answers?.suggestions_school
+      };
+      
+      // Find any text that contains issues
+      Object.entries(textFields).forEach(([field, text]) => {
+        if (text && typeof text === 'string' && text.trim().length > 0) {
+          // Determine sentiment based on rating
+          const rating = f.answers?.overall || 
+                        f.answers?.overall_partner || 
+                        f.answers?.overall_school;
+          
+          const sentiment = rating < 3 ? 'negative' : 
+                           rating < 4 ? 'neutral' : 'positive';
+          
+          // Check if this issue already exists
+          const existingIssue = issuesByFlow[flowType].find(
+            issue => issue.text.toLowerCase() === text.toLowerCase()
+          );
+          
+          if (existingIssue) {
+            existingIssue.count++;
+          } else {
+            issuesByFlow[flowType].push({
+              text: text.trim(),
+              count: 1,
+              sentiment,
+              lastReported: f.createdAt || new Date()
+            });
+          }
+        }
+      });
+    });
+    
+    // Sort issues by frequency and limit to top 10 per flow
+    Object.keys(issuesByFlow).forEach(flowType => {
+      issuesByFlow[flowType].sort((a, b) => b.count - a.count);
+      issuesByFlow[flowType] = issuesByFlow[flowType].slice(0, 10);
+    });
+    
+    // Calculate sentiment by flow
+    const sentimentByFlow = byFlowFormatted.map(flow => {
+      const issues = issuesByFlow[flow._id] || [];
+      const positiveIssues = issues.filter(i => i.sentiment === 'positive').length;
+      const totalIssues = issues.length;
+      
+      return {
+        _id: flow._id,
+        sentimentScore: totalIssues > 0 ? Math.round((positiveIssues / totalIssues) * 100) : 50
+      };
+    });
+    
+    // Get top feature requests (from suggestions with positive sentiment)
+    const topFeatures = [];
+    Object.entries(issuesByFlow).forEach(([flowType, issues]) => {
+      issues.forEach(issue => {
+        if (issue.sentiment === 'positive' && issue.text.toLowerCase().includes('feature')) {
+          topFeatures.push({
+            feature: issue.text,
+            count: issue.count,
+            byFlow: { [flowType]: issue.count }
+          });
+        }
+      });
+    });
+    
+    topFeatures.sort((a, b) => b.count - a.count);
+    
+    res.json({
+      ok: true,
+      total,
+      avgOverall: parseFloat(avgOverall.toFixed(1)),
+      avgNps: parseFloat(avgNps.toFixed(1)),
+      ratingCounts,
+      byFlow: byFlowFormatted,
+      issuesByFlow,
+      sentimentByFlow,
+      topFeatures: topFeatures.slice(0, 5)
+    });
+    
+  } catch (err) {
+    console.error("GET /api/feedback/summary error:", err);
+    res.status(500).json({ ok: false, message: "Server error" });
+  }
+});
+
 module.exports = router;

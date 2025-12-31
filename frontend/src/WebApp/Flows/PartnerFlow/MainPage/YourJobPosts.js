@@ -13,9 +13,11 @@ const YourJobPosts = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const applicationsPerPage = 12;
 
-  // Sorting state
-  const [sortCriteria, setSortCriteria] = useState("jobTitle");
-  const [sortDirection, setSortDirection] = useState("asc");
+const [loading, setLoading] = useState(false);
+const [totalPages, setTotalPages] = useState(1);
+const [sortCriteria, setSortCriteria] = useState("jobTitle");
+const [sortDirection, setSortDirection] = useState("asc");
+
 
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -23,22 +25,37 @@ const YourJobPosts = () => {
   const partnerId = localStorage.getItem("partnerId");
 
   useEffect(() => {
-    const fetchInternships = async () => {
-      try {
-        if (partnerId) {
-          const response = await axios.get(`/api/interns/partner/${partnerId}`);
-          console.log("Fetched internships:", response.data);
-          setInternships(response.data);
-        } else {
-          console.error("Partner ID not found");
-        }
-      } catch (error) {
-        console.error("Error fetching internships:", error);
-      }
-    };
+  const fetchInternships = async () => {
+    if (!partnerId) return;
 
-    fetchInternships();
-  }, [partnerId]);
+    try {
+      setLoading(true);
+
+      const response = await axios.get(
+        `/api/interns/partner/${partnerId}`,
+        {
+          params: {
+            page: currentPage,
+            limit: applicationsPerPage,
+            search: searchQuery,
+            sort: sortCriteria,
+            order: sortDirection,
+          },
+        }
+      );
+
+      setInternships(response.data.data);
+      setTotalPages(response.data.totalPages);
+    } catch (error) {
+      console.error("Error fetching internships:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchInternships();
+}, [partnerId, currentPage, searchQuery, sortCriteria, sortDirection]);
+
 
 
 
@@ -98,42 +115,7 @@ const YourJobPosts = () => {
       console.error("Error updating internship:", error);
     }
   };
-  // Sorting logic
-  const sortInternships = (internships) => {
-    return internships.sort((a, b) => {
-      const aValue = a[sortCriteria].toLowerCase();
-      const bValue = b[sortCriteria].toLowerCase();
-
-      return sortDirection === "asc"
-        ? aValue.localeCompare(bValue)
-        : bValue.localeCompare(aValue);
-    });
-  };
-
-  // Filtering logic
-  const filteredInternships = internships.filter((internship) => {
-    const lowerCaseQuery = searchQuery.toLowerCase();
-    return (
-      (internship.jobTitle &&
-        internship.jobTitle.toLowerCase().includes(lowerCaseQuery)) ||
-      (internship.companyName &&
-        internship.companyName.toLowerCase().includes(lowerCaseQuery)) ||
-      (internship.organization &&
-        internship.organization.toLowerCase().includes(lowerCaseQuery))
-    );
-  });
-
-  // Pagination logic
-  const indexOfLastInternship = currentPage * applicationsPerPage;
-  const indexOfFirstInternship = indexOfLastInternship - applicationsPerPage;
-  const sortedInternships = sortInternships([...filteredInternships]);
-  const currentInternships = sortedInternships.slice(
-    indexOfFirstInternship,
-    indexOfLastInternship
-  );
-  const totalPages = Math.ceil(
-    filteredInternships.length / applicationsPerPage
-  );
+  
 
   return (
     <div className="p-6 rounded-lg font-poppins shadow-md">
@@ -148,7 +130,8 @@ const YourJobPosts = () => {
         />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {currentInternships.map((internship) => (
+        {internships.map((internship) => (
+
           <div
             key={internship._id}
             className="bg-white p-4 rounded-lg shadow-md"

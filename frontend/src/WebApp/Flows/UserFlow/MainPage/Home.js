@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Homeimage from "../../../../assets-webapp/Home-Image.png";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faMapMarkerAlt, faClock, faDollarSign, faHeart, faGlobe } from "@fortawesome/free-solid-svg-icons";
@@ -36,82 +36,84 @@ const Home = () => {
   const [isPremium, setIsPremium] = useState(false);
   const [showPricingModal, setShowPricingModal] = useState(false);
   const [planType, setPlanType] = useState("Freemium");
-
-
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingJobs, setLoadingJobs] = useState(false);
+  const loadMoreRef = useRef(null);
+   const isRestoringScroll = useRef(false);
 
 
   const navigate = useNavigate();
 
+  const fetchJobData = async (pageNumber = 1) => {
+    try {
+      if (loadingJobs || !hasMore) return;
+
+      setLoadingJobs(true);
+
+      const userInfo = JSON.parse(localStorage.getItem("userInfo")) || {};
+      const isPremiumUser = userInfo.isPremium ? "true" : "false";
+
+      const response = await axios.get(
+        `/api/interns/approved?isPremium=${isPremiumUser}&page=${pageNumber}&limit=6`
+      );
+
+      const { data, hasMore: more } = response.data;
+
+      setJobData(prev =>
+        pageNumber === 1 ? data : [...prev, ...data]
+      );
+
+      setHasMore(more);
+      setPage(pageNumber);
+    } catch (error) {
+      console.error("Error fetching internships:", error);
+    } finally {
+      setLoadingJobs(false);
+    }
+  };
+
   // Fetch job data and user profile only once on mount
   useEffect(() => {
-    const fetchJobData = async () => {
-      try {
-        // Parse userInfo safely
-        const userInfo = JSON.parse(localStorage.getItem("userInfo")) || {};
-        const isPremiumUser = userInfo.isPremium ? "true" : "false"; // Ensure correct boolean check
-
-        console.log("Fetching approved internships with isPremium:", isPremiumUser); // Debugging log
-
-        const response = await axios.get(`/api/interns/approved?isPremium=${isPremiumUser}`);
-
-        if (response.status !== 200) {
-          throw new Error(`Failed to fetch internships: ${response.statusText}`);
-        }
-
-        const data = response.data;
-
-        if (!Array.isArray(data)) {
-          console.error("Unexpected response format:", data);
-          return;
-        }
-
-        console.log("Received approved internships:", data.map(i => ({ title: i.jobTitle, type: i.internshipType })));
-
-        setJobData(data);
-      } catch (error) {
-        console.error("Error fetching job data:", error.message);
-      }
-    };
-
 
     const savedPosition = sessionStorage.getItem("scrollPosition");
     if (savedPosition) {
       window.scrollTo(0, parseInt(savedPosition, 10)); // Restore scroll position
     }
 
-   const fetchUserProfile = async () => {
-  try {
-    // ✅ READ TOKEN CORRECTLY
-    const token = localStorage.getItem("userToken");
-    if (!token) {
-      console.error("No token found in localStorage");
-      return;
-    }
+    const fetchUserProfile = async () => {
+      try {
+        // ✅ READ TOKEN CORRECTLY
+        const token = localStorage.getItem("userToken");
+        if (!token) {
+          console.error("No token found in localStorage");
+          return;
+        }
 
-    // ✅ API CALL
-    const { data } = await axios.get("/api/users/profile", {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+        // ✅ API CALL
+        const { data } = await axios.get("/api/users/profile", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
-    setIsPremium(data.isPremium);
-    setPlanType(data.planType || "Freemium");
+        setIsPremium(data.isPremium);
+        setPlanType(data.planType || "Freemium");
 
-    // ✅ application count
-    const userInfo = JSON.parse(localStorage.getItem("userInfo")) || {};
-    if (userInfo._id) {
-      const { data: countData } = await axios.get(
-        `/api/applications/count/${userInfo._id}`
-      );
-      setApplicationCount(countData.count);
-    }
+        // ✅ application count
+        const userInfo = JSON.parse(localStorage.getItem("userInfo")) || {};
+        if (userInfo._id) {
+          const { data: countData } = await axios.get(
+            `/api/applications/count/${userInfo._id}`
+          );
+          setApplicationCount(countData.count);
+        }
 
-  } catch (error) {
-    console.error("Error fetching user profile or application count:", error);
-  }
-};
+      } catch (error) {
+        console.error("Error fetching user profile or application count:", error);
+      }
+    };
 
 
-    fetchJobData();
+    fetchJobData(1);
     fetchUserProfile();
   }, []);
 
@@ -124,10 +126,32 @@ const Home = () => {
     console.log("Normalized jobs:", normalized);
   }, [savedJobs]);
 
+  useEffect(() => {
+    if (!loadMoreRef.current) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const firstEntry = entries[0];
+        if (firstEntry.isIntersecting && hasMore && !loadingJobs) {
+          fetchJobData(page + 1);
+        }
+      },
+      { threshold: 0.8 }
+    );
+
+    observer.observe(loadMoreRef.current);
+
+    return () => observer.disconnect();
+  }, [page, hasMore, loadingJobs]);
+
+   
   // Handle View Details (with application limit check)
-  const handleViewDetails = async (job) => {
+ const handleViewDetails = async (job) => {
     try {
-      sessionStorage.setItem("scrollPosition", window.scrollY); // Store current scroll position
+      // Save scroll position before navigating
+      sessionStorage.setItem("scrollPosition", window.scrollY.toString());
+      sessionStorage.setItem("scrollTime", Date.now().toString());
+      
       const userInfo = JSON.parse(localStorage.getItem("userInfo"));
       if (!userInfo) return;
 
@@ -144,16 +168,41 @@ const Home = () => {
     }
   };
 
-  // Restore scroll position after returning to Home
   const handleBack = () => {
     setSelectedJob(null);
-    setTimeout(() => {
-      const savedPosition = sessionStorage.getItem("scrollPosition");
-      if (savedPosition) {
-        window.scrollTo(0, parseInt(savedPosition, 10)); // Restore scroll position
-      }
-    }, 0);
+    // Trigger scroll restoration on next render
+    isRestoringScroll.current = true;
   };
+
+  // Handle scroll restoration in a separate useEffect
+  useEffect(() => {
+    if (!selectedJob && isRestoringScroll.current) {
+      const savedPosition = sessionStorage.getItem("scrollPosition");
+      const savedTime = sessionStorage.getItem("scrollTime");
+      
+      // Only restore if saved less than 10 seconds ago
+      if (savedPosition && savedTime && (Date.now() - parseInt(savedTime)) < 10000) {
+        requestAnimationFrame(() => {
+          window.scrollTo(0, parseInt(savedPosition, 10));
+          // Clean up
+          sessionStorage.removeItem("scrollPosition");
+          sessionStorage.removeItem("scrollTime");
+          isRestoringScroll.current = false;
+        });
+      }
+    }
+  }, [selectedJob]);
+
+  // Restore scroll position after returning to Home
+  // const handleBack = () => {
+  //   setSelectedJob(null);
+  //   setTimeout(() => {
+  //     const savedPosition = sessionStorage.getItem("scrollPosition");
+  //     if (savedPosition) {
+  //       window.scrollTo(0, parseInt(savedPosition, 10)); // Restore scroll position
+  //     }
+  //   }, 0);
+  // };
 
 
   // Toggle Save Job Logic (check saved job limit)
@@ -316,6 +365,13 @@ const Home = () => {
           </section>
         </>
       )}
+      <div ref={loadMoreRef} className="h-10 flex justify-center items-center">
+        {loadingJobs && (
+          <span className="text-gray-500 text-sm">Loading more internships…</span>
+        )}
+      </div>
+
+
 
       <div className="fixed bottom-28 right-6 z-50">
         <button

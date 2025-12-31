@@ -107,6 +107,8 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
   const [syncErrorMsg, setSyncErrorMsg] = useState('');
   const [syncTotal, setSyncTotal] = useState(0);
   const [showAuthLinkedModal, setShowAuthLinkedModal] = useState(false);
+  const submitLockRef = useRef(false);
+
 
   // 2. STIPEND-SPECIFIC STATE
   const [showStipendModal, setShowStipendModal] = useState(false);
@@ -159,11 +161,16 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
   }, [syncPhase, offer?.internshipId, userInfo?.email]);
 
   // ✅ PayPal Configuration
-  const paypalInitialOptions = {
-    "client-id": process.env.REACT_APP_PAYPAL_CLIENT_ID || "your-paypal-client-id",
-    currency: "USD",
-    intent: "capture",
-  };
+ if (!process.env.REACT_APP_PAYPAL_CLIENT_ID) {
+  console.error("❌ PayPal Client ID missing");
+}
+
+const paypalInitialOptions = {
+  "client-id": process.env.REACT_APP_PAYPAL_CLIENT_ID,
+  currency: "USD",
+  intent: "capture",
+};
+
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -234,28 +241,35 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
   }, [job, offer.status]);
 
   // ─── 3) Check for existing payment status on load ────────
-  useEffect(() => {
-    const checkPaymentStatus = async () => {
-      if (!job || job.internshipType !== "PAID" || !userInfo?._id) return;
-      try {
-        const response = await axios.get(`/api/internship/payments/status/${offer._id}`, {
-          params: { studentId: userInfo._id }
-        });
+ useEffect(() => {
+  const checkPaymentStatus = async () => {
+    if (
+      !job ||
+      job.internshipType !== "PAID" ||
+      !userInfo?._id ||
+      paymentStatus?.paypalPaymentId // 🛑 guard
+    ) return;
 
-        if (response.data.paid) {
-          setPaymentStatus({
-            paid: true,
-            paymentId: response.data.paymentId,
-            amount: response.data.amount,
-            currency: response.data.currency
-          });
-        }
-      } catch (error) {
-        console.error("Error checking payment status:", error);
-      }
-    };
-    checkPaymentStatus();
-  }, [job, offer._id, userInfo]);
+    const response = await axios.get(
+      `/api/internship/payments/status/${offer._id}`,
+      { params: { studentId: userInfo._id } }
+    );
+
+    if (response.data.paid) {
+      setPaymentStatus(prev => ({
+        ...prev,
+        paid: true,
+        mongoPaymentId: response.data.paymentId,
+        paypalPaymentId: response.data.paypalPaymentId,
+        amount: response.data.amount,
+        currency: response.data.currency
+      }));
+    }
+  };
+
+  checkPaymentStatus();
+}, [job, offer._id, userInfo]);
+
 
   // 4. STIPEND SUBMISSION HANDLER
   const handleStipendSubmission = async (formDetails) => {
@@ -315,27 +329,35 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
 // OfferLetterCard.jsx (Inside handleRespond function)
 
 const handleRespond = (type) => {
-    if (type !== "Accepted") {
-      setResponseType(type);
-      setShowModal(true);
-      return;
-    }
-
-    // STIPEND Internship: check if details are submitted
-   if (
-  job?.internshipType?.toLowerCase() === "stipend" &&
-  !stipendDetailsSubmitted
-) {
-  setShowStipendModal(true);
-  return;
-}
-
-// ... rest of function
-
-    // FREE/STIPEND(details submitted)/PAID(paid) -> proceed to confirmation
+  if (type !== "Accepted") {
     setResponseType(type);
     setShowModal(true);
-  };
+    return;
+  }
+
+  // ✅ PAID internship → force payment
+  if (
+    job?.internshipType === "PAID" &&
+    !paymentStatus?.paid
+  ) {
+    setShowPaymentModal(true);
+    return;
+  }
+
+  // ✅ STIPEND internship → force details
+  if (
+    job?.internshipType === "STIPEND" &&
+    !stipendDetailsSubmitted
+  ) {
+    setShowStipendModal(true);
+    return;
+  }
+
+  // FREE or PAID(after payment) or STIPEND(after details)
+  setResponseType(type);
+  setShowModal(true);
+};
+
 
   const normalizeUrl = (url) => {
     if (!url) return "";
@@ -365,97 +387,145 @@ const handleRespond = (type) => {
 
   // ✅ Updated PayPal payment capture
   const onPayPalApprove = async (data, actions) => {
-    try {
-      const response = await axios.post('/api/internship/payments/capture-paypal-payment', {
+  try {
+    const response = await axios.post(
+      '/api/internship/payments/capture-paypal-payment',
+      {
         orderId: data.orderID,
         offerId: offer._id,
         studentId: userInfo._id,
-      });
-
-      if (response.data.success) {
-        setPaymentStatus({
-          paid: true,
-          paymentId: response.data.paymentId,
-          amount: job.compensationDetails.amount,
-          currency: job.compensationDetails.currency || 'USD'
-        });
-        setShowPaymentModal(false);
-        toast.success('✅ Payment successful! You can now accept the offer.');
-
-        // Automatically show acceptance modal after successful payment
-        setTimeout(() => {
-          setResponseType("Accepted");
-          setShowModal(true); // This then leads to confirmRespond, which leads to TimeModal
-        }, 500);
       }
-    } catch (error) {
-      console.error('Error capturing payment:', error);
-      toast.error('Payment failed. Please try again.');
+    );
+
+    if (response.data.success) {
+    setPaymentStatus(prev => ({
+  ...prev,
+  paid: true,
+  mongoPaymentId: response.data.paymentId,
+  paypalPaymentId: response.data.paypalPaymentId, // ✅ KEEP IT
+  amount: response.data.amount,
+  currency: response.data.currency
+}));
+
+
+      setShowPaymentModal(false);
+      toast.success('✅ Payment successful! You can now accept the offer.');
+
+      setTimeout(() => {
+        setResponseType("Accepted");
+        setShowModal(true);
+      }, 500);
     }
-  };
+  } catch (error) {
+    console.error('Error capturing payment:', error);
+    toast.error('Payment failed. Please try again.');
+  }
+};
 
-  const confirmRespond = async () => {
-    if (!responseType) return;
 
-    // ✅ If accepting, show time slot selection first
-    if (responseType === "Accepted") {
-      setShowModal(false);
-      setShowTimeModal(true);
-      return;
-    }
+const confirmRespond = async () => {
+  if (!responseType || loading) return;
 
-    // Rejection flow stays the same
-    try {
-      const payload = { status: responseType };
+  // 🔒 PAID internships must be paid before acceptance
+  if (
+    responseType === "Accepted" &&
+    job?.internshipType === "PAID" &&
+    !paymentStatus?.paid
+  ) {
+    toast.error("Payment required before accepting this internship");
+    return;
+  }
 
-      if (job?.internshipType === "PAID" && paymentStatus?.paymentId) {
-        payload.paymentId = paymentStatus.paymentId;
-      }
+  // ✅ Accepted → ONLY open time slot modal (NO PATCH here)
+  if (responseType === "Accepted") {
+    setShowModal(false);
+    setShowTimeModal(true);
+    return;
+  }
 
-      await axios.patch(`/api/offer-letters/${offer._id}/status`, payload);
-      onStatusChange(responseType);
-      setShowModal(false);
-      setResponseType(null);
-    } catch (error) {
-      console.error("Failed to update offer status:", error);
-      alert("Failed to update status.");
-    }
-  };
+  // ❌ Only rejection reaches backend here
+  try {
+    setLoading(true);
 
-  const confirmTimeSelection = async () => {
-    if (!selectedTimeSlot) {
-      toast.error("Please select a time slot");
-      return;
-    }
+    await axios.patch(`/api/offer-letters/${offer._id}/status`, {
+      status: "Rejected",
+    });
 
-    try {
-      const payload = {
-        status: "Accepted",
-        preferredTimeSlot: selectedTimeSlot,
-      };
+    onStatusChange("Rejected");
+    setShowModal(false);
+    setResponseType(null);
+  } catch (error) {
+    console.error("Failed to update offer status:", error);
+    toast.error("Failed to update status");
+  } finally {
+    setLoading(false);
+  }
+};
 
-      if (job?.internshipType === "PAID" && paymentStatus?.paymentId) {
-        payload.paymentId = paymentStatus.paymentId;
-      }
 
-      await axios.patch(`/api/offer-letters/${offer._id}/status`, payload);
+const confirmTimeSelection = async () => {
+  if (submitLockRef.current) return;
+  submitLockRef.current = true;
 
-      onStatusChange("Accepted");
-      toast.success("Offer accepted and time slot saved");
-      setShowTimeModal(false);
-      setSelectedTimeSlot(null);
-      setResponseType(null);
-    } catch (error) {
-      console.error("Failed to accept offer with time slot:", error);
-      toast.error("Failed to save your time slot. Please try again.");
-    }
-  };
+  if (!selectedTimeSlot) {
+    submitLockRef.current = false;
+    return;
+  }
+
+  if (
+    job?.internshipType === "PAID" &&
+    !paymentStatus?.paypalPaymentId
+  ) {
+    toast.error("Payment not verified yet. Please complete payment.");
+    submitLockRef.current = false;
+    return;
+  }
+
+  try {
+    setLoading(true);
+
+    const payload = {
+      status: "Accepted",
+      preferredTimeSlot: selectedTimeSlot,
+      paymentId: paymentStatus.paypalPaymentId
+    };
+
+    console.log("✅ Sending paymentId:", payload.paymentId);
+
+    await axios.patch(`/api/offer-letters/${offer._id}/status`, payload);
+
+    onStatusChange("Accepted");
+    toast.success("Offer accepted and time slot saved");
+
+    setShowTimeModal(false);
+    setSelectedTimeSlot(null);
+    setResponseType(null);
+  } catch (error) {
+    console.error("Failed to accept offer:", error);
+    toast.error(
+      error?.response?.data?.error ||
+      "Failed to save your time slot."
+    );
+  } finally {
+    setLoading(false);
+    submitLockRef.current = false;
+  }
+};
+
+
+
 
   // ✅ Determine if payment is required
   const requiresPayment = job?.internshipType === "PAID";
   const requiresStipendDetails = job?.internshipType === "STIPEND";
   const paymentAmount = job?.compensationDetails?.amount || 0;
   const currency = job?.compensationDetails?.currency || "USD";
+
+  const isUnpaidAccepted =
+  offer?.status?.toLowerCase() === "accepted" &&
+  job?.internshipType === "PAID" &&
+  !paymentStatus?.paid;
+
 
   const handleUpdateSchedule = async () => {
     try {
@@ -1012,16 +1082,20 @@ const handleRespond = (type) => {
                 Cancel
               </button>
               <button
-                type="button"
-                onClick={confirmTimeSelection}
-                disabled={!selectedTimeSlot}
-                className={`px-4 py-2 rounded-lg text-white transition ${selectedTimeSlot
-                  ? "bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600"
-                  : "bg-gray-300 cursor-not-allowed"
-                  }`}
-              >
-                Confirm
-              </button>
+  type="button"
+  onClick={confirmTimeSelection}
+  disabled={!selectedTimeSlot || loading}
+  className={`px-4 py-2 rounded-lg text-white transition
+    ${loading
+      ? "bg-gray-400 cursor-not-allowed"
+      : selectedTimeSlot
+        ? "bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600"
+        : "bg-gray-300 cursor-not-allowed"
+    }`}
+>
+  {loading ? "Saving..." : "Confirm"}
+</button>
+
             </div>
           </div>
         </div>
@@ -1262,7 +1336,7 @@ const handleRespond = (type) => {
       )}
 
       {/* ✅ ACTION BUTTONS */}
-      {offer.status.toLowerCase() === "sent" && (
+   {(offer.status.toLowerCase() === "sent" || isUnpaidAccepted) && (
         <div className="space-y-3 mt-4">
           {/* Status Indicator for STIPEND details */}
           {requiresStipendDetails && (
@@ -1294,19 +1368,30 @@ const handleRespond = (type) => {
           )}
 
           <div className="flex gap-2">
+           <button
+  onClick={() => handleRespond("Accepted")}
+  disabled={loading}
+  className={`flex-1 px-4 py-2 rounded-lg text-white transition
+    ${loading
+      ? "bg-gray-400 cursor-not-allowed"
+      : "bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600"
+    }`}
+>
+  {loading ? "Processing..." : "Accept"}
+</button>
+
             <button
-              onClick={() => handleRespond("Accepted")}
-              className="flex-1 px-4 py-2 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-lg hover:from-purple-600 hover:to-indigo-600 transition"
-            >
-              {requiresPayment && !paymentStatus?.paid ? 'Pay to Accept' :
-                requiresStipendDetails && !stipendDetailsSubmitted ? 'Enter Details & Accept' : 'Accept'}
-            </button>
-            <button
-              onClick={() => handleRespond("Rejected")}
-              className="flex-1 px-4 py-2 bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-lg hover:from-red-600 hover:to-pink-600 transition"
-            >
-              Reject
-            </button>
+  onClick={() => handleRespond("Rejected")}
+  disabled={loading}
+  className={`flex-1 px-4 py-2 rounded-lg text-white transition
+    ${loading
+      ? "bg-gray-400 cursor-not-allowed"
+      : "bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600"
+    }`}
+>
+  {loading ? "Please wait..." : "Reject"}
+</button>
+
           </div>
         </div>
       )}

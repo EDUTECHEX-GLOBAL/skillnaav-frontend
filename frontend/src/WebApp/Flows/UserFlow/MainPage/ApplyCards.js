@@ -31,8 +31,6 @@ const ApplyCards = ({ job, onBack }) => {
   const [assessment, setAssessment] = useState(null);
   const [showAssessmentModal, setShowAssessmentModal] = useState(false);
 
-
-
   const navigate = useNavigate();
 
   // ✅ Fetch application data

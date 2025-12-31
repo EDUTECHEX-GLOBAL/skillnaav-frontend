@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   TextField,
   IconButton,
@@ -14,7 +14,7 @@ import {
 import SearchIcon from "@mui/icons-material/Search";
 import FilterListIcon from "@mui/icons-material/FilterList";
 import ClearIcon from "@mui/icons-material/Clear";
-import { Skeleton } from "antd"; // Import Skeleton from Ant Design
+import axios from "axios"; // Add axios import
 import Card from "./Card";
 import ApplyCards from "./ApplyCards";
 
@@ -60,126 +60,258 @@ const SearchBar = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedJob, setSelectedJob] = useState(null); // ✅ new state for selected job
+  const [selectedJob, setSelectedJob] = useState(null);
+  const [applicationCount, setApplicationCount] = useState(0);
+  const [showLimitPopup, setShowLimitPopup] = useState(false);
+  const [isPremium, setIsPremium] = useState(false);
+  
+  // ✅ Add job data state here
+  const [jobData, setJobData] = useState([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingJobs, setLoadingJobs] = useState(false);
+  
+  const isRestoringScroll = useRef(false);
+  const loadMoreRef = useRef(null);
 
-  const handleSearch = (event) => {
-    setSearchTerm(event.target.value);
-  };
+  const MAX_FREE_APPLICATIONS = 5;
 
-  const clearSearch = () => {
-    setSearchTerm("");
-  };
-
-  const handleFilterClick = () => setIsFilterOpen(true);
-  const closeFilterDialog = () => setIsFilterOpen(false);
-  const applyFilters = (filters) => {
-    setAppliedFilters(filters);
-    closeFilterDialog();
-  };
-  const removeFilter = (filterIndex) => {
-    setAppliedFilters(appliedFilters.filter((_, index) => index !== filterIndex));
-  };
-
+  // ✅ Fetch user data on mount
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 2000);
+    const fetchUserProfile = async () => {
+      try {
+        const token = localStorage.getItem("userToken");
+        if (!token) {
+          console.error("No token found in localStorage");
+          return;
+        }
 
-    return () => clearTimeout(timer);
+        const { data } = await axios.get("/api/users/profile", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        setIsPremium(data.isPremium);
+
+        const userInfo = JSON.parse(localStorage.getItem("userInfo")) || {};
+        if (userInfo._id) {
+          const { data: countData } = await axios.get(
+            `/api/applications/count/${userInfo._id}`
+          );
+          setApplicationCount(countData.count);
+        }
+
+      } catch (error) {
+        console.error("Error fetching user profile or application count:", error);
+      }
+    };
+
+    fetchUserProfile();
+    fetchJobData(1); // Initial fetch
   }, []);
 
-  // ✅ Render ApplyCards view if a job is selected
+  // ✅ Fetch job data function
+  const fetchJobData = async (pageNumber = 1) => {
+    try {
+      if (loadingJobs || !hasMore) return;
+
+      setLoadingJobs(true);
+
+      const response = await axios.get(
+        `/api/interns/approved?page=${pageNumber}&limit=6`
+      );
+
+      const { data, hasMore: more } = response.data;
+
+      setJobData(prev =>
+        pageNumber === 1 ? data : [...prev, ...data]
+      );
+
+      setHasMore(more);
+      setPage(pageNumber);
+    } catch (error) {
+      console.error("Error fetching internships:", error);
+    } finally {
+      setLoadingJobs(false);
+    }
+  };
+
+  // ✅ Infinite scroll observer
+  useEffect(() => {
+    if (!loadMoreRef.current) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const firstEntry = entries[0];
+        if (firstEntry.isIntersecting && hasMore && !loadingJobs) {
+          fetchJobData(page + 1);
+        }
+      },
+      { threshold: 0.8 }
+    );
+
+    observer.observe(loadMoreRef.current);
+
+    return () => observer.disconnect();
+  }, [page, hasMore, loadingJobs]);
+
+  // ✅ Simplified handleViewDetails
+  const handleViewDetails = async (job) => {
+    // Save scroll position before navigating
+    sessionStorage.setItem("scrollPosition", window.scrollY.toString());
+    sessionStorage.setItem("scrollTime", Date.now().toString());
+    
+    const userInfo = JSON.parse(localStorage.getItem("userInfo"));
+    if (!userInfo) return;
+
+    setSelectedJob(job);
+  };
+
+  // ✅ Handle back from job details
+  const handleBack = () => {
+    setSelectedJob(null);
+    isRestoringScroll.current = true;
+  };
+
+  // ✅ Restore scroll
+  useEffect(() => {
+    if (!selectedJob && isRestoringScroll.current) {
+      const timer = setTimeout(() => {
+        const savedPosition = sessionStorage.getItem("scrollPosition");
+        const savedTime = sessionStorage.getItem("scrollTime");
+        
+        if (savedPosition && savedTime && (Date.now() - parseInt(savedTime)) < 10000) {
+          window.scrollTo({
+            top: parseInt(savedPosition, 10),
+            behavior: 'instant'
+          });
+          
+          sessionStorage.removeItem("scrollPosition");
+          sessionStorage.removeItem("scrollTime");
+        }
+        
+        isRestoringScroll.current = false;
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [selectedJob]);
+
+  // ✅ Show job details
   if (selectedJob) {
     return (
       <ApplyCards
         job={selectedJob}
-        onBack={() => setSelectedJob(null)}
+        onBack={handleBack}
       />
     );
   }
 
-  return (
-    <Box sx={{ padding: 2, fontFamily: "Poppins, sans-serif" }}>
-      {/* Search bar UI */}
-      <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-        <TextField
-          fullWidth
-          placeholder="Search for internships and jobs"
-          value={searchTerm}
-          onChange={handleSearch}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon />
-              </InputAdornment>
-            ),
-            endAdornment: searchTerm && (
-              <InputAdornment position="end">
-                <IconButton onClick={clearSearch}>
-                  <ClearIcon />
-                </IconButton>
-              </InputAdornment>
-            ),
-          }}
-          sx={{
-            "& .MuiInputBase-root": {
-              backgroundColor: "white",
-              border: "none",
-              boxShadow: "none",
-            },
-            "& .MuiInputBase-input": {
-              padding: "10px 14px",
-            },
-          }}
-        />
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={handleFilterClick}
-          startIcon={<FilterListIcon />}
-          sx={{ ml: 2 }}
-        >
-          Filter
-        </Button>
-      </Box>
 
-      {/* Applied Filters */}
-      {appliedFilters.length > 0 && (
-        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mb: 2 }}>
-          {appliedFilters.map((filter, index) => (
-            <Chip
-              key={index}
-              label={filter}
-              onDelete={() => removeFilter(index)}
-              color="primary"
-              variant="outlined"
-              sx={{ mb: 1 }}
-            />
-          ))}
-        </Box>
+  return (
+    <div className="font-poppins">
+      {/* Application Limit Popup */}
+      {showLimitPopup && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg max-w-sm text-center">
+            <h2 className="text-xl font-semibold text-gray-800">Application Limit Reached</h2>
+            <p className="text-gray-600 mt-2">
+              You have reached the maximum of {MAX_FREE_APPLICATIONS} free applications.
+            </p>
+            <p className="text-gray-600 mt-1">Upgrade your account to apply for more jobs.</p>
+
+            {/* Buttons Container */}
+            <div className="flex justify-between mt-4">
+              <button
+                className="bg-gray-400 text-white px-4 py-2 rounded-md hover:bg-gray-500"
+                onClick={() => setShowLimitPopup(false)}
+              >
+                Close
+              </button>
+              <button
+                className="bg-purple-500 text-white px-4 py-2 rounded-md hover:bg-purple-600"
+                onClick={() => {
+                  setShowLimitPopup(false);
+                  // You might want to add a pricing modal here
+                }}
+              >
+                Upgrade Now
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
-      {/* Cards or Skeletons */}
-      <Box>
-        {loading ? (
-          <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 2 }}>
-            <Skeleton active paragraph={{ rows: 3 }} />
-            <Skeleton active paragraph={{ rows: 3 }} />
-            <Skeleton active paragraph={{ rows: 3 }} />
-          </Box>
-        ) : (
-          <Card searchTerm={searchTerm} onViewDetails={(job) => setSelectedJob(job)} />
-        )}
-      </Box>
+      {/* 🔒 STICKY SEARCH BAR */}
+      <div className="sticky top-0 z-20 bg-white border-b p-4">
+        <div className="flex items-center gap-2">
+          <TextField
+            fullWidth
+            placeholder="Search for internships and jobs"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+              endAdornment: searchTerm && (
+                <InputAdornment position="end">
+                  <IconButton onClick={() => setSearchTerm("")}>
+                    <ClearIcon />
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+          />
 
-      {/* Filter Dialog */}
+          <Button
+            variant="contained"
+            startIcon={<FilterListIcon />}
+            onClick={() => setIsFilterOpen(true)}
+          >
+            Filter
+          </Button>
+        </div>
+
+        {appliedFilters.length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-2">
+            {appliedFilters.map((filter, index) => (
+              <Chip
+                key={index}
+                label={filter}
+                onDelete={() =>
+                  setAppliedFilters((prev) =>
+                    prev.filter((_, i) => i !== index)
+                  )
+                }
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* 🔽 CARDS (WINDOW SCROLLS) */}
+        <div className="p-4">
+        <Card
+          searchTerm={searchTerm}
+          onViewDetails={handleViewDetails}
+          jobData={jobData} // Pass job data as prop
+        />
+      </div>
+       {/* Infinite scroll trigger */}
+      <div ref={loadMoreRef} className="h-10 flex justify-center items-center">
+        {loadingJobs && (
+          <span className="text-gray-500 text-sm">Loading more internships…</span>
+        )}
+      </div>
+
       <FilterDialog
         open={isFilterOpen}
-        onClose={closeFilterDialog}
-        onApply={applyFilters}
+        onClose={() => setIsFilterOpen(false)}
+        onApply={(filters) => setAppliedFilters(filters)}
       />
-    </Box>
+    </div>
   );
 };
 

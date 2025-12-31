@@ -75,18 +75,22 @@ const InternshipList = () => {
       }
     };
 
-    const fetchInternships = async (partnerId) => {
-      try {
-        setLoading(true);
-        const { data } = await axios.get(`/api/interns/partner/${partnerId}`);
-        setInternships(data);
-        setError(null);
-      } catch (err) {
-        setError(err.message || "Failed to load internships");
-      } finally {
-        setLoading(false);
-      }
-    };
+    const fetchInternships = async () => {
+    if (!partnerId) return;
+
+    setLoading(true);
+    try {
+      const response = await axios.get(`/api/interns/partner/${partnerId}`);
+
+      // ✅ FIX: extract array correctly
+      setInternships(response.data.data || []);
+    } catch (err) {
+      console.error("Error fetching internships:", err);
+      setInternships([]); // safety fallback
+    } finally {
+      setLoading(false);
+    }
+  };
 
     fetchPartnerData();
   }, []);

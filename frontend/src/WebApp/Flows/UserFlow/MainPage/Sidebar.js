@@ -24,9 +24,9 @@ import { useFeedback } from "../../../../context/FeedbackContext";
 import { userFlowQuestions } from "../../../../components/FeedbackModal/questionSets";
 
 const Sidebar = ({ isMobile, isOpen, onClose }) => {
-  const [selectedTab, setSelectedTab] = useState("home");
+
   const [showSectors, setShowSectors] = useState(false);
-  const { handleSelectTab } = useTabContext();
+const { selectedTab, handleSelectTab } = useTabContext();
   const navigate = useNavigate();
 
   const location = useLocation();
@@ -35,14 +35,14 @@ const Sidebar = ({ isMobile, isOpen, onClose }) => {
   const { openFeedback } = useFeedback();
 
   // When URL contains ?tab=..., open that tab automatically
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const tabFromUrl = params.get("tab");
-    if (tabFromUrl) {
-      setSelectedTab(tabFromUrl);
-      handleSelectTab(tabFromUrl);
-    }
-  }, [location.search, handleSelectTab]);
+  // useEffect(() => {
+  //   const params = new URLSearchParams(location.search);
+  //   const tabFromUrl = params.get("tab");
+  //   if (tabFromUrl) {
+  //     setSelectedTab(tabFromUrl);
+  //     handleSelectTab(tabFromUrl);
+  //   }
+  // }, [location.search, handleSelectTab]);
 
   const topSectors = [
     { id: "advanced-ai", name: "Advanced AI & Autonomous Systems" },
@@ -56,41 +56,46 @@ const Sidebar = ({ isMobile, isOpen, onClose }) => {
     if (tab === "logout") {
       await handleLogoutTrigger();
     } else {
-      setSelectedTab(tab);
+      
       handleSelectTab(tab);
       if (isMobile && onClose) onClose();
     }
   };
 
   /* ---- performLogout is declared first to avoid TDZ/runtime error ---- */
-  const performLogout = async () => {
-    const sessionId = localStorage.getItem("sessionId");
-    const token = JSON.parse(localStorage.getItem("userToken") || "null");
+const performLogout = async () => {
+  const sessionId = localStorage.getItem("sessionId");
+  const token = localStorage.getItem("userToken"); // ✅ FIX
 
-    if (sessionId && token) {
-      try {
-        await axios.post(
-          "/api/sessions/logout",
-          { sessionId },
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-      } catch (error) {
-        // don't block logout for session errors
-        console.error("Logout session error:", error?.response?.data || error?.message);
-      }
-    }
-
-    // clear only relevant keys (avoid wiping unrelated app data)
+  if (sessionId && token) {
     try {
-      localStorage.clear();
-    } catch (err) {
-      console.warn("LocalStorage clear failed:", err);
+      await axios.post(
+        "/api/sessions/logout",
+        { sessionId },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+    } catch (error) {
+      console.error(
+        "Logout session error:",
+        error?.response?.data || error?.message
+      );
     }
+  }
 
-    navigate("/user/login");
-  };
+  // Clear storage safely
+  try {
+    localStorage.clear();
+  } catch (err) {
+    console.warn("LocalStorage clear failed:", err);
+  }
+
+  navigate("/user/login");
+};
+
 
   // When user clicks logout, check if they already submitted feedback.
   // If not, open feedback modal; after submit, perform logout.

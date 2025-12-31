@@ -23,21 +23,39 @@ router.get("/approved", async (req, res) => {
   const isPremiumUser = req.query.isPremium === "true";
   const { sector } = req.query;
 
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 6;
+  const skip = (page - 1) * limit;
+
   try {
     const filter = { deleted: false, adminApproved: true };
     if (sector) filter.sector = sector;
 
-    let internships = await InternshipPosting.find(filter).lean();
+    // Fetch paginated data
+    let internships = await InternshipPosting.find(filter)
+      .sort({ createdAt: -1 }) // base ordering
+      .skip(skip)
+      .limit(limit)
+      .lean();
 
+    // Normalize internshipType
+    internships.forEach(i => {
+      i.internshipType = (i.internshipType || "FREE").toUpperCase();
+    });
+
+    // Priority maps
     const premiumPriority = { PAID: 3, STIPEND: 2, FREE: 1 };
     const nonPremiumPriority = { FREE: 3, STIPEND: 2, PAID: 1 };
-
-    internships.forEach(i => i.internshipType = (i.internshipType || 'FREE').toUpperCase());
     const priority = isPremiumUser ? premiumPriority : nonPremiumPriority;
 
-    internships.sort((a, b) => (priority[b.internshipType] || 0) - (priority[a.internshipType] || 0));
+    // Priority sorting (small dataset only)
+    internships.sort(
+      (a, b) =>
+        (priority[b.internshipType] || 0) -
+        (priority[a.internshipType] || 0)
+    );
 
-    // Controlled randomness
+    // Controlled randomness (safe because page is small)
     for (let i = internships.length - 1; i > 0; i--) {
       if (Math.random() < 0.2) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -45,12 +63,24 @@ router.get("/approved", async (req, res) => {
       }
     }
 
-    res.json(internships);
+    // Check if more data exists
+    const totalCount = await InternshipPosting.countDocuments(filter);
+    const hasMore = skip + internships.length < totalCount;
+
+    res.json({
+      data: internships,
+      page,
+      hasMore,
+    });
   } catch (error) {
     console.error("Error fetching approved internships:", error);
-    res.status(500).json({ message: "Error fetching approved internships", error: error.message });
+    res.status(500).json({
+      message: "Error fetching approved internships",
+      error: error.message,
+    });
   }
 });
+
 
 // POST create a new internship posting
 router.post("/", async (req, res) => {
@@ -288,17 +318,50 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// GET internships by partner ID
+// GET internships by partner ID (with pagination, search, sorting)
 router.get("/partner/:partnerId", async (req, res) => {
   try {
-    const internships = await InternshipPosting.find({ partnerId: req.params.partnerId });
+    const { partnerId } = req.params;
 
-    // Always respond 200 with list, empty if none
-    res.status(200).json(internships);
+    // Query params (safe defaults)
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 12;
+    const search = req.query.search || "";
+    const sortField = req.query.sort || "jobTitle";
+    const sortOrder = req.query.order === "desc" ? -1 : 1;
+
+    // MongoDB filter
+    const filter = {
+      partnerId,
+      $or: [
+        { jobTitle: { $regex: search, $options: "i" } },
+        { companyName: { $regex: search, $options: "i" } },
+        { organization: { $regex: search, $options: "i" } },
+      ],
+    };
+
+    // Count total docs (for pagination UI)
+    const total = await InternshipPosting.countDocuments(filter);
+
+    // Fetch paginated data
+    const internships = await InternshipPosting.find(filter)
+      .sort({ [sortField]: sortOrder })
+      .skip((page - 1) * limit)
+      .limit(limit);
+
+    // Always respond 200
+    res.status(200).json({
+      data: internships,
+      page,
+      total,
+      totalPages: Math.ceil(total / limit),
+    });
   } catch (error) {
+    console.error("Error fetching internships:", error);
     res.status(500).json({ message: "Server Error" });
   }
 });
+
 
 // PUT update an internship posting by ID
 router.put("/:id", async (req, res) => {
