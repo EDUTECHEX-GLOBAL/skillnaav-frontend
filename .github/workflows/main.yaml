@@ -3,7 +3,7 @@ name: Deploy to Server
 on:
   push:
     branches:
-      - feature/GoogleSignup # Adjust the branch as necessary
+      - feature/lazyloading # Adjust the branch as necessary
 
 jobs:
   deploy:
@@ -20,7 +20,7 @@ jobs:
 
       - name: Run deployment script
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@www.skillnaav.com << 'EOF'
+          ssh -o StrictHostKeyChecking=no ubuntu@skillnaav.com << 'EOF'
             cd /home/ubuntu/
-            ./deploy.sh feature/GoogleSignup # Pass the branch name directly
+            ./deploy.sh feature/lazyloading # Pass the branch name directly
           EOF

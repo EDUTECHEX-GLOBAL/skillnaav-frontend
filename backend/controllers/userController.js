@@ -431,7 +431,34 @@ const updateUserProfile = asyncHandler(async (req, res) => {
 
 // Get all users with additional fields
 const getAllUsers = asyncHandler(async (req, res) => {
-  const users = await Userwebapp.find({}, "name email universityName dob educationLevel fieldOfStudy desiredField linkedin status adminApproved");
+  const users = await Userwebapp.find(
+    {},
+    `
+      name
+      email
+      universityName
+      dob
+      educationLevel
+      fieldOfStudy
+      desiredField
+      linkedin
+      status
+      adminApproved
+      profileImage
+      isPremium
+      planType
+      skills
+      interests
+      preferredLocations
+      state
+      country
+      city
+      postalCode
+      address
+      currentGrade
+      gradePercentage
+    `
+  );
 
   if (!users || users.length === 0) {
     res.status(404);
@@ -670,6 +697,50 @@ const googleAuthUser = asyncHandler(async (req, res) => {
   });
 });
 
+// controllers/userController.js
+const getUserById = asyncHandler(async (req, res) => {
+  const user = await Userwebapp.findById(req.params.id);
+
+  if (!user) {
+    res.status(404);
+    throw new Error("User not found");
+  }
+
+  // Reuse your existing expireIfNeeded if needed
+  await expireIfNeeded(user);
+
+  const userProfile = {
+    _id: user._id,
+    name: user.name,
+    email: user.email,
+    universityName: user.universityName,
+    dob: user.dob,
+    educationLevel: user.educationLevel,
+    fieldOfStudy: user.fieldOfStudy,
+    desiredField: user.desiredField,
+    linkedin: user.linkedin,
+    portfolio: user.portfolio,
+    skills: user.skills,
+    interests: user.interests,
+    preferredLocations: user.preferredLocations,
+    adminApproved: user.adminApproved,
+    status: user.status,
+    financialStatus: user.financialStatus,
+    state: user.state,
+    country: user.country,
+    city: user.city,
+    postalCode: user.postalCode,
+    address: user.address,
+    currentGrade: user.currentGrade,
+    gradePercentage: user.gradePercentage,
+    profileImage: user.profileImage,
+    isPremium: user.isPremium,
+    planType: user.planType,
+    premiumExpiration: user.premiumExpiration,
+  };
+
+  res.json(userProfile);
+});
 
 
 module.exports = {
@@ -687,5 +758,6 @@ module.exports = {
   sendSignupVerificationCode,
   verifySignupOTP,
   googleAuthUser,
+  getUserById,
 };
 

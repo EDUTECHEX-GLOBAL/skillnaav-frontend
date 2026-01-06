@@ -19,6 +19,7 @@ const {
   sendSignupVerificationCode,
   verifySignupOTP,
   googleAuthUser,
+  getUserById,
 } = require("../../controllers/userController");
 
 // UPDATED: import authenticate instead of protect
@@ -64,5 +65,9 @@ router.post("/send-verification-code", sendSignupVerificationCode);
 router.post("/verify-code", verifySignupOTP);
 
 router.post("/google-auth", googleAuthUser);
+
+// Add this line after your other routes
+router.get("/:id", getUserById);
+
 
 module.exports = router;
