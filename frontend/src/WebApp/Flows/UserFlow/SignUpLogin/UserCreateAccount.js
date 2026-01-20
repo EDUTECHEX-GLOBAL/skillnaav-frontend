@@ -9,35 +9,10 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import loginImage from "../../../../assets-webapp/login-image.png";
 import { GoogleLogin } from "@react-oauth/google";
+import { COUNTRIES, US_STATES, CA_PROVINCES } from "../../../../constants/locations";
 
-// NOTE: You'll need to define your Firebase config and imports here
-// import { auth, googleAuthProvider, signInWithPopup } from "../../../../config/Firebase"; 
 
-// --- Location constants and GeoDB config (US/CA only) from UserProfileForm.js ---
-const US_STATES = [
-  "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware",
-  "District of Columbia", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa",
-  "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota",
-  "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire", "New Jersey",
-  "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio", "Oklahoma", "Oregon",
-  "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota", "Tennessee", "Texas", "Utah",
-  "Vermont", "Virginia", "Washington", "West Virginia", "Wisconsin", "Wyoming"
-];
 
-const CA_PROVINCES = [
-  "Alberta", "British Columbia", "Manitoba", "New Brunswick", "Newfoundland and Labrador",
-  "Northwest Territories", "Nova Scotia", "Nunavut", "Ontario", "Prince Edward Island",
-  "Quebec", "Saskatchewan", "Yukon"
-];
-
-const GEODB_URL = "https://wft-geo-db.p.rapidapi.com/v1/geo/cities";
-const GEODB_KEY = process.env.REACT_APP_GEODB_KEY || ""; // Replace with your actual key setup
-
-// Example university suggestions
-const universitySuggestions = [
-  "Harvard University", "Stanford University", "University of California",
-  "Massachusetts Institute of Technology", "Oxford University",
-];
 
 const UnifiedUserRegistration = () => {
   const navigate = useNavigate();
@@ -53,17 +28,23 @@ const UnifiedUserRegistration = () => {
   const [canResend, setCanResend] = useState(false);
 
   // States for UserProfileForm.js city/university suggestions
-  const [filteredUniversitySuggestions, setFilteredUniversitySuggestions] = useState([]);
+
   const [citySuggestions, setCitySuggestions] = useState([]);
   const cityTimerRef = useRef(null);
   const cityAbortRef = useRef(null);
+
+  const [filteredInstitutionSuggestions, setFilteredInstitutionSuggestions] =
+    useState([]);
+
+  const institutionTimerRef = useRef(null);
+
 
   // --- UNIFIED STATE MANAGEMENT ---
   const [formData, setFormData] = useState({
     // Step 1: Account
     name: "", email: "", password: "", confirmPassword: "",
     // Step 2: Profile Form
-    universityName: "", dob: null, educationLevel: "", fieldOfStudy: "",
+    institutionName: "", dob: null, educationLevel: "", grade: "", fieldOfStudy: "",
     country: "", state: "", city: "", zip: "", address: "",
     // Step 3: Professional/Picture
     desiredField: "", linkedin: "", portfolio: "", skills: "", interests: "",
@@ -95,14 +76,49 @@ const UnifiedUserRegistration = () => {
     const { name, value } = e.target;
     setFormData((prevData) => ({ ...prevData, [name]: value }));
 
-    // University suggestion filtering (from UserProfileForm.js)
-    if (name === "universityName") {
-      const suggestions = universitySuggestions.filter((university) =>
-        university.toLowerCase().includes(value.toLowerCase())
-      );
-      setFilteredUniversitySuggestions(suggestions);
-    }
+
   };
+  const handleInstitutionInputChange = (e) => {
+    const value = e.target.value;
+
+    setFormData((prev) => ({
+      ...prev,
+      institutionName: value,
+    }));
+
+    if (institutionTimerRef.current)
+      clearTimeout(institutionTimerRef.current);
+
+    // 🛑 High school → manual entry only
+    if (formData.educationLevel === "highschool") {
+      setFilteredInstitutionSuggestions([]);
+      return;
+    }
+
+    // Guards
+    if (!value || value.trim().length < 2 || !formData.country) {
+      setFilteredInstitutionSuggestions([]);
+      return;
+    }
+
+    institutionTimerRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `/api/locations/universities?country=${encodeURIComponent(
+            formData.country
+          )}&query=${encodeURIComponent(value.trim())}`
+        );
+
+        if (!res.ok) return;
+
+        const data = await res.json();
+        setFilteredInstitutionSuggestions(data);
+      } catch (err) {
+        console.error("Institution fetch error:", err);
+      }
+    }, 400);
+  };
+
 
   const handleDateChange = (date) => {
     const updatedDate = date ? new Date(date) : null;
@@ -110,10 +126,7 @@ const UnifiedUserRegistration = () => {
     setFormData((prevData) => ({ ...prevData, dob: updatedDate }));
   };
 
-  const handleUniversitySuggestionClick = (suggestion) => {
-    setFormData((prevData) => ({ ...prevData, universityName: suggestion }));
-    setFilteredUniversitySuggestions([]);
-  };
+
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -169,31 +182,31 @@ const UnifiedUserRegistration = () => {
     }
   };
 
- const handleVerifyOTP = async () => {
-  if (!otp) {
-    setErrorMessage("Please enter the OTP.");
-    return;
-  }
-
-  try {
-    const verifyRes = await axios.post("/api/users/verify-code", {
-      email: formData.email,
-      otp,
-      password: formData.password, 
-    });
-
-    if (verifyRes.data.success) {
-      localStorage.setItem("userToken", verifyRes.data.token);
-      setErrorMessage("");
-      setCurrentStep(2);
-    } else {
-      setErrorMessage("Invalid OTP. Try again.");
-      setCanResend(true);
+  const handleVerifyOTP = async () => {
+    if (!otp) {
+      setErrorMessage("Please enter the OTP.");
+      return;
     }
-  } catch (err) {
-    setErrorMessage("OTP verification failed.");
-  }
-};
+
+    try {
+      const verifyRes = await axios.post("/api/users/verify-code", {
+        email: formData.email,
+        otp,
+        password: formData.password,
+      });
+
+      if (verifyRes.data.success) {
+        localStorage.setItem("userToken", verifyRes.data.token);
+        setErrorMessage("");
+        setCurrentStep(2);
+      } else {
+        setErrorMessage("Invalid OTP. Try again.");
+        setCanResend(true);
+      }
+    } catch (err) {
+      setErrorMessage("OTP verification failed.");
+    }
+  };
 
 
   const handleResendOTP = async () => {
@@ -213,9 +226,43 @@ const UnifiedUserRegistration = () => {
 
   // --- Step 2: Profile Form Submission (Modified from UserProfileForm.js) ---
   const validateStep2 = () => {
-    const { universityName, dob, educationLevel, fieldOfStudy, country, state, city, zip, address } = formData;
-    return Boolean(universityName && dob && educationLevel && fieldOfStudy && country && state && city && zip && address);
+    const {
+      educationLevel,
+      grade,
+      institutionName,
+      country,
+      state,
+      city,
+      zip,
+      address,
+    } = formData;
+
+    // High school → grade required
+    if (educationLevel === "highschool") {
+      return Boolean(
+        grade &&
+        institutionName &&
+        country &&
+        state &&
+        city &&
+        zip &&
+        address
+      );
+    }
+
+    // College / Graduate
+    return Boolean(
+      institutionName &&
+      educationLevel &&
+      country &&
+      state &&
+      city &&
+      zip &&
+      address
+    );
   };
+
+
 
   const handleStep2Submit = (e) => {
     e.preventDefault(); // Stop form default submission
@@ -240,70 +287,82 @@ const UnifiedUserRegistration = () => {
     return Boolean(desiredField && linkedin && profilePic);
   };
 
-const handleStep3Submit = async () => {
-  if (!validateStep3()) {
-    setErrorMessage("Please fill the required fields.");
-    return;
-  }
-
-  try {
-    const fd = new FormData();
-
-    Object.entries(formData).forEach(([key, value]) => {
-      // Skip passwords for Google signup
-      if ((key === "password" || key === "confirmPassword") && !value) {
-        return;
-      }
-
-      // DOB → ISO string
-      if (key === "dob" && value instanceof Date) {
-        fd.append("dob", value.toISOString());
-        return;
-      }
-
-      // FIXED: Send comma-separated text instead of JSON array
-      if (["skills", "interests", "preferredLocations"].includes(key)) {
-        const list = value
-          .split(",")
-          .map((v) => v.trim())
-          .filter(Boolean);
-        fd.append(key, list.join(",")); // <-- FIXED
-        return;
-      }
-
-      // zip → postalCode
-      if (key === "zip") {
-        fd.append("postalCode", value);
-        return;
-      }
-
-      // Skip raw file field
-      if (key !== "profilePic") {
-        fd.append(key, value);
-      }
-    });
-
-    // File field
-    if (formData.profilePic) {
-      fd.append("profileImage", formData.profilePic);
+  const handleStep3Submit = async () => {
+    if (!validateStep3()) {
+      setErrorMessage("Please fill the required fields.");
+      return;
     }
 
-    const res = await axios.put("/api/users/profile", fd, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-        Authorization: `Bearer ${localStorage.getItem("userToken")}`,
-      },
-    });
+    try {
+      const fd = new FormData();
 
-    navigate("/user/login", {
-  state: { message: "Registration successful. Please log in." }
-});
+      Object.entries(formData).forEach(([key, value]) => {
+        if (value === undefined || value === null) return;
 
-  } catch (err) {
-    console.error(err);
-    setErrorMessage("Registration failed. Try again.");
-  }
-};
+        // 🔐 Skip auth-only fields
+        if (key === "password" || key === "confirmPassword") return;
+
+        // ✅ FIX 1: institutionName → universityName
+        if (key === "institutionName") {
+          fd.append("universityName", value);
+          return;
+        }
+
+        // ✅ FIX 2: grade → currentGrade
+        if (key === "grade") {
+          fd.append("currentGrade", value);
+          return;
+        }
+
+        // DOB → ISO string
+        if (key === "dob" && value instanceof Date) {
+          fd.append("dob", value.toISOString());
+          return;
+        }
+
+        // Arrays → comma-separated string
+        if (["skills", "interests", "preferredLocations"].includes(key)) {
+          const list = value
+            .split(",")
+            .map((v) => v.trim())
+            .filter(Boolean);
+          fd.append(key, list.join(","));
+          return;
+        }
+
+        // zip → postalCode
+        if (key === "zip") {
+          fd.append("postalCode", value);
+          return;
+        }
+
+        // Skip raw file field
+        if (key !== "profilePic") {
+          fd.append(key, value);
+        }
+      });
+
+      // File field
+      if (formData.profilePic) {
+        fd.append("profileImage", formData.profilePic);
+      }
+
+      const res = await axios.put("/api/users/profile", fd, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+          Authorization: `Bearer ${localStorage.getItem("userToken")}`,
+        },
+      });
+
+      navigate("/user/login", {
+        state: { message: "Registration successful. Please log in." }
+      });
+
+    } catch (err) {
+      console.error(err);
+      setErrorMessage("Registration failed. Try again.");
+    }
+  };
 
 
 
@@ -336,59 +395,52 @@ const handleStep3Submit = async () => {
   };
 
   const handleCityInputChange = (e) => {
-    const { value } = e.target;
+    const value = e.target.value;
+
     setFormData((prev) => ({ ...prev, city: value }));
 
+    // Clear previous debounce
     if (cityTimerRef.current) clearTimeout(cityTimerRef.current);
-    if (!value || !formData.country) {
+
+    // ✅ HARD GUARDS
+    if (!formData.country) {
       setCitySuggestions([]);
-      if (cityAbortRef.current) cityAbortRef.current.abort();
+      return;
+    }
+
+    if (!value || value.trim().length < 2) {
+      setCitySuggestions([]);
       return;
     }
 
     cityTimerRef.current = setTimeout(async () => {
       try {
-        if (cityAbortRef.current) cityAbortRef.current.abort();
-        cityAbortRef.current = new AbortController();
+        const res = await fetch(
+          `/api/locations/cities?country=${encodeURIComponent(
+            formData.country
+          )}&query=${encodeURIComponent(value.trim())}`
+        );
 
-        const countryIds = formData.country === "Canada" ? "CA" : formData.country === "United States" ? "US" : "US,CA";
+        if (!res.ok) return; // silently ignore 400s
 
-        const url = new URL(GEODB_URL);
-        url.searchParams.set("namePrefix", value);
-        url.searchParams.set("limit", "10");
-        url.searchParams.set("minPopulation", "100000");
-        url.searchParams.set("countryIds", countryIds);
-
-        const resp = await fetch(url.toString(), {
-          method: "GET",
-          headers: {
-            "X-RapidAPI-Key": GEODB_KEY,
-            "X-RapidAPI-Host": "wft-geo-db.p.rapidapi.com",
-          },
-          signal: cityAbortRef.current.signal,
-        });
-
-        if (!resp.ok) throw new Error(`GeoDB error: ${resp.status}`);
-        const json = await resp.json();
-        setCitySuggestions(json?.data ?? []);
+        const data = await res.json();
+        setCitySuggestions(data);
       } catch (err) {
-        if (err?.name === "AbortError") return;
-        console.error(err);
+        console.error("City fetch error:", err);
       }
-    }, 300);
+    }, 400);
   };
 
-  const handleCitySelect = (c) => {
-    const regionName = c?.region || c?.regionCode || "";
-    const normalizedRegion = stateList.includes(regionName) ? regionName : formData.state;
 
+  const handleCitySelect = (c) => {
     setFormData((prev) => ({
       ...prev,
-      city: c?.name || "",
-      state: normalizedRegion,
+      city: c.city,
+      state: c.state,
     }));
     setCitySuggestions([]);
   };
+
 
   // Placeholder for Google Sign-In (requires Firebase setup)
   const handleGoogleSignIn = async () => {
@@ -471,23 +523,127 @@ const handleStep3Submit = async () => {
       return (
         <form onSubmit={handleStep2Submit} className="w-full max-w-xl p-8 space-y-6 bg-white shadow-md rounded-lg">
           <div className="space-y-4">
-            <div className="w-full h-12 p-3 bg-[#F9F0FF] border-b border-[#E6C4FB]">
+            {/* <div className="w-full h-12 p-3 bg-[#F9F0FF] border-b border-[#E6C4FB]">
               <h2 className="text-lg font-bold text-gray-700">BASIC INFORMATION</h2>
+            </div> */}
+
+            {/* EDUCATIONAL INFORMATION */}
+            <div className="w-full h-12 p-3 bg-[#F9F0FF] border-b border-[#E6C4FB]">
+              <h2 className="text-lg font-bold text-gray-700">EDUCATION</h2>
             </div>
-            {/* University Name */}
-            <div className="relative">
-              <label htmlFor="universityName" className="block text-sm font-medium text-gray-700">University Name</label>
-              <input id="universityName" type="text" name="universityName" value={formData.universityName} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500" placeholder="Enter your University Name" autoComplete="off" required />
-              {filteredUniversitySuggestions.length > 0 && (
-                <ul className="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 max-h-40 overflow-y-auto">
-                  {filteredUniversitySuggestions.map((suggestion, index) => (
-                    <li key={index} onClick={() => handleUniversitySuggestionClick(suggestion)} className="cursor-pointer px-4 py-2 hover:bg-purple-100">
-                      {suggestion}
-                    </li>
+
+            {/* Education Level */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                Current level of education
+              </label>
+
+              <div className="mt-2 space-y-2">
+                {["highschool", "undergraduate", "graduate"].map((level) => (
+                  <div key={level} className="flex items-center">
+                    <input
+                      type="radio"
+                      id={level}
+                      name="educationLevel"
+                      value={level}
+                      checked={formData.educationLevel === level}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          educationLevel: e.target.value,
+                          grade: "",
+                          institutionName: "",
+                        }))
+                      }
+                      className="h-4 w-4 text-purple-600"
+                      required
+                    />
+                    <label htmlFor={level} className="ml-3 text-sm text-gray-700">
+                      {level.charAt(0).toUpperCase() + level.slice(1)}
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Grade (ONLY for High School) */}
+            {formData.educationLevel === "highschool" && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Current Grade
+                </label>
+
+                <select
+                  name="grade"
+                  value={formData.grade}
+                  onChange={handleChange}
+                  required
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
+                >
+                  <option value="">Select Grade</option>
+                  {[8, 9, 10, 11, 12].map((g) => (
+                    <option key={g} value={`Grade ${g}`}>
+                      Grade {g}
+                    </option>
                   ))}
-                </ul>
-              )}
-            </div>
+                </select>
+              </div>
+            )}
+
+            {/* Institution Name — only after education level */}
+            {formData.educationLevel && (
+              <div className="relative">
+                <label className="block text-sm font-medium text-gray-700">
+                  {formData.educationLevel === "highschool"
+                    ? "School Name"
+                    : "College / University Name"}
+                </label>
+
+                <input
+                  type="text"
+                  name="institutionName"
+                  value={formData.institutionName}
+                  onChange={handleInstitutionInputChange}
+                  placeholder={
+                    formData.educationLevel === "highschool"
+                      ? "Enter your school name"
+                      : "Search college or university"
+                  }
+                  autoComplete="off"
+                  required
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
+                />
+
+                {/* University suggestions ONLY for non-highschool */}
+                {formData.educationLevel !== "highschool" &&
+                  filteredInstitutionSuggestions.length > 0 && (
+                    <ul className="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 max-h-48 overflow-y-auto">
+                      {filteredInstitutionSuggestions.map((u, index) => (
+                        <li
+                          key={index}
+                          onClick={() => {
+                            setFormData((prev) => ({
+                              ...prev,
+                              institutionName: u.name,
+                            }));
+                            setFilteredInstitutionSuggestions([]);
+                          }}
+                          className="cursor-pointer px-4 py-2 hover:bg-purple-100"
+                        >
+                          {u.name}
+                          {u.state && (
+                            <span className="text-xs text-gray-500 ml-2">
+                              {u.state}
+                            </span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+              </div>
+            )}
+
+
             {/* Date of Birth */}
             <div>
               <label htmlFor="dob" className="block text-sm font-medium text-gray-700">Date of Birth</label>
@@ -524,10 +680,15 @@ const handleStep3Submit = async () => {
                   {citySuggestions.length > 0 && (
                     <ul className="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 max-h-48 overflow-y-auto">
                       {citySuggestions.map((c) => (
-                        <li key={c.id || c.wikiDataId || `${c.name}-${c.region}`} onClick={() => handleCitySelect(c)} className="cursor-pointer px-4 py-2 hover:bg-purple-100">
-                          {c.name}{c.region ? `, ${c.region}` : ""}
+                        <li
+                          key={`${c.city}-${c.state}`}
+                          onClick={() => handleCitySelect(c)}
+                          className="cursor-pointer px-4 py-2 hover:bg-purple-100"
+                        >
+                          {c.city}, {c.state}
                         </li>
                       ))}
+
                     </ul>
                   )}
                 </div>
@@ -544,32 +705,17 @@ const handleStep3Submit = async () => {
               </div>
             </div>
 
-            {/* EDUCATIONAL INFORMATION */}
-            <div className="w-full h-12 p-3 bg-[#F9F0FF] border-b border-[#E6C4FB]">
-              <h2 className="text-lg font-bold text-gray-700">EDUCATIONAL INFORMATION</h2>
-            </div>
-            {/* Education Level Radios */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Current level of education</label>
-              <div className="mt-2 space-y-2">
-                {["highschool", "undergraduate", "graduate"].map((level) => (
-                  <div key={level} className="flex items-center">
-                    <input type="radio" id={level} name="educationLevel" value={level} checked={formData.educationLevel === level} onChange={handleChange} className="h-4 w-4 text-purple-600 border-gray-300 focus:ring-purple-500" required />
-                    <label htmlFor={level} className="ml-3 mt-4 block text-sm text-gray-700">{level.charAt(0).toUpperCase() + level.slice(1)}</label>
-                  </div>
-                ))}
-              </div>
-            </div>
+
             {/* Field of Study Select */}
             <div>
               <label htmlFor="fieldOfStudy" className="block text-sm font-medium text-gray-700">Field of Study</label>
               <select name="fieldOfStudy" value={formData.fieldOfStudy} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500" required>
                 <option value="">Select Your Field</option>
-                <option value="space">Space Internships</option>
-                <option value="aero">Aeronautical Internships</option>
-                <option value="tech">Tech Internships</option>
-                <option value="research">Research Internships</option>
-                <option value="education">Education Internships</option>
+                <option value="Space">Space Internships</option>
+                <option value="Aeronautical">Aeronautical Internships</option>
+                <option value="Tech">Tech Internships</option>
+                <option value="Research">Research Internships</option>
+                <option value="Education">Education Internships</option>
               </select>
             </div>
           </div>
@@ -598,11 +744,11 @@ const handleStep3Submit = async () => {
               <label className="block text-sm font-medium text-gray-700">Desired field of Internship/Job *</label>
               <select name="desiredField" value={formData.desiredField} onChange={handleChange} required className="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500">
                 <option value="">Select Your Field</option>
-                <option value="space">Space Internships</option>
-                <option value="aero">Aeronautical Internships</option>
-                <option value="tech">Tech Internships</option>
-                <option value="research">Research Internships</option>
-                <option value="education">Education Internships</option>
+                <option value="Space">Space Internships</option>
+                <option value="Aeronautical">Aeronautical Internships</option>
+                <option value="Tech">Tech Internships</option>
+                <option value="Research">Research Internships</option>
+                <option value="Education">Education Internships</option>
               </select>
             </div>
 
@@ -686,39 +832,39 @@ const handleStep3Submit = async () => {
 
           {(currentStep === 1 || currentStep === 1.5) && (
             <>
-            <GoogleLogin
-  onSuccess={async (credentialResponse) => {
-    try {
-      const idToken = credentialResponse.credential;
+              <GoogleLogin
+                onSuccess={async (credentialResponse) => {
+                  try {
+                    const idToken = credentialResponse.credential;
 
-      const res = await axios.post("/api/users/google-auth", { idToken });
+                    const res = await axios.post("/api/users/google-auth", { idToken });
 
-      // store in correct key
-      localStorage.setItem("userToken", res.data.token);
+                    // store in correct key
+                    localStorage.setItem("userToken", res.data.token);
 
-      // If profile already completed → go directly
-     if (!res.data.needsProfileCompletion) {
-  navigate("/user/login");
-  return;
-}
+                    // If profile already completed → go directly
+                    if (!res.data.needsProfileCompletion) {
+                      navigate("/user/login");
+                      return;
+                    }
 
 
-      // Prefill fields for step 2
-      setFormData((prev) => ({
-        ...prev,
-        name: res.data.name,
-        email: res.data.email,
-      }));
+                    // Prefill fields for step 2
+                    setFormData((prev) => ({
+                      ...prev,
+                      name: res.data.name,
+                      email: res.data.email,
+                    }));
 
-      // Go to step 2
-      setCurrentStep(2);
+                    // Go to step 2
+                    setCurrentStep(2);
 
-    } catch (error) {
-      console.error(error);
-      setErrorMessage("Google Sign-In failed.");
-    }
-  }}
-/>
+                  } catch (error) {
+                    console.error(error);
+                    setErrorMessage("Google Sign-In failed.");
+                  }
+                }}
+              />
 
 
               <p className="text-center text-gray-500 font-medium text-base">

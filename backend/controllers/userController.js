@@ -289,60 +289,66 @@ const authUser = asyncHandler(async (req, res) => {
 
   const user = await Userwebapp.findOne({ email });
 
- if (user && (user.isGoogleUser || await user.matchPassword(password))) {
-
-
-    // Only check for school-admin restrictions
-    if (user.schoolAdmin && !user.isActive) {
-      res.status(403);
-      throw new Error("Your account has been restricted by your school administrator. Please contact them.");
-    }
-
-    // Expire if needed
-    await expireIfNeeded(user);
-
-    // Generate token
-    const token = generateToken(user._id);
-
-    // 🔥 CREATE SESSION RECORD
-    const session = await LoginSession.create({
-      studentId: user._id,
-      schoolAdmin: user.schoolAdmin,
-      loginAt: new Date(),
-    });
-
-    // 🔥 Return session ID to frontend
-    res.json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      universityName: user.universityName,
-      dob: user.dob,
-      educationLevel: user.educationLevel,
-      fieldOfStudy: user.fieldOfStudy,
-      desiredField: user.desiredField,
-      linkedin: user.linkedin,
-      portfolio: user.portfolio,
-      profileImage: user.profileImage,
-      isPremium: user.isPremium,
-      planType: user.planType,
-      premiumExpiration: user.premiumExpiration,
-      token,
-      sessionId: session._id,   // 👈 VERY IMPORTANT
-      adminApproved: user.adminApproved,
-      status: user.status,
-      isFullyApproved: user.status === "Approved" && user.adminApproved,
-    });
-
-  } else {
+  if (!user) {
     res.status(400);
     throw new Error("Invalid email or password.");
   }
+
+  // 🚫 BLOCK manual login for Google users
+  if (user.isGoogleUser) {
+    res.status(400);
+    throw new Error(
+      "This account was created using Google. Please sign in with Google."
+    );
+  }
+
+  // ✅ Normal user password check
+  const isMatch = await user.matchPassword(password);
+
+  if (!isMatch) {
+    res.status(400);
+    throw new Error("Invalid email or password.");
+  }
+
+  // School-admin restriction
+  if (user.schoolAdmin && !user.isActive) {
+    res.status(403);
+    throw new Error(
+      "Your account has been restricted by your school administrator."
+    );
+  }
+
+  // Expire premium if needed
+  await expireIfNeeded(user);
+
+  const token = generateToken(user._id);
+
+  const session = await LoginSession.create({
+    studentId: user._id,
+    schoolAdmin: user.schoolAdmin,
+    loginAt: new Date(),
+  });
+
+  res.json({
+    _id: user._id,
+    name: user.name,
+    email: user.email,
+    profileImage: user.profileImage,
+    isPremium: user.isPremium,
+    planType: user.planType,
+    premiumExpiration: user.premiumExpiration,
+    token,
+    sessionId: session._id,
+    adminApproved: user.adminApproved,
+    status: user.status,
+    isFullyApproved: user.status === "Approved" && user.adminApproved,
+  });
 });
 
 
 
-// Update user profile
+
+
 // Update user profile
 const updateUserProfile = asyncHandler(async (req, res) => {
   console.log("BODY RECEIVED ===>", req.body);
@@ -523,7 +529,7 @@ const rejectUser = asyncHandler(async (req, res) => {
   res.status(200).json({ message: "User rejected successfully." });
 });
 
-// Get premium status
+
 // Get premium status
 const getPremiumStatus = asyncHandler(async (req, res) => {
 
@@ -583,7 +589,7 @@ const sendSignupVerificationCode = asyncHandler(async (req, res) => {
   res.status(200).json({ message: "Verification code sent to email." });
 });
 
-// Verify the signup OTP
+
 // Verify the signup OTP
 const verifySignupOTP = asyncHandler(async (req, res) => {
   const { email, otp, password } = req.body;

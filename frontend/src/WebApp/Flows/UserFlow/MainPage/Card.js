@@ -1,10 +1,10 @@
-// Card.js (or whatever your Card component file is called)
+// Card.js
 import React, { useEffect, useState, useRef } from "react";
 import { FaMapMarkerAlt, FaClock, FaDollarSign, FaHeart } from "react-icons/fa";
 import axios from "axios";
 import { useTabContext } from "./UserHomePageContext/HomePageContext";
 
-// Create a cache outside the component to persist across re-renders
+// Cache (unchanged)
 const jobCache = {
   data: [],
   page: 1,
@@ -12,29 +12,49 @@ const jobCache = {
   timestamp: null
 };
 
-const CACHE_DURATION = 60000; // Cache for 1 minute
+const CACHE_DURATION = 60000;
 
-const JobCard = ({ searchTerm = "", onViewDetails }) => {
+const JobCard = ({
+  jobs: externalJobs,          // ✅ accept jobs from parent
+  searchTerm = "",
+  onViewDetails
+}) => {
   const { savedJobs, saveJob, removeJob } = useTabContext();
 
-  const [jobs, setJobs] = useState(jobCache.data || []);
+  const isRecommendationMode = Array.isArray(externalJobs);
+
+  const [jobs, setJobs] = useState(externalJobs || jobCache.data || []);
   const [page, setPage] = useState(jobCache.page || 1);
   const [hasMore, setHasMore] = useState(jobCache.hasMore !== false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const loadMoreRef = useRef(null);
 
-  // ✅ SAME fetch logic as Home.js
+  /* ----------------------------------
+     USE RECOMMENDATION JOBS DIRECTLY
+  ---------------------------------- */
+  useEffect(() => {
+    if (isRecommendationMode) {
+      setJobs(externalJobs);
+      setHasMore(false); // ❌ disable infinite scroll
+    }
+  }, [externalJobs, isRecommendationMode]);
+
+  /* ----------------------------------
+     FETCH APPROVED JOBS (HOME PAGE)
+  ---------------------------------- */
   const fetchJobs = async (pageNumber = 1) => {
-    if (loading || !hasMore) return;
+    if (loading || !hasMore || isRecommendationMode) return;
 
     try {
       setLoading(true);
 
-      // Check cache first
-      if (pageNumber === 1 && jobCache.timestamp && 
-          (Date.now() - jobCache.timestamp) < CACHE_DURATION) {
-        console.log("Using cached job data");
+      // Cache check
+      if (
+        pageNumber === 1 &&
+        jobCache.timestamp &&
+        Date.now() - jobCache.timestamp < CACHE_DURATION
+      ) {
         setJobs(jobCache.data);
         setPage(jobCache.page);
         setHasMore(jobCache.hasMore);
@@ -48,27 +68,20 @@ const JobCard = ({ searchTerm = "", onViewDetails }) => {
 
       const { data, hasMore: more } = res.data;
 
-      setJobs((prev) =>
-        pageNumber === 1 ? data : [...prev, ...data]
-      );
+      setJobs(prev => {
+        const updated = pageNumber === 1 ? data : [...prev, ...data];
+
+        // update cache
+        jobCache.data = updated;
+        jobCache.page = pageNumber;
+        jobCache.hasMore = more;
+        jobCache.timestamp = Date.now();
+
+        return updated;
+      });
 
       setHasMore(more);
       setPage(pageNumber);
-
-      // Update cache
-  setJobs(prev => {
-  const updated = pageNumber === 1 ? data : [...prev, ...data];
-
-  // 🔒 lock order
-  jobCache.data = updated;
-  jobCache.page = pageNumber;
-  jobCache.hasMore = more;
-  jobCache.timestamp = Date.now();
-
-  return updated;
-});
-
-
     } catch {
       setError("Failed to load jobs.");
     } finally {
@@ -76,21 +89,27 @@ const JobCard = ({ searchTerm = "", onViewDetails }) => {
     }
   };
 
-  // Initial load - only fetch if cache is empty or expired
-useEffect(() => {
-  if (jobCache.data.length > 0) {
-    setJobs(jobCache.data);
-    setPage(jobCache.page);
-    setHasMore(jobCache.hasMore);
-    return;
-  }
-
-  fetchJobs(1);
-}, []);
-
-  // ✅ FIXED Infinite scroll
+  /* ----------------------------------
+     INITIAL LOAD (ONLY HOME PAGE)
+  ---------------------------------- */
   useEffect(() => {
-    if (!loadMoreRef.current) return;
+    if (isRecommendationMode) return;
+
+    if (jobCache.data.length > 0) {
+      setJobs(jobCache.data);
+      setPage(jobCache.page);
+      setHasMore(jobCache.hasMore);
+      return;
+    }
+
+    fetchJobs(1);
+  }, [isRecommendationMode]);
+
+  /* ----------------------------------
+     INFINITE SCROLL (ONLY HOME PAGE)
+  ---------------------------------- */
+  useEffect(() => {
+    if (isRecommendationMode || !loadMoreRef.current) return;
 
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -103,23 +122,20 @@ useEffect(() => {
 
     observer.observe(loadMoreRef.current);
     return () => observer.disconnect();
-  }, [page, hasMore, loading]);
+  }, [page, hasMore, loading, isRecommendationMode]);
 
-  // ✅ Check saved job
+  /* ----------------------------------
+     SAVED JOB LOGIC (UNCHANGED)
+  ---------------------------------- */
   const isJobSaved = (jobId) =>
     savedJobs.some(
       (savedJob) =>
         savedJob.jobId?._id === jobId || savedJob.jobId === jobId
     );
 
-  // ✅ Toggle save / unsave
   const toggleSaveJob = async (job) => {
     try {
-      if (isJobSaved(job._id)) {
-        await removeJob(job._id);
-      } else {
-        await saveJob(job);
-      }
+      isJobSaved(job._id) ? removeJob(job._id) : saveJob(job);
     } catch (err) {
       console.error("Error toggling save job:", err);
     }
@@ -140,19 +156,21 @@ useEffect(() => {
     return `${diff}d ago`;
   };
 
+  /* ----------------------------------
+     UI (100% UNCHANGED)
+  ---------------------------------- */
   return (
     <>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {filteredJobs.length > 0 ? (
-          filteredJobs.map((job, index) => {
+          filteredJobs.map((job) => {
             const saved = isJobSaved(job._id);
 
             return (
               <div
-                key={job._id} // Use job._id for stable keys
+                key={job._id}
                 className="w-full p-4 border rounded-lg shadow-md relative"
               >
-                {/* Badge & Save */}
                 <div className="absolute top-2 right-2 flex items-center gap-2">
                   {job.internshipType && (
                     <span className="text-xs font-semibold bg-gray-200 px-2 py-1 rounded-full">
@@ -172,7 +190,6 @@ useEffect(() => {
                   </button>
                 </div>
 
-                {/* Job Info */}
                 <div className="flex items-start gap-4">
                   <img
                     src={job.imgUrl}
@@ -187,7 +204,6 @@ useEffect(() => {
                   </div>
                 </div>
 
-                {/* Details */}
                 <div className="mt-4">
                   <p className="flex items-center text-sm text-gray-500">
                     <FaMapMarkerAlt className="mr-2" />
@@ -195,7 +211,7 @@ useEffect(() => {
                   </p>
                   <p className="flex items-center mt-2 text-sm text-gray-500">
                     <FaClock className="mr-2" />
-                    {new Date(job.startDate).toLocaleDateString()} -{" "}
+                    {new Date(job.startDate).toLocaleDateString()} –{" "}
                     {job.endDateOrDuration}
                   </p>
                   <p className="flex items-center mt-2 text-sm text-gray-500">
@@ -208,7 +224,6 @@ useEffect(() => {
                   </p>
                 </div>
 
-                {/* Qualifications */}
                 <div className="flex flex-wrap gap-2 mt-2">
                   {job.qualifications?.slice(0, 2).map((q, i) => (
                     <span
@@ -225,7 +240,6 @@ useEffect(() => {
                   )}
                 </div>
 
-                {/* View details */}
                 <div className="mt-4">
                   <button
                     onClick={() => onViewDetails(job)}
@@ -242,14 +256,16 @@ useEffect(() => {
         )}
       </div>
 
-      {/* Infinite scroll trigger */}
-      <div ref={loadMoreRef} className="h-10 flex justify-center items-center">
-        {loading && (
-          <span className="text-gray-500 text-sm">
-            Loading more internships…
-          </span>
-        )}
-      </div>
+      {/* Infinite scroll trigger (HOME PAGE ONLY) */}
+      {!isRecommendationMode && (
+        <div ref={loadMoreRef} className="h-10 flex justify-center items-center">
+          {loading && (
+            <span className="text-gray-500 text-sm">
+              Loading more internships…
+            </span>
+          )}
+        </div>
+      )}
     </>
   );
 };

@@ -15,25 +15,25 @@ const SchoolAdminAccounts = () => {
   const [itemsPerPage] = useState(10);
   const [searchQuery, setSearchQuery] = useState("");
 
-useEffect(() => {
-  const fetchAdmins = async () => {
-    try {
-      const response = await axios.get("/api/school-admin/schooladmins");
-      const adminsWithStatus = response.data.map((admin) => ({
-        ...admin,
-        status: admin.isApproved ? "Approved" : "Pending",
-        ...admin.profile // assuming profile fields (affiliation, contactPhone, etc.) are inside profile object
-      }));
-      setAdmins(adminsWithStatus);
-      setLoading(false);
-    } catch (err) {
-      setError("Failed to fetch school admins.");
-      setLoading(false);
-    }
-  };
+  useEffect(() => {
+    const fetchAdmins = async () => {
+      try {
+        const response = await axios.get("/api/school-admin/schooladmins");
+        const adminsWithStatus = response.data.map((admin) => ({
+          ...admin,
+          status: admin.isApproved ? "Approved" : "Pending",
+          ...admin.profile // assuming profile fields (affiliation, contactPhone, etc.) are inside profile object
+        }));
+        setAdmins(adminsWithStatus);
+        setLoading(false);
+      } catch (err) {
+        setError("Failed to fetch school admins.");
+        setLoading(false);
+      }
+    };
 
-  fetchAdmins();
-}, []);
+    fetchAdmins();
+  }, []);
 
 
   const filteredAdmins = admins.filter((admin) =>
@@ -41,35 +41,35 @@ useEffect(() => {
     admin.contactEmail.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-const handleApprove = async () => {
-  try {
-    await axios.patch(`/api/school-admin/approve/${confirmAction.adminId}`);
+  const handleApprove = async () => {
+    try {
+      await axios.patch(`/api/school-admin/approve/${confirmAction.adminId}`);
 
-    setAdmins((prev) =>
-      prev.map((admin) =>
-        admin._id === confirmAction.adminId ? { ...admin, status: "Approved" } : admin
-      )
-    );
-    setConfirmAction(null);
-  } catch (err) {
-    alert("Approval failed.");
-  }
-};
+      setAdmins((prev) =>
+        prev.map((admin) =>
+          admin._id === confirmAction.adminId ? { ...admin, status: "Approved" } : admin
+        )
+      );
+      setConfirmAction(null);
+    } catch (err) {
+      alert("Approval failed.");
+    }
+  };
 
 
- const handleReject = async () => {
-  try {
-    await axios.patch(`/api/school-admin/reject/${confirmAction.adminId}`);
-    setAdmins((prev) =>
-      prev.map((admin) =>
-        admin._id === confirmAction.adminId ? { ...admin, status: "Rejected" } : admin
-      )
-    );
-    setConfirmAction(null);
-  } catch (err) {
-    alert("Rejection failed.");
-  }
-};
+  const handleReject = async () => {
+    try {
+      await axios.patch(`/api/school-admin/reject/${confirmAction.adminId}`);
+      setAdmins((prev) =>
+        prev.map((admin) =>
+          admin._id === confirmAction.adminId ? { ...admin, status: "Rejected" } : admin
+        )
+      );
+      setConfirmAction(null);
+    } catch (err) {
+      alert("Rejection failed.");
+    }
+  };
 
 
   const confirmActionHandler = () => {
@@ -163,105 +163,104 @@ const handleApprove = async () => {
         <button onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))} disabled={currentPage === totalPages} className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">Next</button>
       </div>
 
-{isModalOpen && selectedAdmin && (
-  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl px-8 py-6 max-h-[90vh] overflow-y-auto font-poppins">
-      
-      {/* Modal Header */}
-      <div className="mb-6">
-        <h2 className="text-3xl font-semibold text-center text-blue-700">
-          School Admin Details
-        </h2>
-        <p className="text-sm text-center text-gray-500 mt-1">
-          Full profile submitted for verification
-        </p>
-      </div>
+      {isModalOpen && selectedAdmin && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl px-8 py-6 max-h-[90vh] overflow-y-auto font-poppins">
 
-      {/* Modal Body */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-sm text-gray-800">
-        <div>
-          <label className="font-semibold block">School Name</label>
-          <p>{selectedAdmin.schoolName}</p>
-        </div>
-        <div>
-          <label className="font-semibold block">Affiliation</label>
-          <p>{selectedAdmin.affiliation}</p>
-        </div>
-        <div>
-          <label className="font-semibold block">Address</label>
-          <p>{selectedAdmin.address}</p>
-        </div>
-        <div>
-          <label className="font-semibold block">City</label>
-          <p>{selectedAdmin.city}</p>
-        </div>
-        <div>
-          <label className="font-semibold block">State</label>
-          <p>{selectedAdmin.state}</p>
-        </div>
-        <div>
-          <label className="font-semibold block">Postal Code</label>
-          <p>{selectedAdmin.postalCode}</p>
-        </div>
-        <div>
-          <label className="font-semibold block">Country</label>
-          <p>{selectedAdmin.country}</p>
-        </div>
-        <div>
-          <label className="font-semibold block">Website</label>
-          <a
-            href={selectedAdmin.website}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-600 underline"
-          >
-            {selectedAdmin.website || "N/A"}
-          </a>
-        </div>
-        <div>
-          <label className="font-semibold block">Contact Person</label>
-          <p>{selectedAdmin.contactPerson}</p>
-        </div>
-        <div>
-          <label className="font-semibold block">Email</label>
-          <p>{selectedAdmin.contactEmail}</p>
-        </div>
-        <div>
-          <label className="font-semibold block">Phone</label>
-          <p>{selectedAdmin.contactPhone}</p>
-        </div>
-        <div>
-          <label className="font-semibold block">Status</label>
-          <span className={`inline-block px-2 py-1 text-xs rounded-full font-semibold ${
-            selectedAdmin.status === "Approved"
-              ? "bg-green-100 text-green-700"
-              : selectedAdmin.status === "Rejected"
-              ? "bg-red-100 text-red-700"
-              : "bg-yellow-100 text-yellow-700"
-          }`}>
-            {selectedAdmin.status}
-          </span>
-        </div>
-      </div>
+            {/* Modal Header */}
+            <div className="mb-6">
+              <h2 className="text-3xl font-semibold text-center text-blue-700">
+                School Admin Details
+              </h2>
+              <p className="text-sm text-center text-gray-500 mt-1">
+                Full profile submitted for verification
+              </p>
+            </div>
 
-      {/* Modal Footer */}
-      <div className="flex justify-end mt-8 gap-4">
-        <button
-          className="bg-blue-600 text-white px-5 py-2 rounded-md hover:bg-blue-700 transition duration-200"
-          onClick={downloadPDF}
-        >
-          Download PDF
-        </button>
-        <button
-          className="bg-gray-200 text-gray-800 px-5 py-2 rounded-md hover:bg-gray-300 transition duration-200"
-          onClick={closeModal}
-        >
-          Close
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+            {/* Modal Body */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-sm text-gray-800">
+              <div>
+                <label className="font-semibold block">School Name</label>
+                <p>{selectedAdmin.schoolName}</p>
+              </div>
+              <div>
+                <label className="font-semibold block">Affiliation</label>
+                <p>{selectedAdmin.affiliation}</p>
+              </div>
+              <div>
+                <label className="font-semibold block">Address</label>
+                <p>{selectedAdmin.address}</p>
+              </div>
+              <div>
+                <label className="font-semibold block">City</label>
+                <p>{selectedAdmin.city}</p>
+              </div>
+              <div>
+                <label className="font-semibold block">State</label>
+                <p>{selectedAdmin.state}</p>
+              </div>
+              <div>
+                <label className="font-semibold block">Postal Code</label>
+                <p>{selectedAdmin.postalCode}</p>
+              </div>
+              <div>
+                <label className="font-semibold block">Country</label>
+                <p>{selectedAdmin.country}</p>
+              </div>
+              <div>
+                <label className="font-semibold block">Website</label>
+                <a
+                  href={selectedAdmin.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 underline"
+                >
+                  {selectedAdmin.website || "N/A"}
+                </a>
+              </div>
+              <div>
+                <label className="font-semibold block">Contact Person</label>
+                <p>{selectedAdmin.contactPerson}</p>
+              </div>
+              <div>
+                <label className="font-semibold block">Email</label>
+                <p>{selectedAdmin.contactEmail}</p>
+              </div>
+              <div>
+                <label className="font-semibold block">Phone</label>
+                <p>{selectedAdmin.contactPhone}</p>
+              </div>
+              <div>
+                <label className="font-semibold block">Status</label>
+                <span className={`inline-block px-2 py-1 text-xs rounded-full font-semibold ${selectedAdmin.status === "Approved"
+                    ? "bg-green-100 text-green-700"
+                    : selectedAdmin.status === "Rejected"
+                      ? "bg-red-100 text-red-700"
+                      : "bg-yellow-100 text-yellow-700"
+                  }`}>
+                  {selectedAdmin.status}
+                </span>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex justify-end mt-8 gap-4">
+              <button
+                className="bg-blue-600 text-white px-5 py-2 rounded-md hover:bg-blue-700 transition duration-200"
+                onClick={downloadPDF}
+              >
+                Download PDF
+              </button>
+              <button
+                className="bg-gray-200 text-gray-800 px-5 py-2 rounded-md hover:bg-gray-300 transition duration-200"
+                onClick={closeModal}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {confirmAction && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">

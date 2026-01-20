@@ -6,325 +6,286 @@ import { CSVLink } from "react-csv";
 
 Modal.setAppElement("#root");
 
+/* ---------------- Utils ---------------- */
 const formatDateRange = (start, end) => {
   if (!start) return "";
-  const startDate = new Date(start);
-  let endDate;
-  if (end && !isNaN(Date.parse(end))) {
-    endDate = new Date(end);
-  }
-  const startString = startDate.toLocaleDateString("en-GB", {
+  const s = new Date(start).toLocaleDateString("en-GB", {
     day: "2-digit",
     month: "short",
-    year: "numeric"
+    year: "numeric",
   });
-  const endString = endDate
-    ? endDate.toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric"
-      })
-    : end || "";
-  return `${startString} – ${endString}`;
+  const e =
+    end && !isNaN(Date.parse(end))
+      ? new Date(end).toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        })
+      : end || "";
+  return `${s} – ${e}`;
 };
 
+/* ---------------- Component ---------------- */
 const StipendDetails = () => {
   const [internships, setInternships] = useState([]);
   const [stipends, setStipends] = useState([]);
-const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [loadingStipends, setLoadingStipends] = useState(false);
   const [modalIsOpen, setModalIsOpen] = useState(false);
-  const [error, setError] = useState(null);
   const [selectedInternship, setSelectedInternship] = useState(null);
+  const [error, setError] = useState(null);
 
-  const [stipendSearch, setStipendSearch] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const stipendPerPage = 10;
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const PER_PAGE = 10;
 
   const partnerId = localStorage.getItem("partnerId");
 
+  /* Fetch internships */
   useEffect(() => {
-   const fetchInternships = async () => {
     if (!partnerId) return;
-
     setLoading(true);
-    try {
-      const response = await axios.get(`/api/interns/partner/${partnerId}`);
-
-      // ✅ FIX: extract array correctly
-      setInternships(response.data.data || []);
-    } catch (err) {
-      console.error("Error fetching internships:", err);
-      setInternships([]); // safety fallback
-    } finally {
-      setLoading(false);
-    }
-  };
-    fetchInternships();
+    axios
+      .get(`/api/interns/partner/${partnerId}`)
+      .then((res) => setInternships(res.data?.data || []))
+      .catch(() => setInternships([]))
+      .finally(() => setLoading(false));
   }, [partnerId]);
 
-  const handleShowStipendDetails = async (internship) => {
+  /* Fetch stipend details */
+  const openStipends = async (internship) => {
     setSelectedInternship(internship);
-    setLoadingStipends(true);
     setModalIsOpen(true);
-    setError(null);
-    setStipendSearch("");
-    setCurrentPage(1);
+    setLoadingStipends(true);
+    setSearch("");
+    setPage(1);
+
     try {
       const res = await axios.get(
         `/api/internship/stipend-details/internship/${internship._id?.$oid || internship._id}`
       );
-      setStipends(res.data.stipendDetails || []);
-    } catch (err) {
-      setError("Failed to fetch stipend details: " + err.message);
-      setStipends([]);
+      setStipends(res.data?.stipendDetails || []);
+    } catch {
+      setError("Failed to load stipend details");
     } finally {
       setLoadingStipends(false);
     }
   };
 
-  const closeModal = () => {
-    setModalIsOpen(false);
-    setStipends([]);
-    setError(null);
-    setSelectedInternship(null);
-  };
-
-  const filteredStipends = useMemo(() => {
-    if (!stipendSearch.trim()) return stipends;
-    const lower = stipendSearch.toLowerCase();
+  /* Derived data */
+  const filtered = useMemo(() => {
+    if (!search) return stipends;
+    const q = search.toLowerCase();
     return stipends.filter(
       (s) =>
-        (s.bankAccountName?.toLowerCase().includes(lower) ||
-          s.bankAccountNumber?.toLowerCase().includes(lower) ||
-          s.ifscOrSwift?.toLowerCase().includes(lower) ||
-          s.preferredCurrency?.toLowerCase().includes(lower) ||
-          (s.notes?.toLowerCase().includes(lower) ?? false))
+        s.bankAccountName?.toLowerCase().includes(q) ||
+        s.ifscOrSwift?.toLowerCase().includes(q) ||
+        s.bankAccountNumber?.includes(q)
     );
-  }, [stipends, stipendSearch]);
+  }, [stipends, search]);
 
-  const totalPages = Math.ceil(filteredStipends.length / stipendPerPage);
-  const paginatedStipends = filteredStipends.slice(
-    (currentPage - 1) * stipendPerPage,
-    currentPage * stipendPerPage
-  );
+  const totalPages = Math.ceil(filtered.length / PER_PAGE);
+  const pageData = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 
-  if (loading)
-    return (
-      <div className="flex justify-center items-center p-10">
-        <ClipLoader size={50} color="#14b8a6" />
-        <span className="ml-3 text-teal-600 font-semibold text-lg">
-          Loading internships...
-        </span>
-      </div>
-    );
-
-  if (error)
-    return (
-      <div className="text-red-600 p-4 font-semibold bg-red-100 rounded max-w-xl mx-auto">
-        {error}
-      </div>
-    );
-
+  /* ---------------- UI ---------------- */
   return (
-    <div className="p-4 sm:p-6 bg-gray-50 rounded-lg max-w-5xl mx-auto">
-  <h2 className="text-xl sm:text-2xl font-semibold text-teal-600 mb-6">Stipend Internships</h2>
+    <div className="min-h-screen bg-slate-50 px-6 py-8 font-[Poppins]">
+      {/* Header */}
+      <div className="max-w-5xl mx-auto mb-6">
+        <h1 className="text-2xl font-semibold text-slate-900">
+          Stipend Internships
+        </h1>
+        <p className="text-slate-500 mt-1">
+          View stipend submissions for your posted internships
+        </p>
+      </div>
 
-  <div className="grid grid-cols-1 gap-6 mb-10">
-    {internships.length === 0 ? (
-      <p className="text-center text-gray-600">No stipend internships found for this partner.</p>
-    ) : (
-      internships.map((internship) => (
-        <div
-          key={internship._id?.$oid || internship._id}
-          className="bg-white border rounded-xl shadow p-4 sm:p-6 flex flex-col sm:flex-row relative gap-4"
-        >
-          {internship.imgUrl && (
-            <img
-              src={internship.imgUrl}
-              alt={internship.jobTitle}
-              className="w-20 h-20 sm:w-24 sm:h-24 mx-auto sm:mx-0 rounded-full object-contain bg-gray-200"
-            />
-          )}
-          <div className="flex-1 text-center sm:text-left">
-            <h3 className="text-lg sm:text-xl font-bold">{internship.jobTitle}</h3>
-            <p className="text-gray-700 font-medium">
-              {internship.companyName}{" "}
-              {internship.organization ? `(${internship.organization})` : ""}
-            </p>
-            <p className="text-gray-600 mt-1 text-sm sm:text-base">
-              {internship.location} •{" "}
-              {formatDateRange(internship.startDate, internship.endDateOrDuration)} •{" "}
-              {internship.internshipMode}
-            </p>
-            <p className="text-teal-600 font-semibold mt-1">
-              Student Pays:{" "}
-              {internship.compensationDetails?.amount
-                ? `${internship.compensationDetails.amount} ${internship.compensationDetails.currency}`
-                : "N/A"}
-            </p>
-            <div className="flex flex-wrap gap-2 mt-2 justify-center sm:justify-start">
-              {internship.qualifications?.map((qual, idx) => (
-                <span
-                  key={idx}
-                  className="bg-gray-100 border border-gray-300 text-gray-800 text-xs sm:text-sm rounded-full px-3 py-1"
+      {/* Internship Cards (KEPT) */}
+      {loading ? (
+        <div className="flex justify-center py-16">
+          <ClipLoader size={36} color="#14b8a6" />
+        </div>
+      ) : (
+        <div className="max-w-5xl mx-auto space-y-4">
+          {internships.map((internship) => (
+            <div
+              key={internship._id}
+              className="bg-white border border-slate-200 rounded-xl p-5 flex flex-col sm:flex-row gap-5"
+            >
+              {internship.imgUrl && (
+                <img
+                  src={internship.imgUrl}
+                  alt={internship.jobTitle}
+                  className="w-20 h-20 rounded-lg object-contain bg-slate-100"
+                />
+              )}
+
+              <div className="flex-1">
+                <h3 className="text-lg font-medium text-slate-900">
+                  {internship.jobTitle}
+                </h3>
+                <p className="text-sm text-slate-600 mt-0.5">
+                  {internship.companyName}
+                </p>
+                <p className="text-sm text-slate-500 mt-1">
+                  {internship.location} •{" "}
+                  {formatDateRange(
+                    internship.startDate,
+                    internship.endDateOrDuration
+                  )}
+                </p>
+
+                <p className="text-sm text-teal-700 font-medium mt-2">
+                  Student Pays:{" "}
+                  {internship.compensationDetails?.amount
+                    ? `${internship.compensationDetails.amount} ${internship.compensationDetails.currency}`
+                    : "N/A"}
+                </p>
+
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {internship.qualifications?.map((q, i) => (
+                    <span
+                      key={i}
+                      className="text-xs bg-slate-100 px-3 py-1 rounded-full text-slate-600"
+                    >
+                      {q}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-start sm:items-center">
+                <button
+                  onClick={() => openStipends(internship)}
+                  className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
                 >
-                  {qual}
-                </span>
-              ))}
+                  View Stipends
+                </button>
+              </div>
             </div>
+          ))}
+        </div>
+      )}
+
+      {/* Modal */}
+      <Modal
+        isOpen={modalIsOpen}
+        onRequestClose={() => setModalIsOpen(false)}
+        overlayClassName="fixed inset-0 bg-black/60 z-50 flex items-center justify-center"
+        className="bg-white rounded-2xl max-w-6xl w-full mx-4 p-8 outline-none shadow-2xl"
+      >
+        {/* Header */}
+        <div className="flex justify-between mb-6">
+          <div>
+            <h2 className="text-xl font-semibold text-slate-900">
+              {selectedInternship?.jobTitle}
+            </h2>
+            <p className="text-sm text-slate-500">
+              {selectedInternship?.companyName}
+            </p>
           </div>
           <button
-            onClick={() => handleShowStipendDetails(internship)}
-            className="mt-4 sm:mt-0 sm:self-start bg-teal-600 text-white px-4 py-2 rounded hover:bg-teal-700 transition w-full sm:w-auto"
+            onClick={() => setModalIsOpen(false)}
+            className="text-slate-400 hover:text-slate-700 text-xl"
           >
-            Stipend Details
+            ✕
           </button>
         </div>
-      ))
-    )}
-  </div>
 
-  {/* Modal */}
-  <Modal
-    isOpen={modalIsOpen}
-    onRequestClose={closeModal}
-    contentLabel="Stipend Details Modal"
-    className="fixed inset-0 flex items-center justify-center p-4 sm:p-6"
-    overlayClassName="fixed inset-0 bg-black bg-opacity-50 z-50"
-  >
-    <div className="relative bg-white rounded-xl shadow-2xl w-full sm:max-w-lg md:max-w-3xl lg:max-w-5xl max-h-[90vh] overflow-y-auto border border-gray-300 p-6 sm:p-8">
-      {/* Close button */}
-      <button
-        onClick={closeModal}
-        className="absolute top-4 right-4 text-gray-600 hover:text-gray-900 focus:outline-none"
-        aria-label="Close modal"
-        title="Close"
-      >
-        ✕
-      </button>
-
-      {/* Content */}
-      {loadingStipends ? (
-        <div className="flex justify-center items-center space-x-3">
-          <ClipLoader size={36} color="#14b8a6" />
-          <span className="text-teal-600 font-semibold text-base sm:text-lg">
-            Loading stipend details...
-          </span>
-        </div>
-      ) : error ? (
-        <p className="text-red-600 font-semibold">{error}</p>
-      ) : stipends.length === 0 ? (
-        <p className="text-gray-700 text-center text-lg">No stipend details available.</p>
-      ) : (
-        <>
-          {/* Stats */}
-          <div className="mb-4 p-4 bg-teal-100 rounded-lg text-teal-900 font-semibold flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
-            <p>Total stipend submissions: {stipends.length}</p>
-            <p>
-              Total stipend amount:{" "}
-              {selectedInternship?.compensationDetails?.amount
-                ? `${selectedInternship.compensationDetails.amount} ${selectedInternship.compensationDetails.currency}`
-                : "N/A"}
-            </p>
-            <CSVLink
-              data={paginatedStipends.map((s) => ({
-                "Account Name": s.bankAccountName,
-                "Account Number": s.bankAccountNumber,
-                "IFSC / SWIFT": s.ifscOrSwift,
-                Currency: s.preferredCurrency,
-                Notes: s.notes || "-",
-                "Submitted At": new Date(s.submittedAt).toLocaleString(),
-              }))}
-              filename={`stipend-details-${selectedInternship.jobTitle || "internship"}.csv`}
-              className="inline-block cursor-pointer bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-400 text-white font-semibold py-2 px-4 rounded transition w-full sm:w-auto"
-              target="_blank"
-            >
-              Export CSV
-            </CSVLink>
+        {/* KPI Row */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+          <div className="bg-slate-50 border rounded-lg p-4">
+            <p className="text-sm text-slate-500">Submissions</p>
+            <p className="text-2xl font-semibold">{stipends.length}</p>
           </div>
 
-          {/* Search */}
-          <input
-            type="text"
-            placeholder="Search stipend details..."
-            value={stipendSearch}
-            onChange={(e) => {
-              setStipendSearch(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="mb-4 w-full border border-gray-300 rounded py-2 px-3 focus:outline-none focus:ring-2 focus:ring-teal-500"
-          />
+          <div className="bg-slate-50 border rounded-lg p-4">
+            <p className="text-sm text-slate-500">Student Pays</p>
+            <p className="text-lg font-medium">
+              {selectedInternship?.compensationDetails?.amount || "N/A"}
+            </p>
+          </div>
 
-          {/* Table (scrollable on mobile) */}
-          <div className="overflow-x-auto border rounded-lg shadow-sm">
-            <table className="hidden sm:table w-full text-left border-collapse table-auto">
-              <thead className="bg-teal-600 text-white text-sm sm:text-base">
+          <CSVLink
+            data={filtered}
+            filename={`stipends-${selectedInternship?.jobTitle}.csv`}
+            className="flex items-center justify-center bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-medium"
+          >
+            Export CSV
+          </CSVLink>
+        </div>
+
+        {/* Search */}
+        <input
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPage(1);
+          }}
+          placeholder="Search account name, IFSC, number"
+          className="w-full mb-4 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 outline-none"
+        />
+
+        {/* Table */}
+        {loadingStipends ? (
+          <div className="flex justify-center py-20">
+            <ClipLoader size={32} color="#14b8a6" />
+          </div>
+        ) : (
+          <div className="overflow-x-auto border rounded-lg">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-100 text-slate-600">
                 <tr>
-                  <th className="p-3">#</th>
-                  <th className="p-3">Account Name</th>
-                  <th className="p-3">Account No.</th>
-                  <th className="p-3">IFSC / SWIFT</th>
-                  <th className="p-3">Currency</th>
-                  <th className="p-3">Notes</th>
-                  <th className="p-3">Submitted At</th>
+                  <th className="px-5 py-3 text-left">Account Name</th>
+                  <th className="px-5 py-3 text-left">Account</th>
+                  <th className="px-5 py-3 text-left">IFSC</th>
+                  <th className="px-5 py-3 text-left">Currency</th>
+                  <th className="px-5 py-3 text-left">Submitted</th>
                 </tr>
               </thead>
-              <tbody>
-                {paginatedStipends.map((stipend, idx) => (
-                  <tr key={stipend._id} className={idx % 2 === 0 ? "bg-white" : "bg-teal-50"}>
-                    <td className="p-3">{(currentPage - 1) * stipendPerPage + idx + 1}</td>
-                    <td className="p-3">{stipend.bankAccountName}</td>
-                    <td className="p-3">{stipend.bankAccountNumber}</td>
-                    <td className="p-3">{stipend.ifscOrSwift}</td>
-                    <td className="p-3">{stipend.preferredCurrency}</td>
-                    <td className="p-3 whitespace-pre-wrap">{stipend.notes || "-"}</td>
-                    <td className="p-3">{new Date(stipend.submittedAt).toLocaleString()}</td>
+              <tbody className="divide-y">
+                {pageData.map((s) => (
+                  <tr key={s._id} className="hover:bg-slate-50">
+                    <td className="px-5 py-3 font-medium">
+                      {s.bankAccountName}
+                    </td>
+                    <td className="px-5 py-3 font-mono">
+                      ****{s.bankAccountNumber?.slice(-4)}
+                    </td>
+                    <td className="px-5 py-3">{s.ifscOrSwift}</td>
+                    <td className="px-5 py-3">{s.preferredCurrency}</td>
+                    <td className="px-5 py-3 text-slate-500">
+                      {new Date(s.submittedAt).toLocaleString()}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-
-            {/* Card layout for mobile */}
-            <div className="sm:hidden space-y-4 p-2">
-              {paginatedStipends.map((stipend, idx) => (
-                <div key={stipend._id} className="border rounded-lg p-3 bg-white shadow-sm text-sm">
-                  <p><span className="font-semibold">#</span> {(currentPage - 1) * stipendPerPage + idx + 1}</p>
-                  <p><span className="font-semibold">Account Name:</span> {stipend.bankAccountName}</p>
-                  <p><span className="font-semibold">Account No.:</span> {stipend.bankAccountNumber}</p>
-                  <p><span className="font-semibold">IFSC / SWIFT:</span> {stipend.ifscOrSwift}</p>
-                  <p><span className="font-semibold">Currency:</span> {stipend.preferredCurrency}</p>
-                  <p><span className="font-semibold">Notes:</span> {stipend.notes || "-"}</p>
-                  <p><span className="font-semibold">Submitted At:</span> {new Date(stipend.submittedAt).toLocaleString()}</p>
-                </div>
-              ))}
-            </div>
           </div>
+        )}
 
-          {/* Pagination */}
-          <div className="mt-4 flex flex-col sm:flex-row justify-between items-center text-gray-700 gap-2">
-            <button
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-              className="px-4 py-2 bg-gray-300 rounded-md hover:bg-gray-400 disabled:opacity-50 w-full sm:w-auto"
-            >
-              Previous
-            </button>
-            <span>Page {currentPage} of {totalPages}</span>
-            <button
-              disabled={currentPage === totalPages}
-              onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-              className="px-4 py-2 bg-gray-300 rounded-md hover:bg-gray-400 disabled:opacity-50 w-full sm:w-auto"
-            >
-              Next
-            </button>
-          </div>
-        </>
-      )}
+        {/* Pagination */}
+        <div className="flex justify-between items-center mt-6">
+          <button
+            disabled={page === 1}
+            onClick={() => setPage((p) => p - 1)}
+            className="px-4 py-2 rounded-md bg-slate-200 disabled:opacity-40"
+          >
+            Previous
+          </button>
+          <span className="text-sm text-slate-500">
+            Page {page} of {totalPages}
+          </span>
+          <button
+            disabled={page === totalPages}
+            onClick={() => setPage((p) => p + 1)}
+            className="px-4 py-2 rounded-md bg-slate-200 disabled:opacity-40"
+          >
+            Next
+          </button>
+        </div>
+      </Modal>
     </div>
-  </Modal>
-</div>
-
   );
 };
 

@@ -255,6 +255,8 @@ app.use(cors(corsOptions));
 // Ensure preflight is handled for all routes:
 app.options("*", cors(corsOptions));
 
+console.log("GEODB_API_KEY loaded:", Boolean(process.env.GEODB_API_KEY));
+
 // Serve uploaded files
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
@@ -296,6 +298,7 @@ const stipendDetailsRoutes = require("./routes/webapp-routes/stipendDetailsRoute
 const assessmentRoutes = require("./routes/webapp-routes/assessmentRoutes");
 const feedback = require("./routes/webapp-routes/feedbackRoutes");
 const feedbackSummary = require("./routes/webapp-routes/feedbackSummary");
+const locationRoutes = require("./routes/webapp-routes/location.routes");
 
 const curriculumRoutes = require("./routes/webapp-routes/schoolAdmin/curriculumRoutes");
 
@@ -332,6 +335,9 @@ app.use("/api/feedback", feedback);
 app.use("/api/feedback", feedbackSummary);
 
 app.use("/api/curriculum", curriculumRoutes);
+
+
+app.use("/api/locations", locationRoutes);
 
 // Example: Skill gap analysis proxy
 app.post("/analyze-skills", async (req, res) => {
@@ -387,6 +393,7 @@ io.on("connection", (socket) => {
       console.log(`${socket.id} joined partner room ${room}`);
     }
   });
+  
 
   // Handle sending a new message
   socket.on("sendMessage", async (msg) => {

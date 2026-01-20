@@ -31,7 +31,7 @@ const Navbar = ({ onToggleSidebar }) => {
   // From Feedback Context
   const { openFeedback } = useFeedback();
 
- useEffect(() => {
+useEffect(() => {
   const rawUserInfo = localStorage.getItem("userInfo");
   if (!rawUserInfo) return;
 
@@ -50,7 +50,6 @@ const Navbar = ({ onToggleSidebar }) => {
 
   const studentId = storedUserInfo._id;
 
-  // 🔔 Notifications
   const fetchNotifications = async () => {
     try {
       const { data } = await axios.get(`/api/notifications/${studentId}`);
@@ -63,7 +62,6 @@ const Navbar = ({ onToggleSidebar }) => {
     }
   };
 
-  // 💎 Premium status
   const fetchPremiumStatus = async () => {
     try {
       const token = localStorage.getItem("userToken");
@@ -83,8 +81,8 @@ const Navbar = ({ onToggleSidebar }) => {
       };
 
       localStorage.setItem("userInfo", JSON.stringify(updatedUser));
-      setIsPremium(data.user.isPremium);
       setPlanType(data.user.planType);
+      setIsPremium(data.user.isPremium);
     } catch (err) {
       console.error("Failed to fetch premium status:", err);
     }
@@ -92,6 +90,27 @@ const Navbar = ({ onToggleSidebar }) => {
 
   fetchNotifications();
   fetchPremiumStatus();
+}, []);
+
+useEffect(() => {
+  const syncUserInfo = () => {
+    const raw = localStorage.getItem("userInfo");
+    if (!raw) return;
+
+    try {
+      const parsed = JSON.parse(raw);
+      setUserInfo(parsed);
+      setPlanType(parsed.planType || "Free");
+    } catch {
+      console.error("Failed to sync userInfo");
+    }
+  };
+
+  window.addEventListener("storage", syncUserInfo);
+
+  return () => {
+    window.removeEventListener("storage", syncUserInfo);
+  };
 }, []);
 
 
