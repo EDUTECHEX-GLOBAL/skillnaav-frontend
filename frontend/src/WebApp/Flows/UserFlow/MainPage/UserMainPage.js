@@ -12,6 +12,8 @@ import chatBotImage from "../../../../assets-webapp/chat-bot.png";
 
 const UserMainPageContent = () => {
   const { handleSelectTab } = useTabContext();
+  const { selectedTab } = useTabContext();
+
 
   const [userInfo, setUserInfo] = useState(null);
   const [loading, setLoading] = useState(true);

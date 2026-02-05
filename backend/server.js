@@ -300,6 +300,11 @@ const feedback = require("./routes/webapp-routes/feedbackRoutes");
 const feedbackSummary = require("./routes/webapp-routes/feedbackSummary");
 const locationRoutes = require("./routes/webapp-routes/location.routes");
 
+const pipelineRoutes = require("./routes/pipeline/pipelineRoutes");
+const l2AssessmentRoutes = require("./routes/pipeline/l2-AssessmentRoutes");
+const interviewRoutes = require("./routes/pipeline/interviewRoutes");
+
+
 const curriculumRoutes = require("./routes/webapp-routes/schoolAdmin/curriculumRoutes");
 
 // ------------------- Use routes -------------------
@@ -333,6 +338,11 @@ app.use("/api/internship/stipend-details", stipendDetailsRoutes);
 app.use("/api/assessments", assessmentRoutes);
 app.use("/api/feedback", feedback);
 app.use("/api/feedback", feedbackSummary);
+
+app.use("/api/pipeline", pipelineRoutes);
+app.use("/api/l2-assessments", l2AssessmentRoutes);
+app.use("/api/interviews", interviewRoutes);
+
 
 app.use("/api/curriculum", curriculumRoutes);
 

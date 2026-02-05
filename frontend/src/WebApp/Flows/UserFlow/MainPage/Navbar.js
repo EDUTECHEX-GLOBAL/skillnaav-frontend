@@ -18,7 +18,9 @@ import { useFeedback } from "../../../../context/FeedbackContext";
 import { userFlowQuestions } from "../../../../components/FeedbackModal/questionSets";
 
 const Navbar = ({ onToggleSidebar }) => {
-  const { handleSelectTab } = useTabContext();
+ 
+  const { handleSelectTab, selectedTab } = useTabContext();
+
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
@@ -204,6 +206,11 @@ useEffect(() => {
     "Premium Basic": "bg-gradient-to-r from-purple-500 to-purple-700 text-white",
     Free: "bg-gray-200 text-gray-700",
   };
+
+  // ⛔ Hide navbar completely during assessment
+if (selectedTab === "assessment") {
+  return null;
+}
 
   return (
     <div className="bg-white font-poppins border-b border-gray-200 sticky top-0 z-50 w-full">

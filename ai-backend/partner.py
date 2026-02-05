@@ -15,12 +15,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
 from datetime import datetime
 from urllib.parse import urlparse
-from pymongo import MongoClient
+from pymongo import MongoClient, UpdateOne
 from bson import ObjectId
 from bson.errors import InvalidId
 from sentence_transformers import SentenceTransformer, util
 import requests
 import httpx
+
+
 
 # === Utility ===
 def now():
@@ -51,6 +53,7 @@ db = MongoClient(os.getenv("MONGO_URI")).get_default_database()
 print(f"[{now()}] Connected to MongoDB: {db.name}")
 shortlist_collection = db["shortlisted_candidates"]
 applications_collection = db["applications"]
+candidate_pipeline = db["candidatepipelines"]
 
 shortlist_collection.create_index([("internship_id", 1), ("school_admin_id", 1)])
 print(f"[{now()}] Created MongoDB indexes")
@@ -149,6 +152,40 @@ async def process_resume(resume_url, job_embedding):
         "text": text,
         "school_admin_id": school_admin_id
     }
+
+def sync_shortlisted_to_pipeline(candidates, internship_obj_id):
+    now = datetime.utcnow()
+    ops = []
+
+    for c in candidates:
+        sid = c.get("student_id")
+        if not sid or not ObjectId.is_valid(str(sid)):
+            continue
+
+        ops.append(
+            UpdateOne(
+                {
+                    "internshipId": internship_obj_id,
+                    "studentId": ObjectId(sid),
+                },
+                {
+                    "$set": {
+                        "stage": "L2",
+                        "l2.enabled": True,
+                        "l2.status": "not_sent",
+                        "l2.updatedAt": now,
+                    },
+                    "$setOnInsert": {
+                        "internshipId": internship_obj_id,
+                        "studentId": ObjectId(sid),
+                    },
+                },
+                upsert=True,
+            )
+        )
+
+    if ops:
+        candidate_pipeline.bulk_write(ops)
 
 # === FastAPI App Init ===
 app = FastAPI()
@@ -277,11 +314,14 @@ async def shortlist_candidates(
             {"$set": {"status": "Rejected"}}
         )
 
+        sync_shortlisted_to_pipeline(candidates, internship_obj_id)
+
         # Trigger rejection notifications asynchronously
         for resume_url in rejected_resume_urls:
             app_doc = applications_collection.find_one({"resumeUrl": resume_url})
             if app_doc:
                 background_tasks.add_task(notify_rejection, app_doc)
+                sync_shortlisted_to_pipeline(candidates, internship_obj_id)
 
     return {"shortlisted_candidates": convert_object_ids(candidates)}
 

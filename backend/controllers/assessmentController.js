@@ -67,18 +67,46 @@ Return ONLY a valid JSON array with this format:
     const rawOutput = JSON.parse(Buffer.from(response.body).toString("utf-8"));
     const modelText = rawOutput?.output_text || rawOutput?.generation || "";
 
-    let questions = [];
-    try {
-      const match = modelText.match(/\[\s*{[\s\S]*?}\s*\]/);
-      if (!match) throw new Error("No valid JSON array found in AI output");
+   let questions = [];
+try {
+  const match = modelText.match(/\[\s*{[\s\S]*?}\s*\]/);
+  if (!match) throw new Error("No valid JSON array found in AI output");
 
-      questions = JSON.parse(match[0]).map((q) => ({ ...q, fromAI: true }));
-      questions = questions.filter(q => 
-        typeof q.questionText === 'string' &&
-        Array.isArray(q.options) &&
-        q.options.length === 4 &&
-        q.options.every(opt => typeof opt === 'string')
-      );
+  questions = JSON.parse(match[0]).map((q, index) => {
+    let correctAnswer = q.correctAnswer;
+
+    // ✅ FIX: Handle AI returning multiple answers like [2, 3]
+    if (Array.isArray(correctAnswer)) {
+      correctAnswer = correctAnswer[0]; // pick first safely
+    }
+
+    // ✅ Validate correctAnswer strictly
+    if (
+      typeof correctAnswer !== "number" ||
+      correctAnswer < 0 ||
+      correctAnswer > 3
+    ) {
+      throw new Error(`Invalid correctAnswer at question ${index + 1}`);
+    }
+
+    // ✅ Validate options
+    if (
+      !Array.isArray(q.options) ||
+      q.options.length !== 4 ||
+      !q.options.every(opt => typeof opt === "string")
+    ) {
+      throw new Error(`Invalid options at question ${index + 1}`);
+    }
+
+    return {
+      questionText: q.questionText,
+      options: q.options,
+      correctAnswer,
+      marks: q.marks ?? 1,
+      type: "mcq",
+      fromAI: true
+    };
+  });
 
       if (questions.length !== 5) throw new Error("AI did not return exactly 5 valid MCQs");
     } catch (err) {

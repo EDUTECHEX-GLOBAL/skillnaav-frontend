@@ -146,6 +146,12 @@ const performLogout = async () => {
       postSubmitCallback: () => performLogout(),
     });
   };
+  
+  // ⛔ Hide sidebar completely during assessment
+if (selectedTab === "assessment") {
+  return null;
+}
+
 
   return (
     <>

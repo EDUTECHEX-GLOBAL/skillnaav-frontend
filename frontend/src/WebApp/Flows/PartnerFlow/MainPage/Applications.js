@@ -50,7 +50,7 @@ const InternshipList = () => {
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
   const [scheduleViewerOpen, setScheduleViewerOpen] = useState(false);
   const [selectedInternshipForView, setSelectedInternshipForView] = useState(null);
-  const partnerId = localStorage.getItem("partnerId");
+  
 
   useEffect(() => {
     const fetchPartnerData = async () => {
@@ -75,22 +75,24 @@ const InternshipList = () => {
       }
     };
 
-    const fetchInternships = async () => {
-    if (!partnerId) return;
+const fetchInternships = async (pid) => {
+  if (!pid) return;
 
-    setLoading(true);
-    try {
-      const response = await axios.get(`/api/interns/partner/${partnerId}`);
+  setLoading(true);
+  try {
+    const response = await axios.get(`/api/interns/partner/${pid}`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    });
 
-      // ✅ FIX: extract array correctly
-      setInternships(response.data.data || []);
-    } catch (err) {
-      console.error("Error fetching internships:", err);
-      setInternships([]); // safety fallback
-    } finally {
-      setLoading(false);
-    }
-  };
+    setInternships(response.data.data || []);
+  } catch (err) {
+    console.error("Error fetching internships:", err);
+    setInternships([]);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
     fetchPartnerData();
   }, []);
@@ -169,62 +171,91 @@ const InternshipList = () => {
   };
 
 
-  const handleShortlist = async (id, description, skills) => {
-    if (!hasPremiumAccess()) {
-      toast.error(`Please upgrade to Premium Basic or higher to shortlist candidates`);
-      return;
-    }
+const handleShortlist = async (id, description, skills) => {
+  if (!hasPremiumAccess()) {
+    toast.error(`Please upgrade to Premium Basic or higher to shortlist candidates`);
+    return;
+  }
 
-    setLoadingShortlist(true);
-    setModalData({ open: true, internshipId: id, type: "shortlisted", loading: true });
+  setLoadingShortlist(true);
+  setModalData({ open: true, internshipId: id, type: "shortlisted", loading: true });
 
-    try {
-      let resumes = [];
+  try {
+    let resumes = [];
 
-      // If we don't already have applications, fetch them directly
-      if (!applications[id] || applications[id].length === 0) {
-        try {
-          const { data } = await axios.get(`/api/applications/internship/${id}`);
-          const fetchedApplications = Array.isArray(data.applications) ? data.applications : [];
-          setApplications(prev => ({
-            ...prev,
-            [id]: fetchedApplications,
-          }));
-          resumes = fetchedApplications.map((s) => s.resumeUrl).filter(Boolean);
-        } catch (err) {
-          console.error("Error fetching applications for shortlisting:", err);
-        }
-      } else {
-        resumes = applications[id].map((s) => s.resumeUrl).filter(Boolean);
+    // 1️⃣ Ensure applications are loaded
+    if (!applications[id] || applications[id].length === 0) {
+      try {
+        const { data } = await axios.get(`/api/applications/internship/${id}`);
+        const fetchedApplications = Array.isArray(data.applications)
+          ? data.applications
+          : [];
+        setApplications(prev => ({ ...prev, [id]: fetchedApplications }));
+        resumes = fetchedApplications.map(s => s.resumeUrl).filter(Boolean);
+      } catch (err) {
+        console.error("Error fetching applications for shortlisting:", err);
       }
-
-      // Send request without blocking if resumes array is empty
-      const formData = new FormData();
-      formData.append("job_description", description || "");
-      formData.append("job_skills", JSON.stringify(skills || []));
-      resumes.forEach((url) => formData.append("resumes", url));
-      formData.append("internship_id", id);
-
-      const { data } = await axios.post(
-        `${SHORTLIST_API_BASE_URL}/partner/shortlist`,
-        formData,
-        { headers: { "Content-Type": "multipart/form-data" } }
-      );
-
-      setShortlistedCandidates((prev) => ({
-        ...prev,
-        [id]: data.shortlisted_candidates || [],
-      }));
-      toast.success("Candidates shortlisted successfully!");
-    } catch (err) {
-      console.error("Shortlisting error:", err);
-      toast.error("Shortlisting failed. Please try again.");
-      setError(err.message);
-    } finally {
-      setLoadingShortlist(false);
-      setModalData((prev) => ({ ...prev, loading: false }));
+    } else {
+      resumes = applications[id].map(s => s.resumeUrl).filter(Boolean);
     }
-  };
+
+    // 2️⃣ Call shortlist service
+    const formData = new FormData();
+    formData.append("job_description", description || "");
+    formData.append("job_skills", JSON.stringify(skills || []));
+    resumes.forEach(url => formData.append("resumes", url));
+    formData.append("internship_id", id);
+
+    const { data } = await axios.post(
+      `${SHORTLIST_API_BASE_URL}/partner/shortlist`,
+      formData,
+      { headers: { "Content-Type": "multipart/form-data" } }
+    );
+
+    const shortlisted = data.shortlisted_candidates || [];
+
+    // 3️⃣ Update shortlisted UI
+    setShortlistedCandidates(prev => ({
+      ...prev,
+      [id]: shortlisted,
+    }));
+
+    /**
+     * 🚨 IMPORTANT CHANGE
+     * ❌ NO manual promotion to L2 here
+     * ✅ Backend shortlisting logic MUST auto-create/update CandidatePipeline:
+     *
+     * stage: "L2"
+     * l2.enabled: true
+     * l2.status: "not_used"
+     */
+
+    // 4️⃣ Refresh applications to reflect new statuses
+    try {
+      const refreshed = await axios.get(`/api/applications/internship/${id}`);
+      const apps = Array.isArray(refreshed.data?.applications)
+        ? refreshed.data.applications
+        : [];
+      setApplications(prev => ({ ...prev, [id]: apps }));
+    } catch (e) {
+      console.warn(
+        "Failed to refresh applications after shortlisting:",
+        e?.message || e
+      );
+    }
+
+    toast.success("Candidates shortlisted successfully!");
+  } catch (err) {
+    console.error("Shortlisting error:", err);
+    toast.error("Shortlisting failed. Please try again.");
+    setError(err.message);
+  } finally {
+    setLoadingShortlist(false);
+    setModalData(prev => ({ ...prev, loading: false }));
+  }
+};
+
+
 
   const showShortlisted = async (internshipId) => {
     if (!hasPremiumAccess()) {
@@ -281,7 +312,7 @@ const InternshipList = () => {
 
     // Add error handling and logging
     axios
-      .get(`/api/templates?partnerId=${partnerId}`, {
+      .get(`/api/templates?partnerId=${partnerData?._id}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
       .then((res) => {

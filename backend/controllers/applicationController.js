@@ -6,10 +6,9 @@ const sendNotification = require("../utils/Notification.js");
 const { getPersonalizedRecommendations } = require("../utils/recommendationService.js");
 const notifyUser = require("../utils/notifyUser.js");
 const multer = require("multer"); // Multer for file uploads
+const CandidatePipeline = require("../models/pipeline/CandidatePipeline");
 const path = require("path");
 const fs = require("fs");
-
-
 
 const upgradeToPremium = async (req, res) => {
   const { studentId } = req.body;
@@ -98,7 +97,6 @@ const applyForInternship = async (req, res) => {
     });
   }
 };
-
 
 const getApplicationCount = async (req, res) => {
   const { studentId } = req.params;
@@ -401,9 +399,6 @@ const updateApplicationStatus = async (req, res) => {
   }
 };
 
-
-
-
 const getRecommendationsForStudent = async (req, res) => {
   try {
     const studentId = req.query.studentId || req.user._id;
@@ -414,6 +409,90 @@ const getRecommendationsForStudent = async (req, res) => {
   } catch (e) {
     console.error(e);
     res.status(500).json({ success: false, message: "Failed to fetch recommendations" });
+  }
+};
+
+const getStudentDashboardApplications = async (req, res) => {
+  const { studentId } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(studentId)) {
+    return res.status(400).json({ message: "Invalid studentId" });
+  }
+
+  try {
+    // 1️⃣ Fetch applications
+    const applications = await Application.find({ studentId })
+      .populate("internshipId")
+      .lean();
+
+    if (!applications.length) {
+      return res.json({ applications: [] });
+    }
+
+    // 2️⃣ Collect internshipIds
+    const internshipIds = applications
+      .map(app => app.internshipId?._id)
+      .filter(Boolean);
+
+    // 3️⃣ Fetch pipelines
+  const pipelines = await CandidatePipeline.find({
+  studentId,
+  internshipId: { $in: internshipIds }
+})
+.populate({
+  path: "l3.interviewId",
+  select: "link scheduledAt status interviewId",
+})
+.lean();
+
+
+    // 4️⃣ Map pipelines by internshipId
+    const pipelineMap = {};
+    pipelines.forEach(p => {
+      pipelineMap[p.internshipId.toString()] = p;
+    });
+
+    // 5️⃣ Merge data
+ const dashboardApplications = applications.map(app => {
+  const internshipId = app.internshipId?._id?.toString();
+  const pipeline = pipelineMap[internshipId] || null;
+
+  return {
+    _id: app._id,
+    appliedDate: app.appliedDate,
+    internship: app.internshipId,
+
+    pipeline: pipeline
+  ? {
+      stage: pipeline.stage,
+
+      l1: pipeline.l1 || { status: "pending" },
+
+      l2: pipeline.l2 || { status: "not_used" },
+
+      l3: pipeline.l3
+        ? {
+            status: pipeline.l3.status,
+            scheduledAt: pipeline.l3.scheduledAt,
+            interviewId: pipeline.l3.interviewId, // ✅ now populated
+          }
+        : { status: "not_used" },
+    }
+  : {
+      stage: "L1",
+      l1: { status: "pending" },
+      l2: { status: "not_used" },
+      l3: { status: "not_used" },
+    },
+  };
+});
+
+
+    return res.json({ applications: dashboardApplications });
+
+  } catch (err) {
+    console.error("❌ Dashboard applications error:", err);
+    return res.status(500).json({ message: "Failed to load dashboard applications" });
   }
 };
 
@@ -428,4 +507,5 @@ module.exports = {
   getApplicationsCountForInternships,
   updateApplicationStatus,
   getRecommendationsForStudent,
+  getStudentDashboardApplications
 };

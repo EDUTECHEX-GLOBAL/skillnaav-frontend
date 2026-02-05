@@ -14,6 +14,7 @@ const {
   upgradeToPremium,
   getApplicationCount, // Add the new function
   getRecommendationsForStudent,
+  getStudentDashboardApplications,
 } = applicationController;
 
 router.post("/upgrade-to-premium", upgradeToPremium);
@@ -42,5 +43,11 @@ router.put('/:applicationId/status', applicationController.updateApplicationStat
 
 // routes/webapp-routes/applicationRoutes.js
 router.get("/recommendations", authenticate, applicationController.getRecommendationsForStudent);
+
+router.get(
+  "/student/:studentId/dashboard",
+  getStudentDashboardApplications
+);
+
 
 module.exports = router;

@@ -19,6 +19,8 @@ import QuantumComputing from "./QuantumComputing";
 import ClimateTech from "./ClimateTech";
 import BioTech from "./BioTech";
 import Recommendations from "./Recommendations";
+import StudentAssessment from "./StudentAssessment";
+
 
 /**
  * BodyContent
@@ -33,22 +35,28 @@ const BodyContent = () => {
   const selectedTab =
     tabCtx?.selectedTab ?? tabCtx?.tab ?? tabCtx?.currentTab ?? "home";
 
-    // 🔒 Force HOME tab on every page reload
-useEffect(() => {
-  if (typeof tabCtx?.setSelectedTab === "function") {
-    tabCtx.setSelectedTab("home");
-    return;
-  }
+  // 🔒 Force HOME tab on every page reload
+ useEffect(() => {
+  const handler = (e) => {
+    const tab = e?.detail?.tab;
+    if (!tab) return;
 
-  if (typeof tabCtx?.setTab === "function") {
-    tabCtx.setTab("home");
-    return;
-  }
+    // ✅ YOUR ACTUAL CONTEXT API
+    if (typeof tabCtx?.handleSelectTab === "function") {
+      tabCtx.handleSelectTab(tab);
+      return;
+    }
 
-  if (typeof tabCtx?.dispatch === "function") {
-    tabCtx.dispatch({ type: "SET_TAB", tab: "home" });
-  }
-}, []); // 👈 runs ONLY on reload
+    console.warn(
+      "openTab event received but handleSelectTab not found",
+      Object.keys(tabCtx || {})
+    );
+  };
+
+  window.addEventListener("openTab", handler);
+  return () => window.removeEventListener("openTab", handler);
+}, [tabCtx]);
+
 
 
   // Sync URL when tab changes so address bar always matches tab
@@ -62,66 +70,66 @@ useEffect(() => {
     }
   }, [selectedTab, navigate]);
 
-  
+
   // Listen for openTab events from Notifications or other parts of the app
-  useEffect(() => {
-    const handler = (e) => {
-      const tab = e?.detail?.tab;
-      if (!tab) return;
+  // useEffect(() => {
+  //   const handler = (e) => {
+  //     const tab = e?.detail?.tab;
+  //     if (!tab) return;
 
-      // Try common setter patterns safely
+  //     // Try common setter patterns safely
 
-      // 1) Preferred API: setSelectedTab(tab)
-      if (typeof tabCtx?.setSelectedTab === "function") {
-        tabCtx.setSelectedTab(tab);
-        return;
-      }
+  //     // 1) Preferred API: setSelectedTab(tab)
+  //     if (typeof tabCtx?.setSelectedTab === "function") {
+  //       tabCtx.setSelectedTab(tab);
+  //       return;
+  //     }
 
-      // 2) Alternative names: setTab, setSelected
-      if (typeof tabCtx?.setTab === "function") {
-        tabCtx.setTab(tab);
-        return;
-      }
-      if (typeof tabCtx?.setSelected === "function") {
-        tabCtx.setSelected(tab);
-        return;
-      }
+  //     // 2) Alternative names: setTab, setSelected
+  //     if (typeof tabCtx?.setTab === "function") {
+  //       tabCtx.setTab(tab);
+  //       return;
+  //     }
+  //     if (typeof tabCtx?.setSelected === "function") {
+  //       tabCtx.setSelected(tab);
+  //       return;
+  //     }
 
-      // 3) Reducer-style dispatch
-      if (typeof tabCtx?.dispatch === "function") {
-        try {
-          tabCtx.dispatch({ type: "SET_TAB", tab });
-          return;
-        } catch (err) {
-          console.warn("tabCtx.dispatch failed", err);
-        }
-      }
+  //     // 3) Reducer-style dispatch
+  //     if (typeof tabCtx?.dispatch === "function") {
+  //       try {
+  //         tabCtx.dispatch({ type: "SET_TAB", tab });
+  //         return;
+  //       } catch (err) {
+  //         console.warn("tabCtx.dispatch failed", err);
+  //       }
+  //     }
 
-      // 4) Generic update/setState helpers
-      if (typeof tabCtx?.update === "function") {
-        try {
-          tabCtx.update({ selectedTab: tab });
-          return;
-        } catch (err) {
-          console.warn("tabCtx.update failed", err);
-        }
-      }
-      if (typeof tabCtx?.setState === "function") {
-        try {
-          tabCtx.setState((prev) => ({ ...(prev || {}), selectedTab: tab }));
-          return;
-        } catch (err) {
-          console.warn("tabCtx.setState failed", err);
-        }
-      }
+  //     // 4) Generic update/setState helpers
+  //     if (typeof tabCtx?.update === "function") {
+  //       try {
+  //         tabCtx.update({ selectedTab: tab });
+  //         return;
+  //       } catch (err) {
+  //         console.warn("tabCtx.update failed", err);
+  //       }
+  //     }
+  //     if (typeof tabCtx?.setState === "function") {
+  //       try {
+  //         tabCtx.setState((prev) => ({ ...(prev || {}), selectedTab: tab }));
+  //         return;
+  //       } catch (err) {
+  //         console.warn("tabCtx.setState failed", err);
+  //       }
+  //     }
 
-      // Nothing matched — log so you can adapt the context provider
-      console.warn("openTab event received but no setter found on tab context. Context keys:", Object.keys(tabCtx || {}));
-    };
+  //     // Nothing matched — log so you can adapt the context provider
+  //     console.warn("openTab event received but no setter found on tab context. Context keys:", Object.keys(tabCtx || {}));
+  //   };
 
-    window.addEventListener("openTab", handler);
-    return () => window.removeEventListener("openTab", handler);
-  }, [tabCtx]);
+  //   window.addEventListener("openTab", handler);
+  //   return () => window.removeEventListener("openTab", handler);
+  // }, [tabCtx]);
 
   // Choose which component to render for the selectedTab
   let content;
@@ -146,6 +154,9 @@ useEffect(() => {
       break;
     case "saved-jobs":
       content = <SavedJobs />;
+      break;
+    case "assessment":
+      content = <StudentAssessment />;
       break;
     case "profile":
       content = <Profile />;
