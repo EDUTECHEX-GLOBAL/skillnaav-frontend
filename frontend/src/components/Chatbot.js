@@ -6,7 +6,6 @@ export default function Chatbot() {
   const user = JSON.parse(localStorage.getItem("userInfo") || "{}") ?? {};
   const token = localStorage.getItem("userToken") || "";
 
-
   const [chatHistory, setChatHistory] = useState(() => {
     try {
       const saved = sessionStorage.getItem("careerChatHistory");
@@ -135,8 +134,8 @@ export default function Chatbot() {
           <div
             key={idx}
             className={`p-2 rounded-md break-words ${msg.type === "user"
-                ? "bg-blue-100 text-right ml-10 whitespace-pre-wrap"
-                : "bg-gray-100 text-left mr-10"
+              ? "bg-blue-100 text-right ml-10 whitespace-pre-wrap"
+              : "bg-gray-100 text-left mr-10"
               }`}
           >
             {msg.type === "bot" ? (

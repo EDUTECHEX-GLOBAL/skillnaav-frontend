@@ -1,6 +1,14 @@
 // models/webapp-models/InternshipScheduleModel.js
 const mongoose = require('mongoose');
 
+const slotSchema = new mongoose.Schema(
+  {
+    startTime: { type: String, required: true }, // "HH:MM"
+    endTime: { type: String, required: true }    // "HH:MM"
+  },
+  { _id: false }
+);
+
 const internshipScheduleSchema = new mongoose.Schema({
   internshipId: { type: mongoose.Schema.Types.ObjectId, required: true },
   partnerId: { type: mongoose.Schema.Types.ObjectId, required: true },
@@ -27,6 +35,14 @@ const internshipScheduleSchema = new mongoose.Schema({
     enum: ['online', 'offline', 'hybrid'],
     default: 'online'
   },
+
+  // ✅ Paid Internship: store Select Time Slots separately (does not affect timetable)
+  timeSlots: {
+    online: { type: [slotSchema] },
+    offline: { type: [slotSchema] },
+    hybrid: { type: [slotSchema] }
+  },
+
   selectedDays: [{ type: String }], // e.g., ['Monday', 'Wednesday']
 
   timetable: [

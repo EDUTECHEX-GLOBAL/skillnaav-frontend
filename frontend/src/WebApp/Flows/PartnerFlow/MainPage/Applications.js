@@ -19,6 +19,7 @@ import { ApplicationsTable, ShortlistedTable } from "./Tables";
 import { toast } from "react-toastify";
 import ConfirmCloseSchedule from "./ConfirmCloseSchedule";
 import InternshipScheduleViewer from "./InternshipScheduleViewer";
+import TimeSlotsSelected from "./TimeSlotsSelected";
 
 const SHORTLIST_API_BASE_URL = process.env.REACT_APP_SHORTLIST_API_BASE_URL || "http://localhost:8001";
 
@@ -50,7 +51,12 @@ const InternshipList = () => {
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
   const [scheduleViewerOpen, setScheduleViewerOpen] = useState(false);
   const [selectedInternshipForView, setSelectedInternshipForView] = useState(null);
-  
+
+  // ✅ Time Slots Selected (Accepted Offers)
+  const [timeSlotsModal, setTimeSlotsModal] = useState({
+    open: false,
+    internshipId: null,
+  });
 
   useEffect(() => {
     const fetchPartnerData = async () => {
@@ -75,24 +81,23 @@ const InternshipList = () => {
       }
     };
 
-const fetchInternships = async (pid) => {
-  if (!pid) return;
+    const fetchInternships = async (pid) => {
+      if (!pid) return;
 
-  setLoading(true);
-  try {
-    const response = await axios.get(`/api/interns/partner/${pid}`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-    });
+      setLoading(true);
+      try {
+        const response = await axios.get(`/api/interns/partner/${pid}`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        });
 
-    setInternships(response.data.data || []);
-  } catch (err) {
-    console.error("Error fetching internships:", err);
-    setInternships([]);
-  } finally {
-    setLoading(false);
-  }
-};
-
+        setInternships(response.data.data || []);
+      } catch (err) {
+        console.error("Error fetching internships:", err);
+        setInternships([]);
+      } finally {
+        setLoading(false);
+      }
+    };
 
     fetchPartnerData();
   }, []);
@@ -171,89 +176,89 @@ const fetchInternships = async (pid) => {
   };
 
 
-const handleShortlist = async (id, description, skills) => {
-  if (!hasPremiumAccess()) {
-    toast.error(`Please upgrade to Premium Basic or higher to shortlist candidates`);
-    return;
-  }
-
-  setLoadingShortlist(true);
-  setModalData({ open: true, internshipId: id, type: "shortlisted", loading: true });
-
-  try {
-    let resumes = [];
-
-    // 1️⃣ Ensure applications are loaded
-    if (!applications[id] || applications[id].length === 0) {
-      try {
-        const { data } = await axios.get(`/api/applications/internship/${id}`);
-        const fetchedApplications = Array.isArray(data.applications)
-          ? data.applications
-          : [];
-        setApplications(prev => ({ ...prev, [id]: fetchedApplications }));
-        resumes = fetchedApplications.map(s => s.resumeUrl).filter(Boolean);
-      } catch (err) {
-        console.error("Error fetching applications for shortlisting:", err);
-      }
-    } else {
-      resumes = applications[id].map(s => s.resumeUrl).filter(Boolean);
+  const handleShortlist = async (id, description, skills) => {
+    if (!hasPremiumAccess()) {
+      toast.error(`Please upgrade to Premium Basic or higher to shortlist candidates`);
+      return;
     }
 
-    // 2️⃣ Call shortlist service
-    const formData = new FormData();
-    formData.append("job_description", description || "");
-    formData.append("job_skills", JSON.stringify(skills || []));
-    resumes.forEach(url => formData.append("resumes", url));
-    formData.append("internship_id", id);
+    setLoadingShortlist(true);
+    setModalData({ open: true, internshipId: id, type: "shortlisted", loading: true });
 
-    const { data } = await axios.post(
-      `${SHORTLIST_API_BASE_URL}/partner/shortlist`,
-      formData,
-      { headers: { "Content-Type": "multipart/form-data" } }
-    );
-
-    const shortlisted = data.shortlisted_candidates || [];
-
-    // 3️⃣ Update shortlisted UI
-    setShortlistedCandidates(prev => ({
-      ...prev,
-      [id]: shortlisted,
-    }));
-
-    /**
-     * 🚨 IMPORTANT CHANGE
-     * ❌ NO manual promotion to L2 here
-     * ✅ Backend shortlisting logic MUST auto-create/update CandidatePipeline:
-     *
-     * stage: "L2"
-     * l2.enabled: true
-     * l2.status: "not_used"
-     */
-
-    // 4️⃣ Refresh applications to reflect new statuses
     try {
-      const refreshed = await axios.get(`/api/applications/internship/${id}`);
-      const apps = Array.isArray(refreshed.data?.applications)
-        ? refreshed.data.applications
-        : [];
-      setApplications(prev => ({ ...prev, [id]: apps }));
-    } catch (e) {
-      console.warn(
-        "Failed to refresh applications after shortlisting:",
-        e?.message || e
-      );
-    }
+      let resumes = [];
 
-    toast.success("Candidates shortlisted successfully!");
-  } catch (err) {
-    console.error("Shortlisting error:", err);
-    toast.error("Shortlisting failed. Please try again.");
-    setError(err.message);
-  } finally {
-    setLoadingShortlist(false);
-    setModalData(prev => ({ ...prev, loading: false }));
-  }
-};
+      // 1️⃣ Ensure applications are loaded
+      if (!applications[id] || applications[id].length === 0) {
+        try {
+          const { data } = await axios.get(`/api/applications/internship/${id}`);
+          const fetchedApplications = Array.isArray(data.applications)
+            ? data.applications
+            : [];
+          setApplications(prev => ({ ...prev, [id]: fetchedApplications }));
+          resumes = fetchedApplications.map(s => s.resumeUrl).filter(Boolean);
+        } catch (err) {
+          console.error("Error fetching applications for shortlisting:", err);
+        }
+      } else {
+        resumes = applications[id].map(s => s.resumeUrl).filter(Boolean);
+      }
+
+      // 2️⃣ Call shortlist service
+      const formData = new FormData();
+      formData.append("job_description", description || "");
+      formData.append("job_skills", JSON.stringify(skills || []));
+      resumes.forEach(url => formData.append("resumes", url));
+      formData.append("internship_id", id);
+
+      const { data } = await axios.post(
+        `${SHORTLIST_API_BASE_URL}/partner/shortlist`,
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } }
+      );
+
+      const shortlisted = data.shortlisted_candidates || [];
+
+      // 3️⃣ Update shortlisted UI
+      setShortlistedCandidates(prev => ({
+        ...prev,
+        [id]: shortlisted,
+      }));
+
+      /**
+       * 🚨 IMPORTANT CHANGE
+       * ❌ NO manual promotion to L2 here
+       * ✅ Backend shortlisting logic MUST auto-create/update CandidatePipeline:
+       *
+       * stage: "L2"
+       * l2.enabled: true
+       * l2.status: "not_used"
+       */
+
+      // 4️⃣ Refresh applications to reflect new statuses
+      try {
+        const refreshed = await axios.get(`/api/applications/internship/${id}`);
+        const apps = Array.isArray(refreshed.data?.applications)
+          ? refreshed.data.applications
+          : [];
+        setApplications(prev => ({ ...prev, [id]: apps }));
+      } catch (e) {
+        console.warn(
+          "Failed to refresh applications after shortlisting:",
+          e?.message || e
+        );
+      }
+
+      toast.success("Candidates shortlisted successfully!");
+    } catch (err) {
+      console.error("Shortlisting error:", err);
+      toast.error("Shortlisting failed. Please try again.");
+      setError(err.message);
+    } finally {
+      setLoadingShortlist(false);
+      setModalData(prev => ({ ...prev, loading: false }));
+    }
+  };
 
 
 
@@ -406,12 +411,22 @@ const handleShortlist = async (id, description, skills) => {
     setScheduleViewerOpen(true);
   };
 
+  // ✅ Open "Time Slots Selected" -> Show Accepted Offer Students
+  const openTimeSlotsSelected = (internshipId) => {
+    if (!hasFullPremiumAccess()) {
+      toast.error("Please upgrade to Premium Plus to view accepted students");
+      return;
+    }
+
+    setTimeSlotsModal({ open: true, internshipId });
+  };
+
   // 🔹 Permanently close an internship schedule
   const handleConfirmClose = async (internshipId) => {
     try {
       await axios.put('/api/schedule/close', {
         internshipId,
-        partnerId: localStorage.getItem("partnerId")
+        partnerId: partnerData?._id || localStorage.getItem("partnerId")
       }, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
       });
@@ -569,6 +584,10 @@ const handleShortlist = async (id, description, skills) => {
                   ? `Student Pays: ${internship.compensationDetails?.amount} ${internship.compensationDetails?.currency}`
                   : "N/A";
 
+          // ✅ Show Time Slots Selected only for PAID internships (NOT stipend)
+          const isPaidInternship =
+            (internship?.internshipType || "").toUpperCase() === "PAID";
+
           return (
             <div
               key={internship._id}
@@ -697,6 +716,20 @@ const handleShortlist = async (id, description, skills) => {
                   showPremiumLock("Shortlisted Resumes", "Premium Basic")
                 )}
 
+                {/* ✅ Time Slots Selected - Only for Paid internships + Premium Plus */}
+                {isPaidInternship && (
+                  hasFullPremiumAccess() ? (
+                    <button
+                      onClick={() => openTimeSlotsSelected(internship._id)}
+                      className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-slate-600 to-gray-800 text-white font-semibold rounded-lg shadow-lg hover:from-slate-700 hover:to-gray-900 transform hover:scale-105 transition duration-200"
+                    >
+                      <FontAwesomeIcon icon={faCalendarAlt} /> Time Slots Selected
+                    </button>
+                  ) : (
+                    showPremiumLock("Time Slots Selected", "Premium Plus")
+                  )
+                )}
+
                 {/* Schedule - Only for Premium Plus */}
                 {hasFullPremiumAccess() ? (
                   <>
@@ -773,6 +806,17 @@ const handleShortlist = async (id, description, skills) => {
             internshipId={selectedInternshipForSchedule}
             onClose={() => setScheduleFormOpen(false)}
           />
+        )}
+      </Modal>
+
+      {/* ✅ Time Slots Selected Modal -> Accepted Offer Students */}
+      <Modal
+        isOpen={timeSlotsModal.open}
+        onClose={() => setTimeSlotsModal({ open: false, internshipId: null })}
+        title="Time Slots Selected"
+      >
+        {timeSlotsModal.internshipId && (
+          <TimeSlotsSelected internshipId={timeSlotsModal.internshipId} />
         )}
       </Modal>
 
