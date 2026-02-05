@@ -843,5 +843,3 @@ const InternshipList = () => {
 };
 
 export default InternshipList;
-
-//
