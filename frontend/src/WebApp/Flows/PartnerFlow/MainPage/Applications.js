@@ -188,27 +188,28 @@ const InternshipList = () => {
     try {
       let resumes = [];
 
-      // 1️⃣ Ensure applications are loaded
+      // If we don't already have applications, fetch them directly
       if (!applications[id] || applications[id].length === 0) {
         try {
           const { data } = await axios.get(`/api/applications/internship/${id}`);
-          const fetchedApplications = Array.isArray(data.applications)
-            ? data.applications
-            : [];
-          setApplications(prev => ({ ...prev, [id]: fetchedApplications }));
-          resumes = fetchedApplications.map(s => s.resumeUrl).filter(Boolean);
+          const fetchedApplications = Array.isArray(data.applications) ? data.applications : [];
+          setApplications(prev => ({
+            ...prev,
+            [id]: fetchedApplications,
+          }));
+          resumes = fetchedApplications.map((s) => s.resumeUrl).filter(Boolean);
         } catch (err) {
           console.error("Error fetching applications for shortlisting:", err);
         }
       } else {
-        resumes = applications[id].map(s => s.resumeUrl).filter(Boolean);
+        resumes = applications[id].map((s) => s.resumeUrl).filter(Boolean);
       }
 
-      // 2️⃣ Call shortlist service
+      // Send request without blocking if resumes array is empty
       const formData = new FormData();
       formData.append("job_description", description || "");
       formData.append("job_skills", JSON.stringify(skills || []));
-      resumes.forEach(url => formData.append("resumes", url));
+      resumes.forEach((url) => formData.append("resumes", url));
       formData.append("internship_id", id);
 
       const { data } = await axios.post(
@@ -217,38 +218,10 @@ const InternshipList = () => {
         { headers: { "Content-Type": "multipart/form-data" } }
       );
 
-      const shortlisted = data.shortlisted_candidates || [];
-
-      // 3️⃣ Update shortlisted UI
-      setShortlistedCandidates(prev => ({
+      setShortlistedCandidates((prev) => ({
         ...prev,
-        [id]: shortlisted,
+        [id]: data.shortlisted_candidates || [],
       }));
-
-      /**
-       * 🚨 IMPORTANT CHANGE
-       * ❌ NO manual promotion to L2 here
-       * ✅ Backend shortlisting logic MUST auto-create/update CandidatePipeline:
-       *
-       * stage: "L2"
-       * l2.enabled: true
-       * l2.status: "not_used"
-       */
-
-      // 4️⃣ Refresh applications to reflect new statuses
-      try {
-        const refreshed = await axios.get(`/api/applications/internship/${id}`);
-        const apps = Array.isArray(refreshed.data?.applications)
-          ? refreshed.data.applications
-          : [];
-        setApplications(prev => ({ ...prev, [id]: apps }));
-      } catch (e) {
-        console.warn(
-          "Failed to refresh applications after shortlisting:",
-          e?.message || e
-        );
-      }
-
       toast.success("Candidates shortlisted successfully!");
     } catch (err) {
       console.error("Shortlisting error:", err);
@@ -256,11 +229,9 @@ const InternshipList = () => {
       setError(err.message);
     } finally {
       setLoadingShortlist(false);
-      setModalData(prev => ({ ...prev, loading: false }));
+      setModalData((prev) => ({ ...prev, loading: false }));
     }
   };
-
-
 
   const showShortlisted = async (internshipId) => {
     if (!hasPremiumAccess()) {
@@ -426,7 +397,7 @@ const InternshipList = () => {
     try {
       await axios.put('/api/schedule/close', {
         internshipId,
-        partnerId: partnerData?._id || localStorage.getItem("partnerId")
+        partnerId: localStorage.getItem("partnerId")
       }, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
       });
@@ -716,7 +687,7 @@ const InternshipList = () => {
                   showPremiumLock("Shortlisted Resumes", "Premium Basic")
                 )}
 
-                {/* ✅ Time Slots Selected - Only for Paid internships + Premium Plus */}
+                {/* ✅ Time Slots Selected - Only for Paid internships + Premium Plus (NEW) */}
                 {isPaidInternship && (
                   hasFullPremiumAccess() ? (
                     <button
@@ -843,5 +814,3 @@ const InternshipList = () => {
 };
 
 export default InternshipList;
-
-//
