@@ -11,6 +11,7 @@ import {
 } from 'react-icons/fi';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
+import ScheduleFormPaid from './ScheduleFormPaid';
 
 const isPastDate = (dateString) => {
   const date = parseISO(dateString);
@@ -26,6 +27,36 @@ const isFutureDate = (dateString) => {
 
 const allWeekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const internshipTypes = ['online', 'offline', 'hybrid'];
+
+const detectPricingBucket = (internship = {}) => {
+  // ✅ hard booleans (if you have them)
+  if (internship.isPaidInternship === true || internship.isPaid === true) return 'paid';
+
+  // ✅ try common string fields
+  const raw =
+    internship.internshipType ||          // often: Free / Stipend / Paid
+    internship.pricingType ||
+    internship.paymentType ||
+    internship.compensationType ||
+    internship.planType ||
+    internship.plan ||
+    '';
+
+  const v = String(raw).toLowerCase();
+
+  if (v.includes('paid')) return 'paid';
+  if (v.includes('stipend')) return 'stipend';
+  if (v.includes('free') || v.includes('unpaid')) return 'free';
+
+  // ✅ numeric fallback (only if your internship doc has amount fields)
+  const paidAmount = Number(internship.amount ?? internship.price ?? internship.fee ?? 0);
+  const stipendAmount = Number(internship.stipendAmount ?? internship.stipend ?? 0);
+
+  if (!Number.isNaN(paidAmount) && paidAmount > 0) return 'paid';
+  if (!Number.isNaN(stipendAmount) && stipendAmount > 0) return 'stipend';
+
+  return 'free';
+};
 
 /**
  * Helper to render location fields (name, address, map link).
@@ -94,6 +125,7 @@ const ScheduleForm = ({ internshipId, onClose }) => {
     offlineLocation: { name: '', address: '', mapLink: '' },
     hybridEventLink: '',
     hybridLocation: { name: '', address: '', mapLink: '' },
+    scheduleMode: 'manual', // ✅ manual | automated
     isClosed: false
   });
 
@@ -108,6 +140,8 @@ const ScheduleForm = ({ internshipId, onClose }) => {
   const hasAutoScrolledRef = useRef(false);
   const readOnly = !!form.isClosed;
   const [isPersisted, setIsPersisted] = useState(false); // false until load/save
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [pricingBucket, setPricingBucket] = useState(null); // null | free | stipend | paid
 
   // Default getters so preview toggles use the right source every time
   const getDefaultEventLinkForType = (type) => {
@@ -136,6 +170,8 @@ const ScheduleForm = ({ internshipId, onClose }) => {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       })
       .then(({ data }) => {
+        setPricingBucket(detectPricingBucket(data)); // ✅ ADD THIS
+
         setForm(f => ({
           ...f,
           startDate: new Date(data.startDate).toISOString().split('T')[0],
@@ -144,10 +180,19 @@ const ScheduleForm = ({ internshipId, onClose }) => {
           defaultType: f.defaultType || data.type || 'online'
         }));
       })
-      .catch(err => setError(err.message));
+      .catch(err => {
+        setError(err.message);
+        setPricingBucket('free'); // ✅ fallback so your old flow still works
+      });
   }, [internshipId]);
 
   useEffect(() => {
+    // ✅ wait until we know free/stipend/paid
+    if (pricingBucket === null) return;
+
+    // ✅ PAID internships should be handled by ScheduleFormPaid.js
+    if (pricingBucket === 'paid') return;
+
     const fetchSchedule = async () => {
       try {
         const response = await axios.get('/api/schedule/get-schedule', {
@@ -233,8 +278,9 @@ const ScheduleForm = ({ internshipId, onClose }) => {
         }
       }
     };
+
     fetchSchedule();
-  }, [internshipId]);
+  }, [internshipId, pricingBucket]); // ✅ add pricingBucket
 
   const handleFormChange = e => {
     const { name, value } = e.target;
@@ -272,7 +318,63 @@ const ScheduleForm = ({ internshipId, onClose }) => {
       return { ...f, selectedDays: Array.from(sel) };
     });
 
-  const generatePreview = () => {
+  const applyAiSectionSummaries = async (days) => {
+    // If schedule mode is manual, do nothing
+    if (form.scheduleMode !== 'automated') return days;
+
+    // If schedule is persisted, only generate for TODAY + future (past days must remain unchanged)
+    const dayNumberByDate = {};
+    days.forEach((d, idx) => { dayNumberByDate[d.date] = idx + 1; });
+
+    const targetDays = isPersisted
+      ? days.filter(d => isFutureDate(d.date))   // today + future
+      : days;
+
+    // If nothing to generate, return as-is
+    if (!targetDays.length) return days;
+
+    setAiGenerating(true);
+    try {
+      const { data } = await axios.post(
+        '/api/schedule/ai-section-summaries',
+        {
+          internshipId,
+          totalDays: days.length, // ✅ count how many scheduled days
+          days: targetDays.map(d => ({
+            date: d.date,
+            dayNumber: dayNumberByDate[d.date],
+            type: d.type || form.defaultType
+          }))
+        },
+        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+      );
+
+      // Expected: data.summaries = [{ date:"YYYY-MM-DD", sectionSummary:"..." }, ...]
+      const summaryMap = {};
+      (data?.summaries || []).forEach(s => {
+        if (s?.date) summaryMap[s.date] = s.sectionSummary || '';
+      });
+
+      // Merge: keep Excel/manual summary if already present, otherwise fill with AI
+      return days.map(d => {
+        const aiText = summaryMap[d.date];
+        if (!aiText) return d;
+
+        // If already has summary (Excel/user), keep it
+        if (d.sectionSummary && d.sectionSummary.trim() !== '') return d;
+
+        return { ...d, sectionSummary: aiText };
+      });
+    } catch (err) {
+      console.error('AI Section Summary generation failed:', err);
+      setError(err.response?.data?.error || 'AI generation failed. You can still edit manually.');
+      return days; // fallback safely
+    } finally {
+      setAiGenerating(false);
+    }
+  };
+
+  const generatePreview = async () => {
     const {
       startDate,
       endDate,
@@ -380,7 +482,9 @@ const ScheduleForm = ({ internshipId, onClose }) => {
       }
     }
 
-    setTimetable(days);
+    const finalDays = await applyAiSectionSummaries(days);
+
+    setTimetable(finalDays);
     setPreviewed(true);
     setError(null);
   };
@@ -482,23 +586,25 @@ const ScheduleForm = ({ internshipId, onClose }) => {
     if (newDate < startDate || newDate > endDate) {
       return setError(`Date must be between ${startDate} and ${endDate}`);
     }
-    if ((defaultType === 'offline' || defaultType === 'hybrid') && !defaultLocation.address) {
-      return setError('Location address is required for offline/hybrid days');
+    if (defaultType === 'offline' && !defaultLocation.address) {
+      return setError('Location address is required for offline days');
     }
 
     const name = new Date(newDate).toLocaleString('en-us', { weekday: 'long' });
+
+    const initialType = defaultType === 'hybrid' ? 'online' : (defaultType || 'online');
+
     const newDayEntry = {
       date: newDate,
       day: name,
       selected: true,
       startTime: defaultStartTime || '',
       endTime: defaultEndTime || '',
-      eventLink: defaultEventLink || '',
-      type: defaultType || 'online',
-      location:
-        defaultType === 'online'
-          ? { name: '', address: '', mapLink: '' }
-          : defaultLocation,
+      type: initialType,
+      eventLink: initialType === 'online' ? (defaultEventLink || '') : '',
+      location: initialType === 'offline'
+        ? (defaultLocation || { name: '', address: '', mapLink: '' })
+        : { name: '', address: '', mapLink: '' },
       sectionSummary: '',
       instructor: '',
       assignment: null,
@@ -558,6 +664,23 @@ const ScheduleForm = ({ internshipId, onClose }) => {
       setLoading(false);
     }
   };
+
+  // ✅ ROUTE: Paid internships use ScheduleFormPaid.js
+  // 1) Optional: avoid UI flicker while pricingBucket is loading
+  if (pricingBucket === null) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center p-4 z-50">
+        <div className="bg-white rounded-2xl shadow-2xl px-6 py-4">
+          <p className="text-gray-700 font-medium">Loading schedule...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 2) Paid internships should use the separate component/file
+  if (pricingBucket === 'paid') {
+    return <ScheduleFormPaid internshipId={internshipId} onClose={onClose} />;
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center p-4 z-50">
@@ -948,8 +1071,19 @@ const ScheduleForm = ({ internshipId, onClose }) => {
 
                           const formatted = {};
                           rows.forEach((row, index) => {
-                            if (row['Date']) {
-                              formatted[row['Date'].trim()] = {
+                            const rawDate = row['Date'];
+
+                            if (rawDate) {
+                              const dateKey =
+                                typeof rawDate === 'string'
+                                  ? rawDate.trim()
+                                  : rawDate instanceof Date
+                                    ? rawDate.toISOString().split('T')[0]
+                                    : typeof rawDate === 'number'
+                                      ? XLSX.SSF.format('yyyy-mm-dd', rawDate)
+                                      : String(rawDate).trim();
+
+                              formatted[dateKey] = {
                                 summary: row['section summary'] || '',
                                 instructor: row['Instructor Name'] || '',
                                 type: (row['Section type'] || '').toLowerCase(),
@@ -971,14 +1105,69 @@ const ScheduleForm = ({ internshipId, onClose }) => {
                 </div>
               </div>
 
+              {/* ✅ Schedule Creation Method */}
+              <div className="bg-gray-50 p-5 rounded-xl border border-gray-200 space-y-6">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                  Schedule Creation Method
+                </h3>
+
+                {/* Same layout style as Internship Type */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="flex items-center">
+                    <input
+                      type="radio"
+                      id="scheduleMode-manual"
+                      name="scheduleMode"
+                      value="manual"
+                      checked={form.scheduleMode === 'manual'}
+                      onChange={handleFormChange}
+                      className="h-5 w-5 text-indigo-600 focus:ring-indigo-500 -mt-0"
+                    />
+                    <label
+                      htmlFor="scheduleMode-manual"
+                      className="ml-2 text-sm font-medium text-gray-700"
+                    >
+                      Manual Schedule
+                    </label>
+                  </div>
+
+                  <div className="flex items-center">
+                    <input
+                      type="radio"
+                      id="scheduleMode-automated"
+                      name="scheduleMode"
+                      value="automated"
+                      checked={form.scheduleMode === 'automated'}
+                      onChange={handleFormChange}
+                      className="h-5 w-5 text-indigo-600 focus:ring-indigo-500 -mt-0"
+                    />
+                    <label
+                      htmlFor="scheduleMode-automated"
+                      className="ml-2 text-sm font-medium text-gray-700"
+                    >
+                      Automated Schedule
+                    </label>
+                  </div>
+                </div>
+
+                {form.scheduleMode === 'automated' && (
+                  <p className="text-sm text-gray-500">
+                    Automated Schedule will auto-fill <b>Section Summary</b> for each scheduled day
+                    based on the internship you posted.
+                  </p>
+                )}
+              </div>
+
               {/* Generate Preview Button */}
               <div className="flex justify-end">
                 <button
                   type="button"
                   onClick={generatePreview}
-                  className="flex items-center justify-center px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium rounded-lg shadow-md hover:from-indigo-700 hover:to-purple-700 transition-all transform hover:scale-105"
+                  disabled={aiGenerating}
+                  className={`flex items-center justify-center px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium rounded-lg shadow-md hover:from-indigo-700 hover:to-purple-700 transition-all transform hover:scale-105 ${aiGenerating ? 'opacity-60 cursor-not-allowed' : ''
+                    }`}
                 >
-                  Generate Preview
+                  {aiGenerating ? 'Generating with AI...' : 'Generate Preview'}
                   <FiChevronRight className="ml-2" />
                 </button>
               </div>

@@ -384,7 +384,7 @@ function buildOnlineEvent({ slot, dateStr, startDateTime, endDateTime, internshi
     summary: `Online Section by ${slot.instructor || 'Instructor'}`,
     description: `Topic: ${slot.sectionSummary || 'Internship session'}
     
-👨‍🏫 Instructor Name: ${slot.instructor || 'Not assigned'}
+👨‍🏫 ${slot.instructor || 'Not assigned'}
 
 🔗 Online Meeting Link: ${finalEventLink || 'Link not available'}
 
@@ -422,7 +422,7 @@ function buildOfflineEvent({ slot, dateStr, startDateTime, endDateTime, internsh
     summary: `Offline Section by ${slot.instructor || 'Instructor'}`,
     description: `Topic: ${slot.sectionSummary || 'Internship session'}
 
-👨‍🏫 Instructor Name: ${slot.instructor || 'Not assigned'}
+👨‍🏫 ${slot.instructor || 'Not assigned'}
 📅 Date: ${formatDate(dateStr)}
 ⏰ Time: ${slot.startTime} - ${slot.endTime} (IST)
 

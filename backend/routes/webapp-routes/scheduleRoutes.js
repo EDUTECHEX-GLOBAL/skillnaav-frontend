@@ -3,6 +3,7 @@ const router = express.Router();
 const {
   updateInternshipSchedule,
   getInternshipSchedule,
+  generateAiSectionSummaries, // ✅ ADD THIS
 } = require('../../controllers/scheduleController');
 
 // Create or update schedule
@@ -10,6 +11,9 @@ router.post('/create', updateInternshipSchedule);
 
 // Get schedule using query params: ?internshipId=xxx&partnerId=yyy
 router.get('/get-schedule', getInternshipSchedule);
+
+// ✅ AI: generate section summaries for preview
+router.post('/ai-section-summaries', generateAiSectionSummaries);
 
 // Close schedule permanently
 router.put('/close', async (req, res) => {

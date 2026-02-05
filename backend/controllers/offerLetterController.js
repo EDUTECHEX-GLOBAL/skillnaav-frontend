@@ -172,7 +172,7 @@ const getOfferLetterByStudent = async (req, res) => {
 const updateOfferStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, paymentId, preferredTimeSlot } = req.body;
+    const { status, paymentId, preferredTimeSlot, selectedTimeSlot } = req.body;
 
     console.log('Updating offer status:', { id, status, paymentId });
 
@@ -230,10 +230,13 @@ const updateOfferStatus = async (req, res) => {
     }
 
     // 6️⃣ Build update payload (schema-safe)
+    // ✅ accept either preferredTimeSlot OR selectedTimeSlot from frontend
+    const resolvedTimeSlot = preferredTimeSlot || selectedTimeSlot;
+
     const updateData = {
       status,
       ...(resolvedPaymentId && { paymentId: resolvedPaymentId }),
-      ...(preferredTimeSlot && { preferredTimeSlot })
+      ...(resolvedTimeSlot && { preferredTimeSlot: resolvedTimeSlot })
     };
 
     console.log('Updating offer with:', updateData);
@@ -245,52 +248,57 @@ const updateOfferStatus = async (req, res) => {
       { new: true, runValidators: true }
     );
 
-    // 8️⃣ Post-accept notifications
+    // ✅ 8️⃣ Post-accept notifications (RUN IN BACKGROUND so response is fast)
     if (status === 'Accepted') {
-      try {
-        const schedule = await InternshipSchedule
-          .findOne({ internshipId: updatedOffer.internshipId })
-          .lean();
+      setImmediate(async () => {
+        try {
+          const schedule = await InternshipSchedule
+            .findOne({ internshipId: updatedOffer.internshipId })
+            .select('timetable') // ✅ only fetch what you need
+            .lean();
 
-        if (schedule?.timetable?.length) {
-          const upcoming = schedule.timetable.find(s => {
-            const d = new Date(s.date);
-            const today = new Date();
-            d.setHours(0, 0, 0, 0);
-            today.setHours(0, 0, 0, 0);
-            return d >= today;
-          });
+          if (schedule?.timetable?.length) {
+            const upcoming = schedule.timetable.find(s => {
+              const d = new Date(s.date);
+              const today = new Date();
+              d.setHours(0, 0, 0, 0);
+              today.setHours(0, 0, 0, 0);
+              return d >= today;
+            });
 
-          const appUrl =
-            (process.env.WEBAPP_BASE_URL || 'https://www.skillnaav.com') +
-            '/user/login';
+            const appUrl =
+              (process.env.WEBAPP_BASE_URL || 'https://www.skillnaav.com') +
+              '/user/login';
 
-          const previewHtml = upcoming
-            ? `<p><b>Next session:</b> ${new Date(upcoming.date).toLocaleDateString('en-IN')} ${upcoming.startTime}–${upcoming.endTime}</p>`
-            : '';
+            const previewHtml = upcoming
+              ? `<p><b>Next session:</b> ${new Date(upcoming.date).toLocaleDateString('en-IN')} ${upcoming.startTime}–${upcoming.endTime}</p>`
+              : '';
 
-          await notifyUser(
-            updatedOffer.email,
-            'Your internship schedule is available',
-            `
+            // ✅ Run both in parallel and don’t block main request
+            await Promise.allSettled([
+              notifyUser(
+                updatedOffer.email,
+                'Your internship schedule is available',
+                `
               <p>Hi ${updatedOffer.name || 'there'},</p>
               <p>Your internship schedule is now available.</p>
               ${previewHtml}
               <p><a href="${appUrl}">Open your dashboard</a></p>
               <p>— Skillnaav Team</p>
             `
-          ).catch(() => {});
-
-          await sendNotification({
-            studentId: updatedOffer.studentId,
-            title: 'Schedule available',
-            message: 'Tap to view your sessions.',
-            link: appUrl
-          }).catch(() => {});
+              ),
+              sendNotification({
+                studentId: updatedOffer.studentId,
+                title: 'Schedule available',
+                message: 'Tap to view your sessions.',
+                link: appUrl
+              })
+            ]);
+          }
+        } catch (e) {
+          console.error('Post-accept notification error (background):', e);
         }
-      } catch (e) {
-        console.error('Post-accept notification error:', e);
-      }
+      });
     }
 
     return res.status(200).json({
@@ -369,10 +377,31 @@ const getOfferStatusesForInternship = async (req, res) => {
   }
 };
 
+const getAcceptedOffersByInternship = async (req, res) => {
+  try {
+    const { internshipId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(internshipId)) {
+      return res.status(400).json({ error: "Invalid internship ID" });
+    }
+
+    const offers = await OfferLetter.find({
+      internshipId: new mongoose.Types.ObjectId(internshipId),
+      status: "Accepted",
+    }).lean();
+
+    return res.status(200).json({ accepted: offers });
+  } catch (err) {
+    console.error("Error fetching accepted offers:", err);
+    return res.status(500).json({ error: err.message });
+  }
+};
+
 module.exports = {
   sendOfferLetter,
   getOfferLetterByStudent,
   updateOfferStatus,
   getOffersByInternship,
-  getOfferStatusesForInternship
+  getOfferStatusesForInternship,
+  getAcceptedOffersByInternship
 };

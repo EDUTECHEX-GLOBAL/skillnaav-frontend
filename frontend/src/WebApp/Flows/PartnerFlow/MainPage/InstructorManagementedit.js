@@ -56,6 +56,21 @@ const TIMEZONES_US_MX = [
 ];
 
 export default function InstructorManagementedit({ open, item, onClose, onSaved }) {
+  // ✅ ADD: auth config for protected routes (partnerProtect)
+  const authCfg = () => {
+    const token =
+      localStorage.getItem("partnerToken") ||
+      localStorage.getItem("token") ||
+      sessionStorage.getItem("partnerToken");
+
+    const cfg = { withCredentials: true }; // needed if backend uses cookies
+
+    if (token) {
+      cfg.headers = { Authorization: `Bearer ${token}` }; // needed if backend uses JWT
+    }
+
+    return cfg;
+  };
   const [submitting, setSubmitting] = useState(false);
 
   // OTP state
@@ -71,6 +86,10 @@ export default function InstructorManagementedit({ open, item, onClose, onSaved 
   const initialCountry = (item?.country === "Canada" ? "Canada" : "United States");
   const [country, setCountry] = useState(initialCountry);
   const [stateProv, setStateProv] = useState(item?.state || "");
+  const [city, setCity] = useState(item?.city || "");
+  const [postalCode, setPostalCode] = useState(item?.postalCode || "");
+  const [address1, setAddress1] = useState(item?.address1 || "");
+  const [address2, setAddress2] = useState(item?.address2 || "");
 
   // Currency & payout, mirror Add form logic
   const [currency, setCurrency] = useState(item?.currency || (initialCountry === "Canada" ? "CAD" : "USD"));
@@ -160,6 +179,27 @@ export default function InstructorManagementedit({ open, item, onClose, onSaved 
 
     // Native validation first
     const form = e.currentTarget;
+    form.querySelector('[name="country"]')?.setCustomValidity("");
+    form.querySelector('[name="state"]')?.setCustomValidity("");
+    form.querySelector('[name="city"]')?.setCustomValidity("");
+    form.querySelector('[name="postalCode"]')?.setCustomValidity("");
+    form.querySelector('[name="address1"]')?.setCustomValidity("");
+
+    if (!country) {
+      form.querySelector('[name="country"]')?.setCustomValidity("Please fill in this field.");
+    }
+    if (!stateProv) {
+      form.querySelector('[name="state"]')?.setCustomValidity("Please fill in this field.");
+    }
+    if (!city) {
+      form.querySelector('[name="city"]')?.setCustomValidity("Please fill in this field.");
+    }
+    if (!postalCode) {
+      form.querySelector('[name="postalCode"]')?.setCustomValidity("Please fill in this field.");
+    }
+    if (!address1) {
+      form.querySelector('[name="address1"]')?.setCustomValidity("Please fill in this field.");
+    }
     if (!form.checkValidity()) {
       form.reportValidity();
       setSubmitting(false);
@@ -302,7 +342,7 @@ export default function InstructorManagementedit({ open, item, onClose, onSaved 
       }
 
       // Start OTP
-      await axios.post("/api/instructors/otp/start", { email: emailForOtp });
+      await axios.post("/api/instructors/otp/start", { email: emailForOtp }, authCfg());
 
       setPendingFormData(formData);
       setPendingId(itemId);
@@ -320,8 +360,8 @@ export default function InstructorManagementedit({ open, item, onClose, onSaved 
   const doVerifyAndSave = async () => {
     if (!pendingId || !pendingFormData) return;
     try {
-      await axios.post("/api/instructors/otp/verify", { email: otpEmail, otp: otpCode });
-      const { data } = await axios.put(`/api/instructors/${pendingId}`, pendingFormData);
+      await axios.post("/api/instructors/otp/verify", { email: otpEmail, otp: otpCode }, authCfg());
+      const { data } = await axios.put(`/api/instructors/${pendingId}`, pendingFormData, authCfg());
       onSaved?.(data);
 
       // reset OTP UI
@@ -403,7 +443,14 @@ export default function InstructorManagementedit({ open, item, onClose, onSaved 
                       required
                       className={inputCls + " mt-4"}
                       value={country}
-                      onChange={(e) => { setCountry(e.target.value); setStateProv(""); }}
+                      onChange={(e) => {
+                        setCountry(e.target.value);
+                        setStateProv("");
+                        setCity("");
+                        setPostalCode("");
+                        setAddress1("");
+                        setAddress2("");
+                      }}
                     >
                       <option>United States</option>
                       <option>Canada</option>
@@ -418,40 +465,76 @@ export default function InstructorManagementedit({ open, item, onClose, onSaved 
                     </div>
                     <select
                       name="state"
+                      required
+                      disabled={!country}
                       className={inputCls + " mt-4"}
                       value={stateProv}
                       onChange={(e) => setStateProv(e.target.value)}
                     >
-                      {stateList.map((s) => <option key={s} value={s}>{s}</option>)}
+                      <option value="" disabled hidden>
+                        Select
+                      </option>
+
+                      {stateList.map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
                     </select>
+
                   </div>
                 </div>
 
                 <div className="flex flex-col">
                   <div className="relative">
-                    <div className="absolute -top-2 left-0"><label className={labelCls}>City</label></div>
-                    <input name="city" className={inputCls + " mt-4"} defaultValue={item?.city || ""} placeholder={cityPlaceholder} />
+                    <div className="absolute -top-2 left-0"><label className={labelCls}>City *</label></div>
+                    <input
+                      name="city"
+                      required
+                      className={inputCls + " mt-4"}
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      placeholder={cityPlaceholder}
+                    />
                   </div>
                 </div>
 
                 <div className="flex flex-col">
                   <div className="relative">
-                    <div className="absolute -top-2 left-0"><label className={labelCls}>{postalLabel}</label></div>
-                    <input name="postalCode" className={inputCls + " mt-4"} defaultValue={item?.postalCode || ""} placeholder={country === "Canada" ? "M5V 3L9" : "95113"} />
+                    <div className="absolute -top-2 left-0"><label className={labelCls}>{postalLabel} *</label></div>
+                    <input
+                      name="postalCode"
+                      required
+                      className={inputCls + " mt-4"}
+                      value={postalCode}
+                      onChange={(e) => setPostalCode(e.target.value)}
+                      placeholder={country === "Canada" ? "M5V 3L9" : "95113"}
+                    />
                   </div>
                 </div>
 
                 <div className="flex flex-col mt-4">
                   <div className="relative">
-                    <div className="absolute -top-2 left-0"><label className={labelCls}>Address Line 1</label></div>
-                    <input name="address1" className={inputCls + " mt-4"} defaultValue={item?.address1 || ""} placeholder={address1Placeholder} />
+                    <div className="absolute -top-2 left-0"><label className={labelCls}>Address Line 1 *</label></div>
+                    <input
+                      name="address1"
+                      required
+                      className={inputCls + " mt-4"}
+                      value={address1}
+                      onChange={(e) => setAddress1(e.target.value)}
+                      placeholder={address1Placeholder}
+                    />
                   </div>
                 </div>
 
                 <div className="flex flex-col">
                   <div className="relative">
                     <div className="absolute -top-2 left-0"><label className={labelCls}>Address Line 2</label></div>
-                    <input name="address2" className={inputCls + " mt-4"} defaultValue={item?.address2 || ""} placeholder="Optional" />
+                    <input
+                      name="address2"
+                      className={inputCls + " mt-4"}
+                      value={address2}
+                      onChange={(e) => setAddress2(e.target.value)}
+                      placeholder="Optional"
+                    />
                   </div>
                 </div>
               </div>
@@ -463,57 +546,88 @@ export default function InstructorManagementedit({ open, item, onClose, onSaved 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                 <div className="flex flex-col">
                   <div className="relative">
-                    <div className="absolute -top-2 left-0"><label className={labelCls}>Highest Qualification</label></div>
-                    <select name="qualification" className={inputCls + " mt-4"} defaultValue={item?.qualification || ""}>
-                      <option value="" disabled>Select</option>
-                      <option>Diploma</option><option>Bachelor</option><option>Master</option><option>PhD</option><option>Other</option>
+                    <div className="absolute -top-2 left-0">
+                      <label className={labelCls}>Highest Qualification *</label>
+                    </div>
+
+                    <select
+                      name="qualification"
+                      required
+                      className={inputCls + " mt-4"}
+                      defaultValue={item?.qualification || ""}
+                    >
+                      <option value="" disabled hidden>Select</option>
+                      <option value="Diploma">Diploma</option>
+                      <option value="Bachelor">Bachelor</option>
+                      <option value="Master">Master</option>
+                      <option value="PhD">PhD</option>
+                      <option value="Other">Other</option>
                     </select>
                   </div>
                 </div>
+
                 <div className="flex flex-col">
                   <div className="relative">
                     <div className="absolute -top-2 left-0"><label className={labelCls}>Years of Experience</label></div>
                     <input type="number" min="0" step="0.5" name="experienceYears" className={inputCls + " mt-4"} defaultValue={item?.experienceYears ?? ""} placeholder="e.g., 3" />
                   </div>
                 </div>
+
                 <div className="flex flex-col">
                   <div className="relative">
                     <div className="absolute -top-2 left-0"><label className={labelCls}>Current/Recent Organization</label></div>
                     <input name="organization" className={inputCls + " mt-4"} defaultValue={item?.organization || ""} placeholder="Company/Institute" />
                   </div>
                 </div>
+
                 <div className="flex flex-col mt-6 md:col-span-3">
                   <div className="relative">
                     <div className="absolute -top-2 left-0"><label className={labelCls}>Teaching Specializations (comma-separated)</label></div>
                     <input name="specializations" className={inputCls + " mt-4"} defaultValue={initialSpecializations} placeholder="e.g., React, Data Structures, Python" />
                   </div>
                 </div>
+
                 <div className="flex flex-col mt-6 md:col-span-3">
                   <div className="relative">
                     <div className="absolute -top-2 left-0"><label className={labelCls}>Skills / Technologies (comma-separated)</label></div>
                     <input name="skills" className={inputCls + " mt-4"} defaultValue={initialSkills} placeholder="e.g., MongoDB, Node.js, AWS" />
                   </div>
                 </div>
+
                 <div className="flex flex-col mt-6 md:col-span-2">
                   <div className="relative">
                     <div className="absolute -top-2 left-0"><label className={labelCls}>Languages (comma-separated)</label></div>
                     <input name="languages" className={inputCls + " mt-4"} defaultValue={initialLanguages} placeholder="e.g., English, Spanish" />
                   </div>
                 </div>
+
                 <div className="flex flex-col mt-6">
                   <div className="relative">
-                    <div className="absolute -top-2 left-0"><label className={labelCls}>Teaching Mode</label></div>
-                    <select name="teachingMode" className={inputCls + " mt-4"} defaultValue={item?.teachingMode || "Online"}>
-                      <option>Online</option><option>Offline</option><option>Hybrid</option>
+                    <div className="absolute -top-2 left-0">
+                      <label className={labelCls}>Teaching Mode *</label>
+                    </div>
+
+                    <select
+                      name="teachingMode"
+                      required
+                      className={inputCls + " mt-4"}
+                      defaultValue={item?.teachingMode || ""}
+                    >
+                      <option value="" disabled hidden>Select</option>
+                      <option value="Online">Online</option>
+                      <option value="Offline">Offline</option>
+                      <option value="Hybrid">Hybrid</option>
                     </select>
                   </div>
                 </div>
+
                 <div className="flex flex-col mt-6 md:col-span-3">
                   <div className="relative">
                     <div className="absolute -top-2 left-0"><label className={labelCls}>Short Bio / Summary</label></div>
                     <textarea name="bio" rows={3} className={textareaCls + " mt-4"} defaultValue={item?.bio || ""} placeholder="Brief profile to show on your site" />
                   </div>
                 </div>
+
               </div>
             </div>
 
@@ -751,18 +865,21 @@ export default function InstructorManagementedit({ open, item, onClose, onSaved 
                     <input type="file" name="resume" className={inputCls + " mt-4"} accept=".pdf,.doc,.docx" />
                   </div>
                 </div>
+
                 <div className="flex flex-col">
                   <div className="relative">
                     <div className="absolute -top-2 left-0"><label className={labelCls}>Profile Photo (upload to replace)</label></div>
                     <input type="file" name="photo" className={inputCls + " mt-4"} accept="image/*" />
                   </div>
                 </div>
+
                 <div className="flex flex-col">
                   <div className="relative">
                     <div className="absolute -top-2 left-0"><label className={labelCls}>Certificates (upload to add)</label></div>
                     <input type="file" name="certificates" className={inputCls + " mt-4"} accept=".pdf,.png,.jpg,.jpeg" multiple />
                   </div>
                 </div>
+
                 <div className="flex flex-col mt-6">
                   <div className="relative">
                     <div className="absolute -top-2 left-0"><label className={labelCls}>Background Check</label></div>
@@ -782,7 +899,6 @@ export default function InstructorManagementedit({ open, item, onClose, onSaved 
                     <input type="checkbox" name="agreeToTerms" defaultChecked={!!item?.agreeToTerms} />
                     <span className="text-sm text-gray-700">I confirm all details are accurate</span>
                   </label>
-                  <span className="text-xs text-gray-500">Saving will require OTP verification via email.</span>
                 </div>
               </div>
             </div>
@@ -856,7 +972,7 @@ export default function InstructorManagementedit({ open, item, onClose, onSaved 
                 className="text-sm text-teal-700 underline"
                 onClick={async () => {
                   try {
-                    await axios.post("/api/instructors/otp/start", { email: otpEmail });
+                    await axios.post("/api/instructors/otp/start", { email: otpEmail }, authCfg());
                     alert("OTP resent.");
                   } catch {
                     alert("Failed to resend OTP.");

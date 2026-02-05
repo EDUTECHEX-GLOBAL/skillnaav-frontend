@@ -1198,30 +1198,32 @@ const InstructureManagement = () => {
                                                 <div className="absolute -top-2 left-0">
                                                     <label className={labelCls}>Preferred Payout Method</label>
                                                 </div>
+
                                                 <select
                                                     name="payoutMethod"
                                                     className={inputCls + " mt-4"}
                                                     value={payoutMethod}
                                                     onChange={(e) => setPayoutMethod(e.target.value)}
+                                                    disabled={country !== "United States" && country !== "Canada"}
                                                 >
-                                                    {country === "Canada" ? (
+                                                    {/* Default placeholder */}
+                                                    <option value="" disabled>
+                                                        {country ? "Select" : "Select country first"}
+                                                    </option>
+
+                                                    {country === "Canada" && (
                                                         <>
                                                             <option>EFT (CA Bank)</option>
                                                             <option>Interac e-Transfer</option>
                                                             <option>PayPal</option>
                                                         </>
-                                                    ) : country === "United States" ? (
+                                                    )}
+
+                                                    {country === "United States" && (
                                                         <>
                                                             <option>ACH (US Bank)</option>
                                                             <option>Zelle</option>
                                                             <option>PayPal</option>
-                                                        </>
-                                                    ) : (
-                                                        // India
-                                                        <>
-                                                            <option>NEFT/IMPS (IN Bank)</option>
-                                                            <option>UPI (VPA)</option>
-                                                            <option>Paytm Wallet</option>
                                                         </>
                                                     )}
                                                 </select>

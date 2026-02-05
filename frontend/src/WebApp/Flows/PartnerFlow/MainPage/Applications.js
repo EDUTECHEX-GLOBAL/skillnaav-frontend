@@ -19,6 +19,7 @@ import { ApplicationsTable, ShortlistedTable } from "./Tables";
 import { toast } from "react-toastify";
 import ConfirmCloseSchedule from "./ConfirmCloseSchedule";
 import InternshipScheduleViewer from "./InternshipScheduleViewer";
+import TimeSlotsSelected from "./TimeSlotsSelected";
 
 const SHORTLIST_API_BASE_URL = process.env.REACT_APP_SHORTLIST_API_BASE_URL || "http://localhost:8001";
 
@@ -50,6 +51,11 @@ const InternshipList = () => {
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
   const [scheduleViewerOpen, setScheduleViewerOpen] = useState(false);
   const [selectedInternshipForView, setSelectedInternshipForView] = useState(null);
+  // ✅ Time Slots Selected (Accepted Offers)
+  const [timeSlotsModal, setTimeSlotsModal] = useState({
+    open: false,
+    internshipId: null,
+  });
   const partnerId = localStorage.getItem("partnerId");
 
   useEffect(() => {
@@ -76,21 +82,21 @@ const InternshipList = () => {
     };
 
     const fetchInternships = async () => {
-    if (!partnerId) return;
+      if (!partnerId) return;
 
-    setLoading(true);
-    try {
-      const response = await axios.get(`/api/interns/partner/${partnerId}`);
+      setLoading(true);
+      try {
+        const response = await axios.get(`/api/interns/partner/${partnerId}`);
 
-      // ✅ FIX: extract array correctly
-      setInternships(response.data.data || []);
-    } catch (err) {
-      console.error("Error fetching internships:", err);
-      setInternships([]); // safety fallback
-    } finally {
-      setLoading(false);
-    }
-  };
+        // ✅ FIX: extract array correctly
+        setInternships(response.data.data || []);
+      } catch (err) {
+        console.error("Error fetching internships:", err);
+        setInternships([]); // safety fallback
+      } finally {
+        setLoading(false);
+      }
+    };
 
     fetchPartnerData();
   }, []);
@@ -375,6 +381,16 @@ const InternshipList = () => {
     setScheduleViewerOpen(true);
   };
 
+  // ✅ Open "Time Slots Selected" -> Show Accepted Offer Students
+  const openTimeSlotsSelected = (internshipId) => {
+    if (!hasFullPremiumAccess()) {
+      toast.error("Please upgrade to Premium Plus to view accepted students");
+      return;
+    }
+
+    setTimeSlotsModal({ open: true, internshipId });
+  };
+
   // 🔹 Permanently close an internship schedule
   const handleConfirmClose = async (internshipId) => {
     try {
@@ -538,6 +554,10 @@ const InternshipList = () => {
                   ? `Student Pays: ${internship.compensationDetails?.amount} ${internship.compensationDetails?.currency}`
                   : "N/A";
 
+          // ✅ Show Time Slots Selected only for PAID internships (NOT stipend)
+          const isPaidInternship =
+            (internship?.internshipType || "").toUpperCase() === "PAID";
+
           return (
             <div
               key={internship._id}
@@ -666,6 +686,20 @@ const InternshipList = () => {
                   showPremiumLock("Shortlisted Resumes", "Premium Basic")
                 )}
 
+                {/* ✅ Time Slots Selected - Only for Paid internships + Premium Plus (NEW) */}
+                {isPaidInternship && (
+                  hasFullPremiumAccess() ? (
+                    <button
+                      onClick={() => openTimeSlotsSelected(internship._id)}
+                      className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-slate-600 to-gray-800 text-white font-semibold rounded-lg shadow-lg hover:from-slate-700 hover:to-gray-900 transform hover:scale-105 transition duration-200"
+                    >
+                      <FontAwesomeIcon icon={faCalendarAlt} /> Time Slots Selected
+                    </button>
+                  ) : (
+                    showPremiumLock("Time Slots Selected", "Premium Plus")
+                  )
+                )}
+
                 {/* Schedule - Only for Premium Plus */}
                 {hasFullPremiumAccess() ? (
                   <>
@@ -742,6 +776,17 @@ const InternshipList = () => {
             internshipId={selectedInternshipForSchedule}
             onClose={() => setScheduleFormOpen(false)}
           />
+        )}
+      </Modal>
+
+      {/* ✅ Time Slots Selected Modal -> Accepted Offer Students */}
+      <Modal
+        isOpen={timeSlotsModal.open}
+        onClose={() => setTimeSlotsModal({ open: false, internshipId: null })}
+        title="Time Slots Selected"
+      >
+        {timeSlotsModal.internshipId && (
+          <TimeSlotsSelected internshipId={timeSlotsModal.internshipId} />
         )}
       </Modal>
 

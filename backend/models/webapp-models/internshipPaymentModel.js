@@ -43,7 +43,7 @@
 //     type: Object,
 //     default: {} // ✅ Default empty object
 //   },
-  
+
 //   // ✅ Enhanced tracking fields
 //   completedAt: {
 //     type: Date,
@@ -57,7 +57,7 @@
 //     type: String,
 //     default: null
 //   },
-  
+
 //   // ✅ Additional metadata
 //   paymentMethod: {
 //     type: String,
@@ -71,11 +71,11 @@
 //     type: Number,
 //     default: 0
 //   },
-  
+
 //   // ✅ Audit trail
 //   ipAddress: String,
 //   userAgent: String,
-  
+
 // }, {
 //   timestamps: true
 // });
@@ -106,7 +106,7 @@
 // InternshipPaymentSchema.statics.findByStudent = function(studentId, status = null) {
 //   const query = { studentId };
 //   if (status) query.status = status;
-  
+
 //   return this.find(query)
 //     .populate('offerId', 'position companyName')
 //     .populate('internshipId', 'jobTitle companyName')
@@ -191,5 +191,6 @@ const InternshipPaymentSchema = new mongoose.Schema({
 InternshipPaymentSchema.index({ studentId: 1, status: 1 });
 InternshipPaymentSchema.index({ offerId: 1, studentId: 1 });
 InternshipPaymentSchema.index({ partnerId: 1, status: 1 }); // ✅ Speeds up partner queries
+InternshipPaymentSchema.index({ paypalPaymentId: 1 });
 
 module.exports = mongoose.model("InternshipPayment", InternshipPaymentSchema);
