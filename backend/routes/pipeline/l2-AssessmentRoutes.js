@@ -1,4 +1,4 @@
-const express = require("express");
+const express = require('express');
 const router = express.Router();
 
 const {
@@ -10,18 +10,22 @@ const {
   submitAssessment,
   getAssessmentForStudent,
   evaluateAssessment,
-} = require("../../controllers/pipeline/assessmentController");
+  trackSuspiciousActivity,
+} = require('../../controllers/pipeline/assessmentController');
 
-// ✅ IMPORTANT: order matters
-router.post("/generate", generateAssessment);
-router.post("/:id/send", sendAssessment);
+router.post('/generate', generateAssessment);
+router.post('/:id/send', sendAssessment);
 
-router.post("/:id/start", startAssessment);
-router.post("/:id/submit", submitAssessment);
-router.post("/:id/evaluate", evaluateAssessment);
+// student routes
+router.get('/:id', getAssessmentForStudent);
+router.post('/:id/start', startAssessment);
+router.post('/:id/submit', submitAssessment);
+router.post('/:id/evaluate', evaluateAssessment);
+router.post('/:id/track-activity', trackSuspiciousActivity);
 
-router.get("/internship/:internshipId", getAssessmentsByInternship);
-router.get("/student/:studentId", getAssessmentsByStudent);
-router.get("/:id", getAssessmentForStudent);
+// list routes
+router.get('/internship/:internshipId', getAssessmentsByInternship);
+router.get('/student/:studentId', getAssessmentsByStudent);
+
 
 module.exports = router;

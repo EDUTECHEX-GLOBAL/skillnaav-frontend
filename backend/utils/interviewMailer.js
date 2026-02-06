@@ -2,7 +2,7 @@ const notifyUser = require("./notifyUser");
 
 function formatDateTime(date, timezone = "Asia/Kolkata") {
   return new Date(date).toLocaleString("en-IN", {
-    timeZone: timezone,
+    timeZone: timezone, 
     dateStyle: "medium",
     timeStyle: "short",
   });

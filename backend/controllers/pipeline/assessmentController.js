@@ -1,17 +1,25 @@
 const mongoose = require("mongoose");
 const CandidatePipeline = require("../../models/pipeline/CandidatePipeline");
 const Assessment = require("../../models/pipeline/Assessment");
-const { generateMcqSetAI  } = require("../../services/assessmentGenerator");
-const { gradeMcq } = require("../../services/assessmentEvaluator");
+const { generateMcqSetAI } = require("../../services/assessmentGenerator");
+const { gradeMcq, generateFeedback } = require("../../services/assessmentEvaluator");
 const { logEvent } = require("../../services/pipelineEvents");
 const InternshipPost = require("../../models/webapp-models/internshipPostModel");
-const sendNotification = require("../../utils/Notification"); 
-
+const sendNotification = require("../../utils/Notification");
 
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
-
-
+/**
+ * Shuffle array (Fisher-Yates algorithm)
+ */
+function shuffleArray(array) {
+  const arr = [...array];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
 
 /**
  * POST /api/l2-assessments/generate
@@ -30,6 +38,21 @@ async function generateAssessment(req, res) {
       return res.status(400).json({ message: "Invalid IDs" });
     }
 
+    // ✅ CHECK IF ASSESSMENT ALREADY EXISTS (prevent duplicates)
+    const existingAssessment = await Assessment.findOne({
+      internshipId,
+      studentId,
+      attempt: 1,
+    });
+
+    if (existingAssessment) {
+      return res.status(200).json({
+        assessmentId: existingAssessment._id,
+        message: "Assessment already exists",
+        existing: true,
+      });
+    }
+
     // Load internship
     const internship = await InternshipPost.findById(internshipId).lean();
     if (!internship) {
@@ -45,14 +68,14 @@ async function generateAssessment(req, res) {
       ? internship.qualifications
       : [];
 
-    // Config snapshot
+    // Config snapshot with validation
     const cfg = {
       allowText: !!config?.allowText,
       allowFileUpload: !!config?.allowFileUpload,
-      difficulty: Number(config?.difficulty || 2),
-      questionCount: Number(config?.questionCount || 10),
-      timeLimitMinutes: Number(config?.timeLimitMinutes || 20),
-      passScore: Number(config?.passScore || 70),
+      difficulty: Math.min(3, Math.max(1, Number(config?.difficulty || 2))), // ✅ Clamp 1-3
+      questionCount: Math.min(50, Math.max(5, Number(config?.questionCount || 10))), // ✅ Clamp 5-50
+      timeLimitMinutes: Math.min(180, Math.max(5, Number(config?.timeLimitMinutes || 20))), // ✅ Clamp 5-180
+      passScore: Math.min(100, Math.max(0, Number(config?.passScore || 70))), // ✅ Clamp 0-100
     };
 
     // Safety check before AI call
@@ -75,25 +98,31 @@ async function generateAssessment(req, res) {
       return res.status(500).json({ message: "AI failed to generate questions" });
     }
 
-    // Ensure single attempt
-    let assessment = await Assessment.findOne({
-      internshipId,
-      studentId,
-      attempt: 1,
-    });
-
-    if (!assessment) {
-      assessment = await Assessment.create({
-        internshipId,
-        studentId,
-        partnerId,
-        configSnapshot: cfg,
-        timing: { timeLimitMinutes: cfg.timeLimitMinutes },
-        questions,
-        status: "generated",
-        attempt: 1,
+    // ✅ VALIDATE MINIMUM QUESTION COUNT
+    if (questions.length < cfg.questionCount * 0.7) {
+      return res.status(500).json({
+        message: `AI generated insufficient questions (${questions.length}/${cfg.questionCount})`,
       });
     }
+
+    // ✅ USE ATOMIC UPSERT (prevent race conditions)
+    const assessment = await Assessment.findOneAndUpdate(
+      { internshipId, studentId, attempt: 1 },
+      {
+        $setOnInsert: {
+          internshipId,
+          studentId,
+          partnerId,
+          configSnapshot: cfg,
+          timing: { timeLimitMinutes: cfg.timeLimitMinutes },
+          questions,
+          status: "generated",
+          attempt: 1,
+          createdAt: new Date(),
+        },
+      },
+      { upsert: true, new: true }
+    );
 
     // Update candidate pipeline (L2 stage)
     await CandidatePipeline.findOneAndUpdate(
@@ -124,17 +153,20 @@ async function generateAssessment(req, res) {
         assessmentId: String(assessment._id),
         source: "AI",
         internshipTitle,
+        questionCount: questions.length,
+        difficulty: cfg.difficulty,
       },
     });
 
     return res.status(201).json({ assessmentId: assessment._id });
   } catch (err) {
     console.error("❌ generateAssessment error:", err);
-    return res.status(500).json({ message: "Failed to generate assessment", error: err.message });
+    return res.status(500).json({
+      message: "Failed to generate assessment",
+      error: process.env.NODE_ENV === "development" ? err.message : "Internal server error",
+    });
   }
 }
-
-
 
 /**
  * POST /api/l2-assessments/:id/send
@@ -142,236 +174,340 @@ async function generateAssessment(req, res) {
  * Idempotent: if already sent/started/submitted/evaluated, returns ok.
  */
 async function sendAssessment(req, res) {
-  const { id } = req.params;
-  const { partnerId } = req.body;
+  try {
+    const { id } = req.params;
+    const { partnerId } = req.body;
 
-  if (!isValidObjectId(id) || !isValidObjectId(partnerId)) {
-    return res.status(400).json({ message: "Invalid ids" });
-  }
+    if (!isValidObjectId(id) || !isValidObjectId(partnerId)) {
+      return res.status(400).json({ message: "Invalid ids" });
+    }
 
-  const assessment = await Assessment.findById(id);
-  if (!assessment) {
-    return res.status(404).json({ message: "Assessment not found" });
-  }
+    const assessment = await Assessment.findById(id);
+    if (!assessment) {
+      return res.status(404).json({ message: "Assessment not found" });
+    }
 
-  // ✅ Idempotent behavior
-  if (["sent", "started", "submitted", "evaluated"].includes(assessment.status)) {
-    return res.json({ ok: true, status: assessment.status });
-  }
+    // ✅ Idempotent behavior
+    if (["sent", "started", "submitted", "evaluated"].includes(assessment.status)) {
+      return res.json({ ok: true, status: assessment.status });
+    }
 
-  assessment.status = "sent";
-  await assessment.save();
+    assessment.status = "sent";
+    await assessment.save();
 
-  await CandidatePipeline.findOneAndUpdate(
-    { internshipId: assessment.internshipId, studentId: assessment.studentId },
-    {
-      $set: {
-        stage: "L2",
-        "l2.status": "sent",
-        "l2.updatedAt": new Date(),
+    await CandidatePipeline.findOneAndUpdate(
+      { internshipId: assessment.internshipId, studentId: assessment.studentId },
+      {
+        $set: {
+          stage: "L2",
+          "l2.status": "sent",
+          "l2.updatedAt": new Date(),
+        },
       },
-    },
-    { upsert: true }
-  );
+      { upsert: true }
+    );
 
-  // 🔔 SEND NOTIFICATION TO STUDENT
-  await sendNotification({
-    studentId: assessment.studentId,
-    title: "Level 2 Assessment Assigned",
-    message:
-      "Your Level 2 assessment has been assigned. Please complete it within the given time limit.",
-    link: `/student/assessments/${assessment._id}`,
-    type: "general",
-  });
+    // 🔔 SEND NOTIFICATION TO STUDENT
+    await sendNotification({
+      studentId: assessment.studentId,
+      title: "Level 2 Assessment Assigned",
+      message: `Your Level 2 assessment has been assigned. Please complete it within ${assessment.timing.timeLimitMinutes} minutes.`,
+      link: `/student/assessments/${assessment._id}`,
+      type: "general",
+    });
 
-  // Event logging
-  logEvent({
-    internshipId: assessment.internshipId,
-    studentId: assessment.studentId,
-    partnerId,
-    type: "L2_SENT",
-    actorKind: "partner",
-    actorId: partnerId,
-    payload: { assessmentId: String(assessment._id) },
-  });
+    // Event logging
+    logEvent({
+      internshipId: assessment.internshipId,
+      studentId: assessment.studentId,
+      partnerId,
+      type: "L2_SENT",
+      actorKind: "partner",
+      actorId: partnerId,
+      payload: { assessmentId: String(assessment._id) },
+    });
 
-  return res.json({ ok: true, status: "sent" });
+    return res.json({ ok: true, status: "sent" });
+  } catch (err) {
+    console.error("❌ sendAssessment error:", err);
+    return res.status(500).json({ message: "Failed to send assessment" });
+  }
 }
 
-
 async function getAssessmentsByInternship(req, res) {
-  const { internshipId } = req.params;
-  if (!isValidObjectId(internshipId)) return res.status(400).json({ message: "Invalid internshipId" });
+  try {
+    const { internshipId } = req.params;
+    if (!isValidObjectId(internshipId))
+      return res.status(400).json({ message: "Invalid internshipId" });
 
-  const items = await Assessment.find({ internshipId }).sort({ updatedAt: -1 }).lean();
-  return res.json({ items });
+    const items = await Assessment.find({ internshipId }).sort({ updatedAt: -1 }).lean();
+    return res.json({ items });
+  } catch (err) {
+    console.error("❌ getAssessmentsByInternship error:", err);
+    return res.status(500).json({ message: "Failed to fetch assessments" });
+  }
 }
 
 async function getAssessmentsByStudent(req, res) {
-  const { studentId } = req.params;
-  if (!isValidObjectId(studentId)) return res.status(400).json({ message: "Invalid studentId" });
+  try {
+    const { studentId } = req.params;
+    if (!isValidObjectId(studentId))
+      return res.status(400).json({ message: "Invalid studentId" });
 
-  const items = await Assessment.find({ studentId }).sort({ updatedAt: -1 }).lean();
-  return res.json({ items });
+    const items = await Assessment.find({ studentId }).sort({ updatedAt: -1 }).lean();
+    return res.json({ items });
+  } catch (err) {
+    console.error("❌ getAssessmentsByStudent error:", err);
+    return res.status(500).json({ message: "Failed to fetch assessments" });
+  }
 }
 
 /**
  * Student starts test
  * POST /api/l2-assessments/:id/start
+ * body: { ipAddress?, userAgent? }
  */
 async function startAssessment(req, res) {
-  const { id } = req.params;
-  if (!isValidObjectId(id)) return res.status(400).json({ message: "Invalid assessment id" });
+  try {
+    const { id } = req.params;
+    const { ipAddress, userAgent } = req.body;
 
-  const assessment = await Assessment.findById(id);
-  if (!assessment) return res.status(404).json({ message: "Assessment not found" });
+    if (!isValidObjectId(id))
+      return res.status(400).json({ message: "Invalid assessment id" });
 
-  if (["submitted", "evaluated"].includes(assessment.status)) {
-    return res.status(409).json({ message: "Assessment already completed" });
+    const assessment = await Assessment.findById(id);
+    if (!assessment) return res.status(404).json({ message: "Assessment not found" });
+
+    if (["submitted", "evaluated"].includes(assessment.status)) {
+      return res.status(409).json({ message: "Assessment already completed" });
+    }
+
+    // ✅ PREVENT RESTARTING (only start once)
+    if (assessment.status === "started" && assessment.timing.startedAt) {
+      return res.json({
+        ok: true,
+        startedAt: assessment.timing.startedAt,
+        message: "Assessment already started",
+      });
+    }
+
+    // ✅ ANTI-CHEAT: Log metadata
+    const antiCheatData = {
+      ipAddress: ipAddress || req.ip || req.headers["x-forwarded-for"] || "unknown",
+      userAgent: userAgent || req.headers["user-agent"] || "unknown",
+      tabSwitches: 0,
+      suspiciousActivity: [],
+    };
+
+    assessment.timing.startedAt = new Date();
+    assessment.status = "started";
+    assessment.antiCheat = antiCheatData; // ✅ Add this to schema
+    await assessment.save();
+
+    await CandidatePipeline.findOneAndUpdate(
+      { internshipId: assessment.internshipId, studentId: assessment.studentId },
+      { $set: { stage: "L2", "l2.status": "started", "l2.updatedAt": new Date() } },
+      { upsert: true }
+    );
+
+    logEvent({
+      internshipId: assessment.internshipId,
+      studentId: assessment.studentId,
+      partnerId: assessment.partnerId,
+      type: "L2_STARTED",
+      actorKind: "student",
+      actorId: assessment.studentId,
+      payload: {
+        assessmentId: String(assessment._id),
+        ipAddress: antiCheatData.ipAddress,
+      },
+    });
+
+    // ✅ SHUFFLE QUESTIONS (send randomized order)
+    const shuffledQuestions = shuffleArray(
+      assessment.questions.map((q) => ({
+        questionId: q.questionId,
+        question: q.question,
+        options: q.options,
+      }))
+    );
+
+    return res.json({
+      ok: true,
+      startedAt: assessment.timing.startedAt,
+      timeLimitMinutes: assessment.timing.timeLimitMinutes,
+      questions: shuffledQuestions,
+    });
+  } catch (err) {
+    console.error("❌ startAssessment error:", err);
+    return res.status(500).json({ message: "Failed to start assessment" });
   }
-
-  if (!assessment.timing.startedAt) assessment.timing.startedAt = new Date();
-  assessment.status = "started";
-  await assessment.save();
-
-  await CandidatePipeline.findOneAndUpdate(
-    { internshipId: assessment.internshipId, studentId: assessment.studentId },
-    { $set: { stage: "L2", "l2.status": "started", "l2.updatedAt": new Date() } },
-    { upsert: true }
-  );
-
-  logEvent({
-    internshipId: assessment.internshipId,
-    studentId: assessment.studentId,
-    partnerId: assessment.partnerId,
-    type: "L2_STARTED",
-    actorKind: "student",
-    actorId: assessment.studentId,
-    payload: { assessmentId: String(assessment._id) },
-  });
-
-  return res.json({ ok: true, startedAt: assessment.timing.startedAt });
 }
 
 /**
  * Submit answers
  * POST /api/l2-assessments/:id/submit
- * body: { mcqAnswers, textAnswer?, files? }
+ * body: { mcqAnswers, textAnswer?, files?, timingPattern? }
  */
 async function submitAssessment(req, res) {
-  const { id } = req.params;
-  if (!isValidObjectId(id)) return res.status(400).json({ message: "Invalid assessment id" });
+  try {
+    const { id } = req.params;
+    if (!isValidObjectId(id))
+      return res.status(400).json({ message: "Invalid assessment id" });
 
-  const { mcqAnswers, textAnswer, files } = req.body;
+    const { mcqAnswers, textAnswer, files, timingPattern } = req.body;
 
-  const assessment = await Assessment.findById(id);
-  if (!assessment) return res.status(404).json({ message: "Assessment not found" });
+    const assessment = await Assessment.findById(id);
+    if (!assessment) return res.status(404).json({ message: "Assessment not found" });
 
-  if (["submitted", "evaluated"].includes(assessment.status)) {
-    return res.status(409).json({ message: "Assessment already submitted" });
-  }
+    if (["submitted", "evaluated"].includes(assessment.status)) {
+      return res.status(409).json({ message: "Assessment already submitted" });
+    }
 
-  // simple time-limit check
-  if (assessment.timing.startedAt) {
-    const elapsedMs = Date.now() - new Date(assessment.timing.startedAt).getTime();
-    const limitMs = (assessment.timing.timeLimitMinutes || 20) * 60 * 1000;
-   if (elapsedMs > limitMs) {
-  // Save whatever answers were sent (or empty)
-  assessment.submission = assessment.submission || {};
-  assessment.submission.mcqAnswers = Array.isArray(mcqAnswers) ? mcqAnswers : [];
-  assessment.timing.submittedAt = new Date();
+    // ✅ TIME LIMIT CHECK (using atomic operation)
+    if (assessment.timing.startedAt) {
+      const elapsedMs = Date.now() - new Date(assessment.timing.startedAt).getTime();
+      const limitMs = (assessment.timing.timeLimitMinutes || 20) * 60 * 1000;
 
-  // Auto-evaluate
-  const { mcqScore, correctCount, total, pass } = gradeMcq({
-    questions: assessment.questions || [],
-    answers: assessment.submission.mcqAnswers,
-    passScore: assessment.configSnapshot.passScore || 70,
-  });
+      if (elapsedMs > limitMs) {
+        // ✅ AUTO-SUBMIT WITH ATOMIC UPDATE
+        const result = await Assessment.findOneAndUpdate(
+          {
+            _id: id,
+            status: { $nin: ["submitted", "evaluated"] },
+          },
+          {
+            $set: {
+              "submission.mcqAnswers": Array.isArray(mcqAnswers) ? mcqAnswers : [],
+              "timing.submittedAt": new Date(),
+              status: "submitted",
+            },
+          },
+          { new: true }
+        );
 
-  assessment.evaluation = {
-    mcqScore,
-    finalScore: mcqScore,
-    pass,
-    feedback: `Auto-submitted due to time expiry (${correctCount}/${total})`,
-    evaluatedAt: new Date(),
-  };
-
-  assessment.status = "evaluated";
-  await assessment.save();
-
- await CandidatePipeline.findOneAndUpdate(
-  { internshipId: assessment.internshipId, studentId: assessment.studentId },
-  {
-    $set: pass
-      ? {
-          stage: "L3",                // ✅ MOVE TO LEVEL 3
-          "l2.status": "passed",
-          "l2.score": mcqScore,
-          "l2.updatedAt": new Date(),
-
-          "l3.enabled": true,
-          "l3.status": "pending",
-          "l3.updatedAt": new Date(),
+        if (!result) {
+          return res.status(409).json({ message: "Assessment already processed" });
         }
-      : {
-          stage: "L2",
-          "l2.status": "rejected",
-          "l2.score": mcqScore,
-          "l2.updatedAt": new Date(),
-        },
-  },
-  { upsert: true }
-);
 
+        // Auto-evaluate
+        const gradeResult = gradeMcq({
+          questions: result.questions || [],
+          answers: result.submission.mcqAnswers,
+          passScore: result.configSnapshot.passScore || 70,
+          timingPattern,
+        });
 
-  logEvent({
-    internshipId: assessment.internshipId,
-    studentId: assessment.studentId,
-    partnerId: assessment.partnerId,
-    type: "L2_AUTO_SUBMITTED",
-    actorKind: "system",
-    actorId: null,
-    payload: {
-      assessmentId: String(assessment._id),
-      reason: "time_expired",
-      mcqScore,
-    },
-  });
+        const feedback = generateFeedback({
+          mcqScore: gradeResult.mcqScore,
+          correctCount: gradeResult.correctCount,
+          total: gradeResult.total,
+          domainStats: gradeResult.domainStats,
+          pass: gradeResult.pass,
+          passScore: result.configSnapshot.passScore || 70,
+        });
 
-  return res.status(410).json({
-    message: "Time limit exceeded. Assessment auto-submitted.",
-    evaluation: assessment.evaluation,
-  });
-}
+        result.evaluation = {
+          mcqScore: gradeResult.mcqScore,
+          finalScore: gradeResult.mcqScore,
+          pass: gradeResult.pass,
+          feedback: `Auto-submitted due to time expiry.\\n\\n${feedback}`,
+          evaluatedAt: new Date(),
+          detailed: gradeResult.detailed, // ✅ Store detailed results
+          timingAnalysis: gradeResult.timingAnalysis,
+        };
 
+        result.status = "evaluated";
+        await result.save();
+
+        await CandidatePipeline.findOneAndUpdate(
+          { internshipId: result.internshipId, studentId: result.studentId },
+          {
+            $set: gradeResult.pass
+              ? {
+                  stage: "L3",
+                  "l2.status": "passed",
+                  "l2.score": gradeResult.mcqScore,
+                  "l2.updatedAt": new Date(),
+                  "l3.enabled": true,
+                  "l3.status": "pending",
+                  "l3.updatedAt": new Date(),
+                }
+              : {
+                  stage: "L2",
+                  "l2.status": "rejected",
+                  "l2.score": gradeResult.mcqScore,
+                  "l2.updatedAt": new Date(),
+                },
+          },
+          { upsert: true }
+        );
+
+        logEvent({
+          internshipId: result.internshipId,
+          studentId: result.studentId,
+          partnerId: result.partnerId,
+          type: "L2_AUTO_SUBMITTED",
+          actorKind: "system",
+          actorId: null,
+          payload: {
+            assessmentId: String(result._id),
+            reason: "time_expired",
+            mcqScore: gradeResult.mcqScore,
+            suspicious: gradeResult.timingAnalysis?.suspicious || false,
+          },
+        });
+
+        return res.status(410).json({
+          message: "Time limit exceeded. Assessment auto-submitted.",
+          evaluation: result.evaluation,
+        });
+      }
+    }
+
+    // ✅ NORMAL SUBMISSION (within time limit)
+    assessment.submission = assessment.submission || {};
+    assessment.submission.mcqAnswers = Array.isArray(mcqAnswers) ? mcqAnswers : [];
+
+    if (assessment.configSnapshot.allowText)
+      assessment.submission.textAnswer = textAnswer || null;
+
+    if (assessment.configSnapshot.allowFileUpload && Array.isArray(files))
+      assessment.submission.files = files;
+
+    // ✅ STORE TIMING PATTERN FOR ANALYSIS
+    if (Array.isArray(timingPattern)) {
+      assessment.submission.timingPattern = timingPattern;
+    }
+
+    assessment.timing.submittedAt = new Date();
+    assessment.status = "submitted";
+    await assessment.save();
+
+    await CandidatePipeline.findOneAndUpdate(
+      { internshipId: assessment.internshipId, studentId: assessment.studentId },
+      { $set: { stage: "L2", "l2.status": "submitted", "l2.updatedAt": new Date() } },
+      { upsert: true }
+    );
+
+    logEvent({
+      internshipId: assessment.internshipId,
+      studentId: assessment.studentId,
+      partnerId: assessment.partnerId,
+      type: "L2_SUBMITTED",
+      actorKind: "student",
+      actorId: assessment.studentId,
+      payload: {
+        assessmentId: String(assessment._id),
+        answerCount: mcqAnswers?.length || 0,
+      },
+    });
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("❌ submitAssessment error:", err);
+    return res.status(500).json({ message: "Failed to submit assessment" });
   }
-
-  assessment.submission = assessment.submission || {};
-  assessment.submission.mcqAnswers = Array.isArray(mcqAnswers) ? mcqAnswers : [];
-  if (assessment.configSnapshot.allowText) assessment.submission.textAnswer = textAnswer || null;
-  if (assessment.configSnapshot.allowFileUpload && Array.isArray(files)) assessment.submission.files = files;
-
-  assessment.timing.submittedAt = new Date();
-  assessment.status = "submitted";
-  await assessment.save();
-
-  await CandidatePipeline.findOneAndUpdate(
-    { internshipId: assessment.internshipId, studentId: assessment.studentId },
-    { $set: { stage: "L2", "l2.status": "submitted", "l2.updatedAt": new Date() } },
-    { upsert: true }
-  );
-
-  logEvent({
-    internshipId: assessment.internshipId,
-    studentId: assessment.studentId,
-    partnerId: assessment.partnerId,
-    type: "L2_SUBMITTED",
-    actorKind: "student",
-    actorId: assessment.studentId,
-    payload: { assessmentId: String(assessment._id) },
-  });
-
-  return res.json({ ok: true });
 }
 
 /**
@@ -379,105 +515,224 @@ async function submitAssessment(req, res) {
  * POST /api/l2-assessments/:id/evaluate
  */
 async function evaluateAssessment(req, res) {
-  const { id } = req.params;
-  if (!isValidObjectId(id)) return res.status(400).json({ message: "Invalid assessment id" });
+  try {
+    const { id } = req.params;
+    if (!isValidObjectId(id))
+      return res.status(400).json({ message: "Invalid assessment id" });
 
-  const assessment = await Assessment.findById(id);
-  if (!assessment) return res.status(404).json({ message: "Assessment not found" });
+    const assessment = await Assessment.findById(id);
+    if (!assessment) return res.status(404).json({ message: "Assessment not found" });
 
-  if (!["submitted", "evaluated"].includes(assessment.status)) {
-    return res.status(409).json({ message: "Assessment not submitted yet" });
-  }
+    if (!["submitted", "evaluated"].includes(assessment.status)) {
+      return res.status(409).json({ message: "Assessment not submitted yet" });
+    }
 
-  if (assessment.status === "evaluated") {
+    // ✅ IDEMPOTENT: Return existing evaluation
+    if (assessment.status === "evaluated") {
+      return res.json({ ok: true, evaluation: assessment.evaluation });
+    }
+
+    const gradeResult = gradeMcq({
+      questions: assessment.questions || [],
+      answers: assessment.submission?.mcqAnswers || [],
+      passScore: assessment.configSnapshot.passScore || 70,
+      timingPattern: assessment.submission?.timingPattern,
+    });
+
+    const feedback = generateFeedback({
+      mcqScore: gradeResult.mcqScore,
+      correctCount: gradeResult.correctCount,
+      total: gradeResult.total,
+      domainStats: gradeResult.domainStats,
+      pass: gradeResult.pass,
+      passScore: assessment.configSnapshot.passScore || 70,
+    });
+
+    assessment.evaluation = {
+      mcqScore: gradeResult.mcqScore,
+      finalScore: gradeResult.mcqScore,
+      pass: gradeResult.pass,
+      feedback,
+      evaluatedAt: new Date(),
+      detailed: gradeResult.detailed,
+      domainStats: gradeResult.domainStats,
+      timingAnalysis: gradeResult.timingAnalysis,
+    };
+
+    assessment.status = "evaluated";
+    await assessment.save();
+
+    await CandidatePipeline.findOneAndUpdate(
+      { internshipId: assessment.internshipId, studentId: assessment.studentId },
+      {
+        $set: gradeResult.pass
+          ? {
+              stage: "L3",
+              "l2.status": "passed",
+              "l2.score": gradeResult.mcqScore,
+              "l2.updatedAt": new Date(),
+              "l3.enabled": true,
+              "l3.status": "pending",
+              "l3.updatedAt": new Date(),
+            }
+          : {
+              stage: "L2",
+              "l2.status": "rejected",
+              "l2.score": gradeResult.mcqScore,
+              "l2.updatedAt": new Date(),
+            },
+      },
+      { upsert: true }
+    );
+
+    logEvent({
+      internshipId: assessment.internshipId,
+      studentId: assessment.studentId,
+      partnerId: assessment.partnerId,
+      type: "L2_EVALUATED",
+      actorKind: "system",
+      actorId: null,
+      payload: {
+        assessmentId: String(assessment._id),
+        mcqScore: gradeResult.mcqScore,
+        pass: gradeResult.pass,
+        suspicious: gradeResult.timingAnalysis?.suspicious || false,
+      },
+    });
+
     return res.json({ ok: true, evaluation: assessment.evaluation });
+  } catch (err) {
+    console.error("❌ evaluateAssessment error:", err);
+    return res.status(500).json({ message: "Failed to evaluate assessment" });
   }
-
-  const { mcqScore, correctCount, total, pass } = gradeMcq({
-    questions: assessment.questions || [],
-    answers: assessment.submission?.mcqAnswers || [],
-    passScore: assessment.configSnapshot.passScore || 70,
-  });
-
-  assessment.evaluation = assessment.evaluation || {};
-  assessment.evaluation.mcqScore = mcqScore;
-  assessment.evaluation.finalScore = mcqScore;
-  assessment.evaluation.pass = pass;
-  assessment.evaluation.feedback = `Auto-graded MCQ: ${correctCount}/${total} correct.`;
-  assessment.evaluation.evaluatedAt = new Date();
-  assessment.status = "evaluated";
-  await assessment.save();
-
-  await CandidatePipeline.findOneAndUpdate(
-  { internshipId: assessment.internshipId, studentId: assessment.studentId },
-  {
-    $set: pass
-      ? {
-          stage: "L3",
-          "l2.status": "passed",
-          "l2.score": mcqScore,
-          "l2.updatedAt": new Date(),
-
-          "l3.enabled": true,
-          "l3.status": "pending",
-          "l3.updatedAt": new Date(),
-        }
-      : {
-          stage: "L2",
-          "l2.status": "rejected",
-          "l2.score": mcqScore,
-          "l2.updatedAt": new Date(),
-        },
-  },
-  { upsert: true }
-);
-
-
-  logEvent({
-    internshipId: assessment.internshipId,
-    studentId: assessment.studentId,
-    partnerId: assessment.partnerId,
-    type: "L2_EVALUATED",
-    actorKind: "system",
-    actorId: null,
-    payload: { assessmentId: String(assessment._id), mcqScore, pass },
-  });
-
-  return res.json({ ok: true, evaluation: assessment.evaluation });
 }
 
 /**
  * GET /api/l2-assessments/:id
- * Student-safe fetch
+ * Student-safe fetch with status-based access control
  */
 async function getAssessmentForStudent(req, res) {
-  const { id } = req.params;
-  if (!isValidObjectId(id)) {
-    return res.status(400).json({ message: "Invalid assessment id" });
+  try {
+    const { id } = req.params;
+    
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({ message: "Invalid assessment id" });
+    }
+
+    const assessment = await Assessment.findById(id).lean();
+    if (!assessment) {
+      return res.status(404).json({ message: "Assessment not found" });
+    }
+
+    // ✅ DIFFERENT RESPONSES BASED ON STATUS
+    
+    // CASE 1: Not started yet (generated/sent) - Send MINIMAL info
+    if (assessment.status === "generated" || assessment.status === "sent") {
+      return res.json({
+        assessmentId: assessment._id,
+        internshipId: assessment.internshipId,
+        timeLimitMinutes: assessment.timing.timeLimitMinutes,
+        status: assessment.status,
+        questions: [], // ❌ NO QUESTIONS
+      });
+    }
+
+    // CASE 2: Started - Send questions
+    if (assessment.status === "started") {
+      const safeQuestions = assessment.questions.map((q) => ({
+        questionId: q.questionId,
+        question: q.question,
+        options: q.options,
+      }));
+
+      return res.json({
+        assessmentId: assessment._id,
+        internshipId: assessment.internshipId,
+        timeLimitMinutes: assessment.timing.timeLimitMinutes,
+        status: assessment.status,
+        startedAt: assessment.timing.startedAt,
+        questions: safeQuestions,
+      });
+    }
+
+    // CASE 3: Submitted - Send minimal info
+    if (assessment.status === "submitted") {
+      return res.json({
+        assessmentId: assessment._id,
+        internshipId: assessment.internshipId,
+        status: assessment.status,
+        submittedAt: assessment.timing.submittedAt,
+        questions: [],
+      });
+    }
+
+    // CASE 4: Evaluated - Send results
+    if (assessment.status === "evaluated") {
+      return res.json({
+        assessmentId: assessment._id,
+        internshipId: assessment.internshipId,
+        status: assessment.status,
+        evaluation: {
+          mcqScore: assessment.evaluation.mcqScore,
+          pass: assessment.evaluation.pass,
+          feedback: assessment.evaluation.feedback,
+        },
+        questions: [],
+      });
+    }
+
+    // Default: minimal info
+    return res.json({
+      assessmentId: assessment._id,
+      status: assessment.status,
+      questions: [],
+    });
+
+  } catch (err) {
+    console.error("❌ getAssessmentForStudent error:", err);
+    return res.status(500).json({ message: "Failed to fetch assessment" });
   }
-
-  const assessment = await Assessment.findById(id).lean();
-  if (!assessment) {
-    return res.status(404).json({ message: "Assessment not found" });
-  }
-
-  // ❗ DO NOT expose correctIndexHash
-  const safeQuestions = assessment.questions.map(q => ({
-    questionId: q.questionId,
-    question: q.question,
-    options: q.options
-  }));
-
-  return res.json({
-    assessmentId: assessment._id,
-    internshipId: assessment.internshipId,
-    timeLimitMinutes: assessment.timing.timeLimitMinutes,
-    status: assessment.status,
-    startedAt: assessment.timing.startedAt,
-    questions: safeQuestions
-  });
 }
 
+/**
+ * ✅ NEW: Track suspicious activity (tab switches, etc.)
+ * POST /api/l2-assessments/:id/track-activity
+ * body: { activityType, details? }
+ */
+async function trackSuspiciousActivity(req, res) {
+  try {
+    const { id } = req.params;
+    const { activityType, details } = req.body;
+
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({ message: "Invalid assessment id" });
+    }
+
+    const result = await Assessment.findOneAndUpdate(
+      { _id: id, status: "started" },
+      {
+        $inc: activityType === "tab_switch" ? { "antiCheat.tabSwitches": 1 } : {},
+        $push: {
+          "antiCheat.suspiciousActivity": {
+            type: activityType,
+            timestamp: new Date(),
+            details: details || null,
+          },
+        },
+      },
+      { new: true }
+    );
+
+    if (!result) {
+      return res.status(404).json({ message: "Assessment not found or not started" });
+    }
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("❌ trackSuspiciousActivity error:", err);
+    return res.status(500).json({ message: "Failed to track activity" });
+  }
+}
 
 module.exports = {
   generateAssessment,
@@ -488,4 +743,5 @@ module.exports = {
   submitAssessment,
   getAssessmentForStudent,
   evaluateAssessment,
+  trackSuspiciousActivity, // ✅ NEW
 };
