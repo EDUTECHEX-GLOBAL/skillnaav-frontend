@@ -99,9 +99,9 @@ async function generateAssessment(req, res) {
     }
 
     // ✅ VALIDATE MINIMUM QUESTION COUNT
-    if (questions.length < cfg.questionCount * 0.7) {
+    if (questions.length !== cfg.questionCount) {
       return res.status(500).json({
-        message: `AI generated insufficient questions (${questions.length}/${cfg.questionCount})`,
+        message: `AI generated ${questions.length}, expected ${cfg.questionCount}`,
       });
     }
 
@@ -743,5 +743,5 @@ module.exports = {
   submitAssessment,
   getAssessmentForStudent,
   evaluateAssessment,
-  trackSuspiciousActivity, // ✅ NEW
+  trackSuspiciousActivity,
 };

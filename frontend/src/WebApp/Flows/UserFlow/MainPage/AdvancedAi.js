@@ -21,7 +21,7 @@ const AdvancedAi = () => {
         const res = await axios.get("/api/interns/approved", {
           params: { isPremium: false, sector: "advanced-ai" }, // Filtering by sector
         });
-        setInternships(res.data); // Save internships in state
+        setInternships(res.data.data);// Save internships in state
       } catch (err) {
         console.error("Error fetching sector internships:", err);
         setError("Failed to load internships"); // Show error message

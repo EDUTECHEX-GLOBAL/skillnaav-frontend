@@ -56,12 +56,18 @@ Return ONLY a valid JSON array with this format:
 `;
 
     const modelId = process.env.BEDROCK_MODEL_ID || "meta.llama3-8b-instruct-v1:0";
-    const command = new InvokeModelCommand({
-      modelId,
-      contentType: "application/json",
-      accept: "application/json",
-      body: JSON.stringify({ prompt, temperature: 0.6, max_gen_len: 800 }),
-    });
+   const command = new InvokeModelCommand({
+  modelId,
+  contentType: "application/json",
+  accept: "application/json",
+  body: JSON.stringify({
+    prompt,
+    max_tokens: 800,
+    temperature: 0.6,
+    top_p: 0.9
+  }),
+});
+
 
     const response = await bedrockClient.send(command);
     const rawOutput = JSON.parse(Buffer.from(response.body).toString("utf-8"));

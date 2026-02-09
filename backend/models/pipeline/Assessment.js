@@ -81,8 +81,8 @@ const AssessmentSchema = new Schema(
         metadata: {
           domain: {
             type: String,
-            enum: ["frontend", "backend", "database", "devops", "general", "other"],
             default: "general",
+            // No enum restriction - allow AI to categorize freely
           },
           bloomLevel: {
             type: String,

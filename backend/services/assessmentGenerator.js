@@ -84,17 +84,113 @@ function validateQuestion(q, index) {
 }
 
 /**
- * Remove duplicate questions
+ * Extract core concept from a question for semantic deduplication
+ */
+function extractQuestionConcept(question) {
+  const q = question.toLowerCase().trim();
+  
+  // Extract the main concept being asked about
+  let concept = q;
+  
+  // Remove question words and common phrases
+  concept = concept
+    .replace(/^(what|which|how|why|when|where|who|describe|explain|identify|which of the following)\s+(is|are|would|can|will|could|should|does|do|did)\s+/i, '')
+    .replace(/\b(the|a|an|in|on|for|to|of|and|with|by|using|most|key|primary|main|best)\b/g, ' ')
+    .replace(/\?.*$/, '') // Remove everything after first question mark
+    .replace(/[^a-z0-9 ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  
+  // Extract key noun phrases (3-5 word combinations)
+  const words = concept.split(' ').filter(w => w.length > 3);
+  
+  // Create multiple fingerprints of different lengths to catch variations
+  const fingerprints = [];
+  
+  // Primary fingerprint: first 5 significant words
+  if (words.length >= 3) {
+    fingerprints.push(words.slice(0, Math.min(5, words.length)).join(' '));
+  }
+  
+  // Secondary fingerprint: core 3-word phrase (skip first word which might vary)
+  if (words.length >= 4) {
+    fingerprints.push(words.slice(1, 4).join(' '));
+  }
+  
+  // Tertiary: last 3 words (often the actual topic)
+  if (words.length >= 3) {
+    fingerprints.push(words.slice(-3).join(' '));
+  }
+  
+  return {
+    primary: fingerprints[0] || concept,
+    secondary: fingerprints[1] || '',
+    tertiary: fingerprints[2] || '',
+    allFingerprints: fingerprints
+  };
+}
+
+/**
+ * Check if two questions are semantically duplicate
+ */
+function areQuestionsDuplicate(q1, q2) {
+  const c1 = extractQuestionConcept(q1);
+  const c2 = extractQuestionConcept(q2);
+  
+  // Check primary fingerprint match
+  if (c1.primary === c2.primary && c1.primary.length > 10) {
+    return true;
+  }
+  
+  // Check if any fingerprints overlap significantly
+  for (const fp1 of c1.allFingerprints) {
+    for (const fp2 of c2.allFingerprints) {
+      if (fp1 && fp2 && fp1.length > 8 && fp2.length > 8) {
+        // Calculate similarity (simple word overlap)
+        const words1 = fp1.split(' ');
+        const words2 = fp2.split(' ');
+        const overlap = words1.filter(w => words2.includes(w)).length;
+        const similarity = overlap / Math.max(words1.length, words2.length);
+        
+        if (similarity > 0.7) {
+          return true;
+        }
+      }
+    }
+  }
+  
+  return false;
+}
+
+/**
+ * Remove duplicate questions using semantic analysis
  */
 function deduplicateQuestions(questions) {
-  const seen = new Set();
-  return questions.filter(q => {
-    const normalized = q.question.toLowerCase().replace(/[^a-z0-9]/g, '');
-    if (seen.has(normalized)) return false;
-    seen.add(normalized);
-    return true;
-  });
+  const unique = [];
+  const seenConcepts = new Map();
+  
+  for (const q of questions) {
+    const concept = extractQuestionConcept(q.question);
+    let isDuplicate = false;
+    
+    // Check against all previously seen questions
+    for (const [seenQ, seenConcept] of seenConcepts.entries()) {
+      if (areQuestionsDuplicate(q.question, seenQ)) {
+        console.log(`🔄 Skipping duplicate: "${q.question.substring(0, 60)}..." (similar to existing question)`);
+        isDuplicate = true;
+        break;
+      }
+    }
+    
+    if (!isDuplicate) {
+      unique.push(q);
+      seenConcepts.set(q.question, concept);
+    }
+  }
+  
+  return unique;
 }
+
 
 /**
  * Enhanced difficulty guidelines
@@ -128,13 +224,18 @@ function buildAssessmentPrompt({
   internshipDescription,
   skills,
   questionCount,
-  difficulty
+  difficulty,
+  focusArea = null, // NEW: specific area to focus on
 }) {
   const safeTitle = sanitizeInput(internshipTitle, 200);
   const safeDescription = sanitizeInput(internshipDescription, 3000);
   const safeSkills = skills.slice(0, 20).map(s => sanitizeInput(s, 50)).filter(Boolean);
 
   const diffGuide = DIFFICULTY_GUIDELINES[difficulty] || DIFFICULTY_GUIDELINES[2];
+
+  const focusText = focusArea 
+    ? `\n🎯 FOCUS AREA: Prioritize questions about "${focusArea}" for this batch.\n`
+    : '';
 
   return `You are an expert technical assessment generator for hiring purposes.
 
@@ -145,7 +246,7 @@ function buildAssessmentPrompt({
 <difficulty_level>${difficulty} - ${diffGuide.name}</difficulty_level>
 <difficulty_description>${diffGuide.description}</difficulty_description>
 <target_bloom_levels>${diffGuide.bloomLevels.join(", ")}</target_bloom_levels>
-</assessment_context>
+</assessment_context>${focusText}
 
 Generate exactly ${questionCount} multiple-choice questions following these requirements:
 
@@ -168,7 +269,19 @@ DIVERSITY REQUIREMENTS:
 - Cover different skill areas from the required skills list
 - Mix conceptual understanding with practical application
 - Include scenario-based questions for difficulty 2+
-- No duplicate or overly similar questions
+- Vary question types and formats
+
+CRITICAL UNIQUENESS RULES:
+- Each question MUST test a COMPLETELY DIFFERENT concept or skill
+- DO NOT ask about the same topic/feature/technique multiple times
+- Avoid these common duplicates:
+  * Multiple questions about the SAME algorithm (e.g., don't ask "what is X?" AND "why use X?")
+  * Multiple questions about the SAME technique (e.g., don't ask "purpose of dropout" AND "how does dropout work")
+  * Multiple questions about the SAME problem (e.g., don't ask "how to handle X?" AND "what technique addresses X?")
+- If you've asked about attention mechanisms, DON'T ask about it again
+- If you've asked about dynamic programming, DON'T ask about it again
+- Each question should cover a UNIQUE entry from the skills list
+
 
 OUTPUT FORMAT:
 Return ONLY a valid JSON array with NO additional text, markdown, or explanations.
@@ -257,6 +370,305 @@ function parseAIResponse(text) {
 }
 
 /**
+ * Generate ONE batch of MCQs from Bedrock
+ */
+async function generateMcqBatch({
+  internshipTitle,
+  internshipDescription,
+  skills,
+  questionCount,
+  difficulty,
+  excludeConcepts = [],
+  relaxUniqueness = false,
+  attemptNumber = 1,
+  focusArea = null, // NEW
+}) {
+  // Extract key concepts from existing questions
+  const existingConcepts = excludeConcepts.map(q => {
+    // Try to extract the core concept/topic
+    const lowerQ = q.toLowerCase();
+    
+    // Pattern 1: "what/which/how is/are X?" -> extract X
+    let match = lowerQ.match(/(?:what|which|how|why)\s+(?:is|are|does|do|can|would)\s+(.+?)(?:\?|used|important|effective|appropriate)/i);
+    if (match) return match[1].trim();
+    
+    // Pattern 2: "purpose/role of X" -> extract X
+    match = lowerQ.match(/(?:purpose|role|advantage|benefit|use)\s+of\s+(.+?)(?:\?|in|for)/i);
+    if (match) return match[1].trim();
+    
+    // Pattern 3: "how to handle/address X" -> extract X
+    match = lowerQ.match(/(?:handle|address|solve|improve|optimize)\s+(.+?)(?:\?|in|using)/i);
+    if (match) return match[1].trim();
+    
+    // Pattern 4: "X technique/algorithm/method" -> extract X
+    match = lowerQ.match(/(?:using|applying|implementing)\s+(.+?)(?:\s+technique|\s+algorithm|\s+method|\s+in|\?)/i);
+    if (match) return match[1].trim();
+    
+    // Fallback: just take key words
+    return lowerQ
+      .replace(/^(what|which|how|why|when|describe|explain|identify)\s+/i, '')
+      .replace(/\?.*$/, '')
+      .split(' ')
+      .filter(w => w.length > 4)
+      .slice(0, 5)
+      .join(' ');
+  }).filter(Boolean).slice(-20); // Keep last 20 to avoid prompt bloat
+
+  const exclusionText =
+  existingConcepts.length > 0
+    ? `
+⚠️ CRITICAL EXCLUSION RULES - GENERATE COMPLETELY NEW QUESTIONS:
+
+You have ALREADY asked about these concepts - DO NOT repeat them:
+${existingConcepts.map((c, i) => `${i + 1}. ${c}`).join("\n")}
+
+MANDATORY REQUIREMENTS:
+- Test COMPLETELY DIFFERENT concepts, features, or scenarios
+- Use DIFFERENT topics from the skills list
+- DO NOT rephrase or reword existing concepts
+- If stuck, focus on: debugging, optimization, edge cases, real-world scenarios, comparisons, trade-offs
+`
+    : "";
+
+const diversityBoost = attemptNumber > 5
+  ? `
+🎯 DIVERSITY BOOST (Attempt ${attemptNumber}):
+Since this is attempt #${attemptNumber}, you MUST be more creative:
+- Use scenario-based questions with realistic examples
+- Ask about edge cases, best practices, or performance considerations  
+- Cover advanced features, patterns, or architectural decisions
+- Test debugging, optimization, or security aspects
+- Include comparison questions between different approaches
+`
+  : "";
+
+const relaxationText = relaxUniqueness
+  ? `
+🔓 RELAXED MODE:
+- You may reference similar technologies or concepts
+- BUT the specific question and learning objective must be UNIQUE
+- Focus on practical application, troubleshooting, or real-world scenarios
+`
+  : "";
+
+
+  const prompt =
+    buildAssessmentPrompt({
+      internshipTitle,
+      internshipDescription,
+      skills,
+      questionCount,
+      difficulty,
+      focusArea, // NEW
+    }) +
+    "\n" +
+    exclusionText +
+    "\n" +
+    diversityBoost +
+    "\n" +
+    relaxationText;
+
+  const modelId =
+    process.env.BEDROCK_MODEL_ID ||
+    "anthropic.claude-3-haiku-20240307-v1:0";
+
+  // Increase temperature after multiple failed attempts to boost creativity
+  const baseTemperature = 0.7;
+  const temperatureBoost = attemptNumber > 5 ? Math.min(0.2, (attemptNumber - 5) * 0.05) : 0;
+  const finalTemperature = Math.min(baseTemperature + temperatureBoost, 1.0);
+
+  const command = new InvokeModelCommand({
+    modelId,
+    contentType: "application/json",
+    accept: "application/json",
+    body: JSON.stringify({
+      anthropic_version: "bedrock-2023-05-31",
+      max_tokens: 8192,
+      temperature: finalTemperature,
+      messages: [{ role: "user", content: prompt }],
+      system:
+        "You are a strict JSON generator. You MUST output a COMPLETE, VALID JSON array. " +
+        "Do NOT stop early. Do NOT include commentary. " +
+        "Generate UNIQUE questions that have NOT been asked before. " +
+        "If you cannot finish, reduce detail but ALWAYS close the JSON array.",
+    }),
+  });
+
+  let response;
+  try {
+    response = await client.send(command);
+  } catch (err) {
+    console.error("❌ Bedrock call failed:", err);
+    throw err;
+  }
+
+  const raw = JSON.parse(Buffer.from(response.body).toString("utf-8"));
+  const text = raw?.content?.[0]?.text || "";
+
+  if (!text) {
+    console.warn("⚠️ Empty response from Bedrock");
+    return [];
+  }
+
+  let parsed;
+  try {
+    parsed = parseAIResponse(text);
+  } catch (err) {
+    console.warn("⚠️ Partial/invalid JSON from AI. Retrying batch...");
+    return [];
+  }
+
+  if (!Array.isArray(parsed) || parsed.length === 0) {
+    return [];
+  }
+
+  return parsed;
+}
+
+
+async function generateUntilExactCount({
+  internshipTitle,
+  internshipDescription,
+  skills,
+  difficulty,
+  questionCount,
+}) {
+  let allQuestions = [];
+  const maxAttempts = 20;
+  let consecutiveZeros = 0; // Track consecutive failed attempts
+
+  console.log(`🎯 Target: ${questionCount} questions`);
+  console.log(`📚 Available skills: ${skills.join(", ")}`);
+
+  // Phase 1: Generate with topic rotation for diversity
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const remaining = questionCount - allQuestions.length;
+    if (remaining <= 0) break;
+
+    // Early exit if stuck (5 consecutive attempts with 0 new questions)
+    if (consecutiveZeros >= 5) {
+      console.log(`⚠️ Stuck after ${attempt} attempts - moving to Phase 2`);
+      break;
+    }
+
+    // Rotate through skills to force diversity
+    const focusSkill = skills.length > 0 ? skills[(attempt - 1) % skills.length] : null;
+    
+    // Request more questions than needed to account for deduplication
+    const batchSize = Math.min(Math.ceil(remaining * 1.3), 10);
+    
+    console.log(`📦 Attempt ${attempt}/${maxAttempts}: Requesting ${batchSize} questions focusing on "${focusSkill}" (have ${allQuestions.length}/${questionCount})`);
+
+    const batch = await generateMcqBatch({
+      internshipTitle,
+      internshipDescription,
+      skills,
+      difficulty,
+      questionCount: batchSize,
+      excludeConcepts: allQuestions.map(q => q.question),
+      relaxUniqueness: false,
+      attemptNumber: attempt,
+      focusArea: focusSkill,
+    });
+
+    const beforeCount = allQuestions.length;
+    
+    // First deduplicate within the batch itself
+    const uniqueBatch = deduplicateQuestions(batch);
+    
+    // Then deduplicate against existing questions
+    allQuestions = deduplicateQuestions([...allQuestions, ...uniqueBatch]);
+    
+    const addedCount = allQuestions.length - beforeCount;
+    
+    console.log(`✅ Added ${addedCount} unique questions (total: ${allQuestions.length}/${questionCount})`);
+
+    // Track consecutive failures
+    if (addedCount === 0) {
+      consecutiveZeros++;
+    } else {
+      consecutiveZeros = 0; // Reset on success
+    }
+
+    // Early exit if we have enough
+    if (allQuestions.length >= questionCount) {
+      break;
+    }
+
+    // Small delay to avoid rate limits
+    await new Promise(resolve => setTimeout(resolve, 300));
+  }
+
+  // Phase 2: Relaxed uniqueness for remaining questions
+  if (allQuestions.length < questionCount) {
+    const remaining = questionCount - allQuestions.length;
+    console.log(`🔄 Phase 2: Need ${remaining} more questions with relaxed uniqueness`);
+    consecutiveZeros = 0; // Reset counter
+
+    for (let attempt = 1; attempt <= 8; attempt++) { // Increased from 5 to 8
+      const needed = questionCount - allQuestions.length;
+      if (needed <= 0) break;
+
+      // Early exit if stuck in Phase 2
+      if (consecutiveZeros >= 3) {
+        console.log(`⚠️ Phase 2 stuck - accepting ${allQuestions.length} questions`);
+        break;
+      }
+
+      console.log(`📦 Relaxed attempt ${attempt}/8: Requesting ${needed} questions`);
+
+      const topUp = await generateMcqBatch({
+        internshipTitle,
+        internshipDescription,
+        skills,
+        difficulty,
+        questionCount: needed,
+        excludeConcepts: allQuestions.map(q => q.question),
+        relaxUniqueness: true,
+        attemptNumber: attempt + 20, // Continue numbering from Phase 1
+        focusArea: null, // No focus in relaxed mode
+      });
+
+      const beforeCount = allQuestions.length;
+      
+      // First deduplicate within the batch
+      const uniqueTopUp = deduplicateQuestions(topUp);
+      
+      // Then deduplicate against existing questions
+      allQuestions = deduplicateQuestions([...allQuestions, ...uniqueTopUp]);
+      
+      const addedCount = allQuestions.length - beforeCount;
+      
+      console.log(`✅ Added ${addedCount} questions (total: ${allQuestions.length}/${questionCount})`);
+
+      if (addedCount === 0) {
+        consecutiveZeros++;
+      } else {
+        consecutiveZeros = 0;
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 300));
+    }
+  }
+
+  console.log(`✨ Final count: ${allQuestions.length}/${questionCount} questions`);
+  
+  // Final quality check: ensure no semantic duplicates slipped through
+  console.log(`🔍 Running final duplicate check...`);
+  const finalUnique = deduplicateQuestions(allQuestions);
+  
+  if (finalUnique.length < allQuestions.length) {
+    console.log(`⚠️ Removed ${allQuestions.length - finalUnique.length} semantic duplicates in final check`);
+    allQuestions = finalUnique;
+  } else {
+    console.log(`✅ No duplicates found in final set`);
+  }
+  
+  return allQuestions.slice(0, questionCount);
+}
+
+
+/**
  * Main AI MCQ generator with improved error handling and validation
  */
 async function generateMcqSetAI({
@@ -266,115 +678,47 @@ async function generateMcqSetAI({
   questionCount = 10,
   difficulty = 2,
 }) {
-  // Input validation
-  if (!internshipTitle || !internshipDescription) {
-    throw new Error("Internship title and description are required");
-  }
-
-  if (questionCount < 5 || questionCount > 50) {
-    throw new Error("Question count must be between 5 and 50");
-  }
-
-  if (![1, 2, 3].includes(difficulty)) {
-    throw new Error("Difficulty must be 1, 2, or 3");
-  }
-
-  const prompt = buildAssessmentPrompt({
+  const rawQuestions = await generateUntilExactCount({
     internshipTitle,
     internshipDescription,
     skills,
+    difficulty,
     questionCount,
-    difficulty
   });
 
-  // ✅ FIX: Use cross-region inference profile ARN or fallback models
-  const modelId = process.env.BEDROCK_MODEL_ID || 
-    // Haiku is the most reliable and cost-effective option
-    "anthropic.claude-3-haiku-20240307-v1:0";
-    // Alternative: "us.anthropic.claude-3-5-sonnet-20241022-v2:0" (cross-region profile)
-    // Alternative: "anthropic.claude-3-sonnet-20240229-v1:0" (older but stable)
-
-  const command = new InvokeModelCommand({
-    modelId,
-    contentType: "application/json",
-    accept: "application/json",
-    body: JSON.stringify({
-      anthropic_version: "bedrock-2023-05-31",
-      max_tokens: 4000,
-      temperature: 0.7, // Slightly higher for more creative questions
-      messages: [
-        { role: "user", content: prompt }
-      ],
-      system: "You are a JSON generator. You must respond only with valid JSON arrays. No other text is allowed."
-    }),
-  });
-
-  let response;
-  try {
-    response = await client.send(command);
-  } catch (error) {
-    console.error("❌ Bedrock API error:", error);
-    throw new Error(`Failed to call Bedrock API: ${error.message}`);
+  // Relaxed threshold: accept 70% instead of 90%
+  const minAcceptable = Math.floor(questionCount * 0.7);
+  
+  if (rawQuestions.length < minAcceptable) {
+    throw new Error(
+      `AI produced too few questions (${rawQuestions.length}/${questionCount}). Minimum required: ${minAcceptable}`
+    );
   }
 
-  const raw = JSON.parse(Buffer.from(response.body).toString("utf-8"));
-  const text = raw?.content?.[0]?.text || "";
-
-  if (!text) {
-    throw new Error("Empty response from Bedrock");
+  // If we don't have exactly the right count, warn but continue
+  if (rawQuestions.length < questionCount) {
+    console.warn(`⚠️ Generated ${rawQuestions.length}/${questionCount} questions (${Math.round(rawQuestions.length/questionCount*100)}%)`);
   }
 
-  // Parse AI response
-  let parsed;
-  try {
-    parsed = parseAIResponse(text);
-  } catch (error) {
-    console.error("❌ Parse error. Raw response:", text.substring(0, 1000));
-    throw error;
-  }
-
-  if (!Array.isArray(parsed) || parsed.length === 0) {
-    throw new Error("AI returned empty or invalid question array");
-  }
-
-  // Validate each question
-  const allErrors = [];
-  parsed.forEach((q, index) => {
-    const errors = validateQuestion(q, index);
-    allErrors.push(...errors);
-  });
-
-  if (allErrors.length > 0) {
-    console.warn("⚠️ Question validation warnings:", allErrors);
-    // Optionally throw if errors are critical
-    // throw new Error(`Question validation failed: ${allErrors.join("; ")}`);
-  }
-
-  // Remove duplicates
-  const uniqueQuestions = deduplicateQuestions(parsed);
-  if (uniqueQuestions.length < questionCount * 0.8) {
-    console.warn(`⚠️ Only ${uniqueQuestions.length} unique questions generated (expected ${questionCount})`);
-  }
-
-  // Transform to final format with secure hashing
-  return uniqueQuestions.map((q) => {
+  return rawQuestions.map((q) => {
     const correctIndex = Number(q.correctIndex);
 
     return {
       questionId: uid("q"),
       question: q.question.trim(),
-      options: q.options.map(o => String(o).trim()),
-      correctIndexHash: sha256WithSalt(correctIndex), // ✅ Secure hash
+      options: q.options.map((o) => String(o).trim()),
+      correctIndexHash: sha256WithSalt(correctIndex),
       explanation: `AI generated (Difficulty: ${difficulty})`,
       metadata: {
         domain: q.domain || "general",
         bloomLevel: q.bloomLevel || "apply",
-        difficulty: difficulty,
-        generatedAt: new Date()
-      }
+        difficulty,
+        generatedAt: new Date(),
+      },
     };
   });
 }
+
 
 module.exports = { 
   generateMcqSetAI,
