@@ -229,52 +229,6 @@ export const ShortlistedTable = ({ candidates, internshipId }) => {
 }, [activeLevel, internshipId]);
 
 
-  // Load pipeline L2/L3 when tab changes
-  useEffect(() => {
-    const loadPipeline = async () => {
-      if (!internshipId) return;
-      if (activeLevel === "L1") return;
-
-      setPipelineLoading(true);
-      try {
-        if (activeLevel === "L2") {
-          const items = await fetchPipelineByStage(internshipId, "L2");
-          setL2Items(items);
-
-          // also load offer statuses for these students
-          const ids = items.map((x) => x?.studentId?._id || x?.studentId).filter(Boolean);
-          if (ids.length) {
-            const map = await checkOfferStatuses(ids, internshipId);
-            setOfferStatuses((prev) => ({ ...prev, ...(map || {}) }));
-          }
-        }
-
-        if (activeLevel === "L3") {
-          const items = await fetchPipelineByStage(internshipId, "L3");
-          setL3Items(items);
-
-          const ids = items.map((x) => x?.studentId?._id || x?.studentId).filter(Boolean);
-          if (ids.length) {
-            const map = await checkOfferStatuses(ids, internshipId);
-            setOfferStatuses((prev) => ({ ...prev, ...(map || {}) }));
-          }
-        }
-
-        const [offerItems, setOfferItems] = useState([]);
-
-      } catch (e) {
-        console.error("Pipeline load failed:", e);
-      } finally {
-        setPipelineLoading(false);
-      }
-    };
-
-    loadPipeline();
-  }, [activeLevel, internshipId]);
-
-
-
-
 
   // Bulk selection handlers (Level 1 only)
   const handleSelectAll = (e) => {
