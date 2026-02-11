@@ -12,6 +12,7 @@ import CertificateTemplate from "./CertificateTemplate";
 import { API_BASE, GOOGLE_AUTH_URL } from "../../../../config";
 import CalendarSyncStatus from "./calendarsyncstatus";
 import StipendDetailsModal from "./StipendDetailsModal"; // <--- IMPORTED MODAL
+import OfferLetterCardpaid from "./OfferLetterCardpaid"; // <--- NEW PAID SCHEDULE MODAL
 
 import {
   faMapMarkerAlt,
@@ -111,6 +112,62 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
   const [showAuthLinkedModal, setShowAuthLinkedModal] = useState(false);
   const submitLockRef = useRef(false);
 
+  // ✅ NEW: local mirror for preferred time slot (so UI updates immediately without refresh)
+  const [preferredSlotLocal, setPreferredSlotLocal] = useState(
+    offer?.preferredTimeSlot || offer?.selectedTimeSlot || null
+  );
+
+  useEffect(() => {
+    setPreferredSlotLocal(offer?.preferredTimeSlot || offer?.selectedTimeSlot || null);
+  }, [offer?.preferredTimeSlot, offer?.selectedTimeSlot]);
+
+  // ✅ NEW: For FREE + STIPEND — accept immediately and open schedule (no confirmation/time-slot modal)
+  const acceptAndOpenSchedule = async () => {
+    if (loading) return;
+
+    try {
+      setLoading(true);
+
+      // 1) Accept offer (FREE/STIPEND => no paymentId, no preferredTimeSlot)
+      await axios.patch(
+        `/api/offer-letters/${offer._id}/status`,
+        { status: "Accepted" },
+        { withCredentials: true, timeout: 15000 }
+      );
+
+      onStatusChange("Accepted");
+      toast.success("✅ Offer accepted");
+
+      // 2) Fetch schedule immediately so modal shows data
+      const partnerId = job?.partnerId || job?.postedBy || job?.companyId;
+
+      if (partnerId && offer?.internshipId) {
+        setLoadingSchedule(true);
+        try {
+          const res = await axios.get(`/api/schedule/get-schedule`, {
+            params: { internshipId: offer.internshipId, partnerId },
+          });
+          setSchedule(res.data);
+        } catch (err) {
+          console.error("Failed to fetch schedule after accept:", err);
+        } finally {
+          setLoadingSchedule(false);
+        }
+      }
+
+      // 3) Open schedule modal
+      setShowScheduleModal(true);
+    } catch (err) {
+      console.error("Accept failed:", err);
+      toast.error(
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        "Failed to accept offer."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // 2. STIPEND-SPECIFIC STATE
   const [showStipendModal, setShowStipendModal] = useState(false);
@@ -308,6 +365,54 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
 
   // 4. STIPEND SUBMISSION HANDLER
   const handleStipendSubmission = async (formDetails) => {
+
+    // ✅ NEW: For FREE + STIPEND — accept immediately and open schedule (no confirmation/time-slot modal)
+    const acceptAndOpenSchedule = async () => {
+      if (loading) return;
+
+      try {
+        setLoading(true);
+
+        // 1) Accept offer (NO preferredTimeSlot, NO paymentId)
+        await axios.patch(
+          `/api/offer-letters/${offer._id}/status`,
+          { status: "Accepted" },
+          { withCredentials: true, timeout: 15000 }
+        );
+
+        onStatusChange("Accepted");
+        toast.success("✅ Offer accepted");
+
+        // 2) Fetch schedule immediately so modal shows data
+        const partnerId = job?.partnerId || job?.postedBy || job?.companyId;
+        if (partnerId && offer?.internshipId) {
+          setLoadingSchedule(true);
+          try {
+            const res = await axios.get(`/api/schedule/get-schedule`, {
+              params: { internshipId: offer.internshipId, partnerId },
+            });
+            setSchedule(res.data);
+          } catch (err) {
+            console.error("Failed to fetch schedule after accept:", err);
+          } finally {
+            setLoadingSchedule(false);
+          }
+        }
+
+        // 3) Open schedule modal
+        setShowScheduleModal(true);
+      } catch (err) {
+        console.error("Accept failed:", err);
+        toast.error(
+          err?.response?.data?.error ||
+          err?.response?.data?.message ||
+          "Failed to accept offer."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
     setShowStipendModal(false); // Close the modal immediately
     setLoading(true);
 
@@ -323,13 +428,14 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
       const res = await axios.post('/api/internship/stipend-details', payload);
 
       if (res.data.success) {
-        setStipendDetailsSubmitted(true); // Mark as submitted
-        toast.success('✅ Stipend details submitted! Ready to accept offer.');
+        setStipendDetailsSubmitted(true);
+        toast.success("✅ Stipend details submitted! Accepting offer...");
 
-        // Now, proceed to the time slot selection modal
-        setResponseType("Accepted");
-        setShowTimeModal(true);
-      } else {
+        // ✅ NEW: For STIPEND → directly accept + open schedule (NO time-slot modal)
+        await acceptAndOpenSchedule();
+      }
+
+      else {
         toast.error(res.data.message || 'Failed to submit stipend details.');
       }
     } catch (error) {
@@ -364,35 +470,29 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
   // OfferLetterCard.jsx (Inside handleRespond function)
 
   const handleRespond = (type) => {
+    // Reject stays same (confirmation modal)
     if (type !== "Accepted") {
       setResponseType(type);
       setShowModal(true);
       return;
     }
 
-    // ✅ PAID internship → force payment
-    if (
-      job?.internshipType === "PAID" &&
-      !paymentStatus?.paid
-    ) {
-      setShowPaymentModal(true);
+    // ✅ PAID internship → keep existing paid flow (payment → confirmation → time-slot)
+    if (job?.internshipType === "PAID") {
+      if (!paymentStatus?.paid) {
+        setShowPaymentModal(true);
+        return;
+      }
+
+      // Paid & already paid → show confirmation modal → then time slot modal
+      setResponseType(type);
+      setShowModal(true);
       return;
     }
 
-    // ✅ STIPEND internship → force details
-    if (
-      job?.internshipType === "STIPEND" &&
-      !stipendDetailsSubmitted
-    ) {
-      setShowStipendModal(true);
-      return;
-    }
-
-    // FREE or PAID(after payment) or STIPEND(after details)
-    setResponseType(type);
-    setShowModal(true);
+    // ✅ FREE + STIPEND → Accept should directly open schedule (no confirmation/time-slot)
+    acceptAndOpenSchedule();
   };
-
 
   const normalizeUrl = (url) => {
     if (!url) return "";
@@ -474,7 +574,15 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
     // ✅ Accepted → ONLY open time slot modal (NO PATCH here)
     if (responseType === "Accepted") {
       setShowModal(false);
-      setShowTimeModal(true);
+
+      // ✅ Only PAID uses time slot modal
+      if (job?.internshipType === "PAID") {
+        setShowTimeModal(true);
+        return;
+      }
+
+      // ✅ FREE/STIPEND fallback (shouldn't normally hit now, but safe)
+      acceptAndOpenSchedule();
       return;
     }
 
@@ -514,19 +622,22 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
     submitLockRef.current = true;
     setSavingTimeSlot(true);
 
-    // ✅ Close modal immediately for fast UX (save continues in background)
+    // ✅ Close modal immediately for fast UX
     setShowTimeModal(false);
+
+    // ✅ Optimistic UI update (so schedule shows selected slot instantly)
+    const previousSlot = preferredSlotLocal;
+    setPreferredSlotLocal(selectedTimeSlot);
 
     // ✅ Build smallest payload (only include paymentId for PAID)
     const payload = {
       status: "Accepted",
+      preferredTimeSlot: selectedTimeSlot,
     };
 
-    payload.preferredTimeSlot = selectedTimeSlot;
-
     if (job?.internshipType === "PAID") {
-      // Backend supports mongo _id OR paypalPaymentId string
-      payload.paymentId = paymentStatus?.mongoPaymentId || paymentStatus?.paypalPaymentId || null;
+      payload.paymentId =
+        paymentStatus?.mongoPaymentId || paymentStatus?.paypalPaymentId || null;
     }
 
     try {
@@ -543,6 +654,9 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
       setResponseType(null);
     } catch (error) {
       console.error("Failed to accept offer:", error);
+
+      // ❌ rollback optimistic UI update
+      setPreferredSlotLocal(previousSlot);
 
       // Re-open modal so user can retry (keep selected slot)
       setShowTimeModal(true);
@@ -791,10 +905,9 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
                     const isTodaySession = isValid(sessionDate) && isToday(sessionDate);
                     const rowRefKey = `${session.date}-${session.startTime}`;
 
-                    // ✅ For PAID internships, show student's preferred time slot (saved in OfferLetter)
-                    const savedPreferredSlot = offer?.preferredTimeSlot || offer?.selectedTimeSlot;
+                    // ✅ For PAID internships, show student's preferred time slot immediately (local state)
+                    const savedPreferredSlot = preferredSlotLocal;
 
-                    // Decide what to display in the "Time" column
                     const displayTime =
                       job?.internshipType === "PAID" && savedPreferredSlot
                         ? savedPreferredSlot
@@ -1314,13 +1427,12 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
         </p>
 
         {/* ✅ Selected Time Slot (only after accepted) */}
-        {offer?.status?.toLowerCase() === "accepted" &&
-          (offer?.preferredTimeSlot || offer?.selectedTimeSlot) && (
-            <p className="flex items-center">
-              <FontAwesomeIcon icon={faClock} className="mr-2" />
-              Selected Slot: {offer.preferredTimeSlot || offer.selectedTimeSlot}
-            </p>
-          )}
+        {offer?.status?.toLowerCase() === "accepted" && preferredSlotLocal && (
+          <p className="flex items-center">
+            <FontAwesomeIcon icon={faClock} className="mr-2" />
+            Selected Slot: {preferredSlotLocal}
+          </p>
+        )}
 
         <p>
           <FontAwesomeIcon icon={faDollarSign} className="mr-2" />
@@ -1384,8 +1496,8 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
         </div>
       )}
 
-      {/* Schedule Modal */}
-      {showScheduleModal && (
+      {/* ✅ Schedule Modal (FREE + STIPEND) — keep existing code SAME */}
+      {showScheduleModal && job?.internshipType !== "PAID" && (
         <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl relative p-6">
             <button
@@ -1395,10 +1507,7 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
               &times;
             </button>
             <h2 className="text-lg font-semibold mb-4 text-gray-800 flex items-center">
-              <FontAwesomeIcon
-                icon={faCalendarAlt}
-                className="mr-2 text-indigo-500"
-              />
+              <FontAwesomeIcon icon={faCalendarAlt} className="mr-2 text-indigo-500" />
               Internship Schedule
             </h2>
 
@@ -1480,6 +1589,18 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
           </div>
         </div>
       )}
+
+      {/* ✅ Schedule Modal (PAID) — isolated in OfferLetterCardpaid.js */}
+      <OfferLetterCardpaid
+        show={showScheduleModal && job?.internshipType === "PAID"}
+        onClose={() => setShowScheduleModal(false)}
+        renderSchedule={renderSchedule}
+        selectedLocation={selectedLocation}
+        setSelectedLocation={setSelectedLocation}
+        selectedSummary={selectedSummary}
+        setSelectedSummary={setSelectedSummary}
+        normalizeUrl={normalizeUrl}
+      />
 
       {/* Complete Internship Notice */}
       {showCompleteNotice && (

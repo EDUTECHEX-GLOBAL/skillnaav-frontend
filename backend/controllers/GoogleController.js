@@ -4,6 +4,7 @@ const { google } = require('googleapis');
 const TokenModel = require('../models/webapp-models/TokenModel');
 const jwt = require('jsonwebtoken');
 const InternshipScheduleModel = require('../models/webapp-models/InternshipScheduleModel');
+const OfferLetterModel = require('../models/webapp-models/offerLetterModel');
 
 const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET } = process.env;
 
@@ -48,6 +49,68 @@ function getProgress(internshipId, email) {
 }
 function clearProgress(internshipId, email) {
   syncProgressStore.delete(pk(internshipId, email));
+}
+
+// ✅ Detect PAID internship for the student (used to route to GoogleControllerPaid.js)
+function inferPaidFromOffer(offerDoc) {
+  if (!offerDoc) return false;
+
+  // 1) If you have a direct boolean in offer letter
+  if (offerDoc.isPaid === true) return true;
+
+  // 2) If you store internship type as a string in offer letter
+  const typeStr = String(
+    offerDoc.internshipType ||
+    offerDoc.internshipPlan ||
+    offerDoc.planType ||
+    offerDoc.paymentType ||
+    ""
+  ).trim().toLowerCase();
+
+  if (/paid|premium/i.test(typeStr)) return true;
+
+  // 3) If you store an amount/fee in offer letter
+  const amount = Number(
+    offerDoc.amount ||
+    offerDoc.price ||
+    offerDoc.fees ||
+    offerDoc.paidAmount ||
+    offerDoc.totalAmount ||
+    0
+  );
+
+  if (!Number.isNaN(amount) && amount > 0) return true;
+
+  return false;
+}
+
+async function isPaidInternshipForStudent({ internshipId, studentEmail }) {
+  try {
+    // Grab latest offer for this student+internship
+    const offerDoc = await OfferLetterModel.findOne({
+      internshipId,
+      email: studentEmail
+    }).sort({ updatedAt: -1 });
+
+    if (!offerDoc) return false;
+
+    // ✅ Strongest indicator in YOUR flow:
+    // confirmTimeSelection sends paymentId for PAID internships
+    if (offerDoc.paymentId) return true;
+
+    // Optional: if you store these
+    if (offerDoc.paypalPaymentId) return true;
+    if (offerDoc.payment?.paypalPaymentId || offerDoc.payment?.paymentId) return true;
+
+    // Optional: if you store internshipType on offer letter
+    const it = String(offerDoc.internshipType || "").trim().toUpperCase();
+    if (it === "PAID") return true;
+
+    // fallback to your older heuristic
+    return inferPaidFromOffer(offerDoc);
+  } catch (e) {
+    return false;
+  }
 }
 
 const googleAuth = (req, res) => {
@@ -474,8 +537,11 @@ async function upsertScheduleForStudent({
   internshipId,
   timetable,
   internshipTitle = 'Internship Schedule',
-  defaultEventLink = ''
+  defaultEventLink = '',
+  buildOnlineEvent: buildOnlineEventOverride,
+  buildOfflineEvent: buildOfflineEventOverride,
 }) {
+
   try {
     // 0) Load tokens
     const studentToken = await TokenModel.findOne({ email: studentEmail });
@@ -538,6 +604,15 @@ async function upsertScheduleForStudent({
     });
 
     const calendar = google.calendar({ version: 'v3', auth: oAuth2Client });
+
+    // ✅ Allow controller-specific event formatting (Paid can override)
+    const buildOnline = typeof buildOnlineEventOverride === 'function'
+      ? buildOnlineEventOverride
+      : buildOnlineEvent;
+
+    const buildOffline = typeof buildOfflineEventOverride === 'function'
+      ? buildOfflineEventOverride
+      : buildOfflineEvent;
 
     // 2) Validate timetable
     if (!Array.isArray(timetable) || timetable.length === 0) {
@@ -631,16 +706,16 @@ async function upsertScheduleForStudent({
 
       let baseEvent;
       if (slot.type === 'offline') {
-        baseEvent = buildOfflineEvent({ slot, dateStr, startDateTime, endDateTime, internshipTitle });
+        baseEvent = buildOffline({ slot, dateStr, startDateTime, endDateTime, internshipTitle });
       } else if (slot.type === 'online') {
-        baseEvent = buildOnlineEvent({ slot, dateStr, startDateTime, endDateTime, internshipTitle, finalEventLink });
+        baseEvent = buildOnline({ slot, dateStr, startDateTime, endDateTime, internshipTitle, finalEventLink });
       } else if (slot.type === 'hybrid') {
         baseEvent = (slot.location?.address)
-          ? buildOfflineEvent({ slot, dateStr, startDateTime, endDateTime, internshipTitle })
-          : buildOnlineEvent({ slot, dateStr, startDateTime, endDateTime, internshipTitle, finalEventLink });
+          ? buildOffline({ slot, dateStr, startDateTime, endDateTime, internshipTitle })
+          : buildOnline({ slot, dateStr, startDateTime, endDateTime, internshipTitle, finalEventLink });
       } else {
         // default to online formatting to be safe
-        baseEvent = buildOnlineEvent({ slot, dateStr, startDateTime, endDateTime, internshipTitle, finalEventLink });
+        baseEvent = buildOnline({ slot, dateStr, startDateTime, endDateTime, internshipTitle, finalEventLink });
       }
 
       const body = withExtendedProps(baseEvent, { internshipId, slot });
@@ -928,6 +1003,16 @@ const getSyncStatus = async (req, res) => {
 const updateScheduleInGoogleCalendar = async (req, res) => {
   try {
     const { internshipId, studentEmail } = req.body;
+
+    // ✅ Route PAID internships to GoogleControllerPaid.js (googleRoutes.js stays SAME)
+    const isPaid = await isPaidInternshipForStudent({ internshipId, studentEmail });
+    console.log("[/api/google/update-schedule] internshipId:", internshipId, "studentEmail:", studentEmail, "isPaid:", isPaid);
+
+    if (isPaid) {
+      // IMPORTANT: lazy-require to avoid circular dependency crash
+      const { updateScheduleInGoogleCalendarPaid } = require('./GoogleControllerPaid');
+      return updateScheduleInGoogleCalendarPaid(req, res);
+    }
 
     const studentToken = await TokenModel.findOne({ email: studentEmail });
     if (!studentToken?.tokens) {

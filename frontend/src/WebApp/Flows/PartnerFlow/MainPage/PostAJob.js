@@ -206,7 +206,7 @@ const PostAJob = () => {
     }
   };
 
-   // Duration calculator — pure function that accepts dates (stable callback)
+  // Duration calculator — pure function that accepts dates (stable callback)
   const calculateDuration = useCallback((startDate, endDateOrDuration) => {
     if (!startDate || !endDateOrDuration) {
       setFormData((prev) => ({ ...prev, duration: "" }));
@@ -398,10 +398,13 @@ const PostAJob = () => {
             Location
           </label>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* ✅ REPLACE OLD GRID WITH THIS NEW GRID */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
             {/* Country (US/CA only) */}
-            <div>
-              <label htmlFor="country" className="block text-gray-700 text-sm mb-1">Country *</label>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="country" className="block text-gray-700 text-sm">
+                Country *
+              </label>
               <select
                 id="country"
                 name="country"
@@ -412,8 +415,8 @@ const PostAJob = () => {
                   setCitySuggestions([]);
                 }}
                 required
-                className="w-full h-12 box-border p-3 border border-gray-300 rounded-lg bg-white text-gray-900
-               focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 focus:ring-offset-white"
+                className="!mt-0 w-full h-12 box-border p-3 border border-gray-300 rounded-lg bg-white text-gray-900
+          focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 focus:ring-offset-white"
               >
                 <option value="">Select</option>
                 <option value="United States">United States</option>
@@ -422,16 +425,18 @@ const PostAJob = () => {
             </div>
 
             {/* State / Province */}
-            <div>
-              <label htmlFor="state" className="block text-gray-700 text-sm mb-1">{stateLabel} *</label>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="state" className="block text-gray-700 text-sm">
+                {stateLabel} *
+              </label>
               <select
                 id="state"
                 name="state"
                 value={formData.state}
                 onChange={handleChange}
                 required
-                className="w-full h-12 box-border p-3 border border-gray-300 rounded-lg bg-white text-gray-900
-               focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 focus:ring-offset-white"
+                className="!mt-0 w-full h-12 box-border p-3 border border-gray-300 rounded-lg bg-white text-gray-900
+          focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 focus:ring-offset-white"
               >
                 <option value="" disabled>Select</option>
                 {stateList.map((s) => (
@@ -440,9 +445,12 @@ const PostAJob = () => {
               </select>
             </div>
 
-            {/* City with suggestions (country-filtered) */}
-            <div className="relative">
-              <label htmlFor="city" className="block text-gray-700 text-sm mb-1">City *</label>
+            {/* City */}
+            <div className="relative flex flex-col gap-1">
+              <label htmlFor="city" className="block text-gray-700 text-sm">
+                City *
+              </label>
+
               <input
                 id="city"
                 type="text"
@@ -450,17 +458,17 @@ const PostAJob = () => {
                 value={formData.city}
                 onChange={handleCityInputChange}
                 autoComplete="address-level2"
-                className="w-full h-12 box-border p-3 border border-gray-300 rounded-lg bg-white text-gray-900
-               focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 focus:ring-offset-white
-               relative z-[15]"
-                placeholder="Start typing city"
                 required
+                className="!mt-0 w-full h-12 box-border p-3 border border-gray-300 rounded-lg bg-white text-gray-900
+          focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 focus:ring-offset-white
+          relative z-[15]"
+                placeholder="Start typing city"
               />
 
               {citySuggestions.length > 0 && (
                 <ul
                   className="absolute z-[20] left-0 top-full w-full mt-2 max-h-48 overflow-y-auto
-                 bg-white border border-gray-300 rounded-lg shadow-lg"
+            bg-white border border-gray-300 rounded-lg shadow-lg"
                 >
                   {citySuggestions.map((city) => (
                     <li
