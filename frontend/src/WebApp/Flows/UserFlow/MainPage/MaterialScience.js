@@ -18,7 +18,7 @@ const MaterialScience = () => {
         const res = await axios.get("/api/interns/approved", {
           params: { isPremium: false, sector: "materials-science" },
         });
-        setInternships(res.data);
+        setInternships(res.data.data);
       } catch (err) {
         console.error("Error fetching sector internships:", err);
         setError("Failed to load internships");

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import {
   FaMapMarkerAlt, FaCalendarAlt, FaDollarSign, FaLaptopHouse, FaHeart,
@@ -16,27 +16,66 @@ const Internships = () => {
   const [error, setError] = useState(null);
   const [modalStatus, setModalStatus] = useState(null);
   const [selectedInternshipId, setSelectedInternshipId] = useState(null);
+
   const [applications, setApplications] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isFetchingApplications, setIsFetchingApplications] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const loadMoreRef = useRef(null);
 
-  useEffect(() => {
-    const fetchInternships = async () => {
-      console.log('📦 Fetching approved internships...');
-      try {
-        const response = await axios.get('/api/interns/approved');
-        console.log('✅ Internships fetched:', response.data);
-        setInternships(response.data);
-      } catch (err) {
-        console.error('❌ Failed to fetch internships:', err);
-        setError('Failed to load internships.');
-      } finally {
-        setLoading(false);
+useEffect(() => {
+  if (!hasMore || loading) return;
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting) {
+        fetchInternships(page + 1);
       }
-    };
+    },
+    { threshold: 1 }
+  );
 
-    fetchInternships();
+  if (loadMoreRef.current) {
+    observer.observe(loadMoreRef.current);
+  }
+
+  return () => {
+    if (loadMoreRef.current) {
+      observer.unobserve(loadMoreRef.current);
+    }
+  };
+}, [page, hasMore, loading]);
+
+
+  const fetchInternships = async (pageNumber = 1) => {
+    try {
+      setLoading(true);
+
+      const response = await axios.get('/api/interns/approved', {
+        params: { page: pageNumber },
+      });
+
+      setInternships(prev =>
+        pageNumber === 1
+          ? response.data.data
+          : [...prev, ...response.data.data]
+      );
+
+      setHasMore(response.data.hasMore);
+      setPage(response.data.page);
+    } catch (err) {
+      setError('Failed to load internships.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+    useEffect(() => {
+
+    fetchInternships(1);
   }, []);
+
 
   const openModal = async (status, internshipId) => {
     const token = localStorage.getItem('schoolAdminToken');
@@ -67,17 +106,17 @@ const Internships = () => {
       let response;
 
       if (status === 'Shortlisted') {
-  if (!internshipId || !schoolAdminId) {
-    console.error('❌ Missing required IDs:', { internshipId, schoolAdminId });
-    return;
-  }
+        if (!internshipId || !schoolAdminId) {
+          console.error('❌ Missing required IDs:', { internshipId, schoolAdminId });
+          return;
+        }
 
-  const url = `${SHORTLIST_API_BASE_URL}/partner/shortlisted/by-admin?internship_id=${internshipId}&school_admin_id=${schoolAdminId}`;
-  console.log(`🚀 Fetching Shortlisted Students from: ${url}`);
+        const url = `${SHORTLIST_API_BASE_URL}/partner/shortlisted/by-admin?internship_id=${internshipId}&school_admin_id=${schoolAdminId}`;
+        console.log(`🚀 Fetching Shortlisted Students from: ${url}`);
 
-  response = await axios.get(url, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+        response = await axios.get(url, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
         console.log('✅ Shortlisted API response:', response.data);
 
@@ -213,9 +252,23 @@ const Internships = () => {
           onClose={closeModal}
         />
       )}
+     {hasMore && (
+  <div
+    ref={loadMoreRef}
+    className="col-span-full h-10 flex justify-center items-center"
+  >
+    {loading && (
+      <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-purple-600" />
+    )}
+  </div>
+)}
+
+
+
     </div>
   );
 };
+
 
 const MiniStat = ({ icon, label, bg, onClick }) => (
   <div onClick={onClick} className={`flex items-center gap-1 px-2 py-1 rounded-md ${bg} cursor-pointer`}>

@@ -3,7 +3,7 @@ name: Deploy to Server
 on:
   push:
     branches:
-      - feature/lazyloading # Adjust the branch as necessary
+      - feture/schooladminbugs # Adjust the branch as necessary
 
 jobs:
   deploy:
@@ -22,5 +22,5 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@skillnaav.com << 'EOF'
             cd /home/ubuntu/
-            ./deploy.sh feature/lazyloading # Pass the branch name directly
+            ./deploy.sh feture/schooladminbugs # Pass the branch name directly
           EOF
