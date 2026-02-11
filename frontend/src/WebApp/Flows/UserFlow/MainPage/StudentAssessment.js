@@ -99,7 +99,7 @@ const StudentAssessment = () => {
       try {
         // ✅ FETCH BASIC INFO FIRST (from Applications API or different endpoint)
         const { data } = await axios.get(`/api/applications/assessment/${assessmentId}/status`);
-        
+
         // Create minimal assessment object
         setAssessment({
           _id: assessmentId,
@@ -165,13 +165,13 @@ const StudentAssessment = () => {
         setMode("instructions");
       } catch (err) {
         console.error("❌ Failed to fetch assessment:", err);
-        
+
         // ✅ FALLBACK: Try direct fetch (might work if already started)
         if (err.response?.status === 404) {
           try {
             const { data } = await axios.get(`/api/l2-assessments/${assessmentId}`);
             setAssessment(data);
-            
+
             if (data.status === "started") {
               setMode("exam");
             } else {
@@ -184,7 +184,7 @@ const StudentAssessment = () => {
             return;
           }
         }
-        
+
         setError(err.response?.data?.message || "Failed to load assessment");
         setMode("error");
       }
@@ -283,7 +283,7 @@ const StudentAssessment = () => {
       }
 
       await enterFullscreen(document.documentElement);
-      
+
       // Set initial time
       setTimeLeft(fullAssessment.timeLimitMinutes * 60);
       setMode("exam");
@@ -557,9 +557,8 @@ const StudentAssessment = () => {
               {/* TIMER */}
               <div className="flex items-center gap-2">
                 <span
-                  className={`font-bold text-lg ${
-                    timeLeft < 60 ? "text-red-600 animate-pulse" : "text-gray-700"
-                  }`}
+                  className={`font-bold text-lg ${timeLeft < 60 ? "text-red-600 animate-pulse" : "text-gray-700"
+                    }`}
                 >
                   ⏱ {formatTime(timeLeft)}
                 </span>
@@ -594,18 +593,16 @@ const StudentAssessment = () => {
                   key={idx}
                   onClick={() => selectAnswer(q.questionId, idx)}
                   className={`flex items-center gap-4 p-4 rounded-lg border cursor-pointer transition
-                    ${
-                      answers[q.questionId] === idx
-                        ? "border-purple-600 bg-purple-50"
-                        : "border-gray-300 hover:bg-gray-50"
+                    ${answers[q.questionId] === idx
+                      ? "border-purple-600 bg-purple-50"
+                      : "border-gray-300 hover:bg-gray-50"
                     }`}
                 >
                   <div
                     className={`w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0
-                      ${
-                        answers[q.questionId] === idx
-                          ? "border-purple-600"
-                          : "border-gray-400"
+                      ${answers[q.questionId] === idx
+                        ? "border-purple-600"
+                        : "border-gray-400"
                       }`}
                   >
                     {answers[q.questionId] === idx && (
@@ -653,10 +650,9 @@ const StudentAssessment = () => {
                 onClick={() => handleSubmit(false)}
                 disabled={submitting}
                 className={`px-8 py-2 rounded text-white font-semibold
-                  ${
-                    submitting
-                      ? "bg-gray-400 cursor-not-allowed"
-                      : "bg-green-600 hover:bg-green-700"
+                  ${submitting
+                    ? "bg-gray-400 cursor-not-allowed"
+                    : "bg-green-600 hover:bg-green-700"
                   }
                 `}
               >
@@ -684,10 +680,9 @@ const StudentAssessment = () => {
                   key={qItem.questionId}
                   onClick={() => setCurrentQ(idx)}
                   className={`py-2 rounded text-sm font-semibold transition
-                    ${
-                      idx === currentQ
-                        ? "bg-purple-600 text-white"
-                        : answers[qItem.questionId] !== undefined
+                    ${idx === currentQ
+                      ? "bg-purple-600 text-white"
+                      : answers[qItem.questionId] !== undefined
                         ? "bg-green-100 text-green-700 hover:bg-green-200"
                         : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                     }`}

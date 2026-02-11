@@ -425,20 +425,20 @@ async function submitAssessment(req, res) {
           {
             $set: gradeResult.pass
               ? {
-                  stage: "L3",
-                  "l2.status": "passed",
-                  "l2.score": gradeResult.mcqScore,
-                  "l2.updatedAt": new Date(),
-                  "l3.enabled": true,
-                  "l3.status": "pending",
-                  "l3.updatedAt": new Date(),
-                }
+                stage: "L3",
+                "l2.status": "passed",
+                "l2.score": gradeResult.mcqScore,
+                "l2.updatedAt": new Date(),
+                "l3.enabled": true,
+                "l3.status": "pending",
+                "l3.updatedAt": new Date(),
+              }
               : {
-                  stage: "L2",
-                  "l2.status": "rejected",
-                  "l2.score": gradeResult.mcqScore,
-                  "l2.updatedAt": new Date(),
-                },
+                stage: "L2",
+                "l2.status": "rejected",
+                "l2.score": gradeResult.mcqScore,
+                "l2.updatedAt": new Date(),
+              },
           },
           { upsert: true }
         );
@@ -567,20 +567,20 @@ async function evaluateAssessment(req, res) {
       {
         $set: gradeResult.pass
           ? {
-              stage: "L3",
-              "l2.status": "passed",
-              "l2.score": gradeResult.mcqScore,
-              "l2.updatedAt": new Date(),
-              "l3.enabled": true,
-              "l3.status": "pending",
-              "l3.updatedAt": new Date(),
-            }
+            stage: "L3",
+            "l2.status": "passed",
+            "l2.score": gradeResult.mcqScore,
+            "l2.updatedAt": new Date(),
+            "l3.enabled": true,
+            "l3.status": "pending",
+            "l3.updatedAt": new Date(),
+          }
           : {
-              stage: "L2",
-              "l2.status": "rejected",
-              "l2.score": gradeResult.mcqScore,
-              "l2.updatedAt": new Date(),
-            },
+            stage: "L2",
+            "l2.status": "rejected",
+            "l2.score": gradeResult.mcqScore,
+            "l2.updatedAt": new Date(),
+          },
       },
       { upsert: true }
     );
@@ -614,7 +614,7 @@ async function evaluateAssessment(req, res) {
 async function getAssessmentForStudent(req, res) {
   try {
     const { id } = req.params;
-    
+
     if (!isValidObjectId(id)) {
       return res.status(400).json({ message: "Invalid assessment id" });
     }
@@ -625,7 +625,7 @@ async function getAssessmentForStudent(req, res) {
     }
 
     // ✅ DIFFERENT RESPONSES BASED ON STATUS
-    
+
     // CASE 1: Not started yet (generated/sent) - Send MINIMAL info
     if (assessment.status === "generated" || assessment.status === "sent") {
       return res.json({
@@ -745,5 +745,6 @@ module.exports = {
   evaluateAssessment,
   trackSuspiciousActivity,
 };
+
 // for ec2 hit
 //for ci/cd pipeline testing
