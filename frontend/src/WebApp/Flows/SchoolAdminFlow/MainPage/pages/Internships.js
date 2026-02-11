@@ -160,8 +160,8 @@ useEffect(() => {
 
         console.log('✅ Applied API response:', response.data);
 
-        const filtered = response.data.applications.filter(app => app.status === status);
-        setApplications(filtered);
+      setApplications(response.data.applications);
+
       }
     } catch (err) {
       console.error('❌ Error fetching applications:', err);

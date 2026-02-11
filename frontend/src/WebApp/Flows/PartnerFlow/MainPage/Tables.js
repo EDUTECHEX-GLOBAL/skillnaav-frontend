@@ -143,7 +143,7 @@ export const ShortlistedTable = ({ candidates, internshipId }) => {
   // Offer status (shared across all levels)
   const [selectedStudents, setSelectedStudents] = useState([]);
   const [offerStatuses, setOfferStatuses] = useState({});
-  const [loadingStatuses, setLoadingStatuses] = useState({});
+ const [loadingStatuses] = useState({});
   const [isLoadingAll, setIsLoadingAll] = useState(false);
   const [showOfferModal, setShowOfferModal] = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
@@ -177,7 +177,7 @@ export const ShortlistedTable = ({ candidates, internshipId }) => {
   });
 
   // L3 link
-  const [interviewLink, setInterviewLink] = useState("");
+ 
 
 
   // ✅ Deduplicate by student_id (safer than email)
@@ -187,6 +187,34 @@ export const ShortlistedTable = ({ candidates, internshipId }) => {
         index === self.findIndex((s) => s.student_id === student.student_id)
     );
   }, [candidates]);
+
+useEffect(() => {
+  const loadOfferStatuses = async () => {
+    if (!internshipId) return;
+
+    const ids = uniqueCandidates.map(s => s.student_id).filter(Boolean);
+
+    if (ids.length === 0) return;
+
+    setIsLoadingAll(true);
+
+    try {
+      const statusMap = await checkOfferStatuses(ids, internshipId);
+
+      // ✅ merge instead of overwrite
+      setOfferStatuses(prev => ({
+        ...prev,
+        ...statusMap,
+      }));
+    } catch (err) {
+      console.error("Failed to load offer statuses:", err);
+    } finally {
+      setIsLoadingAll(false);
+    }
+  };
+
+  loadOfferStatuses();
+}, [internshipId, uniqueCandidates]);
 
   // =========================
   // Application Counts
