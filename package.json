@@ -109,6 +109,5 @@
     "eslint-plugin-unused-imports": "^4.3.0",
     "globals": "^16.5.0",
     "postcss": "^8.4.38"
-  },
-  "proxy": "http://localhost:5000/"
+  }
 }
