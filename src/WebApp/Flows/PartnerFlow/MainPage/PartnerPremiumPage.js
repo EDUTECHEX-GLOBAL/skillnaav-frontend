@@ -1,0 +1,340 @@
+// src/components/Partner/PartnerPremiumPage.js
+import React, { useState, useEffect } from "react";
+import axios from "axios";
+import Check from "../../../../assets/check.svg";
+import { useSelector } from "react-redux";
+
+const PAYPAL_CLIENT_ID = process.env.REACT_APP_PAYPAL_CLIENT_ID;
+
+const plans = [
+  {
+    title: "Freemium Partner",
+    price: "0.00",
+    duration: 0,
+    features: [
+      "Post up to 2 active internships",
+      "Free & Stipend-Based internships only",
+      "Manual shortlisting of applicants",
+      "Basic internship scheduling tools",
+      "Send standard offer letters",
+      "Mentor details visible on listing",
+      "Admin approval required for posting",
+      "Email-only support",
+      "Application notifications (basic)",
+    ],
+    btnText: "You’re Already on Free",
+    disabled: true,
+    bg: "bg-gray-50",
+    border: "border-gray-200",
+  },
+
+  // ⭐ UPDATED DURATION: 2 DAYS
+  {
+    title: "Premium Basic",
+    price: "9.99",
+    duration: 2, // <-- changed from 1 month to 2 days
+    features: [
+      "Unlimited internship postings",
+      "Free, Stipend-Based & Paid internships",
+      "Manual + Basic AI shortlisting tool",
+      "Structured internship scheduling",
+      "Customizable offer letter templates",
+      "Logo visibility on internship cards",
+      "Priority admin approval for job posts",
+      "View basic analytics (views, applications)",
+      "Priority email support",
+    ],
+    btnText: "Upgrade to Premium Basic",
+    disabled: false,
+    bg: "bg-purple-50",
+    border: "border-purple-300",
+  },
+
+  // ⭐ UPDATED DURATION: 5 DAYS
+  {
+    title: "Premium Plus",
+    price: "19.99",
+    duration: 5, // <-- changed from 1 month to 5 days
+    features: [
+      "All Premium Basic features",
+      "Advanced AI-powered shortlisting",
+      "Calendar-synced scheduling with auto updates",
+      "Smart offer letters with acceptance tracking",
+      "Featured internship posts with highlight badge",
+      "Full analytics: engagement & drop-off metrics",
+      "Downloadable resume books",
+      "Monthly insight reports to email",
+      "Real-time notifications for applications",
+      "Live chat & email support",
+    ],
+    btnText: "Upgrade to Premium Plus",
+    disabled: false,
+    bg: "bg-orange-50",
+    border: "border-orange-300",
+  },
+];
+
+
+export default function PartnerPremiumPage() {
+  const [sdkReady, setSdkReady] = useState(false);
+  const [alert, setAlert] = useState(null);
+  const [selectedIndex, setSelectedIndex] = useState(null);
+  const [paymentData, setPaymentData] = useState(null);
+
+  const reduxPartner = useSelector((s) => s.auth?.partnerInfo);
+  const stored = JSON.parse(localStorage.getItem("userInfo") || "{}");
+  const partner = reduxPartner || stored;
+
+  // 1) Dynamically load the PayPal SDK
+useEffect(() => {
+  if (!PAYPAL_CLIENT_ID) {
+    setAlert({ type: "error", message: "PayPal Client ID not set. Check .env" });
+    return;
+  }
+
+  if (window.paypal) {
+    setSdkReady(true);
+    return;
+  }
+
+  const script = document.createElement("script");
+  script.src = `https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&currency=USD`;
+  script.async = true;
+  script.onload = () => setSdkReady(true);
+  script.onerror = () =>
+    setAlert({ type: "error", message: "Failed to load PayPal SDK. Check Client ID." });
+
+  document.body.appendChild(script);
+
+  return () => {
+    // 💡 SAFELY remove script tag
+    if (script && script.parentNode) {
+      script.parentNode.removeChild(script);
+    }
+  };
+}, []);
+
+
+  // 2) Whenever a plan is selected & SDK is ready, render its PayPalButtons
+  useEffect(() => {
+    if (selectedIndex === null || !sdkReady || !paymentData) return;
+    const containerId = `paypal-button-container-${selectedIndex}`;
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    container.innerHTML = "";
+
+    window.paypal
+      .Buttons({
+        createOrder: async () => {
+          try {
+            const { data } = await axios.post("/api/partner/payments/paypal/order", {
+              amount: paymentData.amount,
+              partnerId: paymentData.partner._id,
+              planType: paymentData.planType,
+              email: paymentData.partner.email,
+              duration: paymentData.duration,
+            });
+            return data.id;
+          } catch (err) {
+            console.error("Order creation failed:", err);
+            setAlert({ type: "error", message: "Unable to create PayPal order." });
+            throw err;
+          }
+        },
+        onApprove: async (data) => {
+  try {
+    const { data: verify } = await axios.post("/api/partner/payments/paypal/verify", {
+      orderID: data.orderID,
+      partnerId: paymentData.partner._id,
+      planType: paymentData.planType,
+      amount: paymentData.amount,
+      email: paymentData.partner.email,
+      duration: paymentData.duration,
+    });
+
+    if (verify.success) {
+      setAlert({ type: "success", message: "Payment verified successfully!" });
+      // update localStorage so UI reflects premium status
+      const updated = {
+        ...paymentData.partner,
+        isPremium: true,
+        planType: verify.partner.planType,
+        premiumExpiration: verify.partner.premiumExpiration,
+      };
+      localStorage.setItem("userInfo", JSON.stringify(updated));
+      // optionally update Redux store if you use it
+    } else if (verify.retry) {
+      // Payment instrument declined: ask user to try another funding source
+      setAlert({ type: "error", message: verify.message || "Payment was declined. Try another payment method." });
+      // keep selectedIndex the same so PayPal Buttons remain available to retry
+    } else {
+      setAlert({ type: "error", message: verify.message || "Payment verification failed." });
+    }
+  } catch (err) {
+    console.error("Verification failed:", err);
+    // If backend returned structured response inside err.response.data
+    const info = err.response?.data;
+    if (info?.retry) {
+      setAlert({ type: "error", message: info.message || "Payment declined. Try another funding source." });
+      // keep selectedIndex to allow retry
+      return;
+    }
+    setAlert({ type: "error", message: "Payment verification error." });
+  } finally {
+    // only hide PayPal button if success — otherwise leave to allow retry
+    if (localStorage.getItem("userInfo")?.isPremium) {
+      setSelectedIndex(null);
+    }
+  }
+},
+
+        onCancel: () => {
+          console.log("User canceled the payment");
+          setSelectedIndex(null);
+        },
+        onError: (err) => {
+          console.error("PayPal error:", err);
+          setAlert({ type: "error", message: "Payment failed. Try again." });
+          setSelectedIndex(null);
+        },
+      })
+      .render(`#${containerId}`);
+  }, [selectedIndex, paymentData, sdkReady]);
+
+  const selectPlan = (plan, idx) => {
+    if (!sdkReady) {
+      setAlert({ type: "error", message: "PayPal is still loading. Try again shortly." });
+      return;
+    }
+    // don’t re-render the free tier
+    if (plan.price === "0.00") return;
+    setPaymentData({ amount: plan.price, planType: plan.title, duration: plan.duration, partner });
+    setSelectedIndex(idx);
+  };
+
+  return (
+    <div className="p-6 font-poppins min-h-screen bg-white">
+      {alert && (
+        <div
+          className={`fixed top-4 right-4 p-3 rounded shadow ${
+            alert.type === "success" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+          }`}
+        >
+          {alert.message}
+        </div>
+      )}
+      <h2 className="text-2xl font-semibold text-center mb-8">Choose Your Partner Plan</h2>
+
+      {/* 🌟 Partner Premium Status Banner */}
+{partner.isPremium && (() => {
+  const exp = partner.premiumExpiration ? new Date(partner.premiumExpiration) : null;
+  const now = new Date();
+
+  let remainingText = "Expired";
+  if (exp && exp > now) {
+    const diff = exp - now;
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+    remainingText = `${days}d ${hours}h ${mins}m`;
+  }
+
+  return (
+    <div className="max-w-2xl mx-auto mb-6 p-5 rounded-lg shadow-md border-l-4 border-indigo-500 bg-indigo-50">
+      <h3 className="text-lg font-semibold text-indigo-800 flex items-center gap-2">
+        ⭐ Partner Premium Active — {partner.planType}
+      </h3>
+
+      <p className="text-indigo-700 mt-1">
+        Expires on:{" "}
+        <span className="font-semibold">
+          {exp
+            ? exp.toLocaleString("en-IN", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })
+            : "N/A"}
+        </span>
+      </p>
+
+      <p className="text-indigo-600 mt-1 font-medium">
+        Time Left: {remainingText}
+      </p>
+
+      {exp && exp < now && (
+        <button
+          className="mt-3 bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 transition"
+          onClick={() => setSelectedIndex(null)}
+        >
+          Renew Partner Premium
+        </button>
+      )}
+    </div>
+  );
+})()}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+       {plans.map((plan, idx) => {
+  const isCurrentPlan =
+    partner.isPremium &&
+    partner.planType === plan.title &&
+    new Date(partner.premiumExpiration) > new Date();
+
+  return (
+    <div
+      key={idx}
+      className={`border rounded-lg p-6 flex flex-col justify-between ${plan.bg} ${plan.border}`}
+    >
+      <div>
+        <h3 className="text-xl font-semibold mb-2">{plan.title}</h3>
+        {isCurrentPlan && (
+          <p className="text-sm text-green-600 mb-2">
+            Subscribed until{" "}
+            {new Date(partner.premiumExpiration).toLocaleDateString()}
+          </p>
+        )}
+        <p className="text-2xl font-bold text-orange-600 mb-1">${plan.price}</p>
+        <p className="text-sm text-gray-600 mb-4">
+          Duration: {plan.duration ? `${plan.duration} Days` : "Unlimited"}
+        </p>
+        <ul className="space-y-2 text-sm text-gray-700 mb-4">
+          {plan.features.map((f, i) => (
+            <li key={i} className="flex items-start gap-2">
+              <img src={Check} alt="✓" className="w-4 h-4 mt-1" />
+              {f}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <button
+        onClick={() => selectPlan(plan, idx)}
+        disabled={plan.disabled || isCurrentPlan}
+        className={`mt-4 py-2 rounded text-white ${
+          plan.disabled || isCurrentPlan
+            ? "bg-gray-400 cursor-not-allowed"
+            : "bg-orange-500 hover:bg-orange-600"
+        }`}
+      >
+        {isCurrentPlan
+          ? "Subscribed"
+          : plan.disabled
+          ? `On ${plan.title}`
+          : plan.btnText}
+      </button>
+
+      {selectedIndex === idx && (
+        <div id={`paypal-button-container-${idx}`} className="mt-4" />
+      )}
+    </div>
+  );
+})}
+
+      </div>
+    </div>
+  );
+}

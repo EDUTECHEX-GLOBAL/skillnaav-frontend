@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+
+/* input */
+input,
+textarea {
+  height: 40px;
+  border: 1px solid gray;
+  width: 100%;
+  padding-left: 20px;
+  margin-top: 20px;
+}
+
+input:focus {
+  outline: none;
+  border: 2px solid rgb(86, 65, 65);
+}
+textarea {
+  height: 100px;
+  padding: 10px;
+}
+
+/* ── custom utility ─────────────────────────────────────────── */
+@layer utilities {
+  .scrollbar-none {
+    /* Firefox / IE / Edge */
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    /* Chrome / Safari / Opera */
+    width: 0 !important;
+    height: 0 !important;
+    background: transparent;
+  }
+}
+/* index.css */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.Toastify__toast-container {
+  z-index: 99999 !important;
+}

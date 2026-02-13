@@ -1,0 +1,1532 @@
+// src/components/ScheduleForm.js
+import React, { useState, useEffect, useRef } from 'react';
+import { parseISO, isBefore, isToday } from 'date-fns';
+import {
+  FiCalendar,
+  FiClock,
+  FiLink,
+  FiChevronRight,
+  FiX,
+  FiMapPin
+} from 'react-icons/fi';
+import axios from 'axios';
+import * as XLSX from 'xlsx';
+import ScheduleFormPaid from './ScheduleFormPaid';
+
+const isPastDate = (dateString) => {
+  const date = parseISO(dateString);
+  return isBefore(date, new Date()) && !isToday(date);
+};
+
+// ✅ ADD THIS
+const isFutureDate = (dateString) => {
+  const date = parseISO(dateString);
+  // Treat TODAY as editable (same as future) after first save
+  return isToday(date) || !isBefore(date, new Date());
+};
+
+const allWeekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const internshipTypes = ['online', 'offline', 'hybrid'];
+
+const detectPricingBucket = (internship = {}) => {
+  // ✅ hard booleans (if you have them)
+  if (internship.isPaidInternship === true || internship.isPaid === true) return 'paid';
+
+  // ✅ try common string fields
+  const raw =
+    internship.internshipType ||          // often: Free / Stipend / Paid
+    internship.pricingType ||
+    internship.paymentType ||
+    internship.compensationType ||
+    internship.planType ||
+    internship.plan ||
+    '';
+
+  const v = String(raw).toLowerCase();
+
+  if (v.includes('paid')) return 'paid';
+  if (v.includes('stipend')) return 'stipend';
+  if (v.includes('free') || v.includes('unpaid')) return 'free';
+
+  // ✅ numeric fallback (only if your internship doc has amount fields)
+  const paidAmount = Number(internship.amount ?? internship.price ?? internship.fee ?? 0);
+  const stipendAmount = Number(internship.stipendAmount ?? internship.stipend ?? 0);
+
+  if (!Number.isNaN(paidAmount) && paidAmount > 0) return 'paid';
+  if (!Number.isNaN(stipendAmount) && stipendAmount > 0) return 'stipend';
+
+  return 'free';
+};
+
+/**
+ * Helper to render location fields (name, address, map link).
+ *
+ * @param {string} prefix       - prefix for the `name` attributes (e.g. "location" or `location-2`)
+ * @param {object} location     - object containing { name, address, mapLink }
+ * @param {function} handleChange - onChange handler that accepts e.target.name / e.target.value
+ */
+const renderLocationFields = (prefix, location, handleChange) => (
+  <div className="mt-4">
+    <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center">
+      <FiMapPin className="mr-2 text-indigo-600" />
+      <span className="mr-1">Location Details</span>
+      <span className="text-sm text-gray-400 font-normal">(Optional)</span>
+    </h4>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Location Name</label>
+        <input
+          type="text"
+          name={`${prefix}.name`}
+          value={location.name || ''}
+          onChange={handleChange}
+          placeholder="Building / Room Name"
+          className="block w-full pl-3 pr-3 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+        <input
+          type="text"
+          name={`${prefix}.address`}
+          value={location.address || ''}
+          onChange={handleChange}
+          placeholder="Full Address"
+          className="block w-full pl-3 pr-3 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Map Link</label>
+        <input
+          type="url"
+          name={`${prefix}.mapLink`}
+          value={location.mapLink || ''}
+          onChange={handleChange}
+          placeholder="https://maps.example.com/your-location"
+          className="block w-full pl-3 pr-3 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+        />
+      </div>
+    </div>
+  </div>
+);
+
+const ScheduleForm = ({ internshipId, onClose }) => {
+  // Form fields
+  const [form, setForm] = useState({
+    startDate: '',
+    endDate: '',
+    workHours: '',
+    defaultStartTimes: { online: '', offline: '', hybrid: '' },
+    defaultEndTimes: { online: '', offline: '', hybrid: '' },
+    defaultType: '', // online / offline / hybrid
+    selectedDays: allWeekdays.slice(),
+    newDate: '',
+    onlineEventLink: '',
+    offlineLocation: { name: '', address: '', mapLink: '' },
+    hybridEventLink: '',
+    hybridLocation: { name: '', address: '', mapLink: '' },
+    scheduleMode: 'manual', // ✅ manual | automated
+    isClosed: false
+  });
+
+  const [error, setError] = useState(null);
+  const [timetable, setTimetable] = useState([]);
+  const [previewed, setPreviewed] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [excelData, setExcelData] = useState({});
+  const previewContainerRef = useRef(null);
+  const todayRef = useRef(null);
+  const previewScrollRef = useRef(null);
+  const hasAutoScrolledRef = useRef(false);
+  const readOnly = !!form.isClosed;
+  const [isPersisted, setIsPersisted] = useState(false); // false until load/save
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [pricingBucket, setPricingBucket] = useState(null); // null | free | stipend | paid
+
+  // Default getters so preview toggles use the right source every time
+  const getDefaultEventLinkForType = (type) => {
+    if (type === 'online') {
+      // If the form is set to hybrid, use the hybrid link; otherwise use online link
+      return form.defaultType === 'hybrid' ? (form.hybridEventLink || '') : (form.onlineEventLink || '');
+    }
+    return ''; // offline doesn't use a link by default
+  };
+
+  const getDefaultLocationForType = (type) => {
+    if (type === 'offline') {
+      // If the form is set to hybrid, use the hybrid location; otherwise use offline location
+      const loc = form.defaultType === 'hybrid' ? form.hybridLocation : form.offlineLocation;
+      return loc && (loc.address || loc.name || loc.mapLink)
+        ? loc
+        : { name: '', address: '', mapLink: '' };
+    }
+    // for online we keep location empty
+    return { name: '', address: '', mapLink: '' };
+  };
+
+  useEffect(() => {
+    axios
+      .get(`/api/interns/${internshipId}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      })
+      .then(({ data }) => {
+        setPricingBucket(detectPricingBucket(data)); // ✅ ADD THIS
+
+        setForm(f => ({
+          ...f,
+          startDate: new Date(data.startDate).toISOString().split('T')[0],
+          endDate: new Date(data.endDateOrDuration).toISOString().split('T')[0],
+          // don't clobber the type loaded from saved schedule
+          defaultType: f.defaultType || data.type || 'online'
+        }));
+      })
+      .catch(err => {
+        setError(err.message);
+        setPricingBucket('free'); // ✅ fallback so your old flow still works
+      });
+  }, [internshipId]);
+
+  useEffect(() => {
+    // ✅ wait until we know free/stipend/paid
+    if (pricingBucket === null) return;
+
+    // ✅ PAID internships should be handled by ScheduleFormPaid.js
+    if (pricingBucket === 'paid') return;
+
+    const fetchSchedule = async () => {
+      try {
+        const response = await axios.get('/api/schedule/get-schedule', {
+          params: { internshipId, partnerId: localStorage.getItem('partnerId') }
+        });
+        const data = response.data;
+
+        // derive saved defaults for Section Timings
+        const savedType = data.defaultType || data?.timetable?.[0]?.type || 'online';
+        const savedStart = data.defaultStartTime || data?.timetable?.[0]?.startTime || '';
+        const savedEnd = data.defaultEndTime || data?.timetable?.[0]?.endTime || '';
+
+        setForm(f => ({
+          ...f,
+          startDate: data.startDate.slice(0, 10),
+          endDate: data.endDate.slice(0, 10),
+          workHours: data.workHours,
+
+          // ✅ Use savedType/savedStart/savedEnd we derived above
+          defaultType: savedType,
+          defaultStartTimes: {
+            ...f.defaultStartTimes,
+            [savedType]: savedStart
+          },
+          defaultEndTimes: {
+            ...f.defaultEndTimes,
+            [savedType]: savedEnd
+          },
+
+          // Pre-fill the specific fields the UI uses
+          ...(savedType === 'online'
+            ? { onlineEventLink: data.defaultEventLink || data?.timetable?.[0]?.eventLink || '' }
+            : {}),
+          ...(savedType === 'hybrid'
+            ? { hybridEventLink: data.defaultEventLink || data?.timetable?.[0]?.eventLink || '' }
+            : {}),
+
+          ...(savedType === 'offline'
+            ? {
+              offlineLocation:
+                data.defaultLocation || data?.timetable?.[0]?.location || { name: '', address: '', mapLink: '' }
+            }
+            : {}),
+          ...(savedType === 'hybrid'
+            ? {
+              hybridLocation:
+                data.defaultLocation || data?.timetable?.[0]?.location || { name: '', address: '', mapLink: '' }
+            }
+            : {}),
+
+          defaultEventLink: data.timetable[0]?.eventLink || '',
+          defaultLocation: data.timetable[0]?.location || {
+            name: '',
+            address: '',
+            mapLink: ''
+          },
+          isClosed: !!data.isClosed   // ✅ force boolean
+        }));
+
+        setTimetable(
+          (data.timetable || []).map(entry => ({
+            date: entry.date.slice(0, 10),
+            day: entry.day,
+            selected: true,
+            startTime: entry.startTime,
+            endTime: entry.endTime,
+            eventLink: entry.eventLink || '',
+            type: entry.type || 'online',
+            location: entry.location || { name: '', address: '', mapLink: '' },
+            sectionSummary: entry.sectionSummary || '',
+            instructor: entry.instructor || '',
+            assignment: entry.assignment || null,
+            events: entry.events || []
+          }))
+        );
+
+        // ✅ Always go straight to preview if schedule exists
+        setPreviewed(true);
+        setIsPersisted(true);
+      } catch (err) {
+        if (err.response?.status !== 404) {
+          setError('Error loading schedule');
+        }
+      }
+    };
+
+    fetchSchedule();
+  }, [internshipId, pricingBucket]); // ✅ add pricingBucket
+
+  const handleFormChange = e => {
+    const { name, value } = e.target;
+
+    // Handle nested default times (e.g., defaultStartTimes.online)
+    if (name.startsWith('defaultStartTimes.') || name.startsWith('defaultEndTimes.')) {
+      const [parent, type] = name.split('.');
+      setForm(f => ({
+        ...f,
+        [parent]: {
+          ...f[parent],
+          [type]: value
+        }
+      }));
+    }
+    // Location fields
+    else if (name.startsWith('offlineLocation.') || name.startsWith('hybridLocation.')) {
+      const [prefix, field] = name.split('.');
+      setForm(f => ({
+        ...f,
+        [prefix]: {
+          ...f[prefix],
+          [field]: value
+        }
+      }));
+    } else {
+      setForm(f => ({ ...f, [name]: value }));
+    }
+  };
+
+  const toggleWeekday = day =>
+    setForm(f => {
+      const sel = new Set(f.selectedDays);
+      sel.has(day) ? sel.delete(day) : sel.add(day);
+      return { ...f, selectedDays: Array.from(sel) };
+    });
+
+  const applyAiSectionSummaries = async (days) => {
+    // If schedule mode is manual, do nothing
+    if (form.scheduleMode !== 'automated') return days;
+
+    // If schedule is persisted, only generate for TODAY + future (past days must remain unchanged)
+    const dayNumberByDate = {};
+    days.forEach((d, idx) => { dayNumberByDate[d.date] = idx + 1; });
+
+    const targetDays = isPersisted
+      ? days.filter(d => isFutureDate(d.date))   // today + future
+      : days;
+
+    // If nothing to generate, return as-is
+    if (!targetDays.length) return days;
+
+    setAiGenerating(true);
+    try {
+      const { data } = await axios.post(
+        '/api/schedule/ai-section-summaries',
+        {
+          internshipId,
+          totalDays: days.length, // ✅ count how many scheduled days
+          days: targetDays.map(d => ({
+            date: d.date,
+            dayNumber: dayNumberByDate[d.date],
+            type: d.type || form.defaultType
+          }))
+        },
+        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+      );
+
+      // Expected: data.summaries = [{ date:"YYYY-MM-DD", sectionSummary:"..." }, ...]
+      const summaryMap = {};
+      (data?.summaries || []).forEach(s => {
+        if (s?.date) summaryMap[s.date] = s.sectionSummary || '';
+      });
+
+      // Merge: keep Excel/manual summary if already present, otherwise fill with AI
+      return days.map(d => {
+        const aiText = summaryMap[d.date];
+        if (!aiText) return d;
+
+        // If already has summary (Excel/user), keep it
+        if (d.sectionSummary && d.sectionSummary.trim() !== '') return d;
+
+        return { ...d, sectionSummary: aiText };
+      });
+    } catch (err) {
+      console.error('AI Section Summary generation failed:', err);
+      setError(err.response?.data?.error || 'AI generation failed. You can still edit manually.');
+      return days; // fallback safely
+    } finally {
+      setAiGenerating(false);
+    }
+  };
+
+  const generatePreview = async () => {
+    const {
+      startDate,
+      endDate,
+      defaultType,
+      selectedDays,
+      workHours
+    } = form;
+
+    const defaultStartTime = form.defaultStartTimes[defaultType];
+    const defaultEndTime = form.defaultEndTimes[defaultType];
+
+    const eventLink =
+      defaultType === 'online'
+        ? form.onlineEventLink
+        : defaultType === 'hybrid'
+          ? form.hybridEventLink
+          : '';
+
+    const location =
+      defaultType === 'offline'
+        ? form.offlineLocation
+        : defaultType === 'hybrid'
+          ? form.hybridLocation
+          : { name: '', address: '', mapLink: '' };
+
+    if (!startDate || !endDate) {
+      return setError('Fill both start date and end date');
+    }
+
+    // 🔴 NEW VALIDATION: end date cannot be before start date
+    if (endDate < startDate) {
+      return setError('End date cannot be before start date');
+    }
+
+    if (!workHours || workHours.trim() === '') {
+      return setError('Fill work hours before generating schedule');
+    }
+
+    if (!defaultStartTime || !defaultEndTime) {
+      return setError('Fill default start time and default end time');
+    }
+
+    if (!selectedDays.length) {
+      return setError('Select at least one day');
+    }
+
+    // If the schedule is already saved, keep a quick lookup to preserve past days
+    const existingByDate = isPersisted
+      ? Object.fromEntries(timetable.map(d => [d.date, d]))
+      : {};
+
+    const days = [];
+    let dayCounter = 1;
+
+    for (let d = new Date(startDate); d <= new Date(endDate); d.setDate(d.getDate() + 1)) {
+      const dayName = d.toLocaleString('en-us', { weekday: 'long' });
+
+      if (selectedDays.includes(dayName)) {
+        const key = `Day - ${dayCounter}`;
+        const isoDateKey = d.toISOString().split('T')[0];
+
+        // ⛔ After first save: do NOT let Excel overwrite past dates
+        if (isPersisted) {
+          const existing = existingByDate[isoDateKey];
+          if (existing && isPastDate(isoDateKey)) {
+            days.push({ ...existing });
+            dayCounter++;
+            continue; // skip any Excel/default overrides for this past day
+          }
+        }
+
+        const excelEntry = excelData[key] || excelData[isoDateKey] || {};
+        const useExcelData = Object.keys(excelEntry).length > 0;
+        const entryType = excelEntry.type || defaultType;
+
+        const resolvedType =
+          defaultType === 'hybrid'
+            ? (entryType === 'online' || entryType === 'offline' ? entryType : 'online')
+            : defaultType;
+
+        days.push({
+          date: d.toISOString().split('T')[0],
+          day: dayName,
+          selected: true,
+          startTime: defaultStartTime,
+          endTime: defaultEndTime,
+          sectionSummary: useExcelData ? excelEntry.summary || '' : '',
+          instructor: useExcelData ? excelEntry.instructor || '' : '',
+          assignment: null,
+          type: resolvedType,
+          eventLink: resolvedType === 'online'
+            ? (useExcelData ? excelEntry.link || eventLink : eventLink)
+            : '',
+          location: resolvedType === 'offline'
+            ? {
+              name: useExcelData ? (excelEntry.locationName || location.name) : location.name,
+              address: useExcelData ? (excelEntry.address || location.address) : location.address,
+              mapLink: useExcelData ? (excelEntry.mapLink || location.mapLink) : location.mapLink
+            }
+            : { name: '', address: '', mapLink: '' },
+          events: []
+        });
+
+        dayCounter++;
+      }
+    }
+
+    const finalDays = await applyAiSectionSummaries(days);
+
+    setTimetable(finalDays);
+    setPreviewed(true);
+    setError(null);
+  };
+
+  // Auto-scroll to today's date ONLY after the schedule has been saved (isPersisted)
+  useEffect(() => {
+    // Do not autoscroll on Read-Only page
+    if (!previewed || !isPersisted || readOnly || !todayRef.current || !previewScrollRef.current) return;
+    if (hasAutoScrolledRef.current) return;
+
+    const scrollToToday = () => {
+      const container = previewScrollRef.current;
+      const todayElement = todayRef.current;
+      const containerRect = container.getBoundingClientRect();
+      const todayRect = todayElement.getBoundingClientRect();
+      const scrollOffset = todayRect.top - containerRect.top + container.scrollTop - 12;
+
+      container.scrollTo({ top: scrollOffset, behavior: 'smooth' });
+      hasAutoScrolledRef.current = true;
+    };
+
+    const timeout = setTimeout(scrollToToday, 250);
+    return () => clearTimeout(timeout);
+  }, [previewed, isPersisted, readOnly]); // ← added isPersisted
+
+  // Reset auto-scroll flag whenever Preview is closed
+  useEffect(() => {
+    if (!previewed) {
+      hasAutoScrolledRef.current = false;
+    }
+  }, [previewed]);
+
+  const toggleDay = idx =>
+    setTimetable(tt => {
+      const copy = [...tt];
+      copy[idx].selected = !copy[idx].selected;
+      return copy;
+    });
+
+  const changeField = (idx, field, val) =>
+    setTimetable(tt => {
+      const copy = [...tt];
+      copy[idx][field] = val;
+
+      // Reset / auto-fill when type changes
+      if (field === 'type') {
+        if (val === 'online') {
+          // Clear location, set meeting link from Hybrid/Online defaults
+          copy[idx].location = getDefaultLocationForType('online'); // empty object
+          copy[idx].eventLink = getDefaultEventLinkForType('online');
+        } else if (val === 'offline') {
+          // Clear link, set location from Hybrid/Offline defaults
+          copy[idx].eventLink = '';
+          copy[idx].location = getDefaultLocationForType('offline');
+        }
+      }
+
+      return copy;
+    });
+
+  const changeLocationField = (idx, field, val) =>
+    setTimetable(tt => {
+      const copy = [...tt];
+      copy[idx].location = {
+        ...copy[idx].location,
+        [field]: val
+      };
+      return copy;
+    });
+
+  const addNewDay = () => {
+    const {
+      newDate,
+      defaultType,
+      startDate,
+      endDate
+    } = form;
+
+    const defaultStartTime = form.defaultStartTimes[defaultType];
+    const defaultEndTime = form.defaultEndTimes[defaultType];
+
+    const defaultEventLink =
+      defaultType === 'online'
+        ? form.onlineEventLink
+        : defaultType === 'hybrid'
+          ? form.hybridEventLink
+          : null;
+
+    const defaultLocation =
+      defaultType === 'offline'
+        ? form.offlineLocation
+        : defaultType === 'hybrid'
+          ? form.hybridLocation
+          : { name: '', address: '', mapLink: '' };
+
+    if (!newDate) {
+      return setError('Pick a date');
+    }
+    if (newDate < startDate || newDate > endDate) {
+      return setError(`Date must be between ${startDate} and ${endDate}`);
+    }
+    if (defaultType === 'offline' && !defaultLocation.address) {
+      return setError('Location address is required for offline days');
+    }
+
+    const name = new Date(newDate).toLocaleString('en-us', { weekday: 'long' });
+
+    const initialType = defaultType === 'hybrid' ? 'online' : (defaultType || 'online');
+
+    const newDayEntry = {
+      date: newDate,
+      day: name,
+      selected: true,
+      startTime: defaultStartTime || '',
+      endTime: defaultEndTime || '',
+      type: initialType,
+      eventLink: initialType === 'online' ? (defaultEventLink || '') : '',
+      location: initialType === 'offline'
+        ? (defaultLocation || { name: '', address: '', mapLink: '' })
+        : { name: '', address: '', mapLink: '' },
+      sectionSummary: '',
+      instructor: '',
+      assignment: null,
+      events: []
+    };
+
+    setTimetable(prev => [...prev, newDayEntry]);
+    setForm(f => ({ ...f, newDate: '' }));
+    setError(null);
+  };
+
+  const saveSchedule = async e => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      const payload = {
+        internshipId,
+        partnerId: localStorage.getItem('partnerId'),
+        startDate: form.startDate,
+        endDate: form.endDate,
+        workHours: form.workHours,
+        defaultStartTime: form.defaultStartTimes[form.defaultType],
+        defaultEndTime: form.defaultEndTimes[form.defaultType],
+        defaultEventLink:
+          form.defaultType === 'online'
+            ? form.onlineEventLink
+            : form.defaultType === 'hybrid'
+              ? form.hybridEventLink
+              : null,
+
+        defaultLocation:
+          form.defaultType === 'offline'
+            ? form.offlineLocation
+            : form.defaultType === 'hybrid'
+              ? form.hybridLocation
+              : null,
+        defaultType: form.defaultType,
+        selectedDays: form.selectedDays,
+        timetable: timetable
+          .filter(d => d.selected)
+          .map(day => ({
+            ...day,
+            location: day.type === 'online' ? null : day.location,
+            assignment: day.assignment?.name || null
+          }))
+      };
+
+      await axios.post('/api/schedule/create', payload, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      setIsPersisted(true); // <— ADD THIS
+      onClose();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Save failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ✅ ROUTE: Paid internships use ScheduleFormPaid.js
+  // 1) Optional: avoid UI flicker while pricingBucket is loading
+  if (pricingBucket === null) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center p-4 z-50">
+        <div className="bg-white rounded-2xl shadow-2xl px-6 py-4">
+          <p className="text-gray-700 font-medium">Loading schedule...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 2) Paid internships should use the separate component/file
+  if (pricingBucket === 'paid') {
+    return <ScheduleFormPaid internshipId={internshipId} onClose={onClose} />;
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center p-4 z-50">
+      <form
+        onSubmit={saveSchedule}
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden"
+      >
+        {/* Header */}
+        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-3 text-white">
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-2xl font-bold">Schedule Configuration</h2>
+              <p className="text-indigo-100 opacity-90">
+                {previewed
+                  ? readOnly
+                    ? 'View Schedule (Read - Only)'
+                    : 'Review and edit schedule'
+                  : 'Set up internship schedule'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-white hover:text-indigo-200 transition-colors p-1 rounded-full"
+            >
+              <FiX size={24} />
+            </button>
+          </div>
+        </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="bg-red-50 border-l-4 border-red-500 p-4 mx-6 mt-4 rounded-r">
+            <p className="text-red-700 font-medium">{error}</p>
+          </div>
+        )}
+
+        {/* Content Area */}
+        <div className="p-6 overflow-y-auto flex-1">
+          {!previewed ? (
+            <div className="space-y-8">
+              {/* Date Range Section */}
+              <div className={`${!isPersisted ? 'bg-white' : 'bg-gray-50'} p-5 rounded-xl border border-gray-200`}>
+                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                  <FiCalendar className="mr-2 text-indigo-600" />
+                  Date Range
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Start Date
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                        <FiCalendar />
+                      </div>
+                      <input
+                        type="date"
+                        name="startDate"
+                        value={form.startDate}
+                        onChange={handleFormChange}
+                        className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      End Date
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                        <FiCalendar />
+                      </div>
+                      <input
+                        type="date"
+                        name="endDate"
+                        value={form.endDate}
+                        onChange={handleFormChange}
+                        className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        required
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Work Hours Section */}
+              <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Work Hours</h3>
+                <input
+                  type="text"
+                  name="workHours"
+                  value={form.workHours}
+                  onChange={handleFormChange}
+                  placeholder="e.g., 09:00 - 17:00"
+                  className="block w-full px-4 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  required
+                />
+              </div>
+
+              {/* Internship Type */}
+              <div className="bg-gray-50 p-5 rounded-xl border border-gray-200 space-y-6">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Internship Type</h3>
+
+                {/* 1) Type Selector */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {internshipTypes.map(type => (
+                    <div key={type} className="flex items-center">
+                      <input
+                        type="radio"
+                        id={`type-${type}`}
+                        name="defaultType"
+                        value={type}
+                        checked={form.defaultType === type}
+                        onChange={handleFormChange}
+                        className="h-5 w-5 text-indigo-600 focus:ring-indigo-500 -mt-0"
+                      />
+                      <label
+                        htmlFor={`type-${type}`}
+                        className="ml-2 text-sm font-medium text-gray-700 capitalize"
+                      >
+                        {type}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+
+                {/* 2 + 3) Default Times + Default Meeting Link – combined only for online type */}
+                {form.defaultType === 'online' && (
+                  <div className="bg-white mt-6 p-5 rounded-xl border border-gray-300 space-y-6">
+                    {/* Default Times Section */}
+                    <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center">
+                      <FiClock className="mr-2 text-indigo-600" />
+                      <span className="mr-1">Section Timings</span>
+                      <span className="text-sm text-gray-400 font-normal">(24 Hours Format)</span>
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                            <FiClock />
+                          </div>
+                          <input
+                            type="time"
+                            name="defaultStartTimes.online"
+                            value={form.defaultStartTimes.online}
+                            onChange={handleFormChange}
+                            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                            required
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">End Time</label>
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                            <FiClock />
+                          </div>
+                          <input
+                            type="time"
+                            name="defaultEndTimes.online"
+                            value={form.defaultEndTimes.online}
+                            onChange={handleFormChange}
+                            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                            required
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Default Meeting Link Section with original font style and icon heading */}
+                    <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center">
+                      <FiLink className="mr-2 text-indigo-600" />
+                      <span className="mr-1">Default Meeting Link</span>
+                      <span className="text-sm text-gray-400 font-normal">(Optional)</span>
+                    </h4>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                        <FiLink />
+                      </div>
+                      <input
+                        type="url"
+                        name="onlineEventLink"
+                        value={form.onlineEventLink}
+                        onChange={handleFormChange}
+                        placeholder="https://meet.example.com/your-link"
+                        className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      />
+                    </div>
+
+                    {/* DOWNLOAD TEMPLATE BUTTON FOR ONLINE*/}
+                    <div className="pt-2">
+                      <a
+                        href="/Online%20Internship%20Schedule%20Template.xlsx"
+                        download
+                        className="inline-block px-5 py-2 bg-blue-100 text-blue-700 text-sm font-semibold rounded-lg hover:bg-blue-200 transition"
+                      >
+                        Download Online Internship Schedule Template
+                      </a>
+                    </div>
+                  </div>
+                )}
+
+                {/* Section Timings – only for offline */}
+                {form.defaultType === 'offline' && (
+                  <div className="bg-white mt-6 p-5 rounded-xl border border-gray-300 space-y-6">
+                    {/* Section Timings */}
+                    <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center">
+                      <FiClock className="mr-2 text-indigo-600" />
+                      <span className="mr-1">Section Timings</span>
+                      <span className="text-sm text-gray-400 font-normal">(24 Hours Format)</span>
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                            <FiClock />
+                          </div>
+                          <input
+                            type="time"
+                            name="defaultStartTimes.offline"
+                            value={form.defaultStartTimes.offline}
+                            onChange={handleFormChange}
+                            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                            required
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">End Time</label>
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                            <FiClock />
+                          </div>
+                          <input
+                            type="time"
+                            name="defaultEndTimes.offline"
+                            value={form.defaultEndTimes.offline}
+                            onChange={handleFormChange}
+                            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                            required
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Location Details */}
+                    {renderLocationFields('offlineLocation', form.offlineLocation, handleFormChange)}
+
+                    {/* DOWNLOAD TEMPLATE BUTTON FOR OFFLINE */}
+                    <div className="pt-2">
+                      <a
+                        href="/Offline%20Internship%20Schedule%20Template.xlsx"
+                        download
+                        className="inline-block px-5 py-2 bg-blue-100 text-blue-700 text-sm font-semibold rounded-lg hover:bg-blue-200 transition"
+                      >
+                        Download Offline Internship Schedule Template
+                      </a>
+                    </div>
+                  </div>
+                )}
+
+                {/* Section Timings – only for hybrid */}
+                {form.defaultType === 'hybrid' && (
+                  <div className="bg-white mt-6 p-5 rounded-xl border border-gray-300 space-y-6">
+                    {/* Section Timings */}
+                    <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center">
+                      <FiClock className="mr-2 text-indigo-600" />
+                      <span className="mr-1">Section Timings</span>
+                      <span className="text-sm text-gray-400 font-normal">(24 Hours Format)</span>
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                            <FiClock />
+                          </div>
+                          <input
+                            type="time"
+                            name="defaultStartTimes.hybrid"
+                            value={form.defaultStartTimes.hybrid}
+                            onChange={handleFormChange}
+                            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                            required
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">End Time</label>
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                            <FiClock />
+                          </div>
+                          <input
+                            type="time"
+                            name="defaultEndTimes.hybrid"
+                            value={form.defaultEndTimes.hybrid}
+                            onChange={handleFormChange}
+                            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                            required
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Default Meeting Link – Optional */}
+                    <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center">
+                      <FiLink className="mr-2 text-indigo-600" />
+                      Default Meeting Link <span className="ml-2 text-sm text-gray-400 font-normal">(Optional)</span>
+                    </h4>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                        <FiLink />
+                      </div>
+                      <input
+                        type="url"
+                        name="hybridEventLink"
+                        value={form.hybridEventLink}
+                        onChange={handleFormChange}
+                        placeholder="https://meet.example.com/your-link"
+                        className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      />
+                    </div>
+
+                    {/* Default Location Details – Optional */}
+                    {renderLocationFields('hybridLocation', form.hybridLocation, handleFormChange)}
+
+                    {/* Download Template */}
+                    <div className="pt-2">
+                      <a
+                        href="/Hybrid%20Internship%20Schedule%20Template.xlsx"
+                        download
+                        className="inline-block px-5 py-2 bg-blue-100 text-blue-700 text-sm font-semibold rounded-lg hover:bg-blue-200 transition"
+                      >
+                        Download Hybrid Internship Schedule Template
+                      </a>
+                    </div>
+                  </div>
+                )}
+
+              </div>
+
+              {/* Weekday Selection + Excel Upload */}
+              <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Working Days</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-7 gap-3">
+                  {allWeekdays.map(day => (
+                    <div key={day} className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id={`day-${day}`}
+                        checked={form.selectedDays.includes(day)}
+                        onChange={() => toggleWeekday(day)}
+                        className="h-5 w-5 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500 -mt-1"
+                      />
+                      <label
+                        htmlFor={`day-${day}`}
+                        className={`ml-2 text-sm font-medium ${form.selectedDays.includes(day) ? 'text-gray-900' : 'text-gray-500'
+                          }`}
+                      >
+                        {day.substring(0, 3)}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Upload Excel file below the checkboxes */}
+                <div className="mt-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Upload Working Days (.xlsx):
+                  </label>
+                  <input
+                    type="file"
+                    accept=".xlsx"
+                    onChange={e => {
+                      const file = e.target.files[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = evt => {
+                          const data = new Uint8Array(evt.target.result);
+                          const workbook = XLSX.read(data, { type: 'array' });
+                          const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                          const rows = XLSX.utils.sheet_to_json(sheet);
+
+                          const formatted = {};
+                          rows.forEach((row, index) => {
+                            const rawDate = row['Date'];
+
+                            if (rawDate) {
+                              const dateKey =
+                                typeof rawDate === 'string'
+                                  ? rawDate.trim()
+                                  : rawDate instanceof Date
+                                    ? rawDate.toISOString().split('T')[0]
+                                    : typeof rawDate === 'number'
+                                      ? XLSX.SSF.format('yyyy-mm-dd', rawDate)
+                                      : String(rawDate).trim();
+
+                              formatted[dateKey] = {
+                                summary: row['section summary'] || '',
+                                instructor: row['Instructor Name'] || '',
+                                type: (row['Section type'] || '').toLowerCase(),
+                                link: row['Meeting Link'] || '',
+                                locationName: row['Location Name'] || '',
+                                address: row['Address'] || '',
+                                mapLink: row['Map Link'] || ''
+                              };
+                            }
+                          });
+
+                          setExcelData(formatted);
+                        };
+                        reader.readAsArrayBuffer(file);
+                      }
+                    }}
+                    className="block w-full text-sm text-gray-700 bg-white border border-gray-300 rounded-lg p-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              {/* ✅ Schedule Creation Method */}
+              <div className="bg-gray-50 p-5 rounded-xl border border-gray-200 space-y-6">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                  Schedule Creation Method
+                </h3>
+
+                {/* Same layout style as Internship Type */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="flex items-center">
+                    <input
+                      type="radio"
+                      id="scheduleMode-manual"
+                      name="scheduleMode"
+                      value="manual"
+                      checked={form.scheduleMode === 'manual'}
+                      onChange={handleFormChange}
+                      className="h-5 w-5 text-indigo-600 focus:ring-indigo-500 -mt-0"
+                    />
+                    <label
+                      htmlFor="scheduleMode-manual"
+                      className="ml-2 text-sm font-medium text-gray-700"
+                    >
+                      Manual Schedule
+                    </label>
+                  </div>
+
+                  <div className="flex items-center">
+                    <input
+                      type="radio"
+                      id="scheduleMode-automated"
+                      name="scheduleMode"
+                      value="automated"
+                      checked={form.scheduleMode === 'automated'}
+                      onChange={handleFormChange}
+                      className="h-5 w-5 text-indigo-600 focus:ring-indigo-500 -mt-0"
+                    />
+                    <label
+                      htmlFor="scheduleMode-automated"
+                      className="ml-2 text-sm font-medium text-gray-700"
+                    >
+                      Automated Schedule
+                    </label>
+                  </div>
+                </div>
+
+                {form.scheduleMode === 'automated' && (
+                  <p className="text-sm text-gray-500">
+                    Automated Schedule will auto-fill <b>Section Summary</b> for each scheduled day
+                    based on the internship you posted.
+                  </p>
+                )}
+              </div>
+
+              {/* Generate Preview Button */}
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={generatePreview}
+                  disabled={aiGenerating}
+                  className={`flex items-center justify-center px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium rounded-lg shadow-md hover:from-indigo-700 hover:to-purple-700 transition-all transform hover:scale-105 ${aiGenerating ? 'opacity-60 cursor-not-allowed' : ''
+                    }`}
+                >
+                  {aiGenerating ? 'Generating with AI...' : 'Generate Preview'}
+                  <FiChevronRight className="ml-2" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-8">
+              {/* Schedule Preview */}
+              <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Schedule Preview</h3>
+                <div
+                  ref={previewScrollRef}
+                  className="space-y-3 max-h-96 overflow-y-auto pr-2"
+                >
+                  {timetable.map((day, idx) => {
+                    const isPast = isPastDate(day.date);
+                    const isFuture = isFutureDate(day.date);
+
+                    // Rules:
+                    // - Always lock if schedule is closed
+                    // - If already saved (persisted), only allow editing future events
+                    // - If not saved yet, allow editing everything
+                    const ro = readOnly || (isPersisted && !isFuture);
+                    const canEditDay = day.selected && !ro;
+
+                    return (
+                      <div
+                        key={day.date}
+                        ref={isPersisted && isToday(new Date(`${day.date}T00:00:00`)) ? todayRef : null}
+                        className={`p-4 rounded-lg transition-all ${readOnly
+                          ? 'bg-white border border-indigo-100 shadow-sm'
+                          : (!isPersisted
+                            ? 'bg-white border border-indigo-100 shadow-sm'
+                            : (day.selected
+                              ? (isPast ? 'bg-gray-100 border border-gray-200 opacity-80'
+                                : 'bg-white border border-indigo-100 shadow-sm')
+                              : 'bg-gray-100 border border-gray-200'))
+                          }`}
+                      >
+                        {/* HEADER Row: Checkbox, Day, Type Dropdown */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-4">
+                            {ro ? (
+                              // When a row is blocked (readOnly OR saved schedule & past day), remove the checkbox
+                              // but keep the same space so layout doesn’t shift.
+                              <span className="inline-block h-5 w-5" aria-hidden />
+                            ) : (
+                              <input
+                                type="checkbox"
+                                checked={day.selected}
+                                onChange={() => toggleDay(idx)}
+                                className="h-5 w-5 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
+                              />
+                            )}
+                            <div>
+                              <p className="font-medium text-gray-900">
+                                {new Date(day.date).toLocaleDateString('en-US', { weekday: 'long' })}
+                              </p>
+                              <p className="text-sm text-gray-500">
+                                {new Date(day.date).toLocaleDateString('en-US', {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: 'numeric',
+                                })}
+                              </p>
+                              <span
+                                className={`inline-block mt-1 px-2 py-0.5 text-xs rounded-full ${(form.defaultType === 'online')
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : (form.defaultType === 'offline')
+                                    ? 'bg-green-100 text-green-800'
+                                    : 'bg-purple-100 text-purple-800'
+                                  } capitalize`}
+                              >
+                                {form.defaultType}
+                              </span>
+                            </div>
+                          </div>
+
+                          {day.selected && (
+                            <div className="flex items-center">
+                              {canEditDay ? (
+                                // Editable (future days / not closed)
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="time"
+                                    value={day.startTime || form.defaultStartTimes[form.defaultType] || ''}
+                                    onChange={(e) => changeField(idx, 'startTime', e.target.value)}
+                                    disabled={ro}
+                                    className="text-sm rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
+                                  />
+                                  <span className="text-gray-600 mt-5">-</span>
+                                  <input
+                                    type="time"
+                                    value={day.endTime || form.defaultEndTimes[form.defaultType] || ''}
+                                    onChange={(e) => changeField(idx, 'endTime', e.target.value)}
+                                    disabled={ro}
+                                    className="text-sm rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
+                                  />
+
+                                  {form.defaultType === 'hybrid' ? (
+                                    <select
+                                      value={day.type}
+                                      onChange={(e) => changeField(idx, 'type', e.target.value)}
+                                      disabled={ro}
+                                      className="text-sm mt-5 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 px-2 py-[6px]"
+                                    >
+                                      <option value="online">online</option>
+                                      <option value="offline">offline</option>
+                                    </select>
+                                  ) : (
+                                    <span className="text-sm ml-2 capitalize mt-5">{day.type}</span>
+                                  )}
+                                </div>
+                              ) : (
+                                // Read-only (saved past days / closed schedule) -> EXACT format requested
+                                <div className="flex items-center text-sm text-gray-800 gap-2 w-full">
+                                  <span className="px-3 py-1 bg-white border border-gray-300 rounded-lg shadow-sm">
+                                    {day.startTime || form.defaultStartTimes[form.defaultType] || ''}
+                                  </span>
+                                  <span className="text-gray-500">-</span>
+                                  <span className="px-3 py-1 bg-white border border-gray-300 rounded-lg shadow-sm">
+                                    {day.endTime || form.defaultEndTimes[form.defaultType] || ''}
+                                  </span>
+                                  <span className="ml-auto px-3 py-1 bg-white border border-gray-300 rounded-lg shadow-sm capitalize">
+                                    {day.type}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Editable Details Section */}
+                        {day.selected && (
+                          <div className="mt-4 ml-14 space-y-4">
+                            {/* Online Meeting Link */}
+                            {day.type === 'online' && (
+                              <div>
+                                <h4 className="text-md font-semibold text-gray-700 mb-1 flex items-center">
+                                  <FiLink className="mr-2 text-indigo-600" />
+                                  Meeting Link
+                                </h4>
+                                <input
+                                  type="text"
+                                  value={day.eventLink}
+                                  onChange={(e) => !ro && changeField(idx, 'eventLink', e.target.value)}
+                                  placeholder="Meeting link"
+                                  className="block w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                                  readOnly={ro}
+                                />
+                              </div>
+                            )}
+
+                            {/* Section Summary */}
+                            <div>
+                              <label className="text-md font-semibold text-gray-700 mb-1 flex items-center">
+                                Section Summary
+                              </label>
+                              <textarea
+                                value={day.sectionSummary || ''}
+                                onChange={(e) => !ro && changeField(idx, 'sectionSummary', e.target.value)}
+                                placeholder="Write a brief section summary here..."
+                                rows={2}
+                                className="block w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                                readOnly={ro}
+                              />
+                            </div>
+
+                            {/* Instructor */}
+                            <div>
+                              <label className="text-md font-semibold text-gray-700 mb-1 flex items-center">
+                                Instructor Name
+                              </label>
+                              <textarea
+                                value={day.instructor || ''}
+                                onChange={(e) => !ro && changeField(idx, 'instructor', e.target.value)}
+                                placeholder="Enter instructor name(s)..."
+                                rows={1}
+                                className="block w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                                readOnly={ro}
+                              />
+                            </div>
+
+                            {/* Assignment Upload */}
+                            {!ro && (
+                              <div>
+                                <label className="text-md font-semibold text-gray-700 mb-1 flex items-center">
+                                  Assignment
+                                </label>
+                                <input
+                                  type="file"
+                                  onChange={(e) => {
+                                    const file = e.target.files[0];
+                                    changeField(idx, 'assignment', file);
+                                  }}
+                                  className="block w-full text-sm text-gray-700 bg-white border border-gray-300 rounded-lg p-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                                />
+                              </div>
+                            )}
+
+                            {/* Location for Offline */}
+                            {day.type === 'offline' && (
+                              <div className="mt-4">
+                                <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center">
+                                  <FiMapPin className="mr-2 text-indigo-600" />
+                                  Location Details
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                      Location Name
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={day.location.name || ''}
+                                      onChange={(e) => !ro && changeLocationField(idx, 'name', e.target.value)}
+                                      placeholder="Building / Room Name"
+                                      className="block w-full pl-3 pr-3 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                      readOnly={ro}
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                      Address
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={day.location.address || ''}
+                                      onChange={(e) => !ro && changeLocationField(idx, 'address', e.target.value)}
+                                      placeholder="Full Address"
+                                      className="block w-full pl-3 pr-3 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                      readOnly={ro}
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                      Map Link
+                                    </label>
+                                    <input
+                                      type="url"
+                                      value={day.location.mapLink || ''}
+                                      onChange={(e) => !ro && changeLocationField(idx, 'mapLink', e.target.value)}
+                                      placeholder="https://maps.example.com/your-location"
+                                      className="block w-full pl-3 pr-3 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                      readOnly={ro}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Add Additional Day Section */}
+              {!readOnly && (
+                <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
+                  <h4 className="text-lg font-semibold text-gray-800 mb-4">Add Additional Day</h4>
+                  <div className="space-y-3">
+                    <div className="flex space-x-2">
+                      <div className="flex-1">
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                            <FiCalendar size={16} />
+                          </div>
+                          <input
+                            type="date"
+                            name="newDate"
+                            value={form.newDate}
+                            onChange={handleFormChange}
+                            className="block w-full pl-10 pr-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={addNewDay}
+                      className="flex items-center justify-center w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
+                    >
+                      <FiChevronRight size={18} className="mr-2" />
+                      Add Day
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              {readOnly ? (
+                <div className="flex justify-end pt-4">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="px-5 py-2 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700"
+                  >
+                    Close
+                  </button>
+                </div>
+              ) : (
+                <div className="flex justify-end space-x-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewed(false)}
+                    className="px-6 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                  >
+                    Back to Settings
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="px-6 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="px-6 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 flex items-center"
+                  >
+                    {loading ? (
+                      <>
+                        <svg
+                          className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          ></circle>
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          ></path>
+                        </svg>
+                        Saving...
+                      </>
+                    ) : (
+                      'Save Schedule'
+                    )}
+                  </button>
+                </div>
+              )}
+
+            </div>
+          )}
+        </div>
+      </form>
+    </div>
+  );
+};
+
+export default ScheduleForm;
