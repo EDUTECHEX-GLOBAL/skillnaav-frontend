@@ -28,11 +28,14 @@ const Dashboard = () => {
     totalRevenue: 0, // Add totalRevenue state
     monthlyRevenue: [],
   });
-  
+
 
   const fetchDashboardData = async () => {
     try {
-      const response = await fetch("/api/dashboard/counts");
+      const response = await fetch(
+        `${process.env.REACT_APP_API_BASE}/api/dashboard/counts`
+      );
+
       const jsonData = await response.json();
       setData({
         partnersCount: jsonData.partnersCount,

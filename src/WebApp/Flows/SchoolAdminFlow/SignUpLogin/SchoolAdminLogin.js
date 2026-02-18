@@ -28,26 +28,30 @@ const handleLogin = async (e) => {
   try {
     setLoading(true);
 
-    const response = await fetch("/api/school-admin/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(credentials),
-    });
+   const response = await fetch(
+  `${process.env.REACT_APP_API_BASE}/api/school-admin/login`,
+  {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(credentials),
+  }
+);
+
 
     const data = await response.json();
 
     if (response.ok) {
       if (!data.isApproved) {
-        setErrorMessage("Your account is not yet approved by the platform administrator.");
+        setErrorMessage(
+          "Your account is not yet approved by the platform administrator."
+        );
         return;
       }
 
-      // ✅ Store separate ID and token for session management
       localStorage.setItem("schoolAdminToken", data.token);
-      localStorage.setItem("schoolAdminId", data._id); // ✅ Required for fetching school-specific applications
+      localStorage.setItem("schoolAdminId", data._id);
       localStorage.setItem("schoolAdminProfile", JSON.stringify(data));
       localStorage.setItem("loginTime", Date.now());
-
 
       navigate("/schooladmin/dashboard");
     } else {
@@ -60,6 +64,7 @@ const handleLogin = async (e) => {
     setLoading(false);
   }
 };
+
 
 
 
