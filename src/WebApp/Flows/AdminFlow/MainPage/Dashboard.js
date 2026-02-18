@@ -31,12 +31,13 @@ const Dashboard = () => {
   });
 
 
- const fetchDashboardData = async () => {
+const fetchDashboardData = async () => {
   try {
     const token = localStorage.getItem("schoolAdminToken");
+    const API = process.env.REACT_APP_API_BASE;
 
     const { data: jsonData } = await axios.get(
-      "/api/dashboard/counts",
+      `${API}/api/dashboard/counts`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -66,6 +67,7 @@ const Dashboard = () => {
     console.error("Error fetching dashboard data:", error);
   }
 };
+
 
 
 

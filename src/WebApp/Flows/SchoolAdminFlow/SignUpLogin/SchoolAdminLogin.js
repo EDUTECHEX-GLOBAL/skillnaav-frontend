@@ -29,8 +29,10 @@ const handleLogin = async (e) => {
   try {
     setLoading(true);
 
+    const API = process.env.REACT_APP_API_BASE;
+
     const { data } = await axios.post(
-      "/api/school-admin/login",
+      `${API}/api/school-admin/login`,
       credentials,
       {
         headers: { "Content-Type": "application/json" },
@@ -59,8 +61,6 @@ const handleLogin = async (e) => {
     setLoading(false);
   }
 };
-
-
 
 
  return (
