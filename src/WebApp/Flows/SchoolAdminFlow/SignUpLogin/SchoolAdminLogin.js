@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { FiEye, FiEyeOff } from "react-icons/fi";
 import classroomImg from "../../../../assets-webapp/school-dashboard.png";
@@ -28,38 +29,32 @@ const handleLogin = async (e) => {
   try {
     setLoading(true);
 
-   const response = await fetch(
-  `${process.env.REACT_APP_API_BASE}/api/school-admin/login`,
-  {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(credentials),
-  }
-);
-
-
-    const data = await response.json();
-
-    if (response.ok) {
-      if (!data.isApproved) {
-        setErrorMessage(
-          "Your account is not yet approved by the platform administrator."
-        );
-        return;
+    const { data } = await axios.post(
+      "/api/school-admin/login",
+      credentials,
+      {
+        headers: { "Content-Type": "application/json" },
       }
+    );
 
-      localStorage.setItem("schoolAdminToken", data.token);
-      localStorage.setItem("schoolAdminId", data._id);
-      localStorage.setItem("schoolAdminProfile", JSON.stringify(data));
-      localStorage.setItem("loginTime", Date.now());
-
-      navigate("/schooladmin/dashboard");
-    } else {
-      setErrorMessage(data.message || "Login failed. Please try again.");
+    if (!data.isApproved) {
+      setErrorMessage(
+        "Your account is not yet approved by the platform administrator."
+      );
+      return;
     }
+
+    localStorage.setItem("schoolAdminToken", data.token);
+    localStorage.setItem("schoolAdminId", data._id);
+    localStorage.setItem("schoolAdminProfile", JSON.stringify(data));
+    localStorage.setItem("loginTime", Date.now());
+
+    navigate("/schooladmin/dashboard");
   } catch (error) {
-    console.error("Login error:", error);
-    setErrorMessage("Something went wrong during login.");
+    console.error("Login error:", error.response || error.message);
+    setErrorMessage(
+      error.response?.data?.message || "Something went wrong during login."
+    );
   } finally {
     setLoading(false);
   }

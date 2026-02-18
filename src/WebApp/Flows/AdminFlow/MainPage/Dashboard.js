@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import axios from "axios";
 import { FaUsers, FaUserFriends, FaBriefcase, FaDollarSign } from "react-icons/fa";
 import DashboardCharts from "./Analytics/DashboardCharts";
 import InternshipTypeChart from "./Analytics/InternshipTypeChart";
@@ -30,35 +31,42 @@ const Dashboard = () => {
   });
 
 
-  const fetchDashboardData = async () => {
-    try {
-      const response = await fetch(
-        `${process.env.REACT_APP_API_BASE}/api/dashboard/counts`
-      );
+ const fetchDashboardData = async () => {
+  try {
+    const token = localStorage.getItem("schoolAdminToken");
 
-      const jsonData = await response.json();
-      setData({
-        partnersCount: jsonData.partnersCount,
-        activeUsersCount: jsonData.usersCount || 0,
-        internshipsCount: jsonData.internshipsCount || 0,
-        paymentsCount: jsonData.paymentsCount || 0,
-        jobApplications: jsonData.jobApplications || 0,
-        internshipApprovals: jsonData.internshipApprovals || 0,
-        internshipRejections: jsonData.internshipRejections || 0,
-        userGrowth: jsonData.userGrowth || [],
-        jobPostings: jsonData.jobPostings || [],
-        internshipTypeDistribution: jsonData.internshipTypeDistribution || {},
-        averageCompensation: jsonData.averageCompensation || {},
-        partnerApproval: jsonData.partnerApproval || {},
-        partnerGrowth: jsonData.partnerGrowth || [],
-        applicationTypeDistribution: jsonData.applicationTypeDistribution || {},
-        totalRevenue: jsonData.totalRevenue || 0, // Fetch total revenue
-        monthlyRevenue: jsonData.monthlyRevenue || [],
-      });
-    } catch (error) {
-      console.error("Error fetching dashboard data:", error);
-    }
-  };
+    const { data: jsonData } = await axios.get(
+      "/api/dashboard/counts",
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    setData({
+      partnersCount: jsonData.partnersCount,
+      activeUsersCount: jsonData.usersCount || 0,
+      internshipsCount: jsonData.internshipsCount || 0,
+      paymentsCount: jsonData.paymentsCount || 0,
+      jobApplications: jsonData.jobApplications || 0,
+      internshipApprovals: jsonData.internshipApprovals || 0,
+      internshipRejections: jsonData.internshipRejections || 0,
+      userGrowth: jsonData.userGrowth || [],
+      jobPostings: jsonData.jobPostings || [],
+      internshipTypeDistribution: jsonData.internshipTypeDistribution || {},
+      averageCompensation: jsonData.averageCompensation || {},
+      partnerApproval: jsonData.partnerApproval || {},
+      partnerGrowth: jsonData.partnerGrowth || [],
+      applicationTypeDistribution: jsonData.applicationTypeDistribution || {},
+      totalRevenue: jsonData.totalRevenue || 0,
+      monthlyRevenue: jsonData.monthlyRevenue || [],
+    });
+  } catch (error) {
+    console.error("Error fetching dashboard data:", error);
+  }
+};
+
 
 
   useEffect(() => {
