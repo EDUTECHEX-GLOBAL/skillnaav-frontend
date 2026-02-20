@@ -3,7 +3,7 @@ name: Deploy to Server
 on:
   push:
     branches:
-      - feture/schooladminbugs # Adjust the branch as necessary
+      - feature/AutomaticInternshipSchedule # Adjust the branch as necessary
 
 jobs:
   deploy:
@@ -22,5 +22,5 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@skillnaav.com << 'EOF'
             cd /home/ubuntu/
-            ./deploy.sh feture/schooladminbugs # Pass the branch name directly
+            ./deploy.sh feature/AutomaticInternshipSchedule # Pass the branch name directly
           EOF

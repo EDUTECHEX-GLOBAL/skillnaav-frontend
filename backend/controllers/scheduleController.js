@@ -189,18 +189,20 @@ const updateInternshipSchedule = async (req, res) => {
           address: entry.location?.address || "",
           mapLink: entry.location?.mapLink || ""
         },
-        events: (entry.events || []).map((ev) => {
-          const evType = ev.type || "online";
-          return {
-            description: ev.description,
-            type: evType,
-            location: evType === "online" ? null : {
-              name: ev.location?.name || "",
-              address: ev.location?.address || "",
-              mapLink: ev.location?.mapLink || ""
-            }
-          };
-        })
+        events: (entry.events || [])
+          .filter(ev => ev && String(ev.description || "").trim())
+          .map((ev) => {
+            const evType = ev.type || "online";
+            return {
+              description: ev.description,
+              type: evType,
+              location: evType === "online" ? null : {
+                name: ev.location?.name || "",
+                address: ev.location?.address || "",
+                mapLink: ev.location?.mapLink || ""
+              }
+            };
+          })
       };
     });
 
@@ -250,39 +252,55 @@ const updateInternshipSchedule = async (req, res) => {
       schedule.markModified("timeSlots");
     }
 
-    await schedule.save();
-
-    // ✅ Send schedule email only to accepted students
-    try {
-      await notifyAcceptedStudentsOfSchedule({
-        internshipId,
-        scheduleDoc: schedule,   // saved schedule doc
-        isNew: wasCreated
-      });
-    } catch (e) {
-      console.error('notifyAcceptedStudentsOfSchedule failed:', e);
+    // ✅ Faster save for big schedules (skip mongoose validations; you already sanitize fields)
+    if (sanitizedTimetable.length > 80) {
+      await schedule.save({ validateBeforeSave: false });
+    } else {
+      await schedule.save();
     }
 
-    // Step: Send to Google Calendar (sync for all accepted students)
-    const acceptedOffers = await OfferLetter
-      .find({ internshipId, status: "Accepted" })
-      .select("email")
-      .lean();
-
-    await Promise.allSettled(
-      acceptedOffers.map((o) =>
-        addScheduleToGoogleCalendar({
-          studentEmail: o.email,
-          timetable: sanitizedTimetable,
-          internshipTitle: "Internship Schedule",
-        })
-      )
-    );
-
-    return res.status(200).json({
-      message: 'Schedule saved successfully',
+    // ✅ RESPOND IMMEDIATELY (FAST)
+    res.status(200).json({
+      message: "Schedule saved successfully",
       schedule,
     });
+
+    // ✅ Run email + calendar sync AFTER response (non-blocking)
+    setImmediate(async () => {
+      // 1) Emails + in-app notification
+      try {
+        await notifyAcceptedStudentsOfSchedule({
+          internshipId,
+          scheduleDoc: schedule,
+          isNew: wasCreated,
+        });
+      } catch (e) {
+        console.error("notifyAcceptedStudentsOfSchedule failed:", e);
+      }
+
+      // 2) Google Calendar sync
+      try {
+        const acceptedOffers = await OfferLetter
+          .find({ internshipId, status: "Accepted" })
+          .select("email")
+          .lean();
+
+        await Promise.allSettled(
+          acceptedOffers.map((o) =>
+            addScheduleToGoogleCalendar({
+              studentEmail: o.email,
+              timetable: sanitizedTimetable,
+              internshipTitle: "Internship Schedule",
+            })
+          )
+        );
+      } catch (e) {
+        console.error("Google Calendar sync failed:", e);
+      }
+    });
+
+    return; // ✅ IMPORTANT: stop execution (response already sent)
+
   } catch (err) {
     console.error('Schedule Save Error:', err);
     return res.status(500).json({
@@ -372,13 +390,41 @@ function extractJson(text) {
   return null;
 }
 
-async function bedrockGenerateText({ prompt }) {
+// ✅ ADD THIS (just below extractJson)
+function chunkArray(arr = [], size = 20) {
+  const out = [];
+  for (let i = 0; i < arr.length; i += size) {
+    out.push(arr.slice(i, i + size));
+  }
+  return out;
+}
+
+// ✅ ADD THIS (just below chunkArray)
+function clampSummary(text = "", max = 200) {
+  const t = String(text || "").trim();
+  return t.length > max ? t.slice(0, max - 1).trim() : t;
+}
+
+async function runWithConcurrency(items, concurrency, handler) {
+  let idx = 0;
+  const workers = new Array(Math.max(1, concurrency)).fill(0).map(async () => {
+    while (idx < items.length) {
+      const current = idx++;
+      await handler(items[current], current);
+    }
+  });
+  await Promise.all(workers);
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function bedrockGenerateText({ prompt, maxTokens = 1200, retries = 2 }) {
   const modelId = process.env.BEDROCK_MODEL_ID;
   if (!modelId) throw new Error("Missing BEDROCK_MODEL_ID in .env");
 
   const body = JSON.stringify({
     anthropic_version: "bedrock-2023-05-31",
-    max_tokens: 2500, // ✅ IMPORTANT: 700 truncates JSON for many days
+    max_tokens: maxTokens,
     temperature: 0.3,
     messages: [{ role: "user", content: [{ type: "text", text: prompt }] }],
   });
@@ -390,9 +436,25 @@ async function bedrockGenerateText({ prompt }) {
     body,
   });
 
-  const response = await bedrock.send(command);
-  const json = JSON.parse(new TextDecoder().decode(response.body));
-  return json?.content?.[0]?.text || "";
+  try {
+    const response = await bedrock.send(command);
+    const json = JSON.parse(new TextDecoder().decode(response.body));
+    return json?.content?.[0]?.text || "";
+  } catch (err) {
+    const nameOrMsg = String(err?.name || err?.message || "");
+    const throttled =
+      nameOrMsg.includes("Throttling") ||
+      nameOrMsg.includes("TooManyRequests") ||
+      nameOrMsg.includes("Rate") ||
+      (err?.$metadata?.httpStatusCode === 429);
+
+    if (throttled && retries > 0) {
+      // backoff: 800ms, 1600ms...
+      await sleep((3 - retries) * 800);
+      return bedrockGenerateText({ prompt, maxTokens, retries: retries - 1 });
+    }
+    throw err;
+  }
 }
 
 const generateAiSectionSummaries = async (req, res) => {
@@ -424,49 +486,160 @@ const generateAiSectionSummaries = async (req, res) => {
       location: internship.location || "",
     };
 
-    const prompt = `
-You are generating "Section Summary" text for an internship schedule.
+    const compactContext = {
+      jobTitle: context.jobTitle,
+      companyName: context.companyName,
+      sector: context.sector,
+      classification: context.classification,
+      mode: context.mode,
+      location: context.location,
+      duration: context.duration,
+      jobDescription: String(context.jobDescription || "").slice(0, 900), // ✅ reduce tokens
+      qualifications: Array.isArray(context.qualifications)
+        ? context.qualifications.slice(0, 10)
+        : [],
+    };
 
-Goal:
-- Create a short section summary for EACH requested day.
-- Summaries must be relevant to the internship posting.
-- Make them progress logically from Day 1 to Day N.
-- Keep each summary 1-2 lines (max ~200 characters).
-- Use classification to adjust difficulty:
-  - Basic: beginner-friendly tasks
-  - Intermediate: more responsibility + practice
-  - Advanced: deeper ownership + deliverables
+    // ✅ milestone + day mapping (prompt rules)
+    const N = Number(totalDays || days.length || 0);
+    const earlyEnd = Math.max(1, Math.round(N * 0.33));
+    const middleEnd = Math.max(1, Math.round(N * 0.75));
+    const dayNumToDate = {};
+    days.forEach(d => {
+      if (d?.dayNumber && d?.date) dayNumToDate[d.dayNumber] = String(d.date).slice(0, 10);
+    });
 
-Input Internship:
-${JSON.stringify(context, null, 2)}
+    // milestone day numbers
+    const dCheckpoint = Math.max(1, Math.round(N * 0.25));
+    const dMid = Math.max(1, Math.round(N * 0.50));
+    const dFinal = Math.max(1, Math.round(N * 0.90));
 
-Requested schedule days:
-${JSON.stringify(days, null, 2)}
+    const milestones = [
+      { label: "Checkpoint", dayNumber: dCheckpoint, date: dayNumToDate[dCheckpoint] || null },
+      { label: "Mid-review", dayNumber: dMid, date: dayNumToDate[dMid] || null },
+      { label: "Final deliverable", dayNumber: dFinal, date: dayNumToDate[dFinal] || null },
+    ].filter(m => m.date);
 
-Return ONLY valid JSON (no markdown, no extra text):
+    // ✅ chunk + parallel calls
+    const CHUNK_SIZE = Number(process.env.BEDROCK_DAYS_PER_CALL || 25);
+    const CONCURRENCY = Number(process.env.BEDROCK_CONCURRENCY || 3);
+
+    // ✅ only send minimal day fields to AI
+    const normalizedDays = (days || []).map(d => ({
+      date: String(d.date).slice(0, 10),
+      dayNumber: d.dayNumber,
+      type: d.type || "online",
+    }));
+
+    // Build milestone lookup
+    const milestoneLabelByDate = {};
+    milestones.forEach(m => {
+      if (m?.date) milestoneLabelByDate[String(m.date).slice(0, 10)] = m.label;
+    });
+
+    const summaryMap = {}; // date -> sectionSummary
+    const chunks = chunkArray(normalizedDays, CHUNK_SIZE);
+
+    // ✅ PARALLEL execution
+    await runWithConcurrency(chunks, CONCURRENCY, async (chunk) => {
+      const prompt = `
+You generate "Section Summary" text for an internship schedule.
+
+Return ONLY valid JSON array (no markdown, no extra text), exactly:
 [
-  { "date": "YYYY-MM-DD", "sectionSummary": "..." },
-  ...
+  { "date": "YYYY-MM-DD", "sectionSummary": "..." }
 ]
+
+Rules:
+- MUST include an item for EVERY input day in THIS request (same dates, no missing).
+- Each sectionSummary must be 1–2 lines, max 200 characters.
+Phase format (MANDATORY):
+- If dayNumber <= ${earlyEnd}, sectionSummary MUST start with "Setup:" and focus on setup + understanding.
+- If ${earlyEnd} < dayNumber <= ${middleEnd}, sectionSummary MUST start with "Practice:" and focus on practice + hands-on work.
+- If dayNumber > ${middleEnd}, sectionSummary MUST start with "Outcome:" and focus on outcomes + results.
+- Do NOT repeat the same sectionSummary across days.
+- Use dayNumber to maintain progress across the full internship (dayNumber is global).
+- classification controls difficulty: Basic / Intermediate / Advanced
+
+Milestone requirements:
+- If a milestone date is in this chunk, that day's summary MUST include the milestone label word:
+${JSON.stringify(milestones, null, 2)}
+
+Internship info:
+${JSON.stringify(compactContext, null, 2)}
+
+Days (do not change dates):
+${JSON.stringify(chunk, null, 2)}
 `;
 
-    const raw = await bedrockGenerateText({ prompt });
-    const parsed = extractJson(raw);
+      const maxTokens = Math.min(1800, 250 + chunk.length * 55);
 
-    if (!Array.isArray(parsed)) {
-      console.error("Bedrock output (not JSON array):", raw);
-      return res.status(500).json({
-        error: "AI did not return valid JSON. Try again.",
+      const raw = await bedrockGenerateText({ prompt, maxTokens });
+      const parsed = extractJson(raw);
+
+      if (!Array.isArray(parsed)) {
+        console.error("Bedrock output (not JSON array):", raw);
+        throw new Error("AI did not return valid JSON.");
+      }
+
+      parsed.forEach(x => {
+        if (!x?.date) return;
+        const dt = String(x.date).slice(0, 10);
+        if (!dt) return;
+        summaryMap[dt] = clampSummary(x.sectionSummary || "", 200);
       });
-    }
+    });
 
-    // sanitize output
-    const summaries = parsed
-      .filter(x => x && x.date)
-      .map(x => ({
-        date: String(x.date).slice(0, 10),
-        sectionSummary: (x.sectionSummary || "").toString().trim(),
-      }));
+    // ✅ GUARANTEE: return summary for every requested day
+    const used = new Set();
+
+    const summaries = normalizedDays.map(d => {
+      const dt = d.date;
+      const milestoneLabel = milestoneLabelByDate[dt];
+
+      const phasePrefix =
+        d.dayNumber <= earlyEnd
+          ? "Setup:"
+          : d.dayNumber <= middleEnd
+            ? "Practice:"
+            : "Outcome:";
+
+      let text = summaryMap[dt];
+
+      // fallback only if missing
+      if (!text || !text.trim()) {
+        if (phasePrefix === "Setup:") {
+          text = "Setup: set up tools and understand today’s goals.";
+        } else if (phasePrefix === "Practice:") {
+          text = "Practice: complete a hands-on task and capture learnings.";
+        } else {
+          text = "Outcome: finalize output and document results clearly.";
+        }
+      } else {
+        // Ensure the output follows required phase prefix (in case AI forgets)
+        if (!/^(Setup:|Practice:|Outcome:)\s*/i.test(String(text).trim())) {
+          text = `${phasePrefix} ${text}`;
+        }
+      }
+
+      // ✅ Ensure milestone word exists WITHOUT breaking the required prefix
+      if (milestoneLabel && !String(text).toLowerCase().includes(milestoneLabel.toLowerCase())) {
+        text = String(text).replace(/^(Setup:|Practice:|Outcome:)\s*/i, (m) => `${m}${milestoneLabel} - `);
+      }
+
+      text = clampSummary(text, 200);
+
+      // ✅ Prevent duplicates without breaking prefix format
+      if (used.has(text)) {
+        text = clampSummary(`${text} (Day ${d.dayNumber})`, 200);
+      }
+      used.add(text);
+
+      return {
+        date: dt,
+        sectionSummary: text,
+      };
+    });
 
     return res.status(200).json({ summaries });
   } catch (err) {

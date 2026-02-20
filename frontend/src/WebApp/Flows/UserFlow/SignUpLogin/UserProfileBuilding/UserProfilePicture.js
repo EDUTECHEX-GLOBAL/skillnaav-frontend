@@ -1,3 +1,5 @@
+// File: UserProfilePicture.js
+
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -12,15 +14,15 @@ const UserProfilePicture = () => {
     return savedData
       ? JSON.parse(savedData)
       : {
-          fieldOfStudy: location.state?.formData.fieldOfStudy || "",
-          desiredField: "",
-          linkedin: "",
-          portfolio: "",
-          skills: "",
-          interests: "",
-          preferredLocations: "",
-          profilePic: null,
-        };
+        fieldOfStudy: location.state?.formData.fieldOfStudy || "",
+        desiredField: "",
+        linkedin: "",
+        portfolio: "",
+        skills: "",
+        interests: "",
+        preferredLocations: "",
+        profilePic: null,
+      };
   });
 
   // Save form data to localStorage
@@ -107,7 +109,7 @@ const UserProfilePicture = () => {
       console.error("Registration error:", error);
       alert(
         error.response?.data?.error ||
-          "Registration failed. Please check your inputs and try again."
+        "Registration failed. Please check your inputs and try again."
       );
     }
   };
@@ -263,11 +265,10 @@ const UserProfilePicture = () => {
               type="button"
               onClick={handleSubmit}
               disabled={!isFormValid()}
-              className={`w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
-                isFormValid()
+              className={`w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${isFormValid()
                   ? "bg-purple-600 hover:bg-purple-700"
                   : "bg-purple-300 cursor-not-allowed"
-              } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500`}
+                } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500`}
             >
               Submit
             </button>

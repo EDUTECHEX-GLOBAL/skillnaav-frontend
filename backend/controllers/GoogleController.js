@@ -51,6 +51,40 @@ function clearProgress(internshipId, email) {
   syncProgressStore.delete(pk(internshipId, email));
 }
 
+// ✅ Decode base64 state safely: { internshipId, email }
+function decodeStatePayload(state) {
+  try {
+    if (!state) return null;
+    const json = Buffer.from(String(state), "base64").toString("utf8");
+    const obj = JSON.parse(json);
+    return obj && typeof obj === "object" ? obj : null;
+  } catch {
+    return null;
+  }
+}
+
+// ✅ Build redirect URL and safely override query params (gauth, etc.)
+function buildFrontendRedirect(params = {}) {
+  const base = `${FRONTEND_BASE_URL}${AFTER_AUTH_PATH}`;
+
+  try {
+    const url = new URL(base);
+    for (const [k, v] of Object.entries(params)) {
+      if (v === undefined || v === null) continue;
+      url.searchParams.set(k, String(v));
+    }
+    return url.toString();
+  } catch {
+    // fallback (if URL() ever fails)
+    const joiner = base.includes("?") ? "&" : "?";
+    const qs = Object.entries(params)
+      .filter(([, v]) => v !== undefined && v !== null)
+      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
+      .join("&");
+    return qs ? `${base}${joiner}${qs}` : base;
+  }
+}
+
 // ✅ Detect PAID internship for the student (used to route to GoogleControllerPaid.js)
 function inferPaidFromOffer(offerDoc) {
   if (!offerDoc) return false;
@@ -128,7 +162,10 @@ const googleAuth = (req, res) => {
 
   const authUrl = oAuth2Client.generateAuthUrl({
     access_type: 'offline',
-    prompt: 'consent',
+
+    // ✅ Force account chooser every time (prevents reusing old Google session silently)
+    prompt: 'consent select_account',
+
     include_granted_scopes: true,
     scope: [
       'openid',
@@ -167,6 +204,10 @@ const googleCallback = async (req, res) => {
 
   try {
     console.log('Starting token exchange process...');
+
+    // ✅ We expect state to contain the SkillNaav user email (the one who clicked "Add/Update")
+    const statePayload = decodeStatePayload(state);
+    const requestedEmail = statePayload?.email ? String(statePayload.email).toLowerCase() : null;
 
     // Exchange code for tokens
     const tokens = await exchangeCodeForTokens(code);
@@ -212,6 +253,11 @@ const googleCallback = async (req, res) => {
       throw new Error("Failed to retrieve user email from Google");
     }
 
+    const googleEmail = String(email).toLowerCase();
+
+    // From here onwards, always use the SkillNaav user's email as the key
+    const identityEmail = requestedEmail || googleEmail;
+
     // Store tokens with email (preserve old refresh_token if Google didn't send one)
     // Also stamp which OAuth client minted these tokens
     const setFields = {
@@ -228,28 +274,28 @@ const googleCallback = async (req, res) => {
     }
 
     const tokenDoc = await TokenModel.findOneAndUpdate(
-      { email },
+      { email: identityEmail },
       { $set: setFields },
       { upsert: true, new: true }
     );
 
-    console.log(`Successfully stored tokens for ${email}`);
+    console.log(`Successfully stored tokens for ${identityEmail}`);
 
     // Send "Google auth successful" mail (best effort; do not block callback)
     try {
       const { sendGoogleAuthSuccessEmail } = require("../utils/googleAuthMailer");
       // If you store instructor names elsewhere and want to include them, look them up here.
-      await sendGoogleAuthSuccessEmail({ to: email });
+      await sendGoogleAuthSuccessEmail({ to: identityEmail });
     } catch (e) {
       console.warn("[googleCallback] success mail failed:", e?.message || e);
     }
     // ✅ Do NOT sync here anymore. Only confirm auth and return to UI.
 
     // (Optional) decode caller state if you need it later
-    let statePayload = null;
+    let callbackStatePayload = null;
     try {
       if (state) {
-        statePayload = JSON.parse(Buffer.from(String(state), 'base64').toString('utf8'));
+        callbackStatePayload = JSON.parse(Buffer.from(String(state), 'base64').toString('utf8'));
       }
     } catch (e) {
       console.warn('Invalid state payload (ignored):', e.message);
@@ -257,7 +303,7 @@ const googleCallback = async (req, res) => {
 
     // ✅ No interstitial page; go straight back to Offer Letter.
     // We rely on ?gauth=success in AFTER_AUTH_PATH and the front-end shows the popup.
-    const redirectUrl = `${FRONTEND_BASE_URL}${AFTER_AUTH_PATH}`;
+    const redirectUrl = buildFrontendRedirect({ gauth: "success" });
     return res.redirect(302, redirectUrl);
 
   } catch (err) {

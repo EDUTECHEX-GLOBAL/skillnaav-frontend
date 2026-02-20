@@ -17,10 +17,10 @@ const formatDateRange = (start, end) => {
   const e =
     end && !isNaN(Date.parse(end))
       ? new Date(end).toLocaleDateString("en-GB", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        })
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      })
       : end || "";
   return `${s} – ${e}`;
 };
@@ -45,12 +45,23 @@ const StipendDetails = () => {
   useEffect(() => {
     if (!partnerId) return;
     setLoading(true);
-    axios
-      .get(`/api/interns/partner/${partnerId}`)
+    axios.get(`/api/interns/partner/${partnerId}?internshipType=STIPEND`)
       .then((res) => setInternships(res.data?.data || []))
       .catch(() => setInternships([]))
       .finally(() => setLoading(false));
   }, [partnerId]);
+
+  const stipendInternships = useMemo(() => {
+    return internships.filter(
+      (i) =>
+        i.internshipType === "STIPEND" &&
+        i.compensationDetails?.type === "STIPEND" &&
+        i.adminApproved === true
+    );
+  }, [internships]);
+
+
+
 
   /* Fetch stipend details */
   const openStipends = async (internship) => {
@@ -107,7 +118,8 @@ const StipendDetails = () => {
         </div>
       ) : (
         <div className="max-w-5xl mx-auto space-y-4">
-          {internships.map((internship) => (
+          {stipendInternships.map((internship) => (
+
             <div
               key={internship._id}
               className="bg-white border border-slate-200 rounded-xl p-5 flex flex-col sm:flex-row gap-5"
@@ -136,7 +148,7 @@ const StipendDetails = () => {
                 </p>
 
                 <p className="text-sm text-teal-700 font-medium mt-2">
-                  Student Pays:{" "}
+                  Stipend:{" "}
                   {internship.compensationDetails?.amount
                     ? `${internship.compensationDetails.amount} ${internship.compensationDetails.currency}`
                     : "N/A"}

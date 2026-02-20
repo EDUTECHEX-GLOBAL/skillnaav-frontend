@@ -323,16 +323,19 @@ router.get("/partner/:partnerId", async (req, res) => {
   try {
     const { partnerId } = req.params;
 
-    // Query params (safe defaults)
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 12;
     const search = req.query.search || "";
     const sortField = req.query.sort || "jobTitle";
     const sortOrder = req.query.order === "desc" ? -1 : 1;
 
-    // MongoDB filter
+    // ⭐ IMPORTANT
+    const internshipType = req.query.internshipType;
+
+    // ⭐ Build filter dynamically
     const filter = {
       partnerId,
+      ...(internshipType && { internshipType }), // ✅ THIS LINE FIXES EVERYTHING
       $or: [
         { jobTitle: { $regex: search, $options: "i" } },
         { companyName: { $regex: search, $options: "i" } },
@@ -340,16 +343,13 @@ router.get("/partner/:partnerId", async (req, res) => {
       ],
     };
 
-    // Count total docs (for pagination UI)
     const total = await InternshipPosting.countDocuments(filter);
 
-    // Fetch paginated data
     const internships = await InternshipPosting.find(filter)
       .sort({ [sortField]: sortOrder })
       .skip((page - 1) * limit)
       .limit(limit);
 
-    // Always respond 200
     res.status(200).json({
       data: internships,
       page,
@@ -361,6 +361,7 @@ router.get("/partner/:partnerId", async (req, res) => {
     res.status(500).json({ message: "Server Error" });
   }
 });
+
 
 
 // PUT update an internship posting by ID

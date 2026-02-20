@@ -1,4 +1,4 @@
-// File: UnifiedUserRegistration.js
+// File: UserCreateAccount.js
 
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
@@ -10,8 +10,7 @@ import "react-datepicker/dist/react-datepicker.css";
 import loginImage from "../../../../assets-webapp/login-image.png";
 import { GoogleLogin } from "@react-oauth/google";
 import { COUNTRIES, US_STATES, CA_PROVINCES } from "../../../../constants/locations";
-
-
+import UserAgeGateConsentModal from "./UserProfileBuilding/UserAgeGateConsentModal";
 
 
 const UnifiedUserRegistration = () => {
@@ -21,6 +20,7 @@ const UnifiedUserRegistration = () => {
   const [otp, setOtp] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showAgeGateModal, setShowAgeGateModal] = useState(false);
 
   // States for OTP resend logic (from UserCreateAccount.js)
   const [resendTimer, setResendTimer] = useState(30);
@@ -198,7 +198,12 @@ const UnifiedUserRegistration = () => {
       if (verifyRes.data.success) {
         localStorage.setItem("userToken", verifyRes.data.token);
         setErrorMessage("");
-        setCurrentStep(2);
+
+        // ✅ NEW: open age gate popup (don’t go to step 2 yet)
+        setShowAgeGateModal(true);
+
+        // ❌ REMOVE this line:
+        // setCurrentStep(2);
       } else {
         setErrorMessage("Invalid OTP. Try again.");
         setCanResend(true);
@@ -535,12 +540,16 @@ const UnifiedUserRegistration = () => {
             {/* Education Level */}
             <div>
               <label className="block text-sm font-medium text-gray-700">
-                Current level of education
+                Current level of education *
               </label>
 
-              <div className="mt-2 space-y-2">
+              <div className="mt-3 flex flex-wrap items-center gap-x-10 gap-y-3">
                 {["highschool", "undergraduate", "graduate"].map((level) => (
-                  <div key={level} className="flex items-center">
+                  <label
+                    key={level}
+                    htmlFor={level}
+                    className="inline-flex items-center gap-2 cursor-pointer select-none"
+                  >
                     <input
                       type="radio"
                       id={level}
@@ -555,22 +564,23 @@ const UnifiedUserRegistration = () => {
                           institutionName: "",
                         }))
                       }
-                      className="h-4 w-4 text-purple-600"
+                      className="h-4 w-4 m-0 text-purple-600"
                       required
                     />
-                    <label htmlFor={level} className="ml-3 text-sm text-gray-700">
+                    <span className="text-sm text-gray-700 leading-none">
                       {level.charAt(0).toUpperCase() + level.slice(1)}
-                    </label>
-                  </div>
+                    </span>
+                  </label>
                 ))}
               </div>
+
             </div>
 
             {/* Grade (ONLY for High School) */}
             {formData.educationLevel === "highschool" && (
               <div>
                 <label className="block text-sm font-medium text-gray-700">
-                  Current Grade
+                  Current Grade *
                 </label>
 
                 <select
@@ -595,8 +605,8 @@ const UnifiedUserRegistration = () => {
               <div className="relative">
                 <label className="block text-sm font-medium text-gray-700">
                   {formData.educationLevel === "highschool"
-                    ? "School Name"
-                    : "College / University Name"}
+                    ? "School Name *"
+                    : "College / University Name *"}
                 </label>
 
                 <input
@@ -643,10 +653,9 @@ const UnifiedUserRegistration = () => {
               </div>
             )}
 
-
             {/* Date of Birth */}
             <div>
-              <label htmlFor="dob" className="block text-sm font-medium text-gray-700">Date of Birth</label>
+              <label htmlFor="dob" className="block text-sm font-medium text-gray-700">Date of Birth *</label>
               <DatePicker selected={formData.dob} onChange={handleDateChange} dateFormat="dd/MM/yyyy" maxDate={new Date()} showYearDropdown showMonthDropdown dropdownMode="select" placeholderText="DD/MM/YYYY" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500" required />
             </div>
 
@@ -705,10 +714,9 @@ const UnifiedUserRegistration = () => {
               </div>
             </div>
 
-
             {/* Field of Study Select */}
             <div>
-              <label htmlFor="fieldOfStudy" className="block text-sm font-medium text-gray-700">Field of Study</label>
+              <label htmlFor="fieldOfStudy" className="block text-sm font-medium text-gray-700">Field of Study *</label>
               <select name="fieldOfStudy" value={formData.fieldOfStudy} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500" required>
                 <option value="">Select Your Field</option>
                 <option value="Space">Space Internships</option>
@@ -813,11 +821,10 @@ const UnifiedUserRegistration = () => {
           <img
             src={loginImage}
             alt="Skillnaav Login Illustration"
-            className="max-w-[90%] max-h-[90%] object-contain"
+            className="w-full h-full object-cover rounded-lg"
           />
         </div>
       )}
-
 
       <div className="flex flex-col items-center justify-center p-8 w-full lg:w-1/2 bg-white mx-auto">
         <div className={`w-full max-w-md ${currentStep !== 1 && currentStep !== 1.5 ? 'max-w-xl' : ''} flex flex-col justify-center min-h-screen lg:min-h-full`}>
@@ -829,6 +836,18 @@ const UnifiedUserRegistration = () => {
           )}
 
           {renderStep()}
+
+          <UserAgeGateConsentModal
+            open={showAgeGateModal}
+            onComplete={(payload) => {
+              // Save age/consent info into formData (minimal, safe)
+              setFormData((prev) => ({ ...prev, ...payload }));
+
+              // Close popup and continue normal flow
+              setShowAgeGateModal(false);
+              setCurrentStep(2);
+            }}
+          />
 
           {(currentStep === 1 || currentStep === 1.5) && (
             <>
