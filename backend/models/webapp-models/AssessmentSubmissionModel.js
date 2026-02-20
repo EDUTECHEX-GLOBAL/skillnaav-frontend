@@ -13,17 +13,25 @@ const responseSchema = new mongoose.Schema({
 
 // Schema for violation tracking
 const violationSchema = new mongoose.Schema({
-  type: { 
-    type: String, 
-    enum: ['TAB_SWITCH', 'KEYBOARD_ATTEMPT', 'FULLSCREEN_EXIT', 'CONTEXT_MENU', 'BLUR_EVENT', 'OTHER'],
-    required: true 
+  type: {
+    type: String,
+    enum: [
+      'TAB_SWITCH',
+      'KEYBOARD_ATTEMPT',
+      'FULLSCREEN_EXIT',
+      'CONTEXT_MENU',
+      'BLUR_EVENT',
+      'WINDOW_BLUR',   // ✅ ADD THIS
+      'OTHER'
+    ],
+    required: true
   },
   timestamp: { type: String, required: true },
   message: { type: String, required: true },
-  severity: { 
-    type: String, 
-    enum: ['low', 'medium', 'high'], 
-    default: 'medium' 
+  severity: {
+    type: String,
+    enum: ['low', 'medium', 'high'],
+    default: 'medium'
   }
 });
 
@@ -44,17 +52,17 @@ const assessmentSubmissionSchema = new mongoose.Schema({
   totalMarks: { type: Number, required: true },
   percentage: { type: Number, required: true },
   timeTaken: { type: Number, required: true }, // in seconds
-  fitStatus: { 
-    type: String, 
-    enum: ["fit", "not fit"], 
-    required: true 
+  fitStatus: {
+    type: String,
+    enum: ["fit", "not fit"],
+    required: true
   },
   submittedAt: { type: Date, default: Date.now },
 
   // Proctoring data
   violations: [violationSchema], // Array of all violations during the exam
   violationCount: { type: Number, default: 0 }, // Total count for quick reference
-  
+
   // Optional proctoring session info
   proctoringSessionId: {
     type: mongoose.Schema.Types.ObjectId,
