@@ -86,5 +86,3 @@ assessmentSubmissionSchema.index({ studentId: 1, assessmentId: 1 });
 assessmentSubmissionSchema.index({ submittedAt: -1 });
 
 module.exports = mongoose.model("AssessmentSubmission", assessmentSubmissionSchema);
-
-//
