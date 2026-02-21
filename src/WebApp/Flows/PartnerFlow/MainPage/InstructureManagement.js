@@ -473,6 +473,8 @@ const InstructureManagement = () => {
 
             // Point directly to your FastAPI service on :8003
             const PY_API = process.env.REACT_APP_PY_API || "http://127.0.0.1:8003";
+            console.log("ENV TEST:", process.env.REACT_APP_PY_API);
+
 
             const { data } = await axios.post(
                 `${PY_API}/assign-instructors`,
