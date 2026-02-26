@@ -372,3 +372,621 @@ async def fetch_applications(job_id: str):
         return {"applications": convert_object_ids(apps)}
     except Exception as e:
         return {"error": str(e)}
+
+from pydantic import BaseModel
+import re
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# RESUME INTELLIGENCE — Full structured extraction
+# Replaces the old skills-only endpoint.
+# Returns: name, email, phone, linkedin, portfolio, summary,
+#          skills[], education[], experience[], projects[],
+#          certifications[], languages[]
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class ResumeRequest(BaseModel):
+    resume_url: str
+
+
+# ── Expanded skill dictionary ─────────────────────────────────────────────────
+SKILL_KEYWORDS = [
+    # Languages
+    "python", "javascript", "typescript", "java", "c++", "c#", "go", "rust",
+    "ruby", "php", "swift", "kotlin", "scala", "r", "matlab", "dart",
+    # Frontend
+    "react", "vue", "angular", "next.js", "svelte", "tailwind", "html", "css",
+    "redux", "webpack", "vite",
+    # Backend
+    "node", "express", "fastapi", "django", "flask", "spring", "laravel",
+    "graphql", "rest api", "microservices",
+    # Data / AI / ML
+    "machine learning", "deep learning", "ai", "tensorflow", "pytorch",
+    "pandas", "numpy", "scikit-learn", "nlp", "computer vision", "data science",
+    "keras", "opencv", "llm",
+    # Cloud / DevOps
+    "aws", "azure", "gcp", "docker", "kubernetes", "ci/cd", "terraform",
+    "linux", "git", "jenkins", "github actions",
+    # Databases
+    "mongodb", "postgresql", "mysql", "redis", "elasticsearch", "sqlite",
+    "firebase", "dynamodb", "sql",
+    # Other
+    "agile", "scrum", "figma", "unity", "android", "ios", "flutter",
+]
+
+
+# ── Section splitter ──────────────────────────────────────────────────────────
+SECTION_PATTERNS = {
+    "summary":        r"(summary|objective|profile|about me|professional summary|career objective)",
+    "experience":     r"(experience|employment|work history|internship|positions?|work experience)",
+    "education":      r"(education|academic|qualification|degree|university|college|school)",
+    "projects":       r"(projects?|portfolio|personal projects?|academic projects?|key projects?)",
+    "certifications": r"(certif|licens|award|achievement|accomplishment)",
+    "skills":         r"(skills?|technical skills?|core competencies|technologies)",
+    "contact":        r"(contact|email|phone|linkedin|portfolio|website|links?)",
+}
+
+def split_sections(text: str) -> dict:
+    lines = text.split("\n")
+    sections = {k: [] for k in SECTION_PATTERNS}
+    sections["other"] = []
+    current = "other"
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        matched = False
+        for section, pattern in SECTION_PATTERNS.items():
+            if re.search(pattern, stripped, re.IGNORECASE) and len(stripped) < 60:
+                current = section
+                matched = True
+                break
+        if not matched:
+            sections[current].append(stripped)
+    return {k: "\n".join(v) for k, v in sections.items()}
+
+
+# ── Field extractors ──────────────────────────────────────────────────────────
+def extract_skills_from_text(text: str) -> list:
+    detected = []
+    lower_text = text.lower()
+    for skill in SKILL_KEYWORDS:
+        if re.search(rf"\b{re.escape(skill)}\b", lower_text):
+            detected.append(skill.title())
+    return list(set(detected))
+
+def extract_email(text: str) -> str:
+    m = re.search(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}", text)
+    return m.group(0) if m else ""
+
+def extract_phone(text: str) -> str:
+    m = re.search(r"(\+?\d[\d\s\-().]{7,}\d)", text)
+    return m.group(0).strip() if m else ""
+
+def extract_linkedin(text: str) -> str:
+    m = re.search(r"(https?://)?(www\.)?linkedin\.com/in/[\w\-]+/?", text, re.IGNORECASE)
+    return m.group(0) if m else ""
+
+def extract_portfolio(text: str) -> str:
+    m = re.search(
+        r"(https?://)?(www\.)?(github\.com/[\w\-]+|[\w\-]+\.(dev|io|me|netlify\.app|vercel\.app)[^\s,)\"']*)",
+        text, re.IGNORECASE
+    )
+    return m.group(0) if m else ""
+
+def extract_name(text: str) -> str:
+    """First short line with 2–5 words and no special chars is usually the name."""
+    for line in text.split("\n"):
+        stripped = line.strip()
+        if stripped and 2 <= len(stripped.split()) <= 5 and len(stripped) < 50:
+            if not re.search(r"[@/\d|•@#]", stripped):
+                return stripped
+    return ""
+
+def parse_summary(section_text: str, full_text: str) -> str:
+    if section_text.strip():
+        return section_text.strip()[:600]
+    paragraphs = [p.strip() for p in full_text.split("\n\n") if p.strip()]
+    for para in paragraphs[1:4]:
+        if len(para) > 80 and not re.search(r"[@\d]{2,}", para[:30]):
+            return para[:600]
+    return ""
+
+def parse_education(section_text: str) -> list:
+    results = []
+    if not section_text.strip():
+        return results
+    chunks = re.split(
+        r"\n{2,}|(?=\b(B\.?Tech|B\.?E|B\.?Sc|M\.?Tech|M\.?Sc|MBA|PhD|Bachelor|Master|High School|Diploma)\b)",
+        section_text
+    )
+    for chunk in chunks:
+        chunk = chunk.strip()
+        if not chunk:
+            continue
+        entry = {}
+        deg = re.search(
+            r"(B\.?Tech|B\.?E|B\.?Sc|M\.?Tech|M\.?Sc|MBA|PhD|Bachelor[^\n,]*|Master[^\n,]*|High School[^\n,]*|Diploma[^\n,]*)",
+            chunk, re.IGNORECASE
+        )
+        if deg:
+            entry["degree"] = deg.group(0).strip()
+        uni = re.search(r"(university|college|institute|school|academy)[^\n,]*", chunk, re.IGNORECASE)
+        if uni:
+            entry["university"] = uni.group(0).strip()
+        years = re.findall(r"\b(20\d{2})\b", chunk)
+        if len(years) >= 2:
+            entry["startYear"] = years[0]
+            entry["endYear"] = years[-1]
+        elif len(years) == 1:
+            entry["startYear"] = years[0]
+        grade = re.search(r"(CGPA|GPA|Grade|Percentage)[:\s]+([0-9.]+\s*%?)", chunk, re.IGNORECASE)
+        if grade:
+            entry["grade"] = f"{grade.group(1)} {grade.group(2)}".strip()
+        if entry.get("degree") or entry.get("university"):
+            results.append(entry)
+    return results[:3]
+
+def parse_experience(section_text: str) -> list:
+    results = []
+    if not section_text.strip():
+        return results
+    chunks = re.split(r"\n{2,}", section_text)
+    for chunk in chunks:
+        chunk = chunk.strip()
+        if not chunk or len(chunk) < 20:
+            continue
+        lines = [l.strip() for l in chunk.split("\n") if l.strip()]
+        entry = {}
+        if lines:
+            entry["title"] = lines[0]
+        if len(lines) > 1:
+            entry["company"] = lines[1]
+        date_matches = re.findall(
+            r"(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|"
+            r"Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)"
+            r"[,\s]+\d{4}",
+            chunk, re.IGNORECASE
+        )
+        year_matches = re.findall(r"\b(20\d{2})\b", chunk)
+        if date_matches:
+            entry["startDate"] = date_matches[0]
+            entry["endDate"] = date_matches[1] if len(date_matches) > 1 else ""
+        elif year_matches:
+            entry["startDate"] = year_matches[0]
+            entry["endDate"] = year_matches[1] if len(year_matches) > 1 else ""
+        entry["current"] = bool(re.search(r"\b(present|current|now)\b", chunk, re.IGNORECASE))
+        entry["location"] = ""
+        entry["description"] = " ".join(lines[2:])[:400] if len(lines) > 2 else ""
+        if entry.get("title"):
+            results.append(entry)
+    return results[:5]
+
+def parse_projects(section_text: str) -> list:
+    results = []
+    if not section_text.strip():
+        return results
+    chunks = re.split(r"\n{2,}", section_text)
+    for chunk in chunks:
+        chunk = chunk.strip()
+        if not chunk or len(chunk) < 15:
+            continue
+        lines = [l.strip() for l in chunk.split("\n") if l.strip()]
+        entry = {}
+        if lines:
+            entry["name"] = lines[0]
+        entry["description"] = " ".join(lines[1:])[:400]
+        tech_match = re.search(
+            r"(?:tech(?:nologies)?|stack|built with|tools|using)[:\s]+([\w,\s.+#]+)",
+            chunk, re.IGNORECASE
+        )
+        if tech_match:
+            entry["techStack"] = [t.strip() for t in re.split(r"[,|·•]", tech_match.group(1)) if t.strip()]
+        else:
+            entry["techStack"] = extract_skills_from_text(chunk)
+        link = re.search(r"https?://[^\s\"'>]+", chunk)
+        entry["link"] = link.group(0) if link else ""
+        if entry.get("name"):
+            results.append(entry)
+    return results[:5]
+
+def parse_certifications(section_text: str) -> list:
+    results = []
+    if not section_text.strip():
+        return results
+    for line in section_text.split("\n"):
+        line = line.strip()
+        if not line or len(line) < 5:
+            continue
+        entry = {"name": line, "issuer": "", "issueDate": "", "expiryDate": "", "credentialUrl": ""}
+        issuer = re.search(
+            r"(Google|AWS|Amazon|Microsoft|Coursera|Udemy|LinkedIn|Meta|IBM|Oracle|Cisco|HackerRank|MongoDB|Nptel|edX)",
+            line, re.IGNORECASE
+        )
+        if issuer:
+            entry["issuer"] = issuer.group(0)
+        date = re.search(r"(20\d{2})", line)
+        if date:
+            entry["issueDate"] = date.group(0)
+        results.append(entry)
+    return results[:6]
+
+def parse_languages(text: str) -> list:
+    common = [
+        "English", "Hindi", "Telugu", "Tamil", "Kannada", "Malayalam",
+        "Spanish", "French", "German", "Chinese", "Japanese", "Arabic",
+        "Portuguese", "Russian", "Korean", "Italian", "Dutch", "Bengali",
+        "Marathi", "Urdu", "Gujarati", "Punjabi",
+    ]
+    results = []
+    for lang in common:
+        if re.search(rf"\b{lang}\b", text, re.IGNORECASE):
+            prof_match = re.search(
+                rf"{lang}[^.\n]*(native|fluent|advanced|intermediate|beginner)",
+                text, re.IGNORECASE
+            )
+            proficiency = "Intermediate"
+            if prof_match:
+                p = prof_match.group(1).lower()
+                if p in ("native", "fluent"):    proficiency = "Native"
+                elif p == "advanced":            proficiency = "Advanced"
+                elif p == "beginner":            proficiency = "Beginner"
+            results.append({"language": lang, "proficiency": proficiency})
+    return results[:5]
+
+
+# ── Main endpoint ─────────────────────────────────────────────────────────────
+@app.post("/extract-resume")
+async def extract_resume(data: ResumeRequest):
+    resume_url = data.resume_url
+    print(f"[{now()}] 🧠 Extract-resume called for: {resume_url}")
+
+    # 1️⃣ Download
+    file_stream = await asyncio.get_event_loop().run_in_executor(
+        None, download_resume_from_s3, resume_url
+    )
+    if not file_stream:
+        raise HTTPException(status_code=400, detail="Failed to download resume")
+
+    # 2️⃣ Extract raw text
+    ext = os.path.splitext(urlparse(resume_url).path)[-1].lower()
+    if ext == ".pdf":
+        text = await asyncio.get_event_loop().run_in_executor(None, extract_text_from_pdf, file_stream)
+    elif ext == ".docx":
+        text = await asyncio.get_event_loop().run_in_executor(None, extract_text_from_docx, file_stream)
+    else:
+        raise HTTPException(status_code=400, detail=f"Unsupported file type: {ext}")
+
+    if not text.strip():
+        raise HTTPException(status_code=422, detail="Could not extract text from resume")
+
+    print(f"[{now()}] 📄 Extracted {len(text)} characters")
+
+    # 3️⃣ Split into sections then extract every field
+    sections   = split_sections(text)
+    name           = extract_name(text)
+    email          = extract_email(text)
+    phone          = extract_phone(text)
+    linkedin       = extract_linkedin(text)
+    portfolio      = extract_portfolio(text)
+    summary        = parse_summary(sections.get("summary", ""), text)
+    skills         = extract_skills_from_text(text)
+    education      = parse_education(sections.get("education", ""))
+    experience     = parse_experience(sections.get("experience", ""))
+    projects       = parse_projects(sections.get("projects", ""))
+    certifications = parse_certifications(sections.get("certifications", ""))
+    languages      = parse_languages(text)
+
+    print(
+        f"[{now()}] ✅ Done → skills:{len(skills)}, exp:{len(experience)}, "
+        f"proj:{len(projects)}, edu:{len(education)}, certs:{len(certifications)}, "
+        f"langs:{len(languages)}, linkedin:{'✓' if linkedin else '✗'}, "
+        f"summary:{'✓' if summary else '✗'}"
+    )
+
+    return {
+        "name":           name,
+        "email":          email,
+        "phone":          phone,
+        "linkedin":       linkedin,
+        "portfolio":      portfolio,
+        "summary":        summary,
+        "skills":         skills,
+        "education":      education,
+        "experience":     experience,
+        "projects":       projects,
+        "certifications": certifications,
+        "languages":      languages,
+    }
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CV GENERATOR — /cv/generate
+# Accepts the merged StudentProfile shape from the Node API and returns a PDF.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+from reportlab.pdfgen import canvas as rl_canvas
+from reportlab.lib.units import mm
+
+from pydantic import BaseModel
+from typing import List, Optional, Any
+from fastapi.responses import StreamingResponse
+
+# ── Pydantic models matching the merged profile shape ─────────────────────────
+class CVRequest(BaseModel):
+    # Userwebapp fields (flat — from merged GET /api/student-profile/:userId)
+    name:              Optional[str] = ""
+    email:             Optional[str] = ""
+    phone:             Optional[str] = ""
+    linkedin:          Optional[str] = ""
+    portfolio:         Optional[str] = ""
+    universityName:    Optional[str] = ""
+    fieldOfStudy:      Optional[str] = ""
+    educationLevel:    Optional[str] = ""
+    country:           Optional[str] = ""
+    skills:            Optional[List[str]] = []
+
+    # StudentProfile extension fields
+    summary:           Optional[str] = ""
+    experience:        Optional[List[Any]] = []
+    projects:          Optional[List[Any]] = []
+    certifications:    Optional[List[Any]] = []
+    languages:         Optional[List[Any]] = []
+
+
+# ── Layout constants ──────────────────────────────────────────────────────────
+W, H      = A4                      # 595 x 842 pt
+MARGIN_X  = 18 * mm
+MARGIN_B  = 14 * mm
+HEADER_H  = 46 * mm
+ACCENT_H  = 5  * mm
+
+# Brand colours
+INDIGO    = colors.HexColor("#4F46E5")
+INDIGO_LT = colors.HexColor("#818CF8")
+SLATE_800 = colors.HexColor("#1E293B")
+SLATE_600 = colors.HexColor("#475569")
+SLATE_400 = colors.HexColor("#94A3B8")
+SLATE_100 = colors.HexColor("#F1F5F9")
+WHITE     = colors.white
+
+
+def build_cv_pdf(p: CVRequest) -> bytes:
+    buf = io.BytesIO()
+    c   = rl_canvas.Canvas(buf, pagesize=A4)
+    c.setTitle(f"Skillnaav CV — {p.name or 'Resume'}")
+
+    # ── state ──────────────────────────────────────────────────────────────
+    y = [H]   # mutable cursor (list so inner funcs can mutate)
+
+    def new_page():
+        c.showPage()
+        y[0] = H - 10 * mm
+        # light top rule on continuation pages
+        c.setStrokeColor(INDIGO)
+        c.setLineWidth(1)
+        c.line(MARGIN_X, y[0], W - MARGIN_X, y[0])
+        y[0] -= 6 * mm
+
+    def check_page(need=14):
+        if y[0] < MARGIN_B + need * mm:
+            new_page()
+
+    # ── HEADER BAND ────────────────────────────────────────────────────────
+    # Indigo background
+    c.setFillColor(INDIGO)
+    c.rect(0, H - HEADER_H, W, HEADER_H, fill=1, stroke=0)
+    # Bottom accent stripe
+    c.setFillColor(INDIGO_LT)
+    c.rect(0, H - HEADER_H, W, ACCENT_H, fill=1, stroke=0)
+
+    # Watermark text
+    c.saveState()
+    c.setFillColor(WHITE)
+    c.setFillAlpha(0.06)
+    c.setFont("Helvetica-Bold", 72)
+    c.drawCentredString(W / 2, H - HEADER_H + 6 * mm, "SKILLNAAV")
+    c.restoreState()
+
+    # Name
+    name_txt = p.name or "Your Name"
+    c.setFillColor(WHITE)
+    c.setFont("Helvetica-Bold", 22)
+    c.drawString(MARGIN_X, H - 18 * mm, name_txt)
+
+    # Contact row
+    contact_parts = [x for x in [p.email, p.phone, p.country] if x]
+    contact_str = "  ·  ".join(contact_parts)
+    c.setFont("Helvetica", 8)
+    c.setFillColor(colors.HexColor("#E0E7FF"))
+    c.drawString(MARGIN_X, H - 27 * mm, contact_str)
+
+    # Links row
+    links = [x for x in [p.linkedin, p.portfolio] if x]
+    if links:
+        c.setFont("Helvetica-Oblique", 7.5)
+        c.setFillColor(colors.HexColor("#C7D2FE"))
+        c.drawString(MARGIN_X, H - 34 * mm, "  |  ".join(links))
+
+    # Skillnaav badge (top-right)
+    c.setFont("Helvetica-Bold", 8)
+    c.setFillColor(WHITE)
+    c.drawRightString(W - MARGIN_X, H - 14 * mm, "skillnaav")
+    c.setFont("Helvetica", 6.5)
+    c.setFillColor(colors.HexColor("#C7D2FE"))
+    c.drawRightString(W - MARGIN_X, H - 20 * mm, "skillnaav.com")
+
+    y[0] = H - HEADER_H - 10 * mm
+
+    # ── SECTION HELPER ────────────────────────────────────────────────────
+    def section_title(title):
+        check_page(20)
+        y[0] -= 4 * mm
+        c.setFont("Helvetica-Bold", 8.5)
+        c.setFillColor(INDIGO)
+        c.drawString(MARGIN_X, y[0], title.upper())
+        # ruled line
+        c.setStrokeColor(SLATE_100)
+        c.setLineWidth(0.8)
+        c.line(MARGIN_X + 3 * mm + c.stringWidth(title.upper(), "Helvetica-Bold", 8.5),
+               y[0] + 1.5 * mm, W - MARGIN_X, y[0] + 1.5 * mm)
+        y[0] -= 5 * mm
+
+    def body_text(txt, indent=0, color=SLATE_600, size=8.5, max_width=None):
+        if not txt:
+            return
+        check_page(6)
+        mw = max_width or (W - 2 * MARGIN_X - indent)
+        # Simple word-wrap
+        words = str(txt).split()
+        line_buf, lines = [], []
+        c.setFont("Helvetica", size)
+        for w_t in words:
+            test = " ".join(line_buf + [w_t])
+            if c.stringWidth(test, "Helvetica", size) > mw:
+                lines.append(" ".join(line_buf))
+                line_buf = [w_t]
+            else:
+                line_buf.append(w_t)
+        if line_buf:
+            lines.append(" ".join(line_buf))
+        for ln in lines:
+            check_page(5)
+            c.setFillColor(color)
+            c.drawString(MARGIN_X + indent, y[0], ln)
+            y[0] -= 4.5 * mm
+
+    def meta_text(txt, indent=0):
+        body_text(txt, indent=indent, color=SLATE_400, size=7.5)
+
+    def bold_text(txt, indent=0, size=9, color=SLATE_800):
+        if not txt:
+            return
+        check_page(6)
+        c.setFont("Helvetica-Bold", size)
+        c.setFillColor(color)
+        c.drawString(MARGIN_X + indent, y[0], str(txt))
+        y[0] -= 4.5 * mm
+
+    # ── SUMMARY ───────────────────────────────────────────────────────────
+    if p.summary:
+        section_title("Professional Summary")
+        body_text(p.summary)
+
+    # ── EDUCATION (from Userwebapp fields) ────────────────────────────────
+    if p.universityName or p.educationLevel:
+        section_title("Education")
+        bold_text(p.universityName or "Institution")
+        meta_text(
+            "  ·  ".join(filter(None, [p.educationLevel, p.fieldOfStudy])),
+            indent=0
+        )
+
+    # ── EXPERIENCE ────────────────────────────────────────────────────────
+    if p.experience:
+        section_title("Experience")
+        for exp in p.experience:
+            check_page(18)
+            bold_text(exp.get("title", ""))
+            co = exp.get("company", "")
+            loc = exp.get("location", "")
+            dates = "  ·  ".join(filter(None, [
+                co, loc,
+                f"{exp.get('startDate','')} – {'Present' if exp.get('current') else exp.get('endDate','')}"
+            ]))
+            meta_text(dates)
+            body_text(exp.get("description", ""))
+            y[0] -= 2 * mm
+
+    # ── SKILLS (pill badges) ──────────────────────────────────────────────
+    if p.skills:
+        section_title("Skills")
+        pill_x = MARGIN_X
+        pill_y = y[0]
+        pill_h = 5 * mm
+        gap_x  = 2.5 * mm
+        gap_y  = 2 * mm
+        c.setFont("Helvetica", 7.5)
+        for skill in p.skills:
+            tw = c.stringWidth(skill, "Helvetica", 7.5)
+            pw = tw + 5 * mm
+            if pill_x + pw > W - MARGIN_X:
+                pill_x  = MARGIN_X
+                pill_y -= pill_h + gap_y
+                check_page(8)
+            # bg
+            c.setFillColor(SLATE_100)
+            c.roundRect(pill_x, pill_y - 1 * mm, pw, pill_h, 2 * mm, fill=1, stroke=0)
+            # text
+            c.setFillColor(INDIGO)
+            c.drawString(pill_x + 2.5 * mm, pill_y + 0.6 * mm, skill)
+            pill_x += pw + gap_x
+        y[0] = pill_y - pill_h - 4 * mm
+
+    # ── PROJECTS ─────────────────────────────────────────────────────────
+    if p.projects:
+        section_title("Projects")
+        for proj in p.projects:
+            check_page(18)
+            name_str = proj.get("name", "")
+            link = proj.get("link", "")
+            display = f"{name_str}  —  {link}" if link else name_str
+            bold_text(display)
+            stack = proj.get("techStack", [])
+            if stack:
+                meta_text("Stack: " + ", ".join(stack[:8]))
+            body_text(proj.get("description", ""))
+            y[0] -= 2 * mm
+
+    # ── CERTIFICATIONS ────────────────────────────────────────────────────
+    if p.certifications:
+        section_title("Certifications")
+        for cert in p.certifications:
+            check_page(10)
+            bold_text(cert.get("name", ""))
+            meta_text("  ·  ".join(filter(None, [cert.get("issuer",""), cert.get("issueDate","")])))
+
+    # ── LANGUAGES ─────────────────────────────────────────────────────────
+    if p.languages:
+        section_title("Languages")
+        lang_str = "   ·   ".join(
+            f"{l.get('language','')} ({l.get('proficiency','')})" for l in p.languages
+        )
+        body_text(lang_str)
+
+    # ── FOOTER ────────────────────────────────────────────────────────────
+    for page_num in range(1, c.getPageNumber() + 1):
+        c.setFont("Helvetica", 6.5)
+        c.setFillColor(SLATE_400)
+        footer = f"Generated by Skillnaav  ·  {p.name or ''}  ·  skillnaav.com"
+        c.drawCentredString(W / 2, MARGIN_B - 5 * mm, footer)
+
+    c.save()
+    buf.seek(0)
+    return buf.read()
+
+
+@app.post("/cv/generate")
+async def generate_cv(profile: CVRequest):
+    """
+    Accepts the merged profile (flat shape from GET /api/student-profile/:userId)
+    and returns a Skillnaav-branded PDF.
+    """
+    print(f"[{now()}] 📄 CV generate for: {profile.name}")
+
+    try:
+        pdf_bytes = await asyncio.get_event_loop().run_in_executor(
+            None, build_cv_pdf, profile
+        )
+    except Exception as e:
+        print(f"[{now()}] ❌ CV generation error: {e}")
+        raise HTTPException(status_code=500, detail=f"CV generation failed: {str(e)}")
+
+    safe_name = (profile.name or "Resume").replace(" ", "_")
+    filename  = f"Skillnaav_CV_{safe_name}.pdf"
+
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

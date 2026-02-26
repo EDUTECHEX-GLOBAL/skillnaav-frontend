@@ -303,6 +303,10 @@ const locationRoutes = require("./routes/webapp-routes/location.routes");
 const pipelineRoutes = require("./routes/pipeline/pipelineRoutes");
 const l2AssessmentRoutes = require("./routes/pipeline/l2-AssessmentRoutes");
 const interviewRoutes = require("./routes/pipeline/interviewRoutes");
+const resumeRoutes = require("./routes/webapp-routes/resumeRoutes");
+const resumeParserRoutes = require("./routes/webapp-routes/resumeParserRoutes");
+const studentProfileRoutes = require("./routes/webapp-routes/StudentprofileRoutes");
+const cvRoutes = require("./routes/webapp-routes/cv");
 
 
 const curriculumRoutes = require("./routes/webapp-routes/schoolAdmin/curriculumRoutes");
@@ -342,8 +346,10 @@ app.use("/api/feedback", feedbackSummary);
 app.use("/api/pipeline", pipelineRoutes);
 app.use("/api/l2-assessments", l2AssessmentRoutes);
 app.use("/api/interviews", interviewRoutes);
-
-
+app.use("/api/resumes", resumeRoutes);
+app.use("/api/resume", resumeParserRoutes);
+app.use("/api/student-profile", studentProfileRoutes);
+app.use("/api/cv", cvRoutes);
 app.use("/api/curriculum", curriculumRoutes);
 
 

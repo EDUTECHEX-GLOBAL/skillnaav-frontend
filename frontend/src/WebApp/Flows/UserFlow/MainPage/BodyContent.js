@@ -9,7 +9,7 @@ import Filter from "./Filter";
 import SavedJobs from "./SavedJobs";
 import Applications from "./Applications";
 import Support from "../MainPage/support/Support";
-import Profile from "./Profile";
+import ProfilePage from "./ProfilePage";
 import PremiumPage from "./PremiumPage";
 import Notifications from "./Notifications";
 import OfferLetter from "./OfferLetter";
@@ -159,7 +159,7 @@ const BodyContent = () => {
       content = <StudentAssessment />;
       break;
     case "profile":
-      content = <Profile />;
+      content = <ProfilePage />;
       break;
     case "support":
       content = <Support />;

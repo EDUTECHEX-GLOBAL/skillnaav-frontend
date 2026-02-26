@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import axios from "axios";
 import { BellIcon, CheckCircleIcon } from "@heroicons/react/24/solid";
 import { EllipsisVerticalIcon } from "@heroicons/react/24/outline";
@@ -10,11 +10,11 @@ const Notifications = ({ onNavigate }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [openMenuId, setOpenMenuId] = useState(null);
-  const menuRef = useRef(null);
   const navigate = useNavigate();
 
-  const unreadCount = notifications.filter(n => !n.isRead).length;
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
+  // ── Fetch ──────────────────────────────────────────────────────────────────
   useEffect(() => {
     const fetchNotifications = async () => {
       try {
@@ -22,18 +22,17 @@ const Notifications = ({ onNavigate }) => {
         const userInfo = JSON.parse(localStorage.getItem("userInfo"));
         const studentId = userInfo?._id;
         if (!studentId) {
-          console.error("No student ID found");
           setError("Unable to identify user");
-          setLoading(false);
           return;
         }
-
         const { data } = await axios.get(`/api/notifications/${studentId}`);
         if (data.success) {
-          setNotifications((data.notifications || []).map(n => ({
-            ...n,
-            isRead: Boolean(n.read || n.isRead)
-          })));
+          setNotifications(
+            (data.notifications || []).map((n) => ({
+              ...n,
+              isRead: Boolean(n.read || n.isRead),
+            }))
+          );
         } else {
           setError("Failed to fetch notifications");
         }
@@ -48,101 +47,115 @@ const Notifications = ({ onNavigate }) => {
     fetchNotifications();
   }, []);
 
+  // ── Close menu on outside click ────────────────────────────────────────────
+  // We attach to document and check openMenuId so we don't need a ref per card
   useEffect(() => {
-    const onDocClick = (e) => {
-      if (menuRef.current && !menuRef.current.contains(e.target)) {
-        setOpenMenuId(null);
-      }
-    };
+    if (!openMenuId) return;
+    const onDocClick = () => setOpenMenuId(null);
     document.addEventListener("click", onDocClick);
     return () => document.removeEventListener("click", onDocClick);
+  }, [openMenuId]);
+
+  // ── Shared navigation helper (deduplicates the repeated logic) ────────────
+  const navigateToLink = useCallback(
+    (link) => {
+      if (!link) return;
+
+      const isAbsolute = /^https?:\/\//i.test(link);
+
+      if (isAbsolute) {
+        const url = new URL(link);
+        if (url.origin === window.location.origin) {
+          const openTab = url.searchParams.get("openTab");
+          if (openTab)
+            window.dispatchEvent(
+              new CustomEvent("openTab", { detail: { tab: openTab, fromNotification: true } })
+            );
+          navigate(url.pathname + url.search + url.hash);
+        } else {
+          window.open(link, "_blank", "noopener,noreferrer");
+        }
+        return;
+      }
+
+      if (link.startsWith("/")) {
+        const urlObj = new URL(link, window.location.origin);
+        const openTab = urlObj.searchParams.get("openTab");
+        if (openTab)
+          window.dispatchEvent(
+            new CustomEvent("openTab", { detail: { tab: openTab, fromNotification: true } })
+          );
+        navigate(urlObj.pathname + urlObj.search + urlObj.hash);
+        return;
+      }
+
+      if (link.startsWith("#") || /recommend/i.test(link)) {
+        window.dispatchEvent(
+          new CustomEvent("openTab", { detail: { tab: "recommendations", fromNotification: true } })
+        );
+        return;
+      }
+
+      window.location.href = link;
+    },
+    [navigate]
+  );
+
+  // ── Mark single as read ────────────────────────────────────────────────────
+  const markOneRead = useCallback(async (id) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n._id === id ? { ...n, isRead: true } : n))
+    );
+    try {
+      await axios.put(`/api/notifications/read/${id}`);
+    } catch (err) {
+      console.error("Error marking notification as read:", err);
+    }
   }, []);
 
+  // ── Mark all read ──────────────────────────────────────────────────────────
   const markAllRead = async () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
     try {
-      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
       await axios.put(`/api/notifications/read-all`);
     } catch (err) {
       console.error("Error marking all read:", err);
     }
   };
 
+  // ── Main notification click ────────────────────────────────────────────────
   const handleNotificationClick = async (notification, e) => {
-    if (e && e.stopPropagation) e.stopPropagation();
-
-    if (!notification.isRead) {
-      try {
-        const { data } = await axios.put(`/api/notifications/read/${notification._id}`);
-        if (data.success) {
-          setNotifications(prev => prev.map(n => n._id === notification._id ? { ...n, isRead: true } : n));
-        }
-      } catch (err) {
-        console.error("Error marking notification as read:", err);
-        setNotifications(prev => prev.map(n => n._id === notification._id ? { ...n, isRead: true } : n));
-      }
-    }
-
-    const link = notification.link;
-    if (!link) return;
-
-    try {
-      // absolute URL?
-      const isAbsolute = /^https?:\/\//i.test(link);
-      if (isAbsolute) {
-        const url = new URL(link);
-        // same-origin -> treat as internal route
-        if (url.origin === window.location.origin) {
-          const pathWithQuery = url.pathname + url.search + url.hash;
-          const openTabParam = (new URLSearchParams(url.search)).get('openTab');
-          if (openTabParam) {
-            window.dispatchEvent(new CustomEvent("openTab", { detail: { tab: openTabParam, fromNotification: true } }));
-          }
-          navigate(pathWithQuery);
-          return;
-        }
-        // external origin -> open new tab
-        window.open(link, "_blank", "noopener,noreferrer");
-        return;
-      }
-
-      // relative -> internal
-      if (link.startsWith("/")) {
-        const urlObj = new URL(link, window.location.origin);
-        const openTabParam = urlObj.searchParams.get('openTab');
-        if (openTabParam) {
-          window.dispatchEvent(new CustomEvent("openTab", { detail: { tab: openTabParam, fromNotification: true } }));
-        }
-        navigate(urlObj.pathname + urlObj.search + urlObj.hash);
-        return;
-      }
-
-      // hash or textual heuristic (fallback)
-      if (link.startsWith("#") || /recommend/i.test(link)) {
-        window.dispatchEvent(new CustomEvent("openTab", { detail: { tab: "recommendations", fromNotification: true } }));
-        return;
-      }
-
-      // final fallback (reload)
-      window.location.href = link;
-    } catch (err) {
-      console.error("Navigation error:", err);
-      window.open(link, "_blank", "noopener,noreferrer");
-    }
+    e?.stopPropagation();
+    if (!notification.isRead) await markOneRead(notification._id);
+    navigateToLink(notification.link);
   };
 
+  // ── Delete ─────────────────────────────────────────────────────────────────
   const handleDelete = async (notification, e) => {
-    if (e && e.stopPropagation) e.stopPropagation();
+    e?.stopPropagation();
     try {
       await axios.delete(`/api/notifications/${notification._id}`);
-      setNotifications(prev => prev.filter(n => n._id !== notification._id));
-      if (openMenuId === notification._id) setOpenMenuId(null);
-    } catch (error) {
-      console.error('Error deleting notification:', error);
+      setNotifications((prev) => prev.filter((n) => n._id !== notification._id));
+      setOpenMenuId(null);
+    } catch (err) {
+      console.error("Error deleting notification:", err);
     }
   };
 
+  // ── Label helpers ──────────────────────────────────────────────────────────
+  const linkLabel = (type) =>
+    type === "offer" ? "📄 View Offer Letter" : "📄 View Recommendation";
+
+  const menuOpenLabel = (type) =>
+    type === "offer" ? "Open Offer Letter" : "Open Recommendation";
+
+  const menuDownloadLabel = (type) =>
+    type === "offer" ? "Download Offer Letter" : "Download Recommendation";
+
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="p-6 min-h-screen font-[Poppins] bg-gradient-to-br from-white via-slate-100 to-slate-200">
+    <div className="p-6 min-h-screen font-poppins bg-gradient-to-br from-white via-slate-100 to-slate-200">
+      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-2xl sm:text-3xl font-semibold text-gray-800 tracking-tight flex items-center gap-3">
@@ -154,39 +167,47 @@ const Notifications = ({ onNavigate }) => {
               </span>
             )}
           </h2>
-          <p className="text-sm text-gray-500 mt-1">Recent updates, offers and recommendations</p>
+          <p className="text-sm text-gray-500 mt-1">
+            Recent updates, offers and recommendations
+          </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={markAllRead}
-            className="inline-flex items-center gap-2 text-sm bg-white border border-gray-200 px-3 py-1 rounded-lg shadow-sm hover:shadow-md"
-            aria-label="Mark all as read"
-          >
-            <ArrowPathIcon className="w-4 h-4" />
-            Mark all read
-          </button>
-        </div>
+        <button
+          onClick={markAllRead}
+          className="inline-flex items-center gap-2 text-sm bg-white border border-gray-200 px-3 py-1 rounded-lg shadow-sm hover:shadow-md transition-shadow"
+          aria-label="Mark all as read"
+        >
+          <ArrowPathIcon className="w-4 h-4" />
+          Mark all read
+        </button>
       </div>
 
+      {/* States */}
       {loading ? (
-        <p className="text-gray-600 text-sm">Loading notifications...</p>
+        <div className="flex items-center gap-2 text-gray-500 text-sm mt-10 justify-center">
+          <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          Loading notifications...
+        </div>
       ) : error ? (
-        <div className="text-red-500 font-medium">{error}</div>
+        <div className="text-red-500 font-medium text-sm">{error}</div>
       ) : notifications.length === 0 ? (
-        <div className="text-center py-12">
+        <div className="text-center py-16">
+          <CheckCircleIcon className="w-10 h-10 text-green-400 mx-auto mb-3" />
           <p className="text-gray-500 text-sm">You're all caught up — no notifications.</p>
         </div>
       ) : (
         <ul className="space-y-4">
-          {notifications.map(notification => (
+          {notifications.map((notification) => (
             <li
               key={notification._id}
-              className={`relative p-4 sm:p-5 rounded-2xl shadow-sm flex gap-4 items-start transition-all duration-150 border ${
-                notification.isRead ? "bg-white border-gray-200" : "bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200"
-              }`}
               onClick={(e) => handleNotificationClick(notification, e)}
+              className={`relative p-4 sm:p-5 rounded-2xl shadow-sm flex gap-4 items-start transition-all duration-150 border cursor-pointer ${
+                notification.isRead
+                  ? "bg-white border-gray-200 hover:border-gray-300"
+                  : "bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200 hover:border-blue-300"
+              }`}
             >
+              {/* Icon */}
               <div className="flex-shrink-0 mt-1">
                 {notification.isRead ? (
                   <CheckCircleIcon className="w-6 h-6 text-green-500" />
@@ -195,41 +216,47 @@ const Notifications = ({ onNavigate }) => {
                 )}
               </div>
 
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className={`text-sm truncate ${notification.isRead ? "text-gray-700" : "text-blue-900 font-medium"}`}>
-                      {notification.message}
-                    </p>
+              {/* Body */}
+              <div className="flex-1 min-w-0 pr-8">
+                <p
+                  className={`text-sm ${
+                    notification.isRead ? "text-gray-700" : "text-blue-900 font-medium"
+                  }`}
+                >
+                  {notification.message}
+                </p>
 
-                    {notification.link && (
-                      <div className="mt-2">
-                        <span className="inline-block text-xs text-blue-700 font-medium underline hover:text-blue-900 transition">
-                          {notification.type === "offer" ? "📄 View Offer Letter" : "📄 View Recommendation"}
-                        </span>
-                      </div>
-                    )}
+                {notification.link && (
+                  <span className="inline-block mt-2 text-xs text-blue-700 font-medium underline hover:text-blue-900 transition-colors">
+                    {linkLabel(notification.type)}
+                  </span>
+                )}
 
-                    <p className="text-xs text-gray-400 mt-2">
-                      {new Date(notification.createdAt).toLocaleString()}
-                    </p>
-                  </div>
-                </div>
+                <p className="text-xs text-gray-400 mt-2">
+                  {new Date(notification.createdAt).toLocaleString()}
+                </p>
               </div>
 
+              {/* Unread badge */}
               {!notification.isRead && (
-                <span className="text-[10px] font-semibold uppercase tracking-wide bg-blue-600 text-white px-2 py-0.5 rounded-full self-start">
+                <span className="flex-shrink-0 text-[10px] font-semibold uppercase tracking-wide bg-blue-600 text-white px-2 py-0.5 rounded-full self-start">
                   New
                 </span>
               )}
 
-              <div ref={menuRef} className="absolute top-3 right-3 z-10">
+              {/* ── Per-card context menu ──────────────────────────────────── */}
+              {/* stopPropagation on the wrapper so li onClick doesn't fire */}
+              <div
+                className="absolute top-3 right-3 z-10"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setOpenMenuId(prev => (prev === notification._id ? null : notification._id));
-                  }}
-                  className="text-gray-600 hover:text-gray-800 p-1 rounded"
+                  onClick={() =>
+                    setOpenMenuId((prev) =>
+                      prev === notification._id ? null : notification._id
+                    )
+                  }
+                  className="text-gray-400 hover:text-gray-700 p-1 rounded transition-colors"
                   aria-label="Open notification menu"
                 >
                   <EllipsisVerticalIcon className="w-5 h-5" />
@@ -237,48 +264,23 @@ const Notifications = ({ onNavigate }) => {
 
                 {openMenuId === notification._id && (
                   <div
-                    onClick={e => e.stopPropagation()}
-                    className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-20 overflow-hidden"
+                    className="absolute right-0 mt-2 w-52 bg-white border border-gray-200 rounded-xl shadow-lg z-20 overflow-hidden py-1"
                     role="menu"
-                    aria-orientation="vertical"
-                    aria-label="Notification menu"
                   >
                     {notification.link && (
                       <>
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            // Use same internal/external logic as the main click handler
-                            if (/^https?:\/\//.test(notification.link)) {
-                              const url = new URL(notification.link);
-                              if (url.origin === window.location.origin) {
-                                const pathWithQuery = url.pathname + url.search + url.hash;
-                                const openTabParam = (new URLSearchParams(url.search)).get('openTab');
-                                if (openTabParam) window.dispatchEvent(new CustomEvent("openTab", { detail: { tab: openTabParam, fromNotification: true } }));
-                                navigate(pathWithQuery);
-                              } else {
-                                window.open(notification.link, "_blank", "noopener,noreferrer");
-                              }
-                            } else if (notification.link.startsWith("/")) {
-                              const urlObj = new URL(notification.link, window.location.origin);
-                              const openTabParam = urlObj.searchParams.get('openTab');
-                              if (openTabParam) window.dispatchEvent(new CustomEvent("openTab", { detail: { tab: openTabParam, fromNotification: true } }));
-                              navigate(urlObj.pathname + urlObj.search + urlObj.hash);
-                            } else if (notification.link.startsWith("#") || /recommend/i.test(notification.link)) {
-                              window.dispatchEvent(new CustomEvent("openTab", { detail: { tab: "recommendations", fromNotification: true } }));
-                            } else {
-                              window.open(notification.link, "_blank", "noopener,noreferrer");
-                            }
+                          onClick={() => {
+                            navigateToLink(notification.link);
                             setOpenMenuId(null);
                           }}
-                          className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50"
+                          className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                         >
-                          {notification.type === "offer" ? "Open Offer Letter" : "Open Recommendation"}
+                          {menuOpenLabel(notification.type)}
                         </button>
 
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
+                          onClick={() => {
                             try {
                               const a = document.createElement("a");
                               a.href = notification.link;
@@ -291,16 +293,18 @@ const Notifications = ({ onNavigate }) => {
                             }
                             setOpenMenuId(null);
                           }}
-                          className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50"
+                          className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                         >
-                          {notification.type === "offer" ? "Download Offer Letter" : "Download Recommendation"}
+                          {menuDownloadLabel(notification.type)}
                         </button>
+
+                        <div className="border-t border-gray-100 my-1" />
                       </>
                     )}
 
                     <button
                       onClick={(e) => handleDelete(notification, e)}
-                      className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                      className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
                     >
                       Delete
                     </button>

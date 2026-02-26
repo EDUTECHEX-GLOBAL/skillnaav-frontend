@@ -30,6 +30,8 @@ const ApplyCards = ({ job, onBack }) => {
   const [loadingAssessment, setLoadingAssessment] = useState(false);
   const [assessment, setAssessment] = useState(null);
   const [showAssessmentModal, setShowAssessmentModal] = useState(false);
+  const [existingResumes, setExistingResumes] = useState([]);
+  const [selectedResumeUrl, setSelectedResumeUrl] = useState(null);
 
   const navigate = useNavigate();
 
@@ -62,6 +64,23 @@ const ApplyCards = ({ job, onBack }) => {
 
     fetchApplicationData();
   }, [job._id]);
+  useEffect(() => {
+    const fetchResumes = async () => {
+      const userInfo = JSON.parse(localStorage.getItem("userInfo"));
+      const studentId = userInfo?._id;
+      if (!studentId) return;
+
+      try {
+        const res = await axios.get(`/api/resumes/user/${studentId}`);
+        console.log("RESUME API RESPONSE:", res.data);   // ⭐ ADD THIS
+        setExistingResumes(res.data.resumes || []);
+      } catch (err) {
+        console.error("Error fetching resumes", err);
+      }
+    };
+
+    fetchResumes();
+  }, []);
 
   // ✅ Fetch existing assessment if any
   useEffect(() => {
@@ -95,116 +114,125 @@ const ApplyCards = ({ job, onBack }) => {
     if (file.size > 5 * 1024 * 1024) return alert("File size should not exceed 5MB.");
 
     setResume(file);
+    setSelectedResumeUrl(null); // keep only one source active
   };
 
   // ✅ Apply to internship
- const handleApply = async () => {
-  if (isApplied) return;
+  const handleApply = async () => {
+    if (isApplied) return;
 
-  const userInfo = JSON.parse(localStorage.getItem("userInfo"));
-  const studentId = userInfo?._id;
-  const token = localStorage.getItem("userToken");
+    const userInfo = JSON.parse(localStorage.getItem("userInfo"));
+    const studentId = userInfo?._id;
+    const token = localStorage.getItem("userToken");
 
-  if (!studentId || !token) {
-    console.error("Missing user or token.");
-    alert("Session expired. Please log in again.");
-    return;
-  }
+    if (!studentId || !token) {
+      console.error("Missing user or token.");
+      alert("Session expired. Please log in again.");
+      return;
+    }
 
-  // 🔹 Check if stipend internship requires assessment
-  if (job.internshipType === "STIPEND") {
-    let studentAssessment;
+    // 🔹 Check if stipend internship requires assessment
+    if (job.internshipType === "STIPEND") {
+      let studentAssessment;
 
+      try {
+        const { data } = await axios.get(
+          `/api/assessments/${studentId}/${job._id}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        studentAssessment = data.assessment;
+        setAssessment(studentAssessment);
+      } catch (error) {
+        console.error("Error fetching assessment:", error);
+      }
+
+      if (!studentAssessment) {
+        alert("You must generate and complete the assessment before applying.");
+        return;
+      }
+
+      let submission;
+      try {
+        const { data } = await axios.get(
+          `/api/assessments/submission/${studentId}/${studentAssessment._id}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        submission = data.submission;
+      } catch {
+        submission = null;
+      }
+
+      if (!submission || submission.fitStatus !== "fit") {
+        alert("You must pass the assessment to apply.");
+        return;
+      }
+    }
+
+    // ✅ Check BOTH options
+    if (!resume && !selectedResumeUrl) {
+      setShowResumePopup(true);
+      return;
+    }
+
+    // 🔹 Check application limit
     try {
-      const { data } = await axios.get(
-        `/api/assessments/${studentId}/${job._id}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      studentAssessment = data.assessment;
-      setAssessment(studentAssessment);
-    } catch (error) {
-      console.error("Error fetching assessment:", error);
-    }
-
-    if (!studentAssessment) {
-      alert("You must generate and complete the assessment before applying.");
-      return;
-    }
-
-    let submission;
-    try {
-      const { data } = await axios.get(
-        `/api/assessments/submission/${studentId}/${studentAssessment._id}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      submission = data.submission;
-    } catch {
-      submission = null;
-    }
-
-    if (!submission || submission.fitStatus !== "fit") {
-      alert("You must pass the assessment to apply.");
-      return;
-    }
-  }
-
-  if (!resume) {
-    setShowResumePopup(true);
-    return;
-  }
-
-  // 🔹 Check application limit
-  try {
-    const { data: countData } = await axios.get(
-      `/api/applications/count/${studentId}`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-
-    const maxApps = MAX_LIMITS[planType]?.applications || 5;
-    if (countData.count >= maxApps) {
-      setShowLimitPopup(true);
-      return;
-    }
-  } catch (error) {
-    console.error("Error checking application count:", error);
-    return;
-  }
-
-  // 🔹 Apply
-  setIsUploading(true);
-  try {
-    const formData = new FormData();
-    formData.append("studentId", studentId);
-    formData.append("internshipId", job._id);
-    formData.append("resume", resume);
-    if (schoolAdminId) formData.append("schoolAdminId", schoolAdminId);
-
-    const res = await axios.post("/api/applications/apply", formData, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "multipart/form-data",
-      },
-    });
-
-    if (res.status === 201) {
-      setIsApplied(true);
-      const { data } = await axios.get(
+      const { data: countData } = await axios.get(
         `/api/applications/count/${studentId}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setApplicationCount(data.count);
+
+      const maxApps = MAX_LIMITS[planType]?.applications || 5;
+      if (countData.count >= maxApps) {
+        setShowLimitPopup(true);
+        return;
+      }
+    } catch (error) {
+      console.error("Error checking application count:", error);
+      return;
     }
-  } catch (error) {
-    const { status, data } = error.response || {};
-    if (status === 403 || data?.message?.includes("already applied")) {
-      setIsApplied(true);
-    } else {
-      alert(data?.message || "Something went wrong.");
+
+    // 🔹 Apply
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("studentId", studentId);
+      formData.append("internshipId", job._id);
+
+      if (resume) {
+        formData.append("resume", resume);
+      }
+
+      if (selectedResumeUrl) {
+        formData.append("resumeUrl", selectedResumeUrl);
+      }
+      if (schoolAdminId) formData.append("schoolAdminId", schoolAdminId);
+
+      const res = await axios.post("/api/applications/apply", formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      if (res.status === 201) {
+        setIsApplied(true);
+        const { data } = await axios.get(
+          `/api/applications/count/${studentId}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setApplicationCount(data.count);
+      }
+    } catch (error) {
+      const { status, data } = error.response || {};
+      if (status === 403 || data?.message?.includes("already applied")) {
+        setIsApplied(true);
+      } else {
+        alert(data?.message || "Something went wrong.");
+      }
+    } finally {
+      setIsUploading(false);
     }
-  } finally {
-    setIsUploading(false);
-  }
-};
+  };
 
 
   // ✅ Save/unsave job
@@ -303,11 +331,39 @@ const ApplyCards = ({ job, onBack }) => {
             </div>
 
             <div className="mt-4">
+              {/* Existing Resumes */}
+              {existingResumes.length > 0 && (
+                <div className="mb-3">
+                  <p className="text-sm font-semibold text-gray-700 mb-1">
+                    Select Existing Resume
+                  </p>
+                  <select
+                    value={selectedResumeUrl || ""}
+                    className="border rounded-md p-2 w-full"
+                    onChange={(e) => {
+                      setSelectedResumeUrl(e.target.value);
+                      setResume(null);
+                    }}
+                  >
+                    <option value="">-- Choose Resume --</option>
+                    {existingResumes.map((res) => (
+                      <option key={res._id} value={res.fileUrl}>
+                        {res.fileName || "Resume"}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Upload New Resume */}
               <input
                 type="file"
                 accept=".pdf,.doc,.docx"
-                onChange={handleFileChange}
-                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100"
+                onChange={(e) => {
+                  handleFileChange(e);
+                  setSelectedResumeUrl(null); // clear existing if uploading new
+                }}
+                className="block w-full text-sm text-gray-500"
               />
             </div>
 
@@ -348,8 +404,8 @@ const ApplyCards = ({ job, onBack }) => {
                   }}
                   disabled={loadingAssessment}
                   className={`px-4 py-2 rounded-full font-semibold ${assessment
-                      ? "bg-green-500 hover:bg-green-600 text-white"
-                      : "bg-orange-500 hover:bg-orange-600 text-white"
+                    ? "bg-green-500 hover:bg-green-600 text-white"
+                    : "bg-orange-500 hover:bg-orange-600 text-white"
                     }`}
                 >
                   {assessment

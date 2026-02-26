@@ -1,5 +1,6 @@
-const Application = require("../models/webapp-models/applicationModel"); // Import the Application model
 const mongoose = require("mongoose");
+const axios = require("axios");
+const Application = require("../models/webapp-models/applicationModel"); // Import the Application model
 const Userwebapp = require("../models/webapp-models/userModel");  // Ensure correct import path
 const InternshipPosting = require("../models/webapp-models/internshipPostModel.js");
 const sendNotification = require("../utils/Notification.js");
@@ -7,6 +8,7 @@ const { getPersonalizedRecommendations } = require("../utils/recommendationServi
 const notifyUser = require("../utils/notifyUser.js");
 const multer = require("multer"); // Multer for file uploads
 const CandidatePipeline = require("../models/pipeline/CandidatePipeline");
+const Resume = require("../models/webapp-models/resumeModel");
 const path = require("path");
 const fs = require("fs");
 
@@ -32,8 +34,11 @@ const applyForInternship = async (req, res) => {
   const { studentId, internshipId } = req.body;
   const resumeFile = req.file;
 
-  if (!resumeFile) {
-    return res.status(400).json({ message: "Please upload a resume." });
+  const resumeUrlFromBody = req.body.resumeUrl;
+  const resumeUrl = resumeFile?.location || resumeUrlFromBody;
+
+  if (!resumeUrl) {
+    return res.status(400).json({ message: "Please provide a resume." });
   }
 
   try {
@@ -44,30 +49,34 @@ const applyForInternship = async (req, res) => {
       return res.status(404).json({ message: "Student or Internship not found." });
     }
 
-    // New check: Reject if applications are closed
     if (!internship.applicationOpen) {
-      return res.status(403).json({ message: "Applications are currently closed for this internship." });
+      return res.status(403).json({
+        message: "Applications are currently closed for this internship.",
+      });
     }
 
-    // Enforce application limit for non-premium users
     if (!student.isPremium) {
       const applicationCount = await Application.countDocuments({ studentId });
 
       if (applicationCount >= 5) {
         return res.status(403).json({
-          message: "You have reached the limit of 5 applications. Upgrade to premium to apply for more jobs.",
+          message:
+            "You have reached the limit of 5 applications. Upgrade to premium to apply for more jobs.",
           limitReached: true,
         });
       }
     }
 
-    const existingApplication = await Application.findOne({ studentId, internshipId });
+    const existingApplication = await Application.findOne({
+      studentId,
+      internshipId,
+    });
 
     if (existingApplication) {
-      return res.status(400).json({ message: "You have already applied for this internship." });
+      return res.status(400).json({
+        message: "You have already applied for this internship.",
+      });
     }
-
-    const resumeUrl = resumeFile.location;
 
     const newApplication = new Application({
       studentId,
@@ -83,12 +92,43 @@ const applyForInternship = async (req, res) => {
 
     await newApplication.save();
 
+    // 🚀 1. AUTO SAVE RESUME FIRST (ONLY IF NEW FILE UPLOADED)
+    if (resumeFile) {
+      try {
+        await Resume.create({
+          userId: studentId,
+          fileUrl: resumeFile.location,
+          fileName: resumeFile.originalname || "Resume",
+          isParsed: false,
+        });
+      } catch (err) {
+        console.error("Resume auto-save failed:", err.message);
+      }
+    }
+
+    // 🧠 2. TRIGGER AUTO PARSE IN BACKGROUND (FIRE-AND-FORGET)
+    try {
+      // Notice there is NO 'await' here. This lets the Node.js server immediately 
+      // move on and send the success response to the user while parsing happens silently.
+      axios.post(
+        `${process.env.SERVER_BASE_URL}/api/resume/parse-from-url`,
+        {
+          userId: studentId,
+          resumeUrl,
+        }
+      ).catch(err => console.log("⚠️ Background parsing error:", err.message));
+      
+      console.log("✅ Resume background parsing triggered");
+    } catch (err) {
+      console.log("⚠️ Failed to trigger parsing:", err.message);
+    }
+
+    // 3. IMMEDIATELY RESPOND TO USER
     res.status(201).json({
       message: "Application submitted successfully!",
       application: newApplication,
       limitReached: false,
     });
-
   } catch (error) {
     console.error("Error during application submission:", error.message);
     res.status(500).json({
