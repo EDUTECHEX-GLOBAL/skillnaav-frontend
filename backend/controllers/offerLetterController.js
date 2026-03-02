@@ -67,6 +67,19 @@ const sendOfferLetter = async (req, res) => {
       return res.status(400).json({ error: e.message });
     }
 
+    // Fix Bug 8: prevent duplicate offer letters for the same student+internship
+    const existingOffer = await OfferLetter.findOne({
+      studentId: studentObjId,
+      internshipId: internshipObjId,
+    });
+    if (existingOffer) {
+      return res.status(409).json({
+        error: "An offer letter has already been sent to this student for this internship",
+        offerId: existingOffer._id,
+        status: existingOffer.status,
+      });
+    }
+
     // ✅ Fetch template if templateId is present
     let template = null;
     if (templateId) {

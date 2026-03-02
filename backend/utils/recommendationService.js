@@ -195,15 +195,15 @@
 const axios = require('axios');
 
 // Wrapper to call your Python FastAPI AI backend
-async function getPersonalizedRecommendations(studentId, limit = 6) {
-  try {
-    const res = await axios.get(`http://localhost:8002/recommendations/${studentId}?limit=${limit}`);
-    return res.data.recommendations;
-  } catch (err) {
-    console.error('[RecommendationService] Python AI backend error:', err.message);
-    // Fallback: return empty list (or optionally your old logic)
-    return [];
-  }
-}
+// async function getPersonalizedRecommendations(studentId, limit = 6) {
+//   try {
+//     const res = await axios.get(`http://localhost:8000/recommendations/${studentId}?limit=${limit}`);
+//     return res.data.recommendations;
+//   } catch (err) {
+//     console.error('[RecommendationService] Python AI backend error:', err.message);
+//     // Fallback: return empty list (or optionally your old logic)
+//     return [];
+//   }
+// }
 
-module.exports = { getPersonalizedRecommendations };
+// module.exports = { getPersonalizedRecommendations };

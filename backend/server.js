@@ -350,6 +350,7 @@ app.use("/api/resumes", resumeRoutes);
 app.use("/api/resume", resumeParserRoutes);
 app.use("/api/student-profile", studentProfileRoutes);
 app.use("/api/cv", cvRoutes);
+app.use('/api/ai', require('./routes/webapp-routes/Airoutes'));
 app.use("/api/curriculum", curriculumRoutes);
 
 

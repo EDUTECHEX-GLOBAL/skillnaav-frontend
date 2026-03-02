@@ -1,26 +1,16 @@
 // Navbar.jsx (updated & cleaned)
 import React, { useEffect, useRef, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faUser,
-  faSignOutAlt,
-  faBell,
-  faBars,
-  faCrown
-} from "@fortawesome/free-solid-svg-icons";
+import { faUser, faSignOutAlt, faBell, faBars, faCrown } from "@fortawesome/free-solid-svg-icons";
 import logo from "../../../../assets-webapp/Skillnaav-logo.png";
 import { useTabContext } from "./UserHomePageContext/HomePageContext";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-
-// Feedback Context (clean: removed feedbackOpen)
 import { useFeedback } from "../../../../context/FeedbackContext";
 import { userFlowQuestions } from "../../../../components/FeedbackModal/questionSets";
 
 const Navbar = ({ onToggleSidebar }) => {
- 
   const { handleSelectTab, selectedTab } = useTabContext();
-
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
@@ -30,134 +20,73 @@ const Navbar = ({ onToggleSidebar }) => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [isPremium, setIsPremium] = useState(false);
 
-  // From Feedback Context
   const { openFeedback } = useFeedback();
 
-useEffect(() => {
-  const rawUserInfo = localStorage.getItem("userInfo");
-  if (!rawUserInfo) return;
+  // ─── Helper: read userInfo from localStorage into state ───
+  const syncUserInfoFromStorage = () => {
+    const rawUserInfo = localStorage.getItem("userInfo");
+    if (!rawUserInfo) return;
 
-  let storedUserInfo;
-  try {
-    storedUserInfo = JSON.parse(rawUserInfo);
-  } catch (err) {
-    console.error("Invalid userInfo in storage");
-    return;
-  }
-
-  if (!storedUserInfo?._id) return;
-
-  setUserInfo(storedUserInfo);
-  setPlanType(storedUserInfo.planType || "Free");
-
-  const studentId = storedUserInfo._id;
-
-  const fetchNotifications = async () => {
+    let storedUserInfo;
     try {
-      const { data } = await axios.get(`/api/notifications/${studentId}`);
-      if (data?.success) {
-        const unread = data.notifications.filter(n => !n.isRead).length;
-        setUnreadCount(unread);
-      }
+      storedUserInfo = JSON.parse(rawUserInfo);
     } catch (err) {
-      console.error("Failed to fetch notifications:", err);
+      console.error("Invalid userInfo in storage");
+      return;
     }
+
+    if (!storedUserInfo?._id) return;
+
+    setUserInfo(storedUserInfo);
+    setPlanType(storedUserInfo.planType || "Free");
+    setIsPremium(storedUserInfo.isPremium || false);
   };
 
-  const fetchPremiumStatus = async () => {
-    try {
-      const token = localStorage.getItem("userToken");
-      if (!token) return;
+  useEffect(() => {
+    syncUserInfoFromStorage();
 
-      const { data } = await axios.get("/api/users/premium-status", {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+    // ✅ Fixed: listen for premium upgrade event dispatched from PremiumPage
+    window.addEventListener("userInfoUpdated", syncUserInfoFromStorage);
+    return () => window.removeEventListener("userInfoUpdated", syncUserInfoFromStorage);
+  }, []);
 
-      if (!data?.user) return;
+  useEffect(() => {
+    if (!userInfo?._id) return;
 
-      const updatedUser = {
-        ...storedUserInfo,
-        isPremium: data.user.isPremium,
-        planType: data.user.planType,
-        premiumExpiration: data.user.premiumExpiration
-      };
+    const studentId = userInfo._id;
 
-      localStorage.setItem("userInfo", JSON.stringify(updatedUser));
-      setPlanType(data.user.planType);
-      setIsPremium(data.user.isPremium);
-    } catch (err) {
-      console.error("Failed to fetch premium status:", err);
-    }
-  };
-
-  fetchNotifications();
-  fetchPremiumStatus();
-}, []);
-
-useEffect(() => {
-  const syncUserInfo = () => {
-    const raw = localStorage.getItem("userInfo");
-    if (!raw) return;
-
-    try {
-      const parsed = JSON.parse(raw);
-      setUserInfo(parsed);
-      setPlanType(parsed.planType || "Free");
-    } catch {
-      console.error("Failed to sync userInfo");
-    }
-  };
-
-  window.addEventListener("storage", syncUserInfo);
-
-  return () => {
-    window.removeEventListener("storage", syncUserInfo);
-  };
-}, []);
-
-
-  const handleUserClick = () => setIsDropdownOpen(!isDropdownOpen);
-
-  /* ---- performLogout declared first (prevents TDZ) ---- */
-  const performLogout = async () => {
-    const sessionId = localStorage.getItem("sessionId");
-   const token = localStorage.getItem("userToken");
-
-
-    if (sessionId && token) {
+    const fetchNotifications = async () => {
       try {
-        await axios.post(
-          "/api/sessions/logout",
-          { sessionId },
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-      } catch (error) {
-        console.error("Logout session error:", error.response?.data || error.message);
+        const { data } = await axios.get(`/api/notifications/${studentId}`);
+        if (data?.success) {
+          const unread = data.notifications.filter((n) => !n.isRead).length;
+          setUnreadCount(unread);
+        }
+      } catch (err) {
+        console.warn("Failed to fetch notifications:", err);
       }
-    }
+    };
 
+    fetchNotifications();
+  }, [userInfo._id]);
+
+  const handleUserClick = () => setIsDropdownOpen((prev) => !prev);
+
+  const performLogout = () => {
     localStorage.clear();
+    sessionStorage.clear();
     navigate("/user/login");
   };
 
-  /* Logout flow with Feedback (now includes 1-minute gating + safe callback) */
- const handleLogoutTrigger = async () => {
-    // --- NEW: enforce 1 minute since login before showing feedback modal ---
+  const handleLogoutTrigger = async () => {
     const loginTime = Number(localStorage.getItem("loginTime"));
-    const oneMinutePassed = !isNaN(loginTime) && (Date.now() - loginTime >= 60000);
+    const oneMinutePassed = !isNaN(loginTime) && Date.now() - loginTime >= 60000;
 
-    if (!oneMinutePassed) {
-      // Less than 1 minute since login → skip feedback and logout immediately
-      return performLogout();
-    }
-    // --- END login gating ---
+    if (!oneMinutePassed) return performLogout();
 
     const sessionUser = JSON.parse(localStorage.getItem("userInfo")) || null;
-    const userId = sessionUser?._1d || sessionUser?._id; // attempt safe read for different shapes
+    const userId = sessionUser?._id;
 
-    // If userId missing, open feedback with null user and perform logout in callback
     if (!userId) {
       openFeedback({
         flow: "user",
@@ -207,10 +136,7 @@ useEffect(() => {
     Free: "bg-gray-200 text-gray-700",
   };
 
-  // ⛔ Hide navbar completely during assessment
-if (selectedTab === "assessment") {
-  return null;
-}
+  if (selectedTab === "assessment") return null;
 
   return (
     <div className="bg-white font-poppins border-b border-gray-200 sticky top-0 z-50 w-full">
@@ -249,7 +175,7 @@ if (selectedTab === "assessment") {
 
           <div className="hidden sm:flex flex-col items-start">
             <span className="text-gray-800 text-sm font-semibold">{userInfo.name}</span>
-            <span className={`text-xs font-semibold rounded-full px-2 py-0.5 mt-1 flex items-center gap-1 ${planStyles[planType]}`}>
+            <span className={`text-xs font-semibold rounded-full px-2 py-0.5 mt-1 flex items-center gap-1 ${planStyles[planType] || planStyles["Free"]}`}>
               <FontAwesomeIcon icon={faCrown} className="text-[10px]" />
               {planType}
             </span>

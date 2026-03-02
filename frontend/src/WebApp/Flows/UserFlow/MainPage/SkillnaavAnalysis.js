@@ -1,14 +1,17 @@
 import React, { useState, useRef, useEffect } from "react";
 import axios from "axios";
 import { FaPaperclip, FaPaperPlane, FaSpinner, FaTimes } from "react-icons/fa";
-import { useNavigate } from "react-router-dom";      // ✅ React-Router v6
+import { useNavigate } from "react-router-dom";
 
-const SKILLGAP_API_BASE_URL =
-  process.env.REACT_APP_SKILLGAP_API_BASE_URL || "/ai";
+// ✅ SECURITY: No Python URL here. Calls go through Node backend (authenticated).
+// Node proxy is mounted at /api/ai — same pattern as Recommendations.jsx
+// Token key: partners use "token", students use "userToken"
+const getToken = () =>
+  localStorage.getItem("userToken") || localStorage.getItem("token") || "";
 
 const SkillAnalysis = ({ job, onClose }) => {
   /* ───────── state & refs ───────── */
-  const navigate = useNavigate();                    // ✅ for redirect
+  const navigate = useNavigate();
   const [messages, setMessages] = useState([]);
   const [step, setStep] = useState(1);
   const [file, setFile] = useState(null);
@@ -53,7 +56,6 @@ const SkillAnalysis = ({ job, onClose }) => {
     const uploadedFile = e.target.files[0];
     if (!uploadedFile) return;
 
-    // Clear previous file input
     e.target.value = null;
 
     if (
@@ -72,7 +74,7 @@ const SkillAnalysis = ({ job, onClose }) => {
           ...prev,
           { sender: "ai", text: "✅ Resume received! Analyzing your skills..." },
         ]);
-        analyzeSkills(uploadedFile); // Pass the file directly
+        analyzeSkills(uploadedFile);
       } else {
         setMessages((prev) => [
           ...prev,
@@ -164,11 +166,16 @@ const SkillAnalysis = ({ job, onClose }) => {
         job ? job.qualifications.join(", ") : requiredSkills
       );
 
+      // ✅ SECURITY: Goes through Node backend → Python internally.
+      // Auth header uses whichever token is present (student or partner).
       const response = await axios.post(
-        `${SKILLGAP_API_BASE_URL}/analyze-skills/`,
+        "/api/ai/analyze-skills",
         formData,
         {
-          headers: { "Content-Type": "multipart/form-data" },
+          headers: {
+            "Content-Type": "multipart/form-data",
+            Authorization: `Bearer ${getToken()}`,
+          },
         }
       );
 
@@ -205,11 +212,13 @@ const SkillAnalysis = ({ job, onClose }) => {
         {
           sender: "ai",
           text: `📚 **Recommended Courses:**\n\n${
-            recommendations.courses && Array.isArray(recommendations.courses) && recommendations.courses.length > 0
+            recommendations.courses &&
+            Array.isArray(recommendations.courses) &&
+            recommendations.courses.length > 0
               ? recommendations.courses
                   .map((course) => {
-                    if (typeof course === 'object' && course !== null) {
-                      return `📚 **${course.title || 'Course Title Not Available'}**\n**Platform:** ${course.platform || 'N/A'}\n**Description:** ${course.description || 'No description available'}\n**Duration:** ${course.duration || 'N/A'}`;
+                    if (typeof course === "object" && course !== null) {
+                      return `📚 **${course.title || "Course Title Not Available"}**\n**Platform:** ${course.platform || "N/A"}\n**Description:** ${course.description || "No description available"}\n**Duration:** ${course.duration || "N/A"}`;
                     } else {
                       return `📚 ${course}`;
                     }
@@ -236,15 +245,14 @@ const SkillAnalysis = ({ job, onClose }) => {
       ]);
     } catch (error) {
       console.error("Analysis error:", error);
-      setMessages((prev) => [
-        ...prev,
-        {
-          sender: "ai",
-          text: `❌ Error analyzing skills: ${
-            error.message || "Try again later."
-          }`,
-        },
-      ]);
+
+      // Surface a clear message for auth failures
+      const msg =
+        error?.response?.status === 401
+          ? "❌ Session expired. Please log in again."
+          : `❌ Error analyzing skills: ${error.message || "Try again later."}`;
+
+      setMessages((prev) => [...prev, { sender: "ai", text: msg }]);
     } finally {
       setLoading(false);
     }
@@ -265,10 +273,8 @@ const SkillAnalysis = ({ job, onClose }) => {
 
           <button
             onClick={() => {
-              if (onClose) onClose();       // still lets parent handle it
-              else navigate("/user-main-page"); // ✅ React-Router redirect
-              // ALT without React-Router:
-              // else window.location.href = "http://localhost:3000/user-main-page";
+              if (onClose) onClose();
+              else navigate("/user-main-page");
             }}
             className="absolute top-4 right-4 text-white text-lg hover:text-gray-300"
             aria-label="Close"

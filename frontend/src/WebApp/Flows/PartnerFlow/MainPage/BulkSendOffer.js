@@ -47,7 +47,18 @@ const BulkSendOffer = ({ selectedStudents, internshipId, onCancel, onSuccess }) 
     fetchTemplates();
   }, [internshipId, partnerId]);
 
-const sendOfferToStudent = async (student) => {
+// Fix Bug 7: validate schoolAdminId before sending
+  const getValidSchoolAdminId = () => {
+    const raw = localStorage.getItem("schoolAdminId");
+    return raw && /^[a-f\d]{24}$/i.test(raw) ? raw : null;
+  };
+
+  const sendOfferToStudent = async (student) => {
+    // Fix Bug 1: guard against undefined/null student entries
+    if (!student || !student.student_id || !student.email) {
+      console.warn("Skipping invalid student entry:", student);
+      return;
+    }
     await axios.post(
       "/api/offer-letters",
       {
@@ -68,12 +79,13 @@ const sendOfferToStudent = async (student) => {
         qualifications: Array.isArray(internship?.qualifications)
           ? internship.qualifications
           : (internship?.qualifications || "").split(",").map((q) => q.trim()),
+        // Fix Bug 6: use real partner/internship contact info, not hardcoded placeholders
         contactInfo: {
-          name: "HR Manager",
-          email: "hr@example.com",
-          phone: "9876543210",
+          name: internship?.contactPerson || "HR Manager",
+          email: internship?.contactEmail || "",
+          phone: internship?.contactPhone || "",
         },
-        schoolAdminId: localStorage.getItem("schoolAdminId") || null,
+        schoolAdminId: getValidSchoolAdminId(),
       },
       {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
@@ -81,27 +93,40 @@ const sendOfferToStudent = async (student) => {
     );
   };
 
- const handleSendBulk = async () => {
-  if (!offerDetails.templateId || !offerDetails.joiningDate) {
-    setError("Please select template and joining date");
-    return;
-  }
-  setIsSending(true);
-  setError(null);
-
-  try {
-    for (const student of selectedStudents) {
-      await sendOfferToStudent(student);
+  const handleSendBulk = async () => {
+    if (!offerDetails.templateId || !offerDetails.joiningDate) {
+      setError("Please select template and joining date");
+      return;
     }
-    toast.success("Offer letters sent successfully!");
-    if (onSuccess) onSuccess(selectedStudents); // Pass the students sent offers
-  } catch (err) {
-    setError("Failed to send some offer letters");
-    toast.error("Failed to send some offer letters");
-  } finally {
+    setIsSending(true);
+    setError(null);
+
+    // Fix Bug 5: use Promise.allSettled so one failure doesn't abort the rest
+    const validStudents = selectedStudents.filter((s) => s && s.student_id && s.email);
+    const results = await Promise.allSettled(validStudents.map((s) => sendOfferToStudent(s)));
+
+    const succeeded = results.filter((r) => r.status === "fulfilled").length;
+    const failedCount = results.filter((r) => r.status === "rejected").length;
+
+    if (failedCount === 0) {
+      toast.success(`All ${succeeded} offer letter${succeeded !== 1 ? "s" : ""} sent successfully!`);
+      if (onSuccess) onSuccess(validStudents);
+    } else if (succeeded > 0) {
+      toast.warn(`${succeeded} sent, ${failedCount} failed. Please retry the failed ones.`);
+      setError(`${failedCount} offer(s) failed to send. The rest were sent successfully.`);
+      // Still mark the succeeded ones in parent state
+      const failedIndexes = new Set(
+        results.map((r, i) => (r.status === "rejected" ? i : -1)).filter((i) => i >= 0)
+      );
+      const succeededStudents = validStudents.filter((_, i) => !failedIndexes.has(i));
+      if (onSuccess) onSuccess(succeededStudents);
+    } else {
+      toast.error("All offer letters failed to send.");
+      setError("Failed to send offer letters. Please try again.");
+    }
+
     setIsSending(false);
-  }
-};
+  };
 
 
   

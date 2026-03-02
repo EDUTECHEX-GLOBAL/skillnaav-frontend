@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Skeleton, Modal } from "antd";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Navbar from "./Navbar";
@@ -11,9 +11,7 @@ import Chatbot from "../../../../components/Chatbot";
 import chatBotImage from "../../../../assets-webapp/chat-bot.png";
 
 const UserMainPageContent = () => {
-  const { handleSelectTab } = useTabContext();
-  const { selectedTab } = useTabContext();
-
+  const { handleSelectTab, selectedTab } = useTabContext();
 
   const [userInfo, setUserInfo] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -23,15 +21,17 @@ const UserMainPageContent = () => {
   const [showUpgradePopup, setShowUpgradePopup] = useState(false);
   const [showPricingModal, setShowPricingModal] = useState(false);
   const [showChatbot, setShowChatbot] = useState(false);
-  const [assistDockOpen, setAssistDockOpen] = useState(false); // controls the half-cylinder dock reveal
+  const [assistDockOpen, setAssistDockOpen] = useState(false);
+
+  // ✅ Track whether user has dismissed the popup this session
+  const [popupDismissed, setPopupDismissed] = useState(false);
+  const popupTimerRef = useRef(null);
 
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
   useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
@@ -39,7 +39,6 @@ const UserMainPageContent = () => {
   useEffect(() => {
     const fetchUserInfo = async () => {
       try {
-        // ✅ READ TOKEN AS STRING (NO JSON.parse)
         let token = localStorage.getItem("userToken");
 
         if (!token) {
@@ -52,20 +51,15 @@ const UserMainPageContent = () => {
           return;
         }
 
-        // ✅ API CALL
         const response = await axios.get("/api/users/profile", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         });
 
         setUserInfo(response.data);
         setIsApproved(response.data.adminApproved);
 
-        // Handle query params
         const openTab = searchParams.get("openTab");
         if (openTab) handleSelectTab(openTab);
-
       } catch (error) {
         console.error("Failed to fetch user info:", error);
         localStorage.clear();
@@ -78,16 +72,31 @@ const UserMainPageContent = () => {
     fetchUserInfo();
   }, [searchParams, navigate, handleSelectTab]);
 
-
+  // ✅ Fixed: popup only shows once per 5 minutes, respects dismiss
   useEffect(() => {
-    if (userInfo && !userInfo.isPremium) {
-      const interval = setInterval(() => {
-        setShowUpgradePopup(true);
-        setTimeout(() => setShowUpgradePopup(false), 10000);
-      }, 30000);
-      return () => clearInterval(interval);
-    }
-  }, [userInfo]);
+    if (!userInfo || userInfo.isPremium || popupDismissed) return;
+
+    // Initial delay of 60s before first popup — not immediately
+    const initialDelay = setTimeout(() => {
+      setShowUpgradePopup(true);
+
+      // Auto-hide after 10s
+      popupTimerRef.current = setTimeout(() => {
+        setShowUpgradePopup(false);
+      }, 10000);
+    }, 60000);
+
+    return () => {
+      clearTimeout(initialDelay);
+      clearTimeout(popupTimerRef.current);
+    };
+  }, [userInfo, popupDismissed]);
+
+  const handleDismissPopup = () => {
+    setShowUpgradePopup(false);
+    setPopupDismissed(true); // ✅ Won't show again this session after user dismisses
+    clearTimeout(popupTimerRef.current);
+  };
 
   const handleToggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
   const handleCloseSidebar = () => setIsSidebarOpen(false);
@@ -141,15 +150,16 @@ const UserMainPageContent = () => {
         </div>
       )}
 
+      {/* ✅ Fixed: dismiss sets popupDismissed so it won't re-fire every 30s */}
       <Modal
         open={showUpgradePopup}
-        onCancel={() => setShowUpgradePopup(false)}
+        onCancel={handleDismissPopup}
         footer={[
           <button
             key="upgrade"
             className="bg-purple-500 text-white px-4 py-2 rounded-md hover:bg-purple-600"
             onClick={() => {
-              setShowUpgradePopup(false);
+              handleDismissPopup();
               setShowPricingModal(true);
             }}
           >
@@ -160,20 +170,17 @@ const UserMainPageContent = () => {
         <div className="text-center">
           <h2 className="text-xl font-semibold">Unlock More Features!</h2>
           <p className="text-gray-600 mt-2">
-            Upgrade to <span className="text-blue-500 font-medium">Premium</span> to apply for unlimited jobs, get priority listings, and exclusive opportunities.
+            Upgrade to <span className="text-blue-500 font-medium">Premium</span> to apply for unlimited jobs,
+            get priority listings, and exclusive opportunities.
           </p>
         </div>
       </Modal>
 
       {showChatbot ? (
-        /* EXPANDED CHATBOT: unchanged */
         <div className="fixed bottom-5 right-5 w-[360px] max-h-[80vh] z-50 shadow-xl rounded-lg bg-white border">
           <div className="flex items-center justify-between bg-red-600 text-white p-3 rounded-t-lg">
             <span className="font-semibold">Career Assistance</span>
-            <button
-              onClick={() => setShowChatbot(false)}
-              className="text-lg font-bold hover:text-gray-300"
-            >
+            <button onClick={() => setShowChatbot(false)} className="text-lg font-bold hover:text-gray-300">
               ✕
             </button>
           </div>
@@ -183,23 +190,17 @@ const UserMainPageContent = () => {
         </div>
       ) : (
         <>
-          {/* HALF-CYLINDER DOCK: stuck to bottom-right edge */}
           <button
             type="button"
             onClick={() => setAssistDockOpen((v) => !v)}
             className="fixed bottom-5 right-0 z-50 h-14 w-12 bg-white border border-gray-300 border-r-0 shadow-md rounded-l-full flex items-center justify-center hover:shadow-lg"
             aria-label={assistDockOpen ? "Hide Career Assistance" : "Show Career Assistance"}
-            title={assistDockOpen ? "Hide Career Assistance" : "Show Career Assistance"}
           >
-            <span
-              className={`text-xl leading-none transition-transform ${assistDockOpen ? "" : "rotate-180"}`}
-              aria-hidden="true"
-            >
+            <span className={`text-xl leading-none transition-transform ${assistDockOpen ? "" : "rotate-180"}`} aria-hidden="true">
               ❯
             </span>
           </button>
 
-          {/* CAREER ASSISTANCE PILL: slides out from the HALF-CYLINDER DOCK */}
           <div
             onClick={(e) => {
               e.stopPropagation();
@@ -207,28 +208,23 @@ const UserMainPageContent = () => {
               setAssistDockOpen(false);
             }}
             aria-hidden={!assistDockOpen}
-            className={`fixed bottom-5 right-16 z-50 cursor-pointer flex items-center gap-2 bg-white border shadow-md rounded-full h-14 px-4 py-2 hover:shadow-lg
-              transform-gpu transition-all duration-300 ease-out
-              ${assistDockOpen ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-20 pointer-events-none'}`}
+            className={`fixed bottom-5 right-16 z-50 cursor-pointer flex items-center gap-2 bg-white border shadow-md rounded-full h-14 px-4 py-2 hover:shadow-lg transform-gpu transition-all duration-300 ease-out ${
+              assistDockOpen ? "opacity-100 translate-x-0" : "opacity-0 translate-x-20 pointer-events-none"
+            }`}
           >
-            <div className="text-sm font-semibold text-red-600 leading-tight">
-              Career Assistance
-            </div>
+            <div className="text-sm font-semibold text-red-600 leading-tight">Career Assistance</div>
             <img src={chatBotImage} alt="Bot Avatar" className="w-10 h-10 rounded-full border" />
           </div>
         </>
       )}
-
     </>
   );
 };
 
-const UserMainPage = () => {
-  return (
-    <TabProvider>
-      <UserMainPageContent />
-    </TabProvider>
-  );
-};
+const UserMainPage = () => (
+  <TabProvider>
+    <UserMainPageContent />
+  </TabProvider>
+);
 
 export default UserMainPage;

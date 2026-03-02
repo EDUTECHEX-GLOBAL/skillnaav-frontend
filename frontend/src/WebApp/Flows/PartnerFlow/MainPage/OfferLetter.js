@@ -90,12 +90,17 @@ const SendOfferLetter = ({ student, internshipId, onSuccess, onCancel }) => {
           qualifications: Array.isArray(internship.qualifications)
             ? internship.qualifications
             : (internship.qualifications || "").split(",").map(q => q.trim()),
+          // Fix Bug 6: use real contact info from internship, not hardcoded placeholders
           contactInfo: {
-            name: "HR Manager",
-            email: "hr@example.com",
-            phone: "9876543210",
+            name: internship.contactPerson || "HR Manager",
+            email: internship.contactEmail || "",
+            phone: internship.contactPhone || "",
           },
-          schoolAdminId: localStorage.getItem("schoolAdminId") || null,
+          // Fix Bug 7: validate schoolAdminId before sending
+          schoolAdminId: (() => {
+            const raw = localStorage.getItem("schoolAdminId");
+            return raw && /^[a-f\d]{24}$/i.test(raw) ? raw : null;
+          })(),
         },
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
@@ -208,7 +213,7 @@ const SendOfferLetter = ({ student, internshipId, onSuccess, onCancel }) => {
             </button>
             <button
               onClick={handleSendOffer}
-              disabled={isSending || !offerDetails.templateId}
+              disabled={isSending || !offerDetails.templateId || !offerDetails.joiningDate}
               className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 flex items-center"
             >
               {isSending ? (
@@ -231,4 +236,3 @@ const SendOfferLetter = ({ student, internshipId, onSuccess, onCancel }) => {
 };
 
 export default SendOfferLetter;
-

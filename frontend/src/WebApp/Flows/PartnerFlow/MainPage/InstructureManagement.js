@@ -467,29 +467,37 @@ const InstructureManagement = () => {
         }
     };
 
-    const handleAssignInstructor = async () => {
-        try {
-            const partnerId = localStorage.getItem("partnerId") || undefined;
+const handleAssignInstructor = async () => {
+    try {
+        const partnerId = localStorage.getItem("partnerId") || undefined;
 
-            // Point directly to your FastAPI service on :8003
-            const PY_API = process.env.REACT_APP_PY_API || "http://127.0.0.1:8003";
+        // Goes through Node backend → Python internally. Port never exposed to browser.
+        const { data } = await axios.post(
+            "/api/ai/assign-instructors",
+            { partnerId },
+            {
+                headers: {
+                    Authorization: `Bearer ${localStorage.getItem("token")}`,
+                },
+            }
+        );
 
-            const { data } = await axios.post(
-                `${PY_API}/assign-instructors`,
-                { partnerId }
-            );
+        const made  = data.assignments_made || 0;
+        const lines = (data.assignments || [])
+            .map((r) => `Internship ${r.internshipId} → ${r.sessionsUpdated} session(s)`)
+            .join("\n");
 
-            const made = data.assignments_made || 0;
-            const lines = (data.assignments || [])
-                .map((r) => `Internship ${r.internshipId} → ${r.sessionsUpdated} session(s)`)
-                .join("\n");
+        alert(`Assigned ${made} session${made === 1 ? "" : "s"}.\n${lines}`);
+    } catch (err) {
+        console.error("Assign Instructor failed:", err);
+        alert(
+            err?.response?.status === 401
+                ? "Session expired. Please log in again."
+                : "Assign Instructor failed. Check server logs."
+        );
+    }
+};
 
-            alert(`Assigned ${made} session${made === 1 ? "" : "s"}.\n${lines}`);
-        } catch (err) {
-            console.error("Assign Instructor failed:", err);
-            alert("Assign Instructor failed. Check server logs.");
-        }
-    };
 
     // FIXED
     const filteredInstructors = instructors.filter((i) => {

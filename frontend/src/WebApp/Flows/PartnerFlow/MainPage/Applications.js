@@ -21,7 +21,9 @@ import ConfirmCloseSchedule from "./ConfirmCloseSchedule";
 import InternshipScheduleViewer from "./InternshipScheduleViewer";
 import TimeSlotsSelected from "./TimeSlotsSelected";
 
-const SHORTLIST_API_BASE_URL = process.env.REACT_APP_SHORTLIST_API_BASE_URL || "http://localhost:8001";
+// All AI calls go through Node backend — same pattern as /api/applications/recommendations
+// No Python URL, no port number, no env var needed in the frontend
+const AI_API = "/api/ai";
 
 const InternshipList = () => {
   const [internships, setInternships] = useState([]);
@@ -68,7 +70,6 @@ const InternshipList = () => {
         });
         setPartnerData(response.data);
 
-        // Fetch internships using the authenticated partner's ID
         if (response.data?._id) {
           fetchInternships(response.data._id);
         } else {
@@ -104,14 +105,12 @@ const InternshipList = () => {
 
   const toggleApplicationOpen = async (internshipId, newStatus) => {
     try {
-      // Optimistic UI update - update locally first
       setInternships(prev =>
         prev.map(intern =>
           intern._id === internshipId ? { ...intern, applicationOpen: newStatus } : intern
         )
       );
 
-      // API call to update on server
       await axios.put(`/api/interns/${internshipId}`, { applicationOpen: newStatus }, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
       });
@@ -121,7 +120,6 @@ const InternshipList = () => {
       console.error("Failed to update application status:", error);
       toast.error("Failed to update application status. Please try again.");
 
-      // Revert local state on failure
       setInternships(prev =>
         prev.map(intern =>
           intern._id === internshipId ? { ...intern, applicationOpen: !newStatus } : intern
@@ -175,7 +173,6 @@ const InternshipList = () => {
     }
   };
 
-
   const handleShortlist = async (id, description, skills) => {
     if (!hasPremiumAccess()) {
       toast.error(`Please upgrade to Premium Basic or higher to shortlist candidates`);
@@ -188,15 +185,11 @@ const InternshipList = () => {
     try {
       let resumes = [];
 
-      // If we don't already have applications, fetch them directly
       if (!applications[id] || applications[id].length === 0) {
         try {
           const { data } = await axios.get(`/api/applications/internship/${id}`);
           const fetchedApplications = Array.isArray(data.applications) ? data.applications : [];
-          setApplications(prev => ({
-            ...prev,
-            [id]: fetchedApplications,
-          }));
+          setApplications(prev => ({ ...prev, [id]: fetchedApplications }));
           resumes = fetchedApplications.map((s) => s.resumeUrl).filter(Boolean);
         } catch (err) {
           console.error("Error fetching applications for shortlisting:", err);
@@ -205,17 +198,22 @@ const InternshipList = () => {
         resumes = applications[id].map((s) => s.resumeUrl).filter(Boolean);
       }
 
-      // Send request without blocking if resumes array is empty
       const formData = new FormData();
       formData.append("job_description", description || "");
       formData.append("job_skills", JSON.stringify(skills || []));
       resumes.forEach((url) => formData.append("resumes", url));
       formData.append("internship_id", id);
 
+      // ✅ SECURITY: proxied through Node backend — Python URL never exposed to browser
       const { data } = await axios.post(
-        `${SHORTLIST_API_BASE_URL}/partner/shortlist`,
+        `${AI_API}/partner/shortlist`,
         formData,
-        { headers: { "Content-Type": "multipart/form-data" } }
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+            Authorization: `Bearer ${localStorage.getItem("token")}`,  // partner token
+          },
+        }
       );
 
       setShortlistedCandidates((prev) => ({
@@ -243,8 +241,12 @@ const InternshipList = () => {
     setModalData({ open: true, internshipId, type: "shortlisted", loading: true });
 
     try {
+      // ✅ SECURITY: proxied through Node backend
       const { data } = await axios.get(
-        `${SHORTLIST_API_BASE_URL}/partner/shortlisted/${internshipId}`
+        `${AI_API}/partner/shortlisted/${internshipId}`,
+        {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        }
       );
       setShortlistedCandidates((prev) => ({
         ...prev,
@@ -286,13 +288,11 @@ const InternshipList = () => {
     );
     setTemplateId("");
 
-    // Add error handling and logging
     axios
       .get(`/api/templates?partnerId=${partnerData?._id}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
       .then((res) => {
-        console.log("Templates fetched:", res.data); // Debug log
         setTemplates(res.data);
       })
       .catch(err => {
@@ -313,10 +313,9 @@ const InternshipList = () => {
       const internship = internships.find(i => i._id === selectedStudent?.internship_id);
       const schoolAdminId = localStorage.getItem("schoolAdminId");
 
-      // Build the payload object clearly
       const payload = {
         partnerId: partnerData?._id,
-        student_id: selectedStudent?._id, // ✅ Make sure this is included
+        student_id: selectedStudent?._id,
         internshipId: internship?._id,
         templateId,
         name: selectedStudent?.name,
@@ -343,10 +342,6 @@ const InternshipList = () => {
         schoolAdminId: schoolAdminId || null,
       };
 
-      // Debug log before sending
-      console.log("Sending Offer Payload:", payload);
-
-      // POST the offer letter
       await axios.post(`/api/offer-letters`, payload, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -372,7 +367,6 @@ const InternshipList = () => {
     setScheduleFormOpen(true);
   };
 
-  // 🔹 Open "View Schedule" (Partner can view schedule for an internship)
   const openScheduleViewer = (internshipId) => {
     if (!hasPremiumAccess()) {
       toast.error("Please upgrade to Premium Basic or higher to view schedules");
@@ -382,17 +376,14 @@ const InternshipList = () => {
     setScheduleViewerOpen(true);
   };
 
-  // ✅ Open "Time Slots Selected" -> Show Accepted Offer Students
   const openTimeSlotsSelected = (internshipId) => {
     if (!hasFullPremiumAccess()) {
       toast.error("Please upgrade to Premium Plus to view accepted students");
       return;
     }
-
     setTimeSlotsModal({ open: true, internshipId });
   };
 
-  // 🔹 Permanently close an internship schedule
   const handleConfirmClose = async (internshipId) => {
     try {
       await axios.put('/api/schedule/close', {
@@ -405,7 +396,6 @@ const InternshipList = () => {
       toast.success("Schedule closed permanently!");
       setConfirmCloseOpen(false);
 
-      // Update local UI so "Schedule" and "Close Schedule" buttons disappear
       setInternships(prev =>
         prev.map(i => i._id === internshipId ? { ...i, isScheduleClosed: true } : i)
       );
@@ -459,59 +449,6 @@ const InternshipList = () => {
 
   return (
     <div className="font-poppins max-w-7xl mx-auto p-6 bg-white shadow-lg rounded-lg">
-      {/* {selectedStudent && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-xl w-[400px]">
-            <h2 className="text-lg font-medium mb-4">
-              Send Offer to {selectedStudent.name}
-            </h2>
-            <label className="block mb-2">Joining Date:</label>
-            <input
-              type="date"
-              className="border w-full mb-4 p-2 rounded"
-              value={joiningDate}
-              onChange={(e) => setJoiningDate(e.target.value)}
-              min={new Date().toISOString().split("T")[0]}
-            />
-            <label className="block mb-2">Select Offer Template:</label>
-            <select
-              className="border w-full mb-4 p-2 rounded"
-              value={templateId}
-              onChange={e => setTemplateId(e.target.value)}
-            >
-              <option value="" disabled>-- Select Template --</option>
-              {templates.map(tpl => {
-                const label = tpl.name.trim();  // your user-entered name
-                return (
-                  <option key={tpl._id} value={tpl._id}>
-                    {label}
-                  </option>
-                );
-              })}
-            </select>
-
-
-            <div className="flex justify-end gap-2">
-              <button
-                className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
-                onClick={() => setSelectedStudent(null)}
-                disabled={sendingOffer}
-              >
-                Cancel
-              </button>
-              <button
-                className={`px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 ${sendingOffer ? "opacity-50 cursor-not-allowed" : ""
-                  }`}
-                onClick={handleSendOfferLetter}
-                disabled={sendingOffer}
-              >
-                {sendingOffer ? "Sending..." : "Send Offer"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )} */}
-
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-3xl font-semibold text-gray-900">
           Internships Posted by Partner
@@ -555,7 +492,6 @@ const InternshipList = () => {
                   ? `Student Pays: ${internship.compensationDetails?.amount} ${internship.compensationDetails?.currency}`
                   : "N/A";
 
-          // ✅ Show Time Slots Selected only for PAID internships (NOT stipend)
           const isPaidInternship =
             (internship?.internshipType || "").toUpperCase() === "PAID";
 
@@ -579,7 +515,6 @@ const InternshipList = () => {
                   </div>
                 </div>
 
-                {/* Toggle Switch */}
                 <label className="inline-flex relative items-center cursor-pointer">
                   <input
                     type="checkbox"
@@ -593,7 +528,6 @@ const InternshipList = () => {
                   </span>
                 </label>
               </div>
-
 
               <div className="text-gray-600 mb-4">
                 <p className="flex items-center mb-2">
@@ -621,7 +555,6 @@ const InternshipList = () => {
               </div>
 
               <div className="flex flex-wrap gap-4 mt-4">
-                {/* View Applications - Available for Premium Basic and Premium Plus */}
                 {hasPremiumAccess() ? (
                   <button
                     onClick={() => fetchApplications(internship._id)}
@@ -641,7 +574,6 @@ const InternshipList = () => {
                   showPremiumLock("View Applications", "Premium Basic")
                 )}
 
-                {/* Shortlist - Available for Premium Basic and Premium Plus */}
                 {hasPremiumAccess() || hasFullPremiumAccess() ? (
                   <button
                     onClick={() =>
@@ -655,19 +587,14 @@ const InternshipList = () => {
                     className={`flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-green-400 to-teal-500 text-white font-semibold rounded-lg shadow-lg hover:from-green-500 hover:to-teal-600 transform hover:scale-105 transition duration-200 ${loadingShortlist ? "opacity-50 cursor-not-allowed" : ""
                       }`}
                   >
-                    {loadingShortlist ? (
-                      "Shortlisting..."
-                    ) : (
-                      <>
-                        <FontAwesomeIcon icon={faStar} /> Shortlist
-                      </>
+                    {loadingShortlist ? "Shortlisting..." : (
+                      <><FontAwesomeIcon icon={faStar} /> Shortlist</>
                     )}
                   </button>
                 ) : (
                   showPremiumLock("Shortlist", "Premium Basic")
                 )}
 
-                {/* Shortlisted Resumes - Available for Premium Basic and Premium Plus */}
                 {hasPremiumAccess() || hasFullPremiumAccess() ? (
                   <button
                     onClick={() => showShortlisted(internship._id)}
@@ -675,19 +602,14 @@ const InternshipList = () => {
                     className={`flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:from-purple-600 hover:to-indigo-700 transform hover:scale-105 transition duration-200 ${loadingShortlist ? "opacity-50 cursor-not-allowed" : ""
                       }`}
                   >
-                    {loadingShortlist ? (
-                      "Loading..."
-                    ) : (
-                      <>
-                        <FontAwesomeIcon icon={faDownload} /> Shortlisted Resumes
-                      </>
+                    {loadingShortlist ? "Loading..." : (
+                      <><FontAwesomeIcon icon={faDownload} /> Shortlisted Resumes</>
                     )}
                   </button>
                 ) : (
                   showPremiumLock("Shortlisted Resumes", "Premium Basic")
                 )}
 
-                {/* ✅ Time Slots Selected - Only for Paid internships + Premium Plus (NEW) */}
                 {isPaidInternship && (
                   hasFullPremiumAccess() ? (
                     <button
@@ -701,10 +623,8 @@ const InternshipList = () => {
                   )
                 )}
 
-                {/* Schedule - Only for Premium Plus */}
                 {hasFullPremiumAccess() ? (
                   <>
-                    {/* Open Schedule */}
                     <button
                       onClick={() => handleSchedule(internship._id)}
                       className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-white font-semibold rounded-lg shadow-lg hover:from-yellow-500 hover:to-orange-600 transform hover:scale-105 transition duration-200"
@@ -712,7 +632,6 @@ const InternshipList = () => {
                       <FontAwesomeIcon icon={faClock} /> Internship Schedule
                     </button>
 
-                    {/* View Schedule - Available for Premium Basic and Premium Plus */}
                     {hasPremiumAccess() ? (
                       <button
                         onClick={() => openScheduleViewer(internship._id)}
@@ -724,9 +643,8 @@ const InternshipList = () => {
                       showPremiumLock("View Schedule", "Premium Basic")
                     )}
 
-                    {/* Close Schedule */}
                     <button
-                      onClick={() => setConfirmCloseOpen(internship._id)}   // pass internshipId
+                      onClick={() => setConfirmCloseOpen(internship._id)}
                       className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-red-500 to-pink-600 text-white font-semibold rounded-lg shadow-lg hover:from-red-600 hover:to-pink-700 transform hover:scale-105 transition duration-200"
                     >
                       <FontAwesomeIcon icon={faTimes} /> Close Schedule
@@ -780,7 +698,6 @@ const InternshipList = () => {
         )}
       </Modal>
 
-      {/* ✅ Time Slots Selected Modal -> Accepted Offer Students */}
       <Modal
         isOpen={timeSlotsModal.open}
         onClose={() => setTimeSlotsModal({ open: false, internshipId: null })}
@@ -791,14 +708,12 @@ const InternshipList = () => {
         )}
       </Modal>
 
-      {/* 🔹 Confirmation Popup */}
       <ConfirmCloseSchedule
         isOpen={!!confirmCloseOpen}
         onCancel={() => setConfirmCloseOpen(false)}
         onConfirm={() => handleConfirmClose(confirmCloseOpen)}
       />
 
-      {/* 🔹 View Schedule Modal */}
       <InternshipScheduleViewer
         isOpen={scheduleViewerOpen}
         onClose={() => {
@@ -808,7 +723,6 @@ const InternshipList = () => {
         internshipId={selectedInternshipForView}
         partnerId={partnerData?._id || localStorage.getItem("partnerId")}
       />
-
     </div>
   );
 };

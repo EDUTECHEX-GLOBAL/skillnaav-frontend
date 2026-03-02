@@ -63,6 +63,8 @@ const offerLetterSchema = new mongoose.Schema({
 });
 
 // ✅ Add indexes for better query performance
+// Fix Bug 8: unique compound index prevents duplicate offers at the DB level
+offerLetterSchema.index({ studentId: 1, internshipId: 1 }, { unique: true });
 offerLetterSchema.index({ studentId: 1, status: 1 });
 offerLetterSchema.index({ internshipId: 1 });
 offerLetterSchema.index({ paymentId: 1 });

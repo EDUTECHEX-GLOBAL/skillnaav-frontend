@@ -69,32 +69,36 @@ const generateOfferPDFBuffer = async (offerData) => {
       let responsibilities = (offerData.jobDescription || "").split("\n").map(s => s.trim()).filter(Boolean);
       let qualifications = (offerData.qualifications || []).slice();
 
-      // Measurement helper
+      // Fix Bug 9: use a SEPARATE measurement doc so the main doc's state
+      // is never mutated during the measurement/font-fitting pass.
       const minFont = 9;
       let baseFont = offerData.template?.textStyle?.fontSize ?? 11.5;
 
       const measureContentHeight = (fontSize, respArr, qualArr) => {
-        doc.font("Helvetica").fontSize(fontSize);
+        // Create a fresh throw-away doc just for height calculations
+        const mDoc = new PDFDocument({ margin: 0, size: "A4" });
+        mDoc.end(); // end immediately — we only need heightOfString, not output
+        mDoc.font("Helvetica").fontSize(fontSize);
         let y = 0;
         // date
-        y += doc.heightOfString(`Date: ${moment().format("MMMM D, YYYY")}`, { width: innerW }) + 8;
+        y += mDoc.heightOfString(`Date: ${moment().format("MMMM D, YYYY")}`, { width: innerW }) + 8;
         // to and email
-        y += doc.heightOfString(`To: ${offerData.name || ""}`, { width: innerW }) + 4;
-        if (offerData.email) y += doc.heightOfString(`Email: ${offerData.email}`, { width: innerW }) + 8;
+        y += mDoc.heightOfString(`To: ${offerData.name || ""}`, { width: innerW }) + 4;
+        if (offerData.email) y += mDoc.heightOfString(`Email: ${offerData.email}`, { width: innerW }) + 8;
         // title
-        doc.font("Helvetica-Bold").fontSize(Math.round(fontSize * 1.18));
-        y += doc.heightOfString(`OFFER LETTER – ${offerData.position || ""}`, { width: innerW }) + 10;
+        mDoc.font("Helvetica-Bold").fontSize(Math.round(fontSize * 1.18));
+        y += mDoc.heightOfString(`OFFER LETTER – ${offerData.position || ""}`, { width: innerW }) + 10;
         // intro
-        doc.font("Helvetica").fontSize(fontSize);
+        mDoc.font("Helvetica").fontSize(fontSize);
         const intro = `Dear ${offerData.name || "Candidate"},\n\nWe are delighted to offer you the position of ${offerData.position || "—"} at ${offerData.companyName || "—"}. Your internship is scheduled to commence on ${offerData.startDate ? moment(offerData.startDate).format("MMMM D, YYYY") : "TBD"}.`;
-        y += doc.heightOfString(intro, { width: innerW, lineGap: 4 }) + 10;
+        y += mDoc.heightOfString(intro, { width: innerW, lineGap: 4 }) + 10;
 
         // helper for sections
         const pushSection = (title, lines) => {
-          doc.font("Helvetica-Bold").fontSize(Math.round(fontSize * 1.02));
-          y += doc.heightOfString(title.toUpperCase(), { width: innerW }) + 6;
-          doc.font("Helvetica").fontSize(fontSize);
-          lines.forEach((ln) => { y += doc.heightOfString(`• ${ln}`, { width: innerW - 20 }) + 4; });
+          mDoc.font("Helvetica-Bold").fontSize(Math.round(fontSize * 1.02));
+          y += mDoc.heightOfString(title.toUpperCase(), { width: innerW }) + 6;
+          mDoc.font("Helvetica").fontSize(fontSize);
+          lines.forEach((ln) => { y += mDoc.heightOfString(`• ${ln}`, { width: innerW - 20 }) + 4; });
           y += 6;
         };
 
@@ -127,7 +131,7 @@ const generateOfferPDFBuffer = async (offerData) => {
         ]);
 
         // acceptance
-        y += doc.heightOfString(`Please sign and return this offer letter by ${moment().add(7, "days").format("MMMM D, YYYY")} to confirm your acceptance.`, { width: innerW }) + 12;
+        y += mDoc.heightOfString(`Please sign and return this offer letter by ${moment().add(7, "days").format("MMMM D, YYYY")} to confirm your acceptance.`, { width: innerW }) + 12;
         return y;
       };
 

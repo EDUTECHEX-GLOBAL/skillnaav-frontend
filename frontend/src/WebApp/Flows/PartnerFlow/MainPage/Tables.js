@@ -197,7 +197,6 @@ export const ShortlistedTable = ({ candidates, internshipId }) => {
   // Offer
   const [selectedStudents, setSelectedStudents] = useState([]);
   const [offerStatuses, setOfferStatuses] = useState({});
-  const [loadingStatuses] = useState({});
   const [isLoadingAll, setIsLoadingAll] = useState(false);
   const [showOfferModal, setShowOfferModal] = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
@@ -231,11 +230,22 @@ export const ShortlistedTable = ({ candidates, internshipId }) => {
       i === arr.findIndex((x) => x.student_id === s.student_id)
     ), [candidates]);
 
+  // ── Stable string dep to prevent re-render loop (Fix: Bug 4) ──────────────
+  const candidateIds = useMemo(
+    () =>
+      uniqueCandidates
+        .map((s) => s.student_id)
+        .filter(Boolean)
+        .sort()
+        .join(","),
+    [uniqueCandidates]
+  );
+
   // ── Load offer statuses ─────────────────────────────────────────────────────
   useEffect(() => {
     const load = async () => {
       if (!internshipId) return;
-      const ids = uniqueCandidates.map((s) => s.student_id).filter(Boolean);
+      const ids = candidateIds ? candidateIds.split(",") : [];
       if (!ids.length) return;
       setIsLoadingAll(true);
       try {
@@ -248,7 +258,7 @@ export const ShortlistedTable = ({ candidates, internshipId }) => {
       }
     };
     load();
-  }, [internshipId, uniqueCandidates]);
+  }, [internshipId, candidateIds]);
 
   // ── Load pipeline data when tab changes ────────────────────────────────────
   useEffect(() => {
@@ -274,11 +284,16 @@ export const ShortlistedTable = ({ candidates, internshipId }) => {
   const l3Count = l3Items.length;
   const offerCount = offerItems.length;
 
+  // Fix Bug 3: All terminal statuses block re-sending, not just "Sent"
+  const OFFER_SENT_STATUSES = new Set(["Sent", "Accepted", "Rejected"]);
+
   // ── L1 bulk selection ───────────────────────────────────────────────────────
   const handleSelectAll = (e) => {
     if (e.target.checked) {
       setSelectedStudents(
-        uniqueCandidates.filter((s) => offerStatuses[s.student_id] !== "Sent").map((s) => s.student_id)
+        uniqueCandidates
+          .filter((s) => !OFFER_SENT_STATUSES.has(offerStatuses[s.student_id]))
+          .map((s) => s.student_id)
       );
     } else {
       setSelectedStudents([]);
@@ -286,7 +301,7 @@ export const ShortlistedTable = ({ candidates, internshipId }) => {
   };
 
   const toggleStudentSelect = (id) => {
-    if (offerStatuses[id] === "Sent") return;
+    if (OFFER_SENT_STATUSES.has(offerStatuses[id])) return;
     setSelectedStudents((prev) =>
       prev.includes(id) ? prev.filter((sid) => sid !== id) : [...prev, id]
     );
@@ -294,11 +309,12 @@ export const ShortlistedTable = ({ candidates, internshipId }) => {
 
   // ── Offer modal ─────────────────────────────────────────────────────────────
   const handleSendOfferClick = (student) => {
-    if (offerStatuses[student.student_id] === "Sent") return;
+    if (OFFER_SENT_STATUSES.has(offerStatuses[student.student_id])) return;
     setSelectedStudent(student);
     setShowOfferModal(true);
   };
-  const handleOfferSuccess = () => {
+  // Fix Bug 2: Accept the offer response data from onSuccess callback
+  const handleOfferSuccess = (offerData) => {
     if (selectedStudent?.student_id) {
       setOfferStatuses((prev) => ({ ...prev, [selectedStudent.student_id]: "Sent" }));
     }
@@ -439,7 +455,7 @@ export const ShortlistedTable = ({ candidates, internshipId }) => {
                   <th className="px-6 py-3 text-center">
                     <input type="checkbox"
                       checked={selectedStudents.length > 0 &&
-                        selectedStudents.length === uniqueCandidates.filter((s) => offerStatuses[s.student_id] !== "Sent").length}
+                        selectedStudents.length === uniqueCandidates.filter((s) => !OFFER_SENT_STATUSES.has(offerStatuses[s.student_id])).length}
                       onChange={handleSelectAll}
                     />
                   </th>
@@ -453,13 +469,13 @@ export const ShortlistedTable = ({ candidates, internshipId }) => {
               <tbody className="divide-y divide-gray-200 text-center">
                 {uniqueCandidates.map((student) => {
                   const status = offerStatuses[student.student_id] || "Not Sent";
-                  const isLoading = loadingStatuses[student.student_id];
+                  const offerSent = OFFER_SENT_STATUSES.has(status);
                   return (
                     <tr key={student.student_id} className="hover:bg-gray-50 transition">
                       <td className="px-6 py-4">
                         <input type="checkbox"
                           checked={selectedStudents.includes(student.student_id)}
-                          disabled={status === "Sent"}
+                          disabled={offerSent}
                           onChange={() => toggleStudentSelect(student.student_id)}
                         />
                       </td>
@@ -470,22 +486,15 @@ export const ShortlistedTable = ({ candidates, internshipId }) => {
                           className="text-blue-600 hover:underline">View Resume</a>
                       </td>
                       <td className="px-6 py-4">
-                        {isLoading
-                          ? <div className="flex justify-center items-center">
-                              <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-blue-500 mr-2" />
-                              <span className="text-xs text-gray-500">Checking...</span>
-                            </div>
-                          : renderOfferStatusPill(student.student_id)}
+                        {renderOfferStatusPill(student.student_id)}
                       </td>
                       <td className="px-6 py-4 space-x-2">
-                        {isLoading
-                          ? <span className="text-gray-500">Loading...</span>
-                          : status === "Not Sent"
-                            ? <button onClick={() => handleSendOfferClick(student)}
-                                className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">
-                                Send Offer
-                              </button>
-                            : <span className="text-sm text-gray-500">{getOfferStatusText(status)}</span>}
+                        {!offerSent
+                          ? <button onClick={() => handleSendOfferClick(student)}
+                              className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">
+                              Send Offer
+                            </button>
+                          : <span className="text-sm text-gray-500">{getOfferStatusText(status)}</span>}
                       </td>
                     </tr>
                   );

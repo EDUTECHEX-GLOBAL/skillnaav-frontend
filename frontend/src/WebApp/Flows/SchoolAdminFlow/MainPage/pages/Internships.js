@@ -8,7 +8,9 @@ import {
   AiOutlineStar, AiOutlineLike, AiOutlineDislike,
 } from 'react-icons/ai';
 
-const SHORTLIST_API_BASE_URL = process.env.REACT_APP_SHORTLIST_API_BASE_URL;
+// All AI calls go through Node backend — same pattern as /api/applications/recommendations
+// No Python URL, no port number, no env var needed in the frontend
+const AI_API = "/api/ai";
 
 const Internships = () => {
   const [internships, setInternships] = useState([]);
@@ -24,29 +26,28 @@ const Internships = () => {
   const [hasMore, setHasMore] = useState(true);
   const loadMoreRef = useRef(null);
 
-useEffect(() => {
-  if (!hasMore || loading) return;
+  useEffect(() => {
+    if (!hasMore || loading) return;
 
-  const observer = new IntersectionObserver(
-    (entries) => {
-      if (entries[0].isIntersecting) {
-        fetchInternships(page + 1);
-      }
-    },
-    { threshold: 1 }
-  );
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          fetchInternships(page + 1);
+        }
+      },
+      { threshold: 1 }
+    );
 
-  if (loadMoreRef.current) {
-    observer.observe(loadMoreRef.current);
-  }
-
-  return () => {
     if (loadMoreRef.current) {
-      observer.unobserve(loadMoreRef.current);
+      observer.observe(loadMoreRef.current);
     }
-  };
-}, [page, hasMore, loading]);
 
+    return () => {
+      if (loadMoreRef.current) {
+        observer.unobserve(loadMoreRef.current);
+      }
+    };
+  }, [page, hasMore, loading]);
 
   const fetchInternships = async (pageNumber = 1) => {
     try {
@@ -71,11 +72,9 @@ useEffect(() => {
     }
   };
 
-    useEffect(() => {
-
+  useEffect(() => {
     fetchInternships(1);
   }, []);
-
 
   const openModal = async (status, internshipId) => {
     const token = localStorage.getItem('schoolAdminToken');
@@ -111,7 +110,8 @@ useEffect(() => {
           return;
         }
 
-        const url = `${SHORTLIST_API_BASE_URL}/partner/shortlisted/by-admin?internship_id=${internshipId}&school_admin_id=${schoolAdminId}`;
+        // ✅ SECURITY: proxied through Node backend — Python URL never exposed to browser
+        const url = `${AI_API}/partner/shortlisted/by-admin?internship_id=${internshipId}&school_admin_id=${schoolAdminId}`;
         console.log(`🚀 Fetching Shortlisted Students from: ${url}`);
 
         response = await axios.get(url, {
@@ -159,9 +159,7 @@ useEffect(() => {
         });
 
         console.log('✅ Applied API response:', response.data);
-
-      setApplications(response.data.applications);
-
+        setApplications(response.data.applications);
       }
     } catch (err) {
       console.error('❌ Error fetching applications:', err);
@@ -194,7 +192,9 @@ useEffect(() => {
       )}
 
       {error && <p className="text-center text-red-500 col-span-full">{error}</p>}
-      {!loading && internships.length === 0 && <p className="text-center col-span-full">No internships available.</p>}
+      {!loading && internships.length === 0 && (
+        <p className="text-center col-span-full">No internships available.</p>
+      )}
 
       {internships.map((item) => (
         <div key={item._id} className="bg-white shadow-md rounded-xl p-5 relative">
@@ -236,10 +236,10 @@ useEffect(() => {
           </div>
 
           <div className="mt-4 grid grid-cols-2 gap-2 text-xs font-medium">
-            <MiniStat icon={<FaLaptopHouse className="text-orange-400" />} label="Applied" bg="bg-orange-50" onClick={() => openModal('Applied', item._id)} />
-            <MiniStat icon={<AiOutlineStar className="text-green-500" />} label="Shortlisted" bg="bg-green-50" onClick={() => openModal('Shortlisted', item._id)} />
-            <MiniStat icon={<AiOutlineLike className="text-pink-500" />} label="Accepted" bg="bg-pink-50" onClick={() => openModal('Accepted', item._id)} />
-            <MiniStat icon={<AiOutlineDislike className="text-blue-500" />} label="Rejected" bg="bg-indigo-50" onClick={() => openModal('Rejected', item._id)} />
+            <MiniStat icon={<FaLaptopHouse className="text-orange-400" />}   label="Applied"     bg="bg-orange-50" onClick={() => openModal('Applied',     item._id)} />
+            <MiniStat icon={<AiOutlineStar className="text-green-500" />}    label="Shortlisted" bg="bg-green-50"  onClick={() => openModal('Shortlisted', item._id)} />
+            <MiniStat icon={<AiOutlineLike className="text-pink-500" />}     label="Accepted"    bg="bg-pink-50"   onClick={() => openModal('Accepted',    item._id)} />
+            <MiniStat icon={<AiOutlineDislike className="text-blue-500" />}  label="Rejected"    bg="bg-indigo-50" onClick={() => openModal('Rejected',    item._id)} />
           </div>
         </div>
       ))}
@@ -252,23 +252,20 @@ useEffect(() => {
           onClose={closeModal}
         />
       )}
-     {hasMore && (
-  <div
-    ref={loadMoreRef}
-    className="col-span-full h-10 flex justify-center items-center"
-  >
-    {loading && (
-      <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-purple-600" />
-    )}
-  </div>
-)}
 
-
-
+      {hasMore && (
+        <div
+          ref={loadMoreRef}
+          className="col-span-full h-10 flex justify-center items-center"
+        >
+          {loading && (
+            <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-purple-600" />
+          )}
+        </div>
+      )}
     </div>
   );
 };
-
 
 const MiniStat = ({ icon, label, bg, onClick }) => (
   <div onClick={onClick} className={`flex items-center gap-1 px-2 py-1 rounded-md ${bg} cursor-pointer`}>
@@ -280,7 +277,6 @@ const MiniStat = ({ icon, label, bg, onClick }) => (
 const StatusModal = ({ status, students, loading, onClose }) => (
   <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
     <div className="bg-white rounded-xl w-full max-w-4xl h-[80vh] p-6 relative flex flex-col shadow-xl">
-      {/* Close Button */}
       <button
         onClick={onClose}
         className="absolute top-3 right-4 text-gray-500 hover:text-red-500 text-2xl font-bold"
@@ -288,12 +284,10 @@ const StatusModal = ({ status, students, loading, onClose }) => (
         &times;
       </button>
 
-      {/* Title */}
       <h2 className="text-xl font-semibold mb-4 text-gray-800">
         Students {status} ({students.length})
       </h2>
 
-      {/* Table Section */}
       <div className="overflow-y-auto border rounded-lg flex-grow">
         {loading ? (
           <div className="flex justify-center items-center h-full py-10">
@@ -345,7 +339,6 @@ const StatusModal = ({ status, students, loading, onClose }) => (
   </div>
 );
 
-
 const formatPostedDate = (dateStr) => {
   if (!dateStr) return '';
   const postedDate = new Date(dateStr);
@@ -355,4 +348,3 @@ const formatPostedDate = (dateStr) => {
 };
 
 export default Internships;
-//this is just testing line 
