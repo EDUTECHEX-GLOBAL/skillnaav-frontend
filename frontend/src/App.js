@@ -38,6 +38,10 @@ import PartnerforgotPassword from "./WebApp/Flows/PartnerFlow/SignUpLogin/Partne
 // import AdminFlow from "./WebApp/Flows/AdminFlow/AdminFlow";
 import AdminCreateAccount from "./WebApp/Flows/AdminFlow/SignUpLogin/AdminCreateAccount";
 import AdminLogin from "./WebApp/Flows/AdminFlow/SignUpLogin/AdminLogin";
+
+import AdminForgotPassword from "./WebApp/Flows/AdminFlow/SignUpLogin/AdminForgotPassword";
+import AdminResetPassword from "./WebApp/Flows/AdminFlow/SignUpLogin/AdminResetPassword";
+
 import AdminProfileForm from "./WebApp/Flows/AdminFlow/SignUpLogin/AdminProfileBuilding/AdminProfileForm";
 import AdminProfilePicture from "./WebApp/Flows/AdminFlow/SignUpLogin/AdminProfileBuilding/AdminProfilePicture";
 import AdminMainPage from "./WebApp/Flows/AdminFlow/MainPage/AdminMainPage";
@@ -162,6 +166,10 @@ function App() {
           {/* <Route path="/admin-account" element={<AdminFlow />} /> */}
           <Route path="/admin-create-account" element={<AdminCreateAccount />} />
           <Route path="/admin/login" element={<AdminLogin />} />
+
+          <Route path="/admin/forgot-password" element={<AdminForgotPassword />} />
+          <Route path="/admin/reset-password" element={<AdminResetPassword />} />
+
           <Route path="/admin-profile-form" element={<AdminProfileForm />} />
           <Route path="/admin-profile-picture" element={<AdminProfilePicture />} />
           <Route path="/admin-main-page" element={<AdminMainPage />} />

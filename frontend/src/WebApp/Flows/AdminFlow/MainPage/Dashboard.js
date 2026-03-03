@@ -1,3 +1,5 @@
+// File: Dashboard.js
+
 import React, { useState, useEffect } from "react";
 import { FaUsers, FaUserFriends, FaBriefcase, FaDollarSign } from "react-icons/fa";
 import DashboardCharts from "./Analytics/DashboardCharts";
@@ -28,7 +30,7 @@ const Dashboard = () => {
     totalRevenue: 0, // Add totalRevenue state
     monthlyRevenue: [],
   });
-  
+
 
   const fetchDashboardData = async () => {
     try {

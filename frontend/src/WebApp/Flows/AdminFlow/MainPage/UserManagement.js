@@ -1,8 +1,10 @@
+//File: UserManagement.js
+
 import React, { useState, useEffect, useMemo } from "react";
 import axios from "axios";
-import { 
-  AiOutlineClose, 
-  AiOutlineSearch, 
+import {
+  AiOutlineClose,
+  AiOutlineSearch,
   AiOutlineDownload,
   AiOutlineCheck,
   AiOutlineCloseCircle,
@@ -16,7 +18,6 @@ import {
   AiOutlineCamera
 } from "react-icons/ai";
 import { MdOutlineSchool, MdOutlineWork } from "react-icons/md";
-import jsPDF from "jspdf";
 import UserCard from "./UserCard";
 
 const UserManagement = () => {
@@ -53,7 +54,7 @@ const UserManagement = () => {
     if (!isValidToken) return;
 
     axios.defaults.headers.common["Authorization"] = `Bearer ${raw}`;
-    
+
     const fetchUsers = async () => {
       try {
         const { data } = await axios.get("/api/users/users");
@@ -73,17 +74,17 @@ const UserManagement = () => {
   // Filter users based on search and status
   useEffect(() => {
     let result = users;
-    
+
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      result = result.filter(user => 
+      result = result.filter(user =>
         user.name?.toLowerCase().includes(query) ||
         user.email?.toLowerCase().includes(query) ||
         user.universityName?.toLowerCase().includes(query) ||
         user.fieldOfStudy?.toLowerCase().includes(query)
       );
     }
-    
+
     if (statusFilter !== "all") {
       result = result.filter(user => {
         if (statusFilter === "pending") return !user.status || user.status === "Pending";
@@ -92,30 +93,55 @@ const UserManagement = () => {
         return true;
       });
     }
-    
+
     setFilteredUsers(result);
     setCurrentPage(1);
   }, [searchQuery, statusFilter, users]);
 
   const handleApprove = (userId) => setConfirmAction({ type: "approve", userId });
   const handleReject = (userId) => setConfirmAction({ type: "reject", userId });
+  const handleRequestReverify = (userId) => setConfirmAction({ type: "reverify", userId });
 
   const confirmActionHandler = async () => {
-    const { type, userId } = confirmAction;
+    const { type, userId } = confirmAction || {};
+    if (!type || !userId) return;
+
     setConfirmLoading(true);
 
     try {
-      await axios.patch(
-        `/api/users/${type}/${userId}`,
-        { status: type === "approve" ? "Approved" : "Rejected" }
-      );
-      
-      setUsers(prevUsers =>
-        prevUsers.map(user =>
-          user._id === userId
-            ? { ...user, status: type === "approve" ? "Approved" : "Rejected" }
-            : user
+      if (type === "reverify") {
+        await axios.patch(`/api/user-age-gate-consent/request-reverify/${userId}`);
+
+        // ✅ minimal UI update (so admin sees it immediately without refresh)
+        setUsers((prevUsers) =>
+          prevUsers.map((u) =>
+            u._id === userId ? { ...u, status: "Pending", adminApproved: false } : u
+          )
+        );
+
+        setSelectedUser((prev) =>
+          prev && prev._id === userId ? { ...prev, status: "Pending", adminApproved: false } : prev
+        );
+
+        return;
+      }
+
+      await axios.patch(`/api/users/${type}/${userId}`, {
+        status: type === "approve" ? "Approved" : "Rejected",
+      });
+
+      setUsers((prevUsers) =>
+        prevUsers.map((u) =>
+          u._id === userId
+            ? { ...u, status: type === "approve" ? "Approved" : "Rejected" }
+            : u
         )
+      );
+
+      setSelectedUser((prev) =>
+        prev && prev._id === userId
+          ? { ...prev, status: type === "approve" ? "Approved" : "Rejected" }
+          : prev
       );
     } catch (err) {
       setError(err.response?.data?.message || err.message);
@@ -135,39 +161,11 @@ const UserManagement = () => {
     setSelectedUser(null);
   };
 
-  const downloadPDF = (user) => {
-    const doc = new jsPDF();
-    doc.setFontSize(16);
-    doc.text("User Profile Details", 20, 20);
-    doc.setFontSize(12);
-    
-    const fields = [
-      ["Name", user.name],
-      ["Email", user.email],
-      ["Status", user.status || "Pending"],
-      ["University", user.universityName],
-      ["Date of Birth", user.dob],
-      ["Educational Level", user.educationLevel],
-      ["Field of Study", user.fieldOfStudy],
-      ["Desired Field", user.desiredField],
-      ["City", user.city],
-      ["Country", user.country],
-    ];
-    
-    let yPos = 40;
-    fields.forEach(([label, value]) => {
-      doc.text(`${label}: ${value || "N/A"}`, 20, yPos);
-      yPos += 10;
-    });
-    
-    doc.save(`${user.name}_Profile.pdf`);
-  };
-
   const nextPage = () => setCurrentPage(p => Math.min(p + 1, totalPages));
   const prevPage = () => setCurrentPage(p => Math.max(p - 1, 1));
 
   const getStatusColor = (status) => {
-    switch(status) {
+    switch (status) {
       case "Approved": return "bg-green-100 text-green-800 border-green-200";
       case "Rejected": return "bg-red-100 text-red-800 border-red-200";
       default: return "bg-yellow-100 text-yellow-800 border-yellow-200";
@@ -175,7 +173,7 @@ const UserManagement = () => {
   };
 
   const getStatusIcon = (status) => {
-    switch(status) {
+    switch (status) {
       case "Approved": return <AiOutlineCheck className="text-green-600" size={14} />;
       case "Rejected": return <AiOutlineCloseCircle className="text-red-600" size={14} />;
       default: return <AiOutlineCalendar className="text-yellow-600" size={14} />;
@@ -193,7 +191,7 @@ const UserManagement = () => {
 
   const getAvatarColor = (name) => {
     if (!name) return "from-blue-500 to-purple-600";
-    
+
     const colors = [
       "from-blue-500 to-purple-600",
       "from-green-500 to-teal-600",
@@ -204,7 +202,7 @@ const UserManagement = () => {
       "from-indigo-500 to-blue-600",
       "from-emerald-500 to-green-600",
     ];
-    
+
     let hash = 0;
     for (let i = 0; i < name.length; i++) {
       hash = name.charCodeAt(i) + ((hash << 5) - hash);
@@ -214,23 +212,23 @@ const UserManagement = () => {
   };
 
   const hasProfileImage = (user) => {
-    return user.profileImage && 
-           user.profileImage.trim() !== "" && 
-           user.profileImage !== "null" && 
-           user.profileImage !== "undefined";
+    return user.profileImage &&
+      user.profileImage.trim() !== "" &&
+      user.profileImage !== "null" &&
+      user.profileImage !== "undefined";
   };
 
   const getProfileImageUrl = (profileImage) => {
     if (!profileImage || profileImage.trim() === "") return null;
-    
+
     if (profileImage.startsWith('http://') || profileImage.startsWith('https://')) {
       return profileImage;
     }
-    
+
     if (profileImage.startsWith('/')) {
       return `${window.location.origin}${profileImage}`;
     }
-    
+
     return `${window.location.origin}/uploads/${profileImage}`;
   };
 
@@ -242,8 +240,8 @@ const UserManagement = () => {
           <div className="text-red-500 text-6xl mb-4">🔒</div>
           <h2 className="text-2xl font-bold text-gray-800 mb-2">Session Expired</h2>
           <p className="text-gray-600 mb-6">Your admin session has expired or is invalid.</p>
-          <a 
-            href="/admin/login" 
+          <a
+            href="/admin/login"
             className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
           >
             Log In Again
@@ -274,7 +272,7 @@ const UserManagement = () => {
           <div className="text-red-500 text-6xl mb-4">⚠️</div>
           <h2 className="text-2xl font-bold text-gray-800 mb-2">Error Loading Data</h2>
           <p className="text-gray-600 mb-6">{error}</p>
-          <button 
+          <button
             onClick={() => window.location.reload()}
             className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
           >
@@ -295,7 +293,7 @@ const UserManagement = () => {
             <h1 className="text-3xl font-bold text-gray-900">Student Applications</h1>
             <p className="text-gray-600 mt-2">Review and manage student applications</p>
           </div>
-          
+
           <div className="flex items-center gap-4">
             <div className="text-sm font-medium text-gray-700 bg-white px-4 py-2 rounded-lg shadow">
               Total: <span className="font-bold text-blue-600">{filteredUsers.length}</span> students
@@ -317,7 +315,7 @@ const UserManagement = () => {
                 className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-poppins"
               />
               {searchQuery && (
-                <button 
+                <button
                   onClick={() => setSearchQuery("")}
                   className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
@@ -404,14 +402,14 @@ const UserManagement = () => {
         {viewMode === "grid" ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
             {currentUsers.map((user) => (
-              <div 
-                key={user._id} 
-                className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100 hover:border-blue-100"
+              <div
+                key={user._id}
+                className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100 hover:border-blue-100 flex flex-col h-full"
               >
                 {/* Card Header with Profile Image */}
                 <div className="relative">
                   <div className="h-24 bg-gradient-to-r from-blue-50 to-indigo-50"></div>
-                  
+
                   {/* Profile Image/Initial */}
                   <div className="absolute -bottom-8 left-6">
                     {hasProfileImage(user) ? (
@@ -455,7 +453,8 @@ const UserManagement = () => {
                 </div>
 
                 {/* Card Content */}
-                <div className="pt-12 px-6 pb-6">
+                <div className="pt-12 px-6 pb-6 flex-1 flex flex-col">
+
                   {/* User Info */}
                   <div className="mb-6">
                     <h3 className="font-bold text-xl text-gray-900 mb-1 truncate">{user.name || "No Name"}</h3>
@@ -479,7 +478,7 @@ const UserManagement = () => {
                   </div>
 
                   {/* Actions */}
-                  <div className="space-y-3">
+                  <div className="space-y-3 mt-auto">
                     <button
                       onClick={() => handleViewProfile(user)}
                       className="w-full px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium text-sm flex items-center justify-center gap-2"
@@ -487,29 +486,27 @@ const UserManagement = () => {
                       <AiOutlineEye />
                       View Full Profile
                     </button>
-                    
+
                     <div className="flex gap-2">
                       {/* Approve Button - Always visible for admin */}
                       <button
                         onClick={() => handleApprove(user._id)}
-                        className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-1 ${
-                          user.status === "Approved" 
-                            ? "bg-green-600 text-white cursor-default" 
-                            : "bg-green-500 text-white hover:bg-green-600"
-                        }`}
+                        className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-1 ${user.status === "Approved"
+                          ? "bg-green-600 text-white cursor-default"
+                          : "bg-green-500 text-white hover:bg-green-600"
+                          }`}
                       >
                         <AiOutlineCheck size={14} />
                         {user.status === "Approved" ? "Approved" : "Approve"}
                       </button>
-                      
+
                       {/* Reject Button - Always visible for admin */}
                       <button
                         onClick={() => handleReject(user._id)}
-                        className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-1 ${
-                          user.status === "Rejected" 
-                            ? "bg-red-600 text-white cursor-default" 
-                            : "bg-red-500 text-white hover:bg-red-600"
-                        }`}
+                        className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-1 ${user.status === "Rejected"
+                          ? "bg-red-600 text-white cursor-default"
+                          : "bg-red-500 text-white hover:bg-red-600"
+                          }`}
                       >
                         <AiOutlineCloseCircle size={14} />
                         {user.status === "Rejected" ? "Rejected" : "Reject"}
@@ -521,11 +518,12 @@ const UserManagement = () => {
             ))}
           </div>
         ) : (
+
           /* List View */
           <div className="space-y-4 mb-8">
             {currentUsers.map((user) => (
-              <div 
-                key={user._id} 
+              <div
+                key={user._id}
                 className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 p-6"
               >
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -560,7 +558,7 @@ const UserManagement = () => {
                         </div>
                       </div>
                     )}
-                    
+
                     <div>
                       <div className="flex items-center gap-3 mb-2">
                         <h3 className="font-bold text-lg text-gray-900">{user.name || "No Name"}</h3>
@@ -589,7 +587,7 @@ const UserManagement = () => {
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center gap-3">
                     <button
                       onClick={() => handleViewProfile(user)}
@@ -598,29 +596,27 @@ const UserManagement = () => {
                       <AiOutlineEye />
                       View Profile
                     </button>
-                    
+
                     <div className="flex gap-2">
                       {/* Approve Button */}
                       <button
                         onClick={() => handleApprove(user._id)}
-                        className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-1 ${
-                          user.status === "Approved" 
-                            ? "bg-green-600 text-white cursor-default" 
-                            : "bg-green-500 text-white hover:bg-green-600"
-                        }`}
+                        className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-1 ${user.status === "Approved"
+                          ? "bg-green-600 text-white cursor-default"
+                          : "bg-green-500 text-white hover:bg-green-600"
+                          }`}
                       >
                         <AiOutlineCheck size={12} />
                         {user.status === "Approved" ? "Approved" : "Approve"}
                       </button>
-                      
+
                       {/* Reject Button */}
                       <button
                         onClick={() => handleReject(user._id)}
-                        className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-1 ${
-                          user.status === "Rejected" 
-                            ? "bg-red-600 text-white cursor-default" 
-                            : "bg-red-500 text-white hover:bg-red-600"
-                        }`}
+                        className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-1 ${user.status === "Rejected"
+                          ? "bg-red-600 text-white cursor-default"
+                          : "bg-red-500 text-white hover:bg-red-600"
+                          }`}
                       >
                         <AiOutlineCloseCircle size={12} />
                         {user.status === "Rejected" ? "Rejected" : "Reject"}
@@ -639,15 +635,14 @@ const UserManagement = () => {
             <button
               onClick={prevPage}
               disabled={currentPage === 1}
-              className={`px-4 py-2 rounded-lg flex items-center gap-2 font-medium ${
-                currentPage === 1 
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
-                  : 'bg-blue-600 text-white hover:bg-blue-700'
-              }`}
+              className={`px-4 py-2 rounded-lg flex items-center gap-2 font-medium ${currentPage === 1
+                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
             >
               Previous
             </button>
-            
+
             <div className="flex items-center gap-2">
               {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                 let pageNum;
@@ -660,31 +655,29 @@ const UserManagement = () => {
                 } else {
                   pageNum = currentPage - 2 + i;
                 }
-                
+
                 return (
                   <button
                     key={pageNum}
                     onClick={() => setCurrentPage(pageNum)}
-                    className={`w-10 h-10 rounded-lg font-medium ${
-                      currentPage === pageNum
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
+                    className={`w-10 h-10 rounded-lg font-medium ${currentPage === pageNum
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
                   >
                     {pageNum}
                   </button>
                 );
               })}
             </div>
-            
+
             <button
               onClick={nextPage}
               disabled={currentPage === totalPages}
-              className={`px-4 py-2 rounded-lg flex items-center gap-2 font-medium ${
-                currentPage === totalPages
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : 'bg-blue-600 text-white hover:bg-blue-700'
-              }`}
+              className={`px-4 py-2 rounded-lg flex items-center gap-2 font-medium ${currentPage === totalPages
+                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
             >
               Next
             </button>
@@ -697,7 +690,7 @@ const UserManagement = () => {
             <div className="text-gray-400 text-6xl mb-4">👤</div>
             <h3 className="text-xl font-bold text-gray-700 mb-2">No users found</h3>
             <p className="text-gray-500">
-              {searchQuery 
+              {searchQuery
                 ? `No users match "${searchQuery}"`
                 : "No users match the selected filters"}
             </p>
@@ -717,55 +710,20 @@ const UserManagement = () => {
       </div>
 
       {/* UserCard Component Modal */}
-     
-{isUserCardOpen && selectedUser && (
-  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-    <div className="relative w-full max-w-4xl">
-      <UserCard user={selectedUser} onClose={closeProfileModal} />
-      
-      {/* Action Buttons inside UserCard modal */}
-      <div className="mt-4 flex justify-center gap-3">
-        <button
-          onClick={() => {
-            handleApprove(selectedUser._id);
-            closeProfileModal();
-          }}
-          className={`px-6 py-3 rounded-lg font-medium flex items-center gap-2 ${
-            selectedUser.status === "Approved" 
-              ? "bg-green-600 text-white cursor-default" 
-              : "bg-green-500 text-white hover:bg-green-600"
-          }`}
-        >
-          <AiOutlineCheck />
-          {selectedUser.status === "Approved" ? "Approved" : "Approve"}
-        </button>
-        
-        <button
-          onClick={() => {
-            handleReject(selectedUser._id);
-            closeProfileModal();
-          }}
-          className={`px-6 py-3 rounded-lg font-medium flex items-center gap-2 ${
-            selectedUser.status === "Rejected" 
-              ? "bg-red-600 text-white cursor-default" 
-              : "bg-red-500 text-white hover:bg-red-600"
-          }`}
-        >
-          <AiOutlineCloseCircle />
-          {selectedUser.status === "Rejected" ? "Rejected" : "Reject"}
-        </button>
-        
-        <button
-          onClick={() => downloadPDF(selectedUser)}
-          className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium flex items-center gap-2"
-        >
-          <AiOutlineDownload />
-          Download PDF
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+
+      {isUserCardOpen && selectedUser && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="relative w-full max-w-4xl">
+            <UserCard
+              user={selectedUser}
+              onClose={closeProfileModal}
+              onApprove={handleApprove}
+              onReject={handleReject}
+              onRequestReverify={handleRequestReverify}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Confirm Action Modal */}
       {confirmAction && (
@@ -775,18 +733,28 @@ const UserManagement = () => {
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 {confirmAction.type === "approve" ? (
                   <AiOutlineCheck className="text-green-600 text-3xl" />
-                ) : (
+                ) : confirmAction.type === "reject" ? (
                   <AiOutlineCloseCircle className="text-red-600 text-3xl" />
+                ) : (
+                  <AiOutlineCamera className="text-yellow-600 text-3xl" />
                 )}
               </div>
+
               <h3 className="text-xl font-bold text-gray-900 mb-2">
-                {confirmAction.type === "approve" ? "Approve Application" : "Reject Application"}
+                {confirmAction.type === "approve"
+                  ? "Approve Application"
+                  : confirmAction.type === "reject"
+                    ? "Reject Application"
+                    : "Request Age Re-Verification"}
               </h3>
+
               <p className="text-gray-600">
-                Are you sure you want to {confirmAction.type} this user's application?
+                {confirmAction.type === "reverify"
+                  ? "This will ask the user to recapture their selfie on next login and move them back to Pending."
+                  : `Are you sure you want to ${confirmAction.type} this user's application?`}
               </p>
             </div>
-            
+
             <div className="flex gap-3">
               <button
                 onClick={() => setConfirmAction(null)}
@@ -794,24 +762,30 @@ const UserManagement = () => {
               >
                 Cancel
               </button>
+
               <button
                 onClick={confirmActionHandler}
                 disabled={confirmLoading}
-                className={`flex-1 px-4 py-3 rounded-lg text-white font-medium transition ${
-                  confirmAction.type === "approve" 
-                    ? 'bg-green-600 hover:bg-green-700' 
-                    : 'bg-red-600 hover:bg-red-700'
-                } ${confirmLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`flex-1 px-4 py-3 rounded-lg text-white font-medium transition
+    ${confirmAction.type === "approve"
+                    ? "bg-green-600 hover:bg-green-700"
+                    : confirmAction.type === "reject"
+                      ? "bg-red-600 hover:bg-red-700"
+                      : "bg-yellow-600 hover:bg-yellow-700"}
+    ${confirmLoading ? "opacity-50 cursor-not-allowed" : ""}`}
               >
                 {confirmLoading ? (
                   <span className="flex items-center justify-center gap-2">
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     Processing...
                   </span>
+                ) : confirmAction.type === "reverify" ? (
+                  "Yes, request re-verification"
                 ) : (
                   `Yes, ${confirmAction.type}`
                 )}
               </button>
+
             </div>
           </div>
         </div>

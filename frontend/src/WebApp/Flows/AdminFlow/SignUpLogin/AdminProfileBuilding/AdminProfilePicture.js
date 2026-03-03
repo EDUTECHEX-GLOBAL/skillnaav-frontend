@@ -1,3 +1,5 @@
+// File: AdminProfilePicture.js
+
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import uploadButtonIcon from "../../../../../assets-webapp/Upload-button.png"; // Adjust path if needed
@@ -209,11 +211,10 @@ const AdminProfilePicture = ({ onSubmit }) => {
           <button
             type="button"
             onClick={handleSubmit}
-            className={`w-full py-2 px-4 border rounded-md shadow-sm text-sm font-medium ${
-              buttonDisabled
+            className={`w-full py-2 px-4 border rounded-md shadow-sm text-sm font-medium ${buttonDisabled
                 ? "bg-[#E9D7FE] text-[#B4A0D1]"
                 : "bg-purple-600 text-white hover:bg-purple-700"
-            }`}
+              }`}
             disabled={buttonDisabled}
           >
             Submit

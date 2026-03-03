@@ -297,7 +297,7 @@ const updateOfferStatus = async (req, res) => {
               <p>Your internship schedule is now available.</p>
               ${previewHtml}
               <p><a href="${appUrl}">Open your dashboard</a></p>
-              <p>— Skillnaav Team</p>
+              <p>- Skillnaav Team</p>
             `
               ),
               sendNotification({

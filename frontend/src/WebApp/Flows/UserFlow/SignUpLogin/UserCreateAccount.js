@@ -10,7 +10,7 @@ import "react-datepicker/dist/react-datepicker.css";
 import loginImage from "../../../../assets-webapp/login-image.png";
 import { GoogleLogin } from "@react-oauth/google";
 import { COUNTRIES, US_STATES, CA_PROVINCES } from "../../../../constants/locations";
-import UserAgeGateConsentModal from "./UserProfileBuilding/UserAgeGateConsentModal";
+import UserAgeGateConsent from "./UserProfileBuilding/UserAgeGateConsent";
 
 
 const UnifiedUserRegistration = () => {
@@ -21,6 +21,7 @@ const UnifiedUserRegistration = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showAgeGateModal, setShowAgeGateModal] = useState(false);
+  const [savingConsent, setSavingConsent] = useState(false);
 
   // States for OTP resend logic (from UserCreateAccount.js)
   const [resendTimer, setResendTimer] = useState(30);
@@ -213,6 +214,61 @@ const UnifiedUserRegistration = () => {
     }
   };
 
+  const handleAgeGateComplete = async (payload) => {
+    try {
+      setSavingConsent(true);
+
+      const token = localStorage.getItem("userToken");
+
+      // ✅ If OVER_18 flow sends a captured photo file, send multipart/form-data
+      const hasPhotoFile = payload?.ageVerificationPhoto instanceof File;
+
+      if (hasPhotoFile) {
+        const fd = new FormData();
+
+        // append normal fields
+        Object.entries(payload).forEach(([key, value]) => {
+          if (value === undefined || value === null) return;
+          if (key === "ageVerificationPhoto") return;
+
+          // FormData stores booleans as strings
+          if (typeof value === "boolean") {
+            fd.append(key, value ? "true" : "false");
+          } else {
+            fd.append(key, value);
+          }
+        });
+
+        // append file
+        fd.append("ageVerificationPhoto", payload.ageVerificationPhoto);
+
+        await axios.post("/api/user-age-gate-consent", fd, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            // ✅ Let axios/browser set boundary automatically
+            // DO NOT manually set Content-Type with boundary
+          },
+        });
+      } else {
+        // ✅ Under-18 normal JSON save (same as before)
+        await axios.post("/api/user-age-gate-consent", payload, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+      }
+
+      // ✅ After saving consent, go to Education/Profile form (Step 2)
+      setShowAgeGateModal(false);
+      setCurrentStep(2);
+      setErrorMessage("");
+    } catch (err) {
+      console.error("Consent save failed:", err);
+      setErrorMessage("Failed to save consent. Please try again.");
+    } finally {
+      setSavingConsent(false);
+    }
+  };
 
   const handleResendOTP = async () => {
     try {
@@ -837,16 +893,10 @@ const UnifiedUserRegistration = () => {
 
           {renderStep()}
 
-          <UserAgeGateConsentModal
+          <UserAgeGateConsent
             open={showAgeGateModal}
-            onComplete={(payload) => {
-              // Save age/consent info into formData (minimal, safe)
-              setFormData((prev) => ({ ...prev, ...payload }));
-
-              // Close popup and continue normal flow
-              setShowAgeGateModal(false);
-              setCurrentStep(2);
-            }}
+            saving={savingConsent}
+            onComplete={handleAgeGateComplete}
           />
 
           {(currentStep === 1 || currentStep === 1.5) && (

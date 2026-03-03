@@ -9,6 +9,7 @@ import axios from "axios";
 import PremiumPage from "./PremiumPage";
 import Chatbot from "../../../../components/Chatbot";
 import chatBotImage from "../../../../assets-webapp/chat-bot.png";
+import UserAgeGateConsent from "../SignUpLogin/UserProfileBuilding/UserAgeGateConsent";
 
 const UserMainPageContent = () => {
   const { handleSelectTab, selectedTab } = useTabContext();
@@ -21,7 +22,9 @@ const UserMainPageContent = () => {
   const [showUpgradePopup, setShowUpgradePopup] = useState(false);
   const [showPricingModal, setShowPricingModal] = useState(false);
   const [showChatbot, setShowChatbot] = useState(false);
-  const [assistDockOpen, setAssistDockOpen] = useState(false);
+  const [assistDockOpen, setAssistDockOpen] = useState(false); // controls the half-cylinder dock reveal
+  const [showReverifyModal, setShowReverifyModal] = useState(false);
+  const [reverifySaving, setReverifySaving] = useState(false);
 
   // ✅ Track whether user has dismissed the popup this session
   const [popupDismissed, setPopupDismissed] = useState(false);
@@ -51,13 +54,27 @@ const UserMainPageContent = () => {
           return;
         }
 
-        const response = await axios.get("/api/users/profile", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        // ✅ API CALL (profile + consent together)
+        const [profileRes, consentRes] = await Promise.all([
+          axios.get("/api/users/profile", {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          axios.get("/api/user-age-gate-consent", {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+        ]);
 
-        setUserInfo(response.data);
-        setIsApproved(response.data.adminApproved);
+        setUserInfo(profileRes.data);
 
+        // ✅ If reverify requested, force waiting state + open modal immediately
+        const reverifyRequested = !!consentRes.data?.data?.reverificationRequested;
+        setIsApproved(reverifyRequested ? false : profileRes.data.adminApproved);
+
+        if (reverifyRequested) {
+          setShowReverifyModal(true);
+        }
+
+        // Handle query params
         const openTab = searchParams.get("openTab");
         if (openTab) handleSelectTab(openTab);
       } catch (error) {
@@ -100,6 +117,38 @@ const UserMainPageContent = () => {
 
   const handleToggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
   const handleCloseSidebar = () => setIsSidebarOpen(false);
+
+  const handleReverifyComplete = async (payload) => {
+    try {
+      let token = localStorage.getItem("userToken") || sessionStorage.getItem("userToken");
+      if (!token) {
+        navigate("/user/login");
+        return;
+      }
+
+      setReverifySaving(true);
+
+      const fd = new FormData();
+      fd.append("ageCategory", "OVER_18");
+      fd.append("ageGateCompleted", "true");
+      fd.append("ageVerificationPhoto", payload.ageVerificationPhoto);
+
+      await axios.post("/api/user-age-gate-consent", fd, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      // ✅ close modal; user still waits for admin approval
+      setShowReverifyModal(false);
+      setIsApproved(false);
+    } catch (err) {
+      console.error("Reverification upload failed:", err);
+    } finally {
+      setReverifySaving(false);
+    }
+  };
 
   return (
     <>
@@ -208,15 +257,25 @@ const UserMainPageContent = () => {
               setAssistDockOpen(false);
             }}
             aria-hidden={!assistDockOpen}
-            className={`fixed bottom-5 right-16 z-50 cursor-pointer flex items-center gap-2 bg-white border shadow-md rounded-full h-14 px-4 py-2 hover:shadow-lg transform-gpu transition-all duration-300 ease-out ${
-              assistDockOpen ? "opacity-100 translate-x-0" : "opacity-0 translate-x-20 pointer-events-none"
-            }`}
+            className={`fixed bottom-5 right-16 z-50 cursor-pointer flex items-center gap-2 bg-white border shadow-md rounded-full h-14 px-4 py-2 hover:shadow-lg transform-gpu transition-all duration-300 ease-out ${assistDockOpen ? "opacity-100 translate-x-0" : "opacity-0 translate-x-20 pointer-events-none"
+              }`}
           >
             <div className="text-sm font-semibold text-red-600 leading-tight">Career Assistance</div>
             <img src={chatBotImage} alt="Bot Avatar" className="w-10 h-10 rounded-full border" />
           </div>
         </>
       )}
+
+      {showReverifyModal && (
+        <UserAgeGateConsent
+          open={showReverifyModal}
+          mode="REVERIFY_OVER18"
+          saving={reverifySaving}
+          onClose={() => setShowReverifyModal(false)}
+          onComplete={handleReverifyComplete}
+        />
+      )}
+
     </>
   );
 };

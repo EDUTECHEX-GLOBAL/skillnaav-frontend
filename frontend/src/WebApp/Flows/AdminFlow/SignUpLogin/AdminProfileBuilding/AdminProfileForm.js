@@ -1,3 +1,5 @@
+// File: AdminProfileForm.js
+
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Link } from "react-router-dom";
@@ -53,9 +55,8 @@ const AdminProfileForm = () => {
               name="name"
               value={formData.name}
               onChange={handleChange}
-              className={`mt-1 block w-full px-3 py-2 border ${
-                formData.name ? "border-gray-300" : "border-gray-200"
-              } rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500`}
+              className={`mt-1 block w-full px-3 py-2 border ${formData.name ? "border-gray-300" : "border-gray-200"
+                } rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500`}
               placeholder="Enter your Name"
             />
           </div>
@@ -68,9 +69,8 @@ const AdminProfileForm = () => {
               name="dob"
               value={formData.dob}
               onChange={handleChange}
-              className={`mt-1 block w-full px-3 py-2 border ${
-                formData.dob ? "border-gray-300" : "border-gray-200"
-              } rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500`}
+              className={`mt-1 block w-full px-3 py-2 border ${formData.dob ? "border-gray-300" : "border-gray-200"
+                } rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500`}
               placeholder="DD/MM/YYYY"
               style={{ textTransform: "uppercase" }}
             />
@@ -148,9 +148,8 @@ const AdminProfileForm = () => {
               name="fieldOfStudy"
               value={formData.fieldOfStudy}
               onChange={handleChange}
-              className={`mt-1 block w-full px-3 py-2 border ${
-                formData.fieldOfStudy ? "border-gray-300" : "border-gray-200"
-              } bg-white rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500`}
+              className={`mt-1 block w-full px-3 py-2 border ${formData.fieldOfStudy ? "border-gray-300" : "border-gray-200"
+                } bg-white rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500`}
             >
               <option value="">Select Your Field</option>
               <option value="CSE">CSE</option>
@@ -168,11 +167,10 @@ const AdminProfileForm = () => {
             type="button"
             onClick={handleSubmit}
             disabled={!isFormValid}
-            className={`w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
-              isFormValid
+            className={`w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${isFormValid
                 ? "bg-purple-600 hover:bg-purple-700"
                 : "bg-purple-300 cursor-not-allowed"
-            } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500`}
+              } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500`}
           >
             <a href="/admin-profile-picture">Continue</a>
           </button>

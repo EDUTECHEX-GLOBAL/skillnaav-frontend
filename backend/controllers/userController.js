@@ -1,5 +1,6 @@
 const asyncHandler = require("express-async-handler");
 const Userwebapp = require("../models/webapp-models/userModel");
+const UserAgeGateConsent = require("../models/webapp-models/UserAgeGateConsentModel");
 const generateToken = require("../utils/generateToken");
 const notifyUser = require("../utils/notifyUser");
 const { profilePicUpload } = require('../utils/multer');
@@ -435,8 +436,9 @@ const updateUserProfile = asyncHandler(async (req, res) => {
 
 
 
-// Get all users with additional fields
+// Get all users with additional fields + AgeGate consent selfie (OVER_18)
 const getAllUsers = asyncHandler(async (req, res) => {
+  // 1) Fetch users (use lean() so we can attach extra fields)
   const users = await Userwebapp.find(
     {},
     `
@@ -464,14 +466,48 @@ const getAllUsers = asyncHandler(async (req, res) => {
       currentGrade
       gradePercentage
     `
-  );
+  ).lean();
 
   if (!users || users.length === 0) {
     res.status(404);
     throw new Error("No users found.");
   }
 
-  res.status(200).json(users);
+  // 2) Fetch consent records for these users
+  const userIds = users.map((u) => u._id);
+
+  const consents = await UserAgeGateConsent.find({
+    user: { $in: userIds },
+  })
+    .sort({ updatedAt: -1 })
+    .select("user ageCategory ageGateCompleted ageVerificationPhotoUrl ageVerificationPhotoKey guardianName guardianEmail guardianRelationship")
+    .lean();
+
+  // 3) Map latest consent by userId
+  const consentMap = new Map();
+  for (const c of consents) {
+    const key = String(c.user);
+    if (!consentMap.has(key)) consentMap.set(key, c); // keep latest due to sort
+  }
+
+  // 4) Merge consent fields into user objects
+  const mergedUsers = users.map((u) => {
+    const c = consentMap.get(String(u._id));
+    return {
+      ...u,
+      ageCategory: c?.ageCategory || "",
+      ageGateCompleted: c?.ageGateCompleted || false,
+      ageVerificationPhotoUrl: c?.ageVerificationPhotoUrl || "",
+      ageVerificationPhotoKey: c?.ageVerificationPhotoKey || "",
+
+      // ✅ UNDER_18 consent details (send to frontend)
+      guardianName: c?.guardianName || "",
+      guardianEmail: c?.guardianEmail || "",
+      guardianRelationship: c?.guardianRelationship || "",
+    };
+  });
+
+  res.status(200).json(mergedUsers);
 });
 
 // Admin approve a user
@@ -766,5 +802,3 @@ module.exports = {
   googleAuthUser,
   getUserById,
 };
-//cic/cd
-

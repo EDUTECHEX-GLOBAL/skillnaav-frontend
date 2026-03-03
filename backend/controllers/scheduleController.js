@@ -114,7 +114,7 @@ async function notifyAcceptedStudentsOfSchedule({ internshipId, scheduleDoc, isN
         <p>${isNew ? 'A new' : 'An updated'} schedule has been posted for your internship.</p>
         ${previewHtml}
         <p><a href="${appUrl}">Open your dashboard</a> to view all sessions.</p>
-        <p>— Skillnaav Team</p>
+        <p>- Skillnaav Team</p>
         `
       ).catch(err => console.error('Schedule email failed:', o.email, err))
     )
