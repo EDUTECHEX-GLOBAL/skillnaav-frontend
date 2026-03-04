@@ -171,17 +171,17 @@ const closeApproveModal = () => {
         const data = response.data;
 
         const adminInfo = JSON.parse(localStorage.getItem("adminInfo"));
-        const adminId = adminInfo?.id;
+        const adminId = adminInfo?._id || adminInfo?.id;
 
         if (Array.isArray(data) && data.length > 0) {
           const wasAdminSender = data.some((msg) => msg.sender === adminId);
 
-          if (wasAdminSender && !selectedInternship.AdminReviewed) {
-            setSelectedInternship((prev) => ({ ...prev, AdminReviewed: true }));
+          if (wasAdminSender && !selectedInternship.adminReviewed) {
+            setSelectedInternship((prev) => ({ ...prev, adminReviewed: true }));
             setInternships((prev) =>
               prev.map((i) =>
                 i._id === selectedInternship._id
-                  ? { ...i, AdminReviewed: true }
+                  ? { ...i, adminReviewed: true }
                   : i
               )
             );
@@ -218,14 +218,14 @@ const closeApproveModal = () => {
     setSending(true);
 
     const adminInfo = JSON.parse(localStorage.getItem("adminInfo"));
-    if (!adminInfo?.id) {
+    if (!(adminInfo?._id || adminInfo?.id)) {
       console.error("Admin ID not found.");
       setNewMessage(messageText);
       setSending(false);
       return;
     }
 
-    const adminId = adminInfo.id;
+    const adminId = adminInfo._id || adminInfo.id;
 
     const optimisticMessage = {
       sender: adminId,
@@ -241,7 +241,7 @@ const closeApproveModal = () => {
       const payload = {
         internshipId: selectedInternship._id,
         senderId: adminId,
-        receiverId: selectedInternship.partnerId,
+        partnerId: selectedInternship.partnerId,
         message: messageText,
       };
 
@@ -250,12 +250,12 @@ const closeApproveModal = () => {
       setChatMessages((prev) => [...prev.slice(0, -1), response.data]);
 
       // Mark as reviewed after first message
-      if (!selectedInternship.AdminReviewed) {
+      if (!selectedInternship.adminReviewed) {
         await axios.post(`/api/interns/${selectedInternship._id}/review`);
-        setSelectedInternship((prev) => ({ ...prev, AdminReviewed: true }));
+        setSelectedInternship((prev) => ({ ...prev, adminReviewed: true }));
         setInternships((prev) =>
           prev.map((i) =>
-            i._id === selectedInternship._id ? { ...i, AdminReviewed: true } : i
+            i._id === selectedInternship._id ? { ...i, adminReviewed: true } : i
           )
         );
       }
@@ -355,7 +355,7 @@ const closeApproveModal = () => {
         (statusFilter === "PENDING" &&
           !i.adminApproved &&
           !i.rejectionReason) ||
-        (statusFilter === "REVIEWED" && i.AdminReviewed);
+        (statusFilter === "REVIEWED" && i.adminReviewed);
 
       return matchesSearch && matchesStatus;
     });
@@ -369,7 +369,7 @@ const closeApproveModal = () => {
       pending: internships.filter(
         (i) => !i.adminApproved && !i.rejectionReason
       ).length,
-      reviewed: internships.filter((i) => i.AdminReviewed).length,
+      reviewed: internships.filter((i) => i.adminReviewed).length,
     };
 
     return { stats, filteredInternships: filtered };
@@ -634,7 +634,7 @@ const closeApproveModal = () => {
                 onClick={() => handleOpenChat(internship)}
                 aria-label="Open chat to review"
                 className={`w-8 h-8 rounded-full flex items-center justify-center shadow-md transition-all group-hover:scale-110 ${
-                  internship.AdminReviewed
+                  internship.adminReviewed
                     ? "bg-green-500 text-white"
                     : "bg-gray-200 text-gray-500 hover:bg-purple-500 hover:text-white"
                 }`}
@@ -731,7 +731,7 @@ const closeApproveModal = () => {
 
     <button
       className={`px-3 py-2.5 rounded-xl font-semibold text-white shadow-sm transition-all ${
-        internship.AdminReviewed
+        internship.adminReviewed
           ? "bg-green-600 hover:bg-green-700"
           : "bg-purple-500 hover:bg-purple-600 hover:shadow-md"
       }`}
@@ -952,7 +952,7 @@ const closeApproveModal = () => {
         <>
           {chatMessages.map((msg, idx) => {
             const adminInfo = JSON.parse(localStorage.getItem("adminInfo"));
-            const isOwn = msg.sender === adminInfo?.id;
+            const isOwn = msg.sender === (adminInfo?._id || adminInfo?.id);
             return <MessageBubble key={msg._id || idx} message={msg} isOwn={isOwn} />;
           })}
           <div ref={messagesEndRef} />

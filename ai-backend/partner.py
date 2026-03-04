@@ -21,6 +21,15 @@ from bson.errors import InvalidId
 from sentence_transformers import SentenceTransformer, util
 import requests
 import httpx
+from fastapi import BackgroundTasks
+from pydantic import BaseModel
+from typing import List
+
+class ShortlistRequest(BaseModel):
+    internship_id: str
+    job_description: str
+    job_skills: List[str]
+    resumes: List[str]
 
 
 
@@ -252,23 +261,28 @@ async def notify_rejection(app_doc):
 
 @app.post("/partner/shortlist")
 async def shortlist_candidates(
-    internship_id: str = Form(...),
-    job_description: str = Form(...),
-    job_skills: str = Form(...),
-    resumes: list[str] = Form(...),
-    background_tasks: BackgroundTasks = None
+    background_tasks: BackgroundTasks,
+    request: Request,
 ):
+    """Accepts multipart/form-data from Node AiServices.js"""
+    form = await request.form()
+    internship_id   = form.get("internship_id", "")
+    job_description = form.get("job_description", "")
+    raw_skills      = form.get("job_skills", "[]")
+    resumes         = form.getlist("resumes")
+
+    try:
+        job_skills_list = json.loads(raw_skills) if isinstance(raw_skills, str) else raw_skills
+    except (json.JSONDecodeError, TypeError):
+        job_skills_list = []
+
+    print(f"[{now()}] shortlist -> internship_id='{internship_id}' resumes={len(resumes)} skills={job_skills_list}")
+
     # Validate internship_id
     try:
         internship_obj_id = ObjectId(internship_id)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid internship_id: {e}")
-
-    # Parse job skills
-    try:
-        job_skills_list = json.loads(job_skills)
-    except Exception:
-        job_skills_list = []
 
     if not resumes:
         raise HTTPException(status_code=400, detail="No resumes provided.")
@@ -277,38 +291,34 @@ async def shortlist_candidates(
     job_text = job_description + " " + " ".join(job_skills_list)
     job_embedding = embedder.encode(job_text, convert_to_tensor=True)
 
-    # Async process each resume and compute similarity
+    # Async process each resume
     tasks = [process_resume(url, job_embedding) for url in resumes]
     results = await asyncio.gather(*tasks)
 
-    # Filter candidates by similarity threshold
-    candidates = [c for c in results if c and c['similarity_score'] >= 0.3]
+    # Filter candidates
+    candidates = [c for c in results if c and c["similarity_score"] >= 0.3]
 
-    # Attach normalized IDs and validate school_admin_id
     for cand in candidates:
-        cand['internship_id'] = internship_obj_id
-        if cand.get("school_admin_id") and ObjectId.is_valid(str(cand['school_admin_id'])):
-            cand['school_admin_id'] = ObjectId(cand['school_admin_id'])
+        cand["internship_id"] = internship_obj_id
+        if cand.get("school_admin_id") and ObjectId.is_valid(str(cand["school_admin_id"])):
+            cand["school_admin_id"] = ObjectId(cand["school_admin_id"])
 
-    # Sort candidates in descending order of similarity
-    candidates = sorted(candidates, key=lambda x: x['similarity_score'], reverse=True)
+    candidates = sorted(candidates, key=lambda x: x["similarity_score"], reverse=True)
 
     if candidates:
-        # Insert shortlisted candidates into MongoDB collection
         shortlist_collection.insert_many(candidates)
 
-        shortlisted_resume_urls = [c['resumeUrl'] for c in candidates]
+        shortlisted_resume_urls = [c["resumeUrl"] for c in candidates]
         all_applications = list(applications_collection.find({"internshipId": internship_obj_id}))
-        all_resume_urls = [app['resumeUrl'] for app in all_applications]
+        all_resume_urls = [app["resumeUrl"] for app in all_applications]
 
-        # Identify rejected resumes as those applied but not shortlisted
         rejected_resume_urls = list(set(all_resume_urls) - set(shortlisted_resume_urls))
 
-        # Update statuses in application collection
         applications_collection.update_many(
             {"resumeUrl": {"$in": shortlisted_resume_urls}},
             {"$set": {"status": "Shortlisted"}}
         )
+
         applications_collection.update_many(
             {"resumeUrl": {"$in": rejected_resume_urls}},
             {"$set": {"status": "Rejected"}}
@@ -316,12 +326,11 @@ async def shortlist_candidates(
 
         sync_shortlisted_to_pipeline(candidates, internship_obj_id)
 
-        # Trigger rejection notifications asynchronously
+        # Send rejection notifications
         for resume_url in rejected_resume_urls:
             app_doc = applications_collection.find_one({"resumeUrl": resume_url})
             if app_doc:
                 background_tasks.add_task(notify_rejection, app_doc)
-                sync_shortlisted_to_pipeline(candidates, internship_obj_id)
 
     return {"shortlisted_candidates": convert_object_ids(candidates)}
 

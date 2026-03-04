@@ -4,19 +4,15 @@ const {
   getChatMessages,
   sendMessage,
   getMessages,
-  sendReply,
 } = require("../../controllers/ChatController");
 
-// ✅ Get all messages between a partner and admin for a specific internship
+// Partner view: get all messages for a specific internship thread
 router.get("/partner/:partnerId/internship/:internshipId", getChatMessages);
 
-// ✅ Get all messages for a specific internship (admin view)
+// Admin view: get all messages for a specific internship
 router.get("/internship/:internshipId", getMessages);
 
-// ✅ Send a new message
+// Send a message — works for both partner->admin and admin->partner
 router.post("/send", sendMessage);
-
-// ✅ Send a reply to a message thread
-router.post("/reply", sendReply);
 
 module.exports = router;

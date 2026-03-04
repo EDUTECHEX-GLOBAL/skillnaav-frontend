@@ -35,12 +35,19 @@ const getRecommendationsForStudent = async (req, res) => {
 const shortlistCandidates = async (req, res) => {
   try {
     const { internship_id, job_description, job_skills } = req.body;
-    const resumeUrls = Array.isArray(req.body.resumes)
-      ? req.body.resumes
-      : req.body.resumes ? [req.body.resumes] : [];
+
+    // multer puts repeated fields as an array, single fields as a string
+    const rawResumes = req.body.resumes;
+    const resumeUrls = Array.isArray(rawResumes)
+      ? rawResumes
+      : rawResumes ? [rawResumes] : [];
+
     const parsedSkills = typeof job_skills === 'string'
       ? JSON.parse(job_skills)
       : (job_skills || []);
+
+    console.log('[aiController] shortlistCandidates → internship_id:', internship_id,
+      '| resumes:', resumeUrls.length, '| skills:', parsedSkills.length);
 
     const candidates = await aiService.shortlistCandidates(
       internship_id, job_description, parsedSkills, resumeUrls

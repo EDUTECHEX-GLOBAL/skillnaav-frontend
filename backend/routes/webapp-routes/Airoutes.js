@@ -44,7 +44,7 @@ const upload = multer({
 });
 
 // ── Shortlisting ──────────────────────────────────────────────────────────────
-router.post('/partner/shortlist',                authenticate, shortlistCandidates);
+router.post('/partner/shortlist',                authenticate, upload.none(), shortlistCandidates);
 router.get('/partner/shortlisted/by-admin',      authenticate, getShortlistedByAdmin);
 router.get('/partner/shortlisted/:internshipId', authenticate, getShortlisted);
 

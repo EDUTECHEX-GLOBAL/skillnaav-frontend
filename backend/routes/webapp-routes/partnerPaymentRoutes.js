@@ -139,6 +139,7 @@ router.post("/paypal/verify", async (req, res) => {
         email: email || captureData.payer?.email_address,
         amount: paypalAmount.toString(),
         paymentId: orderID,
+        orderId: orderID,
         status: "Success",
         premiumExpiration,
       });
