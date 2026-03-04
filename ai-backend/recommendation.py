@@ -8,7 +8,7 @@ from bson import ObjectId
 from sentence_transformers import SentenceTransformer, util
 from typing import List, Dict, Any, Union
 
-# Load environment variables from .env file
+# Load environment variables from .env filessss
 load_dotenv()
 
 app = FastAPI()
