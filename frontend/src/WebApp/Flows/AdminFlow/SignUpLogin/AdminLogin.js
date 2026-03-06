@@ -34,31 +34,34 @@ const AdminLogin = () => {
         },
       };
 
-      // Make API call to admin login endpoint
-      const { data } = await axios.post(
-        "/api/admin/login", // Ensure this matches the backend route
-        values,
-        config
-      );
+      // ✅ Call login API first, then use data
+      const response = await axios.post("/api/admin/login", values, config);
+      const data = response.data;
 
       console.log("Login response:", data);
 
-      // Store the token and admin details in localStorage
-      localStorage.setItem("adminToken", data.token);
-      localStorage.setItem("adminInfo", JSON.stringify({
-        id: data.id,
-        name: data.name,
-        email: data.email,
-        isAdmin: data.isAdmin,
-        pic: data.pic
-      }));
+      // ✅ If OTP is required, go to OTP page (do not store token yet)
+      if (data?.otpRequired) {
+        navigate(`/admin/login-otp?email=${encodeURIComponent(values.email)}`);
+        return;
+      }
 
-      // Redirect to admin dashboard
+      // ✅ Fallback: if backend returns token directly
+      localStorage.setItem("adminToken", data.token);
+      localStorage.setItem(
+        "adminInfo",
+        JSON.stringify({
+          id: data.id,
+          name: data.name,
+          email: data.email,
+          isAdmin: data.isAdmin,
+          pic: data.pic,
+        })
+      );
+
       navigate("/admin-main-page");
     } catch (err) {
       console.error("Login error:", err.response || err.message);
-
-      // Show error message returned from the backend or fallback message
       setError(err.response?.data?.message || "Login failed. Please try again.");
     } finally {
       setLoading(false);

@@ -52,6 +52,11 @@ const timeToMinutes = (t = '') => {
 const allWeekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const internshipTypes = ['online', 'offline', 'hybrid'];
 
+const normalizeInternshipMode = (mode = '') => {
+  const value = String(mode).trim().toLowerCase();
+  return ['online', 'offline', 'hybrid'].includes(value) ? value : 'online';
+};
+
 /**
  * Helper to render location fields (name, address, map link).
  *
@@ -138,6 +143,8 @@ const ScheduleFormPaid = ({ internshipId, onClose }) => {
   const readOnly = !!form.isClosed;
   const [isPersisted, setIsPersisted] = useState(false); // false until load/save
   const [aiGenerating, setAiGenerating] = useState(false);
+  const [lockedInternshipType, setLockedInternshipType] = useState('');
+  const visibleInternshipTypes = lockedInternshipType ? [lockedInternshipType] : [];
 
   // Default getters so preview toggles use the right source every time
   const getDefaultEventLinkForType = (type) => {
@@ -236,15 +243,21 @@ const ScheduleFormPaid = ({ internshipId, onClose }) => {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       })
       .then(({ data }) => {
+        const resolvedType = normalizeInternshipMode(data.internshipMode); // ✅ read from DB
+
+        setLockedInternshipType(resolvedType);
+
         setForm(f => ({
           ...f,
           startDate: new Date(data.startDate).toISOString().split('T')[0],
           endDate: new Date(data.endDateOrDuration).toISOString().split('T')[0],
-          // don't clobber the type loaded from saved schedule
-          defaultType: f.defaultType || data.type || 'online'
+          defaultType: resolvedType // ✅ reflect selected mode in schedule form
         }));
       })
-      .catch(err => setError(err.message));
+      .catch(err => {
+        setError(err.message);
+        setLockedInternshipType('online');
+      });
   }, [internshipId]);
 
   useEffect(() => {
@@ -260,56 +273,58 @@ const ScheduleFormPaid = ({ internshipId, onClose }) => {
         const savedStart = data.defaultStartTime || data?.timetable?.[0]?.startTime || '';
         const savedEnd = data.defaultEndTime || data?.timetable?.[0]?.endTime || '';
 
-        setForm(f => ({
-          ...f,
-          startDate: data.startDate.slice(0, 10),
-          endDate: data.endDate.slice(0, 10),
-          workHours: data.workHours,
+        setForm(f => {
+          const effectiveType = f.defaultType || savedType; // ✅ keep type coming from internship post
 
-          // ✅ Use savedType/savedStart/savedEnd we derived above
-          defaultType: savedType,
-          timeSlots: data.timeSlots
-            ? {
-              online: Array.isArray(data.timeSlots.online) ? data.timeSlots.online : [],
-              offline: Array.isArray(data.timeSlots.offline) ? data.timeSlots.offline : [],
-              hybrid: Array.isArray(data.timeSlots.hybrid) ? data.timeSlots.hybrid : [],
-            }
-            : {
-              ...f.timeSlots,
-              [savedType]: (savedStart || savedEnd)
-                ? [{ startTime: savedStart || '', endTime: savedEnd || '' }]
-                : []
+          return {
+            ...f,
+            startDate: data.startDate.slice(0, 10),
+            endDate: data.endDate.slice(0, 10),
+            workHours: data.workHours,
+
+            defaultType: effectiveType,
+            timeSlots: data.timeSlots
+              ? {
+                online: Array.isArray(data.timeSlots.online) ? data.timeSlots.online : [],
+                offline: Array.isArray(data.timeSlots.offline) ? data.timeSlots.offline : [],
+                hybrid: Array.isArray(data.timeSlots.hybrid) ? data.timeSlots.hybrid : [],
+              }
+              : {
+                ...f.timeSlots,
+                [effectiveType]: (savedStart || savedEnd)
+                  ? [{ startTime: savedStart || '', endTime: savedEnd || '' }]
+                  : []
+              },
+
+            ...(effectiveType === 'online'
+              ? { onlineEventLink: data.defaultEventLink || data?.timetable?.[0]?.eventLink || '' }
+              : {}),
+            ...(effectiveType === 'hybrid'
+              ? { hybridEventLink: data.defaultEventLink || data?.timetable?.[0]?.eventLink || '' }
+              : {}),
+
+            ...(effectiveType === 'offline'
+              ? {
+                offlineLocation:
+                  data.defaultLocation || data?.timetable?.[0]?.location || { name: '', address: '', mapLink: '' }
+              }
+              : {}),
+            ...(effectiveType === 'hybrid'
+              ? {
+                hybridLocation:
+                  data.defaultLocation || data?.timetable?.[0]?.location || { name: '', address: '', mapLink: '' }
+              }
+              : {}),
+
+            defaultEventLink: data.timetable[0]?.eventLink || '',
+            defaultLocation: data.timetable[0]?.location || {
+              name: '',
+              address: '',
+              mapLink: ''
             },
-
-          // Pre-fill the specific fields the UI uses
-          ...(savedType === 'online'
-            ? { onlineEventLink: data.defaultEventLink || data?.timetable?.[0]?.eventLink || '' }
-            : {}),
-          ...(savedType === 'hybrid'
-            ? { hybridEventLink: data.defaultEventLink || data?.timetable?.[0]?.eventLink || '' }
-            : {}),
-
-          ...(savedType === 'offline'
-            ? {
-              offlineLocation:
-                data.defaultLocation || data?.timetable?.[0]?.location || { name: '', address: '', mapLink: '' }
-            }
-            : {}),
-          ...(savedType === 'hybrid'
-            ? {
-              hybridLocation:
-                data.defaultLocation || data?.timetable?.[0]?.location || { name: '', address: '', mapLink: '' }
-            }
-            : {}),
-
-          defaultEventLink: data.timetable[0]?.eventLink || '',
-          defaultLocation: data.timetable[0]?.location || {
-            name: '',
-            address: '',
-            mapLink: ''
-          },
-          isClosed: !!data.isClosed   // ✅ force boolean
-        }));
+            isClosed: !!data.isClosed
+          };
+        });
 
         setTimetable(
           (data.timetable || []).map(entry => ({
@@ -871,7 +886,7 @@ const ScheduleFormPaid = ({ internshipId, onClose }) => {
 
                 {/* 1) Type Selector */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {internshipTypes.map(type => (
+                  {visibleInternshipTypes.map(type => (
                     <div key={type} className="flex items-center">
                       <input
                         type="radio"

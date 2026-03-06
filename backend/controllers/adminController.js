@@ -6,41 +6,52 @@ const bcrypt = require('bcryptjs');
 const sendEmail = require("../utils/SendAdminOtp");
 
 // Login Controller
+// Login Controller (Step-1: Verify password + send OTP)
 const loginUser = async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    // Find user by email
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(401).json({ message: 'Invalid email or password' });
+      return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    // Check if password matches
     const isMatch = await user.matchPassword(password);
     if (!isMatch) {
-      return res.status(401).json({ message: 'Invalid email or password' });
+      return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    // Generate JWT Token
-    const token = jwt.sign(
-      { id: user._id, isAdmin: user.isAdmin },
-      process.env.JWT_SECRET || 'yoursecretkey',
-      { expiresIn: '1h' }
-    );
+    // ✅ Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-    // Send response
-    res.json({
-      id: user._id,
-      name: user.name,
+    // ✅ Hash OTP + store expiry (10 minutes)
+    user.loginOtpHash = await bcrypt.hash(otp, 10);
+    user.loginOtpExpires = new Date(Date.now() + 10 * 60 * 1000);
+    await user.save();
+
+    // ✅ Respond immediately (no token yet)
+    res.status(200).json({
+      otpRequired: true,
+      message: "OTP sent to your email.",
       email: user.email,
-      isAdmin: user.isAdmin,
-      pic: user.pic,
-      token,
     });
 
+    // ✅ Send OTP email in background
+    setImmediate(async () => {
+      try {
+        await sendEmail({
+          to: user.email,
+          subject: "SkillNaav Admin Login OTP",
+          text: `Your login OTP is ${otp}. It will expire in 10 minutes.`,
+        });
+      } catch (err) {
+        console.error("❌ Admin Login OTP email failed:", err.message || err);
+      }
+    });
+
+    return;
   } catch (error) {
-    res.status(500).json({ message: 'Server error' });
+    return res.status(500).json({ message: "Server error" });
   }
 };
 
@@ -122,8 +133,57 @@ const resetPassword = async (req, res) => {
   }
 };
 
+// ✅ Verify Login OTP (Step-2: Verify OTP + return token)
+const verifyLoginOtp = async (req, res) => {
+  const { email, otp } = req.body;
+
+  try {
+    const user = await User.findOne({ email });
+
+    if (!user || !user.loginOtpHash || !user.loginOtpExpires) {
+      return res.status(400).json({ message: "OTP not requested. Please login again." });
+    }
+
+    if (user.loginOtpExpires < new Date()) {
+      user.loginOtpHash = null;
+      user.loginOtpExpires = null;
+      await user.save();
+      return res.status(400).json({ message: "OTP expired. Please login again." });
+    }
+
+    const isOtpMatch = await bcrypt.compare(otp, user.loginOtpHash);
+    if (!isOtpMatch) {
+      return res.status(400).json({ message: "Invalid OTP. Please try again." });
+    }
+
+    // ✅ Clear OTP after successful verification
+    user.loginOtpHash = null;
+    user.loginOtpExpires = null;
+    await user.save();
+
+    // ✅ Generate JWT Token (same as your old login response)
+    const token = jwt.sign(
+      { id: user._id, isAdmin: user.isAdmin },
+      process.env.JWT_SECRET || "yoursecretkey",
+      { expiresIn: "1h" }
+    );
+
+    return res.status(200).json({
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      isAdmin: user.isAdmin,
+      pic: user.pic,
+      token,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
 module.exports = {
   loginUser,
+  verifyLoginOtp,
   forgotPassword,
   resetPassword,
 };

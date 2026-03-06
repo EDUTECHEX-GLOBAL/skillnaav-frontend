@@ -89,7 +89,7 @@ print("\n[unified] Registering routes ...")
 _absorb(_main.app,        "skills")
 _absorb(_partner.app,     "partner")
 _absorb(_recommend.app,   "recommend")
-_absorb(_instructor.app,  "instructor")
+_absorb(_instructor.instructor_app,  "instructor")
 print("[unified] All routes registered.\n")
 
 # ── Root convenience route ────────────────────────────────────────────────────

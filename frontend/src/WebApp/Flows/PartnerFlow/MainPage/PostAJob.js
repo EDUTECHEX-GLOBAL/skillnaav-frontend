@@ -295,6 +295,7 @@ const PostAJob = () => {
 
     const payload = {
       ...formData,
+      internshipMode: (formData.mode || "Online").toUpperCase(), // ✅ save selected mode in DB
       location: formData.state
         ? `${formData.city}, ${formData.state}, ${formData.country}`
         : `${formData.city}, ${formData.country}`,

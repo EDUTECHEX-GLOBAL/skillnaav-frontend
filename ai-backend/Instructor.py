@@ -305,8 +305,8 @@ def assign_instructors(partner_id: Optional[str] = None) -> Dict[str, Any]:
 class AssignPayload(BaseModel):
     partnerId: Optional[str] = None
 
-app = FastAPI(title="Instructor Assignment API", version="2.0.0")
-app.add_middleware(
+instructor_app = FastAPI(title="Instructor Assignment API", version="2.0.0")
+instructor_app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
@@ -314,31 +314,31 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/health")
+@instructor_app.get("/health")
 def health():
-    return {"ok": True, "service": "instructor-assignment", "port": 8003}
+    return {"ok": True, "service": "instructor-assignment", "port": 8000}
 
-@app.post("/assign-instructors")
+@instructor_app.post("/assign-instructors")
 def assign_instructors_http(payload: AssignPayload = Body(default=None),
                             partnerId: Optional[str] = Query(default=None)):
     pid = partnerId or (payload.partnerId if payload else None)
     return assign_instructors(partner_id=pid)
 
-@app.get("/assign-instructors")
+@instructor_app.get("/assign-instructors")
 def assign_instructors_http_get(partnerId: Optional[str] = Query(default=None)):
     return assign_instructors(partner_id=partnerId)
 
-@app.get("/")
+@instructor_app.get("/")
 def root():
     # Send browser to the interactive docs instead of 404
     return RedirectResponse(url="/docs")
 
-@app.get("/favicon.ico")
+@instructor_app.get("/favicon.ico")
 def favicon():
     # Empty 200 response so the browser doesn't log a 404 for the tab icon
     return Response(content=b"", media_type="image/x-icon",
                     headers={"Cache-Control": "public, max-age=86400"})
 
 if __name__ == "__main__":
-    # Local debug: uvicorn Instructor:app --reload --port 8003
+    # Local debug (unified): uvicorn app:app --reload --port 8000
     print(json.dumps(assign_instructors(partner_id=None), default=str))

@@ -28,6 +28,11 @@ const isFutureDate = (dateString) => {
 const allWeekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const internshipTypes = ['online', 'offline', 'hybrid'];
 
+const normalizeInternshipMode = (mode = '') => {
+  const value = String(mode).trim().toLowerCase();
+  return ['online', 'offline', 'hybrid'].includes(value) ? value : 'online';
+};
+
 const detectPricingBucket = (internship = {}) => {
   // ✅ hard booleans (if you have them)
   if (internship.isPaidInternship === true || internship.isPaid === true) return 'paid';
@@ -142,6 +147,8 @@ const ScheduleForm = ({ internshipId, onClose }) => {
   const [isPersisted, setIsPersisted] = useState(false); // false until load/save
   const [aiGenerating, setAiGenerating] = useState(false);
   const [pricingBucket, setPricingBucket] = useState(null); // null | free | stipend | paid
+  const [lockedInternshipType, setLockedInternshipType] = useState('');
+  const visibleInternshipTypes = lockedInternshipType ? [lockedInternshipType] : [];
 
   // Default getters so preview toggles use the right source every time
   const getDefaultEventLinkForType = (type) => {
@@ -170,19 +177,22 @@ const ScheduleForm = ({ internshipId, onClose }) => {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       })
       .then(({ data }) => {
-        setPricingBucket(detectPricingBucket(data)); // ✅ ADD THIS
+        const resolvedType = normalizeInternshipMode(data.internshipMode); // ✅ read from DB
+
+        setPricingBucket(detectPricingBucket(data));
+        setLockedInternshipType(resolvedType);
 
         setForm(f => ({
           ...f,
           startDate: new Date(data.startDate).toISOString().split('T')[0],
           endDate: new Date(data.endDateOrDuration).toISOString().split('T')[0],
-          // don't clobber the type loaded from saved schedule
-          defaultType: f.defaultType || data.type || 'online'
+          defaultType: resolvedType // ✅ reflect selected mode in schedule form
         }));
       })
       .catch(err => {
         setError(err.message);
-        setPricingBucket('free'); // ✅ fallback so your old flow still works
+        setPricingBucket('free');
+        setLockedInternshipType('online');
       });
   }, [internshipId]);
 
@@ -205,52 +215,54 @@ const ScheduleForm = ({ internshipId, onClose }) => {
         const savedStart = data.defaultStartTime || data?.timetable?.[0]?.startTime || '';
         const savedEnd = data.defaultEndTime || data?.timetable?.[0]?.endTime || '';
 
-        setForm(f => ({
-          ...f,
-          startDate: data.startDate.slice(0, 10),
-          endDate: data.endDate.slice(0, 10),
-          workHours: data.workHours,
+        setForm(f => {
+          const effectiveType = f.defaultType || savedType; // ✅ keep type coming from internship post
 
-          // ✅ Use savedType/savedStart/savedEnd we derived above
-          defaultType: savedType,
-          defaultStartTimes: {
-            ...f.defaultStartTimes,
-            [savedType]: savedStart
-          },
-          defaultEndTimes: {
-            ...f.defaultEndTimes,
-            [savedType]: savedEnd
-          },
+          return {
+            ...f,
+            startDate: data.startDate.slice(0, 10),
+            endDate: data.endDate.slice(0, 10),
+            workHours: data.workHours,
 
-          // Pre-fill the specific fields the UI uses
-          ...(savedType === 'online'
-            ? { onlineEventLink: data.defaultEventLink || data?.timetable?.[0]?.eventLink || '' }
-            : {}),
-          ...(savedType === 'hybrid'
-            ? { hybridEventLink: data.defaultEventLink || data?.timetable?.[0]?.eventLink || '' }
-            : {}),
+            defaultType: effectiveType,
+            defaultStartTimes: {
+              ...f.defaultStartTimes,
+              [effectiveType]: savedStart
+            },
+            defaultEndTimes: {
+              ...f.defaultEndTimes,
+              [effectiveType]: savedEnd
+            },
 
-          ...(savedType === 'offline'
-            ? {
-              offlineLocation:
-                data.defaultLocation || data?.timetable?.[0]?.location || { name: '', address: '', mapLink: '' }
-            }
-            : {}),
-          ...(savedType === 'hybrid'
-            ? {
-              hybridLocation:
-                data.defaultLocation || data?.timetable?.[0]?.location || { name: '', address: '', mapLink: '' }
-            }
-            : {}),
+            ...(effectiveType === 'online'
+              ? { onlineEventLink: data.defaultEventLink || data?.timetable?.[0]?.eventLink || '' }
+              : {}),
+            ...(effectiveType === 'hybrid'
+              ? { hybridEventLink: data.defaultEventLink || data?.timetable?.[0]?.eventLink || '' }
+              : {}),
 
-          defaultEventLink: data.timetable[0]?.eventLink || '',
-          defaultLocation: data.timetable[0]?.location || {
-            name: '',
-            address: '',
-            mapLink: ''
-          },
-          isClosed: !!data.isClosed   // ✅ force boolean
-        }));
+            ...(effectiveType === 'offline'
+              ? {
+                offlineLocation:
+                  data.defaultLocation || data?.timetable?.[0]?.location || { name: '', address: '', mapLink: '' }
+              }
+              : {}),
+            ...(effectiveType === 'hybrid'
+              ? {
+                hybridLocation:
+                  data.defaultLocation || data?.timetable?.[0]?.location || { name: '', address: '', mapLink: '' }
+              }
+              : {}),
+
+            defaultEventLink: data.timetable[0]?.eventLink || '',
+            defaultLocation: data.timetable[0]?.location || {
+              name: '',
+              address: '',
+              mapLink: ''
+            },
+            isClosed: !!data.isClosed
+          };
+        });
 
         setTimetable(
           (data.timetable || []).map(entry => ({
@@ -788,7 +800,7 @@ const ScheduleForm = ({ internshipId, onClose }) => {
 
                 {/* 1) Type Selector */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {internshipTypes.map(type => (
+                  {visibleInternshipTypes.map(type => (
                     <div key={type} className="flex items-center">
                       <input
                         type="radio"

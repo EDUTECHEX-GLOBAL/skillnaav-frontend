@@ -38,6 +38,7 @@ import PartnerforgotPassword from "./WebApp/Flows/PartnerFlow/SignUpLogin/Partne
 // import AdminFlow from "./WebApp/Flows/AdminFlow/AdminFlow";
 import AdminCreateAccount from "./WebApp/Flows/AdminFlow/SignUpLogin/AdminCreateAccount";
 import AdminLogin from "./WebApp/Flows/AdminFlow/SignUpLogin/AdminLogin";
+import AdminLoginOtp from "./WebApp/Flows/AdminFlow/SignUpLogin/AdminLoginOtp";
 
 import AdminForgotPassword from "./WebApp/Flows/AdminFlow/SignUpLogin/AdminForgotPassword";
 import AdminResetPassword from "./WebApp/Flows/AdminFlow/SignUpLogin/AdminResetPassword";
@@ -166,6 +167,7 @@ function App() {
           {/* <Route path="/admin-account" element={<AdminFlow />} /> */}
           <Route path="/admin-create-account" element={<AdminCreateAccount />} />
           <Route path="/admin/login" element={<AdminLogin />} />
+          <Route path="/admin/login-otp" element={<AdminLoginOtp />} />
 
           <Route path="/admin/forgot-password" element={<AdminForgotPassword />} />
           <Route path="/admin/reset-password" element={<AdminResetPassword />} />

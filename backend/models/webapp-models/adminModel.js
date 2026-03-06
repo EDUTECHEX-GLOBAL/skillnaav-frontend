@@ -43,6 +43,17 @@ const adminwebappsSchema = new mongoose.Schema({
     default: null
   },
 
+  // ✅ Login OTP (for entering dashboard after password)
+  loginOtpHash: {
+    type: String,
+    default: null,
+  },
+
+  loginOtpExpires: {
+    type: Date,
+    default: null,
+  },
+
 }, {
   timestamps: true
 });

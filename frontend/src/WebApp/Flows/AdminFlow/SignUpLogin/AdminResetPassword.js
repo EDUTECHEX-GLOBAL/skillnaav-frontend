@@ -1,3 +1,5 @@
+// File: AdminResetPassword.js
+
 import React, { useEffect, useMemo, useState } from "react";
 import { Formik, Form, Field, ErrorMessage } from "formik";
 import * as Yup from "yup";
@@ -186,7 +188,7 @@ const AdminResetPassword = () => {
                                         />
                                         <button
                                             type="button"
-                                            className="absolute inset-y-0 right-4 flex items-center"
+                                            className="absolute right-4 top-1/2 -translate-y-1/2 mt-[9px] flex items-center justify-center"
                                             onClick={() => setShowPassword(!showPassword)}
                                         >
                                             <FontAwesomeIcon
@@ -208,7 +210,7 @@ const AdminResetPassword = () => {
                                         />
                                         <button
                                             type="button"
-                                            className="absolute inset-y-0 right-4 flex items-center"
+                                            className="absolute right-4 top-1/2 -translate-y-1/2 mt-[9px] flex items-center justify-center"
                                             onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                                         >
                                             <FontAwesomeIcon
