@@ -31,7 +31,6 @@ const ProfileForm = () => {
     preferredLocations: "",
   });
 
-  // City and university autocomplete states
   const [citySuggestions, setCitySuggestions] = useState([]);
   const [filteredInstitutionSuggestions, setFilteredInstitutionSuggestions] = useState([]);
   const cityTimerRef = useRef(null);
@@ -44,12 +43,10 @@ const ProfileForm = () => {
   const [isLevel2Open, setIsLevel2Open] = useState(false);
   const [isLevel3Open, setIsLevel3Open] = useState(false);
   const [createLevelThree, setCreateLevelThree] = useState(true);
-  
-  // New states for edit mode
+
   const [isEditing, setIsEditing] = useState(false);
   const [tempUser, setTempUser] = useState({});
 
-  // State/Province list based on country
   const stateList =
     tempUser.country === "Canada"
       ? CA_PROVINCES
@@ -71,7 +68,6 @@ const ProfileForm = () => {
       ? "ZIP Code"
       : "ZIP / Postal Code";
 
-  // Education level options for dropdown
   const educationLevels = [
     { value: "", label: "Select Education Level" },
     { value: "highschool", label: "High School" },
@@ -79,7 +75,6 @@ const ProfileForm = () => {
     { value: "graduate", label: "Graduate" }
   ];
 
-  // Grade options for high school
   const gradeOptions = [
     { value: "", label: "Select Grade" },
     ...Array.from({ length: 5 }, (_, i) => {
@@ -88,7 +83,6 @@ const ProfileForm = () => {
     })
   ];
 
-  // Field of study options
   const fieldOptions = [
     { value: "", label: "Select Your Field" },
     { value: "Space", label: "Space Internships" },
@@ -104,7 +98,6 @@ const ProfileForm = () => {
     return !isNaN(parsed.getTime());
   };
 
-  // 🔄 Fetch profile
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
@@ -132,7 +125,7 @@ const ProfileForm = () => {
         };
 
         setUser(formattedData);
-        setTempUser(formattedData); // Initialize tempUser with fetched data
+        setTempUser(formattedData);
       } catch (err) {
         console.error(err);
         setErrorMessage("Failed to load profile.");
@@ -142,7 +135,6 @@ const ProfileForm = () => {
     fetchUserProfile();
   }, []);
 
-  // Cleanup timers/requests
   useEffect(() => {
     return () => {
       if (cityTimerRef.current) clearTimeout(cityTimerRef.current);
@@ -153,24 +145,27 @@ const ProfileForm = () => {
 
   const handleEditClick = () => {
     setIsEditing(true);
-    setTempUser({ ...user }); // Copy current user data to tempUser for editing
+    setTempUser({ ...user });
   };
 
   const handleCancelClick = () => {
     setIsEditing(false);
-    setTempUser({ ...user }); // Reset tempUser to original user data
+    setTempUser({ ...user });
     setCitySuggestions([]);
     setFilteredInstitutionSuggestions([]);
   };
 
   const handleTempChange = (e) => {
     const { name, value } = e.target;
-    setTempUser((prev) => ({ ...prev, [name]: value }));
-    
-    // If education level changes and it's not highschool, clear current grade
-    if (name === "educationLevel" && value !== "highschool") {
-      setTempUser(prev => ({ ...prev, currentGrade: "" }));
-    }
+    // ✅ FIX: Use functional update with spread to avoid stale state
+    setTempUser((prev) => {
+      const updated = { ...prev, [name]: value };
+      // Clear currentGrade when education level changes away from highschool
+      if (name === "educationLevel" && value !== "highschool") {
+        updated.currentGrade = "";
+      }
+      return updated;
+    });
   };
 
   const handleDateChange = (date) => {
@@ -183,7 +178,7 @@ const ProfileForm = () => {
     const file = e.target.files[0];
     if (!file) return;
 
-    if (file && !file.type.startsWith("image/")) {
+    if (!file.type.startsWith("image/")) {
       alert("Please upload an image file (JPEG, PNG, JPG)");
       return;
     }
@@ -191,25 +186,18 @@ const ProfileForm = () => {
     setTempUser((prev) => ({ ...prev, profileImage: file }));
   };
 
-  // University autocomplete
   const handleInstitutionInputChange = (e) => {
     const value = e.target.value;
 
-    setTempUser((prev) => ({
-      ...prev,
-      universityName: value,
-    }));
+    setTempUser((prev) => ({ ...prev, universityName: value }));
 
-    if (institutionTimerRef.current)
-      clearTimeout(institutionTimerRef.current);
+    if (institutionTimerRef.current) clearTimeout(institutionTimerRef.current);
 
-    // 🛑 High school → manual entry only
     if (tempUser.educationLevel === "highschool") {
       setFilteredInstitutionSuggestions([]);
       return;
     }
 
-    // Guards
     if (!value || value.trim().length < 2 || !tempUser.country) {
       setFilteredInstitutionSuggestions([]);
       return;
@@ -233,16 +221,13 @@ const ProfileForm = () => {
     }, 400);
   };
 
-  // City autocomplete
   const handleCityInputChange = (e) => {
     const value = e.target.value;
 
     setTempUser((prev) => ({ ...prev, city: value }));
 
-    // Clear previous debounce
     if (cityTimerRef.current) clearTimeout(cityTimerRef.current);
 
-    // ✅ HARD GUARDS
     if (!tempUser.country) {
       setCitySuggestions([]);
       return;
@@ -261,7 +246,7 @@ const ProfileForm = () => {
           )}&query=${encodeURIComponent(value.trim())}`
         );
 
-        if (!res.ok) return; // silently ignore 400s
+        if (!res.ok) return;
 
         const data = await res.json();
         setCitySuggestions(data);
@@ -281,13 +266,12 @@ const ProfileForm = () => {
   };
 
   const handleCountryChange = (value) => {
-    // Reset state & city when country changes
-    setTempUser((prev) => ({ 
-      ...prev, 
-      country: value, 
-      state: "", 
+    setTempUser((prev) => ({
+      ...prev,
+      country: value,
+      state: "",
       city: "",
-      universityName: "" 
+      universityName: ""
     }));
     setCitySuggestions([]);
     setFilteredInstitutionSuggestions([]);
@@ -306,14 +290,10 @@ const ProfileForm = () => {
 
       const formData = new FormData();
 
-      // Map field names to match API expectations
       Object.entries(tempUser).forEach(([key, value]) => {
         if (value === undefined || value === null || value === "") return;
-
-        // Skip file field for now
         if (key === "profileImage" && typeof value === "object") return;
 
-        // Convert arrays
         if (["skills", "interests", "preferredLocations"].includes(key)) {
           const list = value
             .split(",")
@@ -323,30 +303,25 @@ const ProfileForm = () => {
           return;
         }
 
-        // DOB → ISO string
         if (key === "dob" && value instanceof Date) {
           formData.append("dob", value.toISOString());
           return;
         }
 
-        // Regular fields
         formData.append(key, value);
       });
 
-      // Add profile image if changed
       if (tempUser.profileImage && typeof tempUser.profileImage === "object") {
         formData.append("profileImage", tempUser.profileImage);
       }
 
-      // 1️⃣ Update profile
       await axios.put("/api/users/profile", formData, {
-        headers: { 
+        headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "multipart/form-data"
         },
       });
 
-      // 2️⃣ Refetch updated user
       const { data: updatedUser } = await axios.get("/api/users/profile", {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -364,20 +339,35 @@ const ProfileForm = () => {
         postalCode: updatedUser.postalCode || updatedUser.zip || "",
       };
 
-      // 3️⃣ Update state and localStorage
       setUser(formattedUpdatedUser);
-      localStorage.setItem("userInfo", JSON.stringify(updatedUser));
+      setTempUser(formattedUpdatedUser); // ✅ FIX: sync tempUser too, otherwise Cancel after save shows stale data
 
-      // 4️⃣ Notify Navbar
+      // ✅ FIX: Store the full updated profile in localStorage (not just updatedUser which
+      //    lacks isPremium/planType fields that Navbar reads). Merge with existing stored
+      //    premium fields so they are never wiped on a profile save.
+      const existingStored = (() => {
+        try { return JSON.parse(localStorage.getItem("userInfo")) || {}; } catch { return {}; }
+      })();
+      localStorage.setItem("userInfo", JSON.stringify({
+        ...existingStored,
+        ...updatedUser,
+        // Never overwrite premium fields from a profile-update response
+        isPremium: existingStored.isPremium ?? updatedUser.isPremium,
+        planType: existingStored.planType ?? updatedUser.planType ?? "Free",
+        premiumExpiration: existingStored.premiumExpiration ?? updatedUser.premiumExpiration,
+      }));
+
+      // ✅ FIX: Dispatch "userInfoUpdated" (what Navbar actually listens for after our fix),
+      //    AND the native "storage" event for any other listeners.
       window.dispatchEvent(new Event("storage"));
+      window.dispatchEvent(new Event("userInfoUpdated"));
 
       setSuccessMessage("Profile updated successfully!");
-      setIsEditing(false); // Exit edit mode
-      
-      // Clear suggestions after save
+      setIsEditing(false);
+
       setCitySuggestions([]);
       setFilteredInstitutionSuggestions([]);
-      
+
     } catch (err) {
       console.error(err);
       setErrorMessage(
@@ -386,7 +376,6 @@ const ProfileForm = () => {
     }
   };
 
-  // Format date for display
   const formatDate = (date) => {
     if (!date) return "";
     if (typeof date === "string") {
@@ -399,12 +388,16 @@ const ProfileForm = () => {
     return "";
   };
 
-  // Get display value for dropdowns
   const getDisplayValue = (value, options) => {
     if (!value) return "";
     const option = options.find(opt => opt.value === value);
     return option ? option.label : value;
   };
+
+  // ✅ FIX: Use tempUser.educationLevel in edit mode for conditional rendering,
+  //    and user.educationLevel in view mode — previously both always used user.educationLevel
+  //    which meant grade/school fields showed stale values while editing.
+  const activeEducationLevel = isEditing ? tempUser.educationLevel : user.educationLevel;
 
   return (
     <div className="min-h-screen mt-12 flex justify-center bg-gray-50 font-poppins">
@@ -417,7 +410,7 @@ const ProfileForm = () => {
               {isEditing ? "Edit your personal and academic details" : "View your personal and academic details"}
             </p>
           </div>
-          
+
           {!isEditing ? (
             <button
               onClick={handleEditClick}
@@ -451,7 +444,7 @@ const ProfileForm = () => {
             {errorMessage}
           </div>
         )}
-        
+
         {successMessage && (
           <div className="mb-4 p-4 bg-green-100 text-green-700 border border-green-200 rounded-lg">
             {successMessage}
@@ -460,7 +453,7 @@ const ProfileForm = () => {
 
         {/* Profile Level 1 */}
         <div className="mb-6 border border-gray-200 rounded-lg overflow-hidden">
-          <div 
+          <div
             className="flex justify-between items-center p-4 bg-blue-50 cursor-pointer hover:bg-blue-100"
             onClick={() => setIsLevel1Open(!isLevel1Open)}
           >
@@ -470,7 +463,6 @@ const ProfileForm = () => {
 
           {isLevel1Open && (
             <div className="p-6 space-y-6">
-              {/* Basic Info Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Full Name */}
                 <div className="space-y-2">
@@ -568,8 +560,8 @@ const ProfileForm = () => {
                 )}
               </div>
 
-              {/* Grade (ONLY for High School) */}
-              {user.educationLevel === "highschool" && (
+              {/* ✅ FIX: Use activeEducationLevel so grade/school fields react to edits instantly */}
+              {activeEducationLevel === "highschool" && (
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-700">Current Grade</label>
                   {isEditing ? (
@@ -593,11 +585,10 @@ const ProfileForm = () => {
                 </div>
               )}
 
-              {/* Institution Name */}
-              {user.educationLevel && (
+              {activeEducationLevel && (
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-700">
-                    {user.educationLevel === "highschool" ? "School Name" : "College / University Name"}
+                    {activeEducationLevel === "highschool" ? "School Name" : "College / University Name"}
                   </label>
                   {isEditing ? (
                     <div className="relative">
@@ -614,7 +605,6 @@ const ProfileForm = () => {
                         autoComplete="off"
                         className="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
-                      {/* University suggestions ONLY for non-highschool */}
                       {tempUser.educationLevel !== "highschool" &&
                         filteredInstitutionSuggestions.length > 0 && (
                           <ul className="absolute z-10 w-full bg-white border border-gray-300 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto">
@@ -622,19 +612,14 @@ const ProfileForm = () => {
                               <li
                                 key={index}
                                 onClick={() => {
-                                  setTempUser((prev) => ({
-                                    ...prev,
-                                    universityName: u.name,
-                                  }));
+                                  setTempUser((prev) => ({ ...prev, universityName: u.name }));
                                   setFilteredInstitutionSuggestions([]);
                                 }}
                                 className="cursor-pointer px-4 py-2 hover:bg-blue-50"
                               >
                                 {u.name}
                                 {u.state && (
-                                  <span className="text-xs text-gray-500 ml-2">
-                                    {u.state}
-                                  </span>
+                                  <span className="text-xs text-gray-500 ml-2">{u.state}</span>
                                 )}
                               </li>
                             ))}
@@ -810,7 +795,7 @@ const ProfileForm = () => {
 
         {/* Profile Level 2 */}
         <div className="mb-6 border border-gray-200 rounded-lg overflow-hidden">
-          <div 
+          <div
             className="flex justify-between items-center p-4 bg-blue-50 cursor-pointer hover:bg-blue-100"
             onClick={() => setIsLevel2Open(!isLevel2Open)}
           >
@@ -820,9 +805,7 @@ const ProfileForm = () => {
 
           {isLevel2Open && (
             <div className="p-6 space-y-6">
-              {/* Financial Status and Grade Percentage */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Financial Status */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-700">Financial Status</label>
                   {isEditing ? (
@@ -841,8 +824,8 @@ const ProfileForm = () => {
                   )}
                 </div>
 
-                {/* Grade Percentage - Only show if not high school */}
-                {user.educationLevel !== "highschool" && (
+                {/* ✅ FIX: Use activeEducationLevel here too for consistency */}
+                {activeEducationLevel !== "highschool" && (
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700">Grade Percentage</label>
                     {isEditing ? (
@@ -863,11 +846,9 @@ const ProfileForm = () => {
                 )}
               </div>
 
-              {/* LOCATION */}
               <div className="space-y-4">
                 <h4 className="text-lg font-semibold text-gray-700">Location Information</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Country */}
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700">Country</label>
                     {isEditing ? (
@@ -887,8 +868,7 @@ const ProfileForm = () => {
                       </div>
                     )}
                   </div>
-                  
-                  {/* State / Province */}
+
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700">{stateLabel}</label>
                     {isEditing ? (
@@ -910,8 +890,7 @@ const ProfileForm = () => {
                       </div>
                     )}
                   </div>
-                  
-                  {/* City */}
+
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700">City</label>
                     {isEditing ? (
@@ -946,8 +925,7 @@ const ProfileForm = () => {
                       </div>
                     )}
                   </div>
-                  
-                  {/* ZIP / Postal Code */}
+
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700">{zipLabel}</label>
                     {isEditing ? (
@@ -966,8 +944,7 @@ const ProfileForm = () => {
                       </div>
                     )}
                   </div>
-                  
-                  {/* Full Address */}
+
                   <div className="md:col-span-2 space-y-2">
                     <label className="text-sm font-medium text-gray-700">Address</label>
                     {isEditing ? (
@@ -994,14 +971,14 @@ const ProfileForm = () => {
 
         {/* Profile Level 3 */}
         <div className="border border-gray-200 rounded-lg overflow-hidden">
-          <div 
+          <div
             className="flex justify-between items-center p-4 bg-blue-50 cursor-pointer hover:bg-blue-100"
             onClick={() => setIsLevel3Open(!isLevel3Open)}
           >
             <h3 className="text-xl font-semibold text-gray-800">Profile Level 3</h3>
             <span className="text-gray-600">{isLevel3Open ? "▲" : "▼"}</span>
           </div>
-          
+
           {isLevel3Open && createLevelThree && (
             <div className="p-6">
               <LevelThree

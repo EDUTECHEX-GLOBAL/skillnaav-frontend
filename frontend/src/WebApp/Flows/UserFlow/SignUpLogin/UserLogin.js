@@ -10,8 +10,6 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
 import { FcGoogle } from "react-icons/fc";
 import ForgotPasswordModal from "../SignUpLogin/UserforgotPassword";
-// import { auth, googleAuthProvider } from "../../../../config/Firebase"; // Firebase setup
-// import { signInWithPopup } from "firebase/auth";
 import { GoogleLogin } from "@react-oauth/google";
 import axios from "axios";
 
@@ -26,40 +24,6 @@ const UserLogin = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
-
-  // const handleGoogleSignIn = async () => {
-  //   setLoading(true);
-  //   setError("");
-  //   try {
-  //     // Ensure account selection by setting `prompt`
-  //     googleAuthProvider.setCustomParameters({ prompt: "select_account" });
-
-  //     // Open the Google sign-in popup
-  //     const result = await signInWithPopup(auth, googleAuthProvider);
-  //     const user = result.user;
-
-  //     // Obtain user token
-  //     const token = await user.getIdToken();
-
-  //     // Store token and user info in localStorage
-  //     localStorage.setItem("userToken", JSON.stringify(token));
-  //     localStorage.setItem("userInfo", JSON.stringify(user));
-  //     sessionStorage.setItem("userToken", JSON.stringify(token));
-
-  //     // --- RECORD LOGIN TIME (used by feedback gating) ---
-  //     localStorage.setItem("loginTime", Date.now());
-
-  //     console.log("Google user:", user);
-
-  //     // Navigate to the main page
-  //     navigate("/user-main-page");
-  //   } catch (err) {
-  //     console.error("Google sign-in error:", err);
-  //     setError("Google sign-in failed. Please try again.");
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
 
   const handleSubmit = async (values, { setSubmitting }) => {
     setError("");
@@ -77,13 +41,10 @@ const UserLogin = () => {
         throw new Error("Invalid response from server");
       }
 
-      // 🧹 Clear any existing localStorage
       localStorage.clear();
 
-      // 💾 Store token as STRING (VERY IMPORTANT)
       localStorage.setItem("userToken", data.token);
 
-      // 💾 Store only profile info (no token duplication)
       localStorage.setItem("userInfo", JSON.stringify({
         _id: data._id,
         name: data.name,
@@ -91,16 +52,15 @@ const UserLogin = () => {
         profileImage: data.profileImage,
         isPremium: data.isPremium,
         planType: data.planType,
+        premiumExpiration: data.premiumExpiration ?? null, // ✅ FIX: was missing — Navbar reads this from localStorage on load
         adminApproved: data.adminApproved,
         status: data.status,
       }));
 
-      // ✅ Store schoolAdminId if present
       if (data.schoolAdminId) {
         localStorage.setItem("schoolAdminId", data.schoolAdminId);
       }
 
-      // 🛠 Start login session
       const sessionRes = await axios.post(
         "/api/sessions/login",
         {},
@@ -115,7 +75,6 @@ const UserLogin = () => {
         localStorage.setItem("sessionId", sessionRes.data.sessionId);
       }
 
-      // --- RECORD LOGIN TIME (used by feedback gating) ---
       localStorage.setItem("loginTime", Date.now());
 
       setLoading(false);
@@ -148,13 +107,13 @@ const UserLogin = () => {
           <h2 className="text-lg font-medium mb-6 text-center text-gray-600">
             Please sign in to your account
           </h2>
-          {/* Error Message */}
+
           {error && (
             <div className="bg-red-200 text-red-600 p-3 mb-4 text-center rounded-lg">
               {error}
             </div>
           )}
-          {/* Loading */}
+
           {loading ? (
             <Loading />
           ) : (
@@ -224,6 +183,7 @@ const UserLogin = () => {
               )}
             </Formik>
           )}
+
           <div className="flex items-center my-6">
             <hr className="w-full border-gray-300" />
             <span className="px-3 text-gray-500">OR</span>
@@ -237,23 +197,21 @@ const UserLogin = () => {
 
                 const res = await axios.post("/api/users/google-auth", { idToken });
 
-                // ✅ STORE TOKEN AS STRING (NO JSON.parse EVER)
                 localStorage.setItem("userToken", res.data.token);
 
-                // ✅ STORE USER INFO AS JSON
                 localStorage.setItem("userInfo", JSON.stringify({
                   _id: res.data._id,
                   name: res.data.name,
                   email: res.data.email,
                   profileImage: res.data.profileImage,
                   isGoogleUser: res.data.isGoogleUser,
-                  planType: "Free"
+                  isPremium: res.data.isPremium ?? false,           // ✅ FIX: was missing entirely for Google users
+                  planType: res.data.planType ?? "Free",            // ✅ FIX: was hardcoded "Free" ignoring server value
+                  premiumExpiration: res.data.premiumExpiration ?? null, // ✅ FIX: was missing
                 }));
 
-                // record login time
                 localStorage.setItem("loginTime", Date.now());
 
-                // ✅ NAVIGATION (THIS WORKS)
                 if (res.data.needsProfileCompletion) {
                   navigate("/user/complete-profile");
                 } else {
@@ -268,11 +226,6 @@ const UserLogin = () => {
             onError={() => setError("Google login failed")}
           />
 
-
-
-
-
-          {/* Sign Up Button */}
           <div className="flex justify-center mt-4">
             <p className="text-sm text-gray-600">
               Don't have an account?{" "}
@@ -284,7 +237,6 @@ const UserLogin = () => {
         </div>
       </div>
 
-      {/* ForgotPasswordModal Component */}
       <ForgotPasswordModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
     </div>
   );

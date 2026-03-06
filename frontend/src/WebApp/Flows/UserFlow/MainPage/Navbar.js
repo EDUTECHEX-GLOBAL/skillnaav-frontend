@@ -45,19 +45,26 @@ const Navbar = ({ onToggleSidebar }) => {
   useEffect(() => {
     syncUserInfoFromStorage();
 
-    // ✅ Fixed: listen for premium upgrade event dispatched from PremiumPage
+    // ✅ Listen for both custom event (premium upgrade) and native storage event (profile update)
     window.addEventListener("userInfoUpdated", syncUserInfoFromStorage);
-    return () => window.removeEventListener("userInfoUpdated", syncUserInfoFromStorage);
+    window.addEventListener("storage", syncUserInfoFromStorage);  // ✅ FIX: was missing — ProfileForm dispatches "storage" but Navbar only listened for "userInfoUpdated"
+    return () => {
+      window.removeEventListener("userInfoUpdated", syncUserInfoFromStorage);
+      window.removeEventListener("storage", syncUserInfoFromStorage);
+    };
   }, []);
 
-  useEffect(() => {
-    if (!userInfo?._id) return;
+  // ✅ FIX: Separated userId into its own variable to stabilise the dependency
+  //    Previously `userInfo._id` could be undefined on first render, causing the
+  //    effect to silently skip and never re-run even after userInfo loaded.
+  const userId = userInfo?._id;
 
-    const studentId = userInfo._id;
+  useEffect(() => {
+    if (!userId) return;
 
     const fetchNotifications = async () => {
       try {
-        const { data } = await axios.get(`/api/notifications/${studentId}`);
+        const { data } = await axios.get(`/api/notifications/${userId}`);
         if (data?.success) {
           const unread = data.notifications.filter((n) => !n.isRead).length;
           setUnreadCount(unread);
@@ -68,7 +75,7 @@ const Navbar = ({ onToggleSidebar }) => {
     };
 
     fetchNotifications();
-  }, [userInfo._id]);
+  }, [userId]); // ✅ FIX: was [userInfo._id] which throws if userInfo is {} on mount
 
   const handleUserClick = () => setIsDropdownOpen((prev) => !prev);
 
@@ -84,10 +91,16 @@ const Navbar = ({ onToggleSidebar }) => {
 
     if (!oneMinutePassed) return performLogout();
 
-    const sessionUser = JSON.parse(localStorage.getItem("userInfo")) || null;
-    const userId = sessionUser?._id;
+    // ✅ FIX: Guard against stale/corrupt JSON in localStorage
+    let sessionUser = null;
+    try {
+      sessionUser = JSON.parse(localStorage.getItem("userInfo")) || null;
+    } catch {
+      sessionUser = null;
+    }
+    const uid = sessionUser?._id;
 
-    if (!userId) {
+    if (!uid) {
       openFeedback({
         flow: "user",
         questions: userFlowQuestions,
@@ -100,7 +113,7 @@ const Navbar = ({ onToggleSidebar }) => {
 
     try {
       const resp = await axios.get("/api/feedback/check", {
-        params: { userId, flow: "user" },
+        params: { userId: uid, flow: "user" },
       });
 
       if (resp.data?.alreadySubmitted) {

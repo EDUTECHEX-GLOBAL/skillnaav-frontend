@@ -4,7 +4,7 @@ const axios = require("axios");
 const { getAccessToken } = require("../../utils/paypal");
 const Payment = require("../../models/webapp-models/PaymentModel");
 const User = require("../../models/webapp-models/userModel");
-const { authenticate } = require("../../middlewares/authMiddleware"); // ✅ Auth middleware
+const { authenticate } = require("../../middlewares/authMiddleware");
 
 // ─────────────────────────────────────────────
 // POST /api/payments/paypal/order
@@ -55,16 +55,26 @@ router.post("/paypal/verify", authenticate, async (req, res) => {
     return res.status(400).json({ success: false, message: "Missing required fields" });
   }
 
-  // ✅ Fixed: safe numeric parse (handles "2", "7", "30", etc.)
+  // ✅ Validate planType matches the schema enum before touching DB
+  const validPlans = ["Free", "Premium Basic", "Premium Plus"];
+  if (!validPlans.includes(planType)) {
+    return res.status(400).json({ success: false, message: `Invalid planType: "${planType}"` });
+  }
+
   const days = parseInt(duration, 10);
   if (!Number.isFinite(days) || days <= 0) {
     return res.status(400).json({ success: false, message: "Invalid duration" });
   }
 
+  // ✅ Parse amount to Number early — schema requires Number, not String
+  const parsedAmount = parseFloat(amount);
+  if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+    return res.status(400).json({ success: false, message: "Invalid amount" });
+  }
+
   try {
     const accessToken = await getAccessToken();
 
-    // ✅ Fixed: capture response verified before trusting success
     const captureRes = await axios.post(
       `${process.env.PAYPAL_API}/v2/checkout/orders/${orderID}/capture`,
       {},
@@ -84,9 +94,21 @@ router.post("/paypal/verify", authenticate, async (req, res) => {
       });
     }
 
-    // ✅ Fixed: real capture transaction ID extracted
+    // ✅ FIX: Log the full capture response to diagnose ID extraction in production
+    console.log("✅ PayPal capture response:", JSON.stringify(captureRes.data, null, 2));
+
+    // ✅ FIX: Extract real capture transaction ID — falls back to orderID only as last resort
     const captureId =
-      captureRes.data?.purchase_units?.[0]?.payments?.captures?.[0]?.id || orderID;
+      captureRes.data?.purchase_units?.[0]?.payments?.captures?.[0]?.id;
+
+    if (!captureId) {
+      // Log and alert — this means PayPal response structure changed unexpectedly
+      console.error("❌ Could not extract captureId from PayPal response. Full data:", captureRes.data);
+      return res.status(500).json({
+        success: false,
+        message: "Could not extract capture transaction ID from PayPal response.",
+      });
+    }
 
     const now = Date.now();
     const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -103,28 +125,39 @@ router.post("/paypal/verify", authenticate, async (req, res) => {
     }
     const premiumExpiration = new Date(baseTime + days * MS_PER_DAY);
 
-    // ✅ Fixed: amount as Number, paymentId = capture ID, orderId = order ID
+    // ✅ FIX: Save Payment record first with validated Number amount and distinct IDs
     const payment = new Payment({
       userId,
       planType,
       email,
-      amount: parseFloat(amount),
-      paymentId: captureId,
-      orderId: orderID,
+      amount: parsedAmount,        // ✅ Always a Number now
+      paymentId: captureId,        // ✅ Real capture ID (never equals orderId)
+      orderId: orderID,            // ✅ Original order ID kept separate
       status: "Success",
       premiumExpiration,
     });
     await payment.save();
 
+    // ✅ FIX: Remove runValidators — it was silently blocking the update when
+    //    other user fields failed validation (e.g. dob format, enum mismatches).
+    //    We only need to set these three specific premium fields safely.
     const updatedUser = await User.findByIdAndUpdate(
       userId,
-      { $set: { isPremium: true, planType, premiumExpiration } },
-      { new: true, runValidators: true }
+      {
+        $set: {
+          isPremium: true,
+          planType,
+          premiumExpiration,        // ✅ This will now actually persist
+        },
+      },
+      { new: true }               // ✅ runValidators removed — was causing silent failures
     ).select("-password");
 
     if (!updatedUser) {
       return res.status(404).json({ success: false, message: "User not found after update" });
     }
+
+    console.log(`✅ Premium activated for user ${userId} until ${premiumExpiration.toISOString()}`);
 
     return res.json({ success: true, user: updatedUser });
   } catch (err) {
