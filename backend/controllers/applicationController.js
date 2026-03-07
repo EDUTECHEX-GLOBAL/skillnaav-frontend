@@ -500,6 +500,7 @@ const getStudentDashboardApplications = async (req, res) => {
   return {
     _id: app._id,
     appliedDate: app.appliedDate,
+    status: app.status,          // ✅ raw DB status — used as fallback when no pipeline
     internship: app.internshipId,
 
     pipeline: pipeline

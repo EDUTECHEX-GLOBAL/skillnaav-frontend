@@ -46,33 +46,38 @@ const Applications = () => {
   }, [studentId]);
 
   /* ================================
-     FINAL STATUS RESOLVER (L3 > L2 > L1)
+     FINAL STATUS RESOLVER (L3 > L2 > L1 > DB status)
   ================================= */
- const resolveApplicationStatus = (pipeline) => {
-  if (!pipeline) return "Applied";
+  const resolveApplicationStatus = (pipeline, appStatus) => {
+    if (!pipeline) return appStatus || "Applied";
 
-  // L3 (highest priority)
-  if (pipeline.l3?.status === "scheduled") return "Interview Scheduled";
-  if (pipeline.l3?.status === "sent") return "Interview Invite Sent";
-  if (pipeline.l3?.status === "created") return "Interview Pending";
+    // L3 (highest priority)
+    if (pipeline.l3?.status === "scheduled") return "Interview Scheduled";
+    if (pipeline.l3?.status === "sent") return "Interview Invite Sent";
+    if (pipeline.l3?.status === "created") return "Interview Pending";
 
-  // L2
-  if (pipeline.l2?.status === "passed") return "Assessment Cleared";
-  if (
-    ["generated", "sent", "started", "submitted"].includes(
-      pipeline.l2?.status
+    // L2
+    if (pipeline.l2?.status === "passed") return "Assessment Cleared";
+    if (
+      ["generated", "sent", "started", "submitted"].includes(
+        pipeline.l2?.status
+      )
     )
-  )
-    return "Assessment In Progress";
-  if (pipeline.l2?.status === "rejected") return "Assessment Failed";
+      return "Assessment In Progress";
+    if (pipeline.l2?.status === "rejected") return "Assessment Failed";
 
-  // L1
-  if (pipeline.l1?.status === "shortlisted") return "Shortlisted";
-  if (pipeline.l1?.status === "rejected") return "Rejected";
+    // L1
+    if (pipeline.l1?.status === "shortlisted") return "Shortlisted";
+    if (pipeline.l1?.status === "rejected") return "Rejected";
 
-  return "Applied";
-};
+    // ✅ No pipeline stage matched — fall back to the raw DB status on the
+    // application document. This covers the case where partner.py already set
+    // status="Shortlisted" or "Rejected" but a CandidatePipeline row doesn't
+    // exist yet (e.g. right after shortlisting before L2 is triggered).
+    if (appStatus && appStatus !== "Applied") return appStatus;
 
+    return "Applied";
+  };
 
   /* ================================
      STATUS COLORS
@@ -80,6 +85,7 @@ const Applications = () => {
   const statusColors = {
     Applied: "bg-gray-100 text-gray-700",
     Shortlisted: "bg-yellow-100 text-yellow-700",
+    Rejected: "bg-red-100 text-red-700",
 
     "Assessment In Progress": "bg-purple-100 text-purple-700",
     "Assessment Cleared": "bg-green-100 text-green-700",
@@ -88,8 +94,6 @@ const Applications = () => {
     "Interview Pending": "bg-orange-100 text-orange-700",
     "Interview Scheduled": "bg-blue-100 text-blue-700",
     "Interview Invite Sent": "bg-green-100 text-green-800",
-
-    Rejected: "bg-red-100 text-red-700",
   };
 
   /* ================================
@@ -100,7 +104,7 @@ const Applications = () => {
 
     const { l2, l3 } = pipeline;
 
-    // 🚫 Once in L3, never show assessment CTA
+    // Once in L3, never show assessment CTA
     if (l3?.status && l3.status !== "not_used") return null;
     if (!l2 || l2.status === "not_used") return null;
 
@@ -159,50 +163,46 @@ const Applications = () => {
   /* ================================
      INTERVIEW INFO (L3)
   ================================= */
-const renderInterviewInfo = (pipeline) => {
-  const l3 = pipeline?.l3;
+  const renderInterviewInfo = (pipeline) => {
+    const l3 = pipeline?.l3;
 
-  if (!l3 || !["scheduled", "sent"].includes(l3.status)) return null;
+    if (!l3 || !["scheduled", "sent"].includes(l3.status)) return null;
 
-  // interviewId may be populated OR just an ID
-  const interview =
-    typeof l3.interviewId === "object" ? l3.interviewId : null;
+    const interview =
+      typeof l3.interviewId === "object" ? l3.interviewId : null;
 
-  const scheduledAt =
-    interview?.scheduledAt || l3?.scheduledAt;
+    const scheduledAt = interview?.scheduledAt || l3?.scheduledAt;
 
-  return (
-    <div className="mt-3 text-sm bg-blue-50 text-blue-800 p-2 rounded">
-      📅 <b>Interview Scheduled</b>
+    return (
+      <div className="mt-3 text-sm bg-blue-50 text-blue-800 p-2 rounded">
+        📅 <b>Interview Scheduled</b>
 
-      {scheduledAt && (
-        <div className="mt-1">
-          {new Date(scheduledAt).toLocaleString()}
-        </div>
-      )}
+        {scheduledAt && (
+          <div className="mt-1">
+            {new Date(scheduledAt).toLocaleString()}
+          </div>
+        )}
 
-      {interview?.link ? (
-        <div className="mt-1">
-          🔗{" "}
-          <a
-            href={interview.link}
-            target="_blank"
-            rel="noreferrer"
-            className="underline font-medium"
-          >
-            Join Interview
-          </a>
-        </div>
-      ) : (
-        <div className="mt-1 text-gray-600">
-          Meeting link will be shared shortly
-        </div>
-      )}
-    </div>
-  );
-};
-
-
+        {interview?.link ? (
+          <div className="mt-1">
+            🔗{" "}
+            <a
+              href={interview.link}
+              target="_blank"
+              rel="noreferrer"
+              className="underline font-medium"
+            >
+              Join Interview
+            </a>
+          </div>
+        ) : (
+          <div className="mt-1 text-gray-600">
+            Meeting link will be shared shortly
+          </div>
+        )}
+      </div>
+    );
+  };
 
   /* ================================
      OPEN ASSESSMENT
@@ -254,7 +254,9 @@ const renderInterviewInfo = (pipeline) => {
             const job = app.internship;
             if (!job) return null;
 
-            const finalStatus = resolveApplicationStatus(app.pipeline);
+            // ✅ Pass app.status as the fallback so Shortlisted/Rejected from
+            // partner.py shows up even when no CandidatePipeline row exists yet.
+            const finalStatus = resolveApplicationStatus(app.pipeline, app.status);
 
             return (
               <div key={app._id} className="bg-white rounded-lg shadow-lg p-4">
@@ -278,7 +280,7 @@ const renderInterviewInfo = (pipeline) => {
 
                   <span
                     className={`px-3 py-1 rounded-full text-sm ${
-                      statusColors[finalStatus]
+                      statusColors[finalStatus] || "bg-gray-100 text-gray-700"
                     }`}
                   >
                     {finalStatus}

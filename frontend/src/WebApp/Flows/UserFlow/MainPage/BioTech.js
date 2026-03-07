@@ -3,7 +3,7 @@ import axios from "axios";
 import JobCard from "./Card";
 import ApplyCards from "./ApplyCards";
 
-// Component to display Biotechnology internshipsssss
+// Component to display Biotechnology internshipsss
 const BioTech = () => {
   const [internships, setInternships] = useState([]);
   const [selectedJob, setSelectedJob] = useState(null);

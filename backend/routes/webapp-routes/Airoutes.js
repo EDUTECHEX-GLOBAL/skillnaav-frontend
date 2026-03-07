@@ -26,7 +26,7 @@ const {
   extractResume,
   generateCV,
   assignInstructors,
-} = require('../../controllers/aicontroller');
+} = require('../../controllers/Aicontroller');
 
 // multer: memory storage, PDF/DOCX only, 10MB max
 const upload = multer({

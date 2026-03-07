@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -21,8 +21,6 @@ import ConfirmCloseSchedule from "./ConfirmCloseSchedule";
 import InternshipScheduleViewer from "./InternshipScheduleViewer";
 import TimeSlotsSelected from "./TimeSlotsSelected";
 
-// All AI calls go through Node backend — same pattern as /api/applications/recommendations
-// No Python URL, no port number, no env var needed in the frontend
 const AI_API = "/api/ai";
 
 const InternshipList = () => {
@@ -48,17 +46,53 @@ const InternshipList = () => {
   const [templates, setTemplates] = useState([]);
   const [sendingOffer, setSendingOffer] = useState(false);
 
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [totalPages, setTotalPages] = useState(1);
+
+  // Ref to hold partner ID so pagination buttons can access it without stale closure
+  const partnerIdRef = useRef(null);
+
   const [scheduleFormOpen, setScheduleFormOpen] = useState(false);
   const [selectedInternshipForSchedule, setSelectedInternshipForSchedule] = useState(null);
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
   const [scheduleViewerOpen, setScheduleViewerOpen] = useState(false);
   const [selectedInternshipForView, setSelectedInternshipForView] = useState(null);
 
-  // ✅ Time Slots Selected (Accepted Offers)
   const [timeSlotsModal, setTimeSlotsModal] = useState({
     open: false,
     internshipId: null,
   });
+
+  // ─── fetchInternships at component scope so pagination can call it ────────
+  const fetchInternships = async (pid, pageNum = 1) => {
+    if (!pid) return;
+
+    pageNum === 1 ? setLoading(true) : setLoadingMore(true);
+
+    try {
+      const response = await axios.get(`/api/interns/partner/${pid}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        params: { page: pageNum, limit: 6 },
+      });
+
+      const newData = response.data.data || [];
+      const tp = response.data.totalPages || 1;
+
+      setInternships(newData);
+      setPage(pageNum);
+      setTotalPages(tp);
+      setHasMore(pageNum < tp);
+    } catch (err) {
+      console.error("Error fetching internships:", err);
+      if (pageNum === 1) setInternships([]);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  };
 
   useEffect(() => {
     const fetchPartnerData = async () => {
@@ -71,31 +105,14 @@ const InternshipList = () => {
         setPartnerData(response.data);
 
         if (response.data?._id) {
-          fetchInternships(response.data._id);
+          partnerIdRef.current = response.data._id;
+          fetchInternships(response.data._id, 1);
         } else {
           throw new Error("Partner ID not found in profile");
         }
       } catch (err) {
         console.error("Failed to fetch partner data:", err);
         setError("Unable to load partner profile");
-        setLoading(false);
-      }
-    };
-
-    const fetchInternships = async (pid) => {
-      if (!pid) return;
-
-      setLoading(true);
-      try {
-        const response = await axios.get(`/api/interns/partner/${pid}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        });
-
-        setInternships(response.data.data || []);
-      } catch (err) {
-        console.error("Error fetching internships:", err);
-        setInternships([]);
-      } finally {
         setLoading(false);
       }
     };
@@ -204,14 +221,13 @@ const InternshipList = () => {
       resumes.forEach((url) => formData.append("resumes", url));
       formData.append("internship_id", id);
 
-      // ✅ SECURITY: proxied through Node backend — Python URL never exposed to browser
       const { data } = await axios.post(
         `${AI_API}/partner/shortlist`,
         formData,
         {
           headers: {
             "Content-Type": "multipart/form-data",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,  // partner token
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         }
       );
@@ -241,7 +257,6 @@ const InternshipList = () => {
     setModalData({ open: true, internshipId, type: "shortlisted", loading: true });
 
     try {
-      // ✅ SECURITY: proxied through Node backend
       const { data } = await axios.get(
         `${AI_API}/partner/shortlisted/${internshipId}`,
         {
@@ -399,7 +414,6 @@ const InternshipList = () => {
       setInternships(prev =>
         prev.map(i => i._id === internshipId ? { ...i, isScheduleClosed: true } : i)
       );
-
     } catch (err) {
       toast.error(err.response?.data?.error || "Failed to close schedule");
     }
@@ -434,6 +448,7 @@ const InternshipList = () => {
         </div>
       </div>
     );
+
   if (error)
     return (
       <div className="text-center text-lg text-red-500">
@@ -449,17 +464,19 @@ const InternshipList = () => {
 
   return (
     <div className="font-poppins max-w-7xl mx-auto p-6 bg-white shadow-lg rounded-lg">
+      {/* ─── Header ─────────────────────────────────────────────────────────── */}
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-3xl font-semibold text-gray-900">
           Internships Posted by Partner
         </h2>
         {partnerData && (
-          <div className={`px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 ${partnerData.isPremium
-            ? partnerData.planType === "Premium Plus"
-              ? "bg-purple-100 text-purple-800"
-              : "bg-blue-100 text-blue-800"
-            : "bg-gray-100 text-gray-800"
-            }`}>
+          <div className={`px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 ${
+            partnerData.isPremium
+              ? partnerData.planType === "Premium Plus"
+                ? "bg-purple-100 text-purple-800"
+                : "bg-blue-100 text-blue-800"
+              : "bg-gray-100 text-gray-800"
+          }`}>
             {partnerData.isPremium && (
               <FontAwesomeIcon icon={faCrown} className={
                 partnerData.planType === "Premium Plus" ? "text-purple-500" : "text-blue-500"
@@ -477,6 +494,7 @@ const InternshipList = () => {
         )}
       </div>
 
+      {/* ─── Internship Cards ─────────────────────────────────────────────── */}
       {internships.length === 0 ? (
         <div className="text-center text-gray-500 text-lg mt-10">
           🚫 No internships posted yet. Post one to see candidates here.
@@ -492,8 +510,7 @@ const InternshipList = () => {
                   ? `Student Pays: ${internship.compensationDetails?.amount} ${internship.compensationDetails?.currency}`
                   : "N/A";
 
-          const isPaidInternship =
-            (internship?.internshipType || "").toUpperCase() === "PAID";
+          const isPaidInternship = (internship?.internshipType || "").toUpperCase() === "PAID";
 
           return (
             <div
@@ -531,15 +548,15 @@ const InternshipList = () => {
 
               <div className="text-gray-600 mb-4">
                 <p className="flex items-center mb-2">
-                  <FontAwesomeIcon icon={faMapMarkerAlt} className="mr-2" />{" "}
+                  <FontAwesomeIcon icon={faMapMarkerAlt} className="mr-2" />
                   {internship.location} • {internship.jobType}
                 </p>
                 <p className="flex items-center mb-2">
-                  <FontAwesomeIcon icon={faClock} className="mr-2" />{" "}
+                  <FontAwesomeIcon icon={faClock} className="mr-2" />
                   {new Date(internship.startDate).toLocaleDateString()} – {new Date(internship.endDateOrDuration).toLocaleDateString()}
                 </p>
                 <p className="flex items-center mb-2">
-                  <FontAwesomeIcon icon={faDollarSign} className="mr-2" />{" "}
+                  <FontAwesomeIcon icon={faDollarSign} className="mr-2" />
                   {compensationText}
                 </p>
                 <p className="mt-2">
@@ -559,15 +576,12 @@ const InternshipList = () => {
                   <button
                     onClick={() => fetchApplications(internship._id)}
                     disabled={loadingApplications[internship._id]}
-                    className={`flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:from-blue-600 hover:to-indigo-700 transform hover:scale-105 transition duration-200 ${loadingApplications[internship._id] ? "opacity-50 cursor-not-allowed" : ""
-                      }`}
+                    className={`flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:from-blue-600 hover:to-indigo-700 transform hover:scale-105 transition duration-200 ${
+                      loadingApplications[internship._id] ? "opacity-50 cursor-not-allowed" : ""
+                    }`}
                   >
-                    {loadingApplications[internship._id] ? (
-                      "Loading..."
-                    ) : (
-                      <>
-                        <FontAwesomeIcon icon={faEye} /> View Applications
-                      </>
+                    {loadingApplications[internship._id] ? "Loading..." : (
+                      <><FontAwesomeIcon icon={faEye} /> View Applications</>
                     )}
                   </button>
                 ) : (
@@ -576,16 +590,11 @@ const InternshipList = () => {
 
                 {hasPremiumAccess() || hasFullPremiumAccess() ? (
                   <button
-                    onClick={() =>
-                      handleShortlist(
-                        internship._id,
-                        internship.jobDescription,
-                        internship.qualifications || []
-                      )
-                    }
+                    onClick={() => handleShortlist(internship._id, internship.jobDescription, internship.qualifications || [])}
                     disabled={loadingShortlist}
-                    className={`flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-green-400 to-teal-500 text-white font-semibold rounded-lg shadow-lg hover:from-green-500 hover:to-teal-600 transform hover:scale-105 transition duration-200 ${loadingShortlist ? "opacity-50 cursor-not-allowed" : ""
-                      }`}
+                    className={`flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-green-400 to-teal-500 text-white font-semibold rounded-lg shadow-lg hover:from-green-500 hover:to-teal-600 transform hover:scale-105 transition duration-200 ${
+                      loadingShortlist ? "opacity-50 cursor-not-allowed" : ""
+                    }`}
                   >
                     {loadingShortlist ? "Shortlisting..." : (
                       <><FontAwesomeIcon icon={faStar} /> Shortlist</>
@@ -599,8 +608,9 @@ const InternshipList = () => {
                   <button
                     onClick={() => showShortlisted(internship._id)}
                     disabled={loadingShortlist}
-                    className={`flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:from-purple-600 hover:to-indigo-700 transform hover:scale-105 transition duration-200 ${loadingShortlist ? "opacity-50 cursor-not-allowed" : ""
-                      }`}
+                    className={`flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:from-purple-600 hover:to-indigo-700 transform hover:scale-105 transition duration-200 ${
+                      loadingShortlist ? "opacity-50 cursor-not-allowed" : ""
+                    }`}
                   >
                     {loadingShortlist ? "Loading..." : (
                       <><FontAwesomeIcon icon={faDownload} /> Shortlisted Resumes</>
@@ -659,6 +669,46 @@ const InternshipList = () => {
         })
       )}
 
+      {/* ─── Pagination ───────────────────────────────────────────────────── */}
+      {totalPages > 1 && (
+        <div className="flex justify-center items-center gap-2 mt-8 flex-wrap">
+          {/* Prev button */}
+          <button
+            onClick={() => fetchInternships(partnerIdRef.current, page - 1)}
+            disabled={page === 1 || loadingMore}
+            className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 font-medium hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition"
+          >
+            ← Prev
+          </button>
+
+          {/* Page number buttons */}
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+            <button
+              key={pageNum}
+              onClick={() => fetchInternships(partnerIdRef.current, pageNum)}
+              disabled={loadingMore}
+              className={`px-4 py-2 rounded-lg font-semibold transition ${
+                pageNum === page
+                  ? "bg-blue-600 text-white shadow"
+                  : "border border-gray-300 text-gray-700 hover:bg-gray-100"
+              }`}
+            >
+              {pageNum}
+            </button>
+          ))}
+
+          {/* Next button */}
+          <button
+            onClick={() => fetchInternships(partnerIdRef.current, page + 1)}
+            disabled={!hasMore || loadingMore}
+            className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 font-medium hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition"
+          >
+            {loadingMore ? "Loading..." : "Next →"}
+          </button>
+        </div>
+      )}
+
+      {/* ─── Modals ───────────────────────────────────────────────────────── */}
       <Modal
         isOpen={modalData.open}
         onClose={closeModal}
@@ -669,19 +719,19 @@ const InternshipList = () => {
           (applications[modalData.internshipId] || []).length === 0
             ? <p className="p-6 text-center text-gray-600">No applications yet.</p>
             : <ApplicationsTable
-              applications={applications[modalData.internshipId]}
-              onStatusUpdate={updateApplicationStatus}
-            />
+                applications={applications[modalData.internshipId]}
+                onStatusUpdate={updateApplicationStatus}
+              />
         )}
 
         {modalData.type === "shortlisted" && !modalData.loading && (
           (shortlistedCandidates[modalData.internshipId] || []).length === 0
             ? <p className="p-6 text-center text-gray-600">No candidates shortlisted yet.</p>
             : <ShortlistedTable
-              candidates={shortlistedCandidates[modalData.internshipId]}
-              internshipId={modalData.internshipId}
-              onSendOffer={handleSendOffer}
-            />
+                candidates={shortlistedCandidates[modalData.internshipId]}
+                internshipId={modalData.internshipId}
+                onSendOffer={handleSendOffer}
+              />
         )}
       </Modal>
 

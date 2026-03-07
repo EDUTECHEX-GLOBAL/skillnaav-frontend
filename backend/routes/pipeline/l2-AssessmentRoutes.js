@@ -10,7 +10,7 @@ const {
   getAssessmentForStudent,
   evaluateAssessment,
   trackSuspiciousActivity,
-} = require("../../controllers/pipeline/AssessmentController");
+} = require("../../controllers/pipeline/assessmentController");
 
 // ✅ RULE: All fixed-path and sub-path routes MUST be declared BEFORE /:id
 // Express matches top-to-bottom. If GET /:id comes first, it will match

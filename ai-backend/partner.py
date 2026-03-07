@@ -291,11 +291,35 @@ async def shortlist_candidates(
     job_text = job_description + " " + " ".join(job_skills_list)
     job_embedding = embedder.encode(job_text, convert_to_tensor=True)
 
-    # Async process each resume
-    tasks = [process_resume(url, job_embedding) for url in resumes]
+    # ── FIX 1: Skip resumes whose application is already Shortlisted ─────────
+    # Prevents duplicate shortlist entries and re-processing on repeated clicks.
+    already_shortlisted_urls = set(
+        doc["resumeUrl"]
+        for doc in applications_collection.find(
+            {
+                "internshipId": internship_obj_id,
+                "resumeUrl": {"$in": resumes},
+                "status": "Shortlisted",
+            },
+            {"resumeUrl": 1},
+        )
+    )
+
+    pending_resumes = [url for url in resumes if url not in already_shortlisted_urls]
+
+    if already_shortlisted_urls:
+        print(f"[{now()}] ⏭ Skipping {len(already_shortlisted_urls)} already-shortlisted resume(s).")
+
+    if not pending_resumes:
+        existing = list(shortlist_collection.find({"internship_id": internship_obj_id}))
+        print(f"[{now()}] ✅ All resumes already shortlisted — returning cached results.")
+        return {"shortlisted_candidates": convert_object_ids(existing)}
+
+    # ── Process only pending resumes ──────────────────────────────────────────
+    tasks = [process_resume(url, job_embedding) for url in pending_resumes]
     results = await asyncio.gather(*tasks)
 
-    # Filter candidates
+    # Filter by similarity threshold
     candidates = [c for c in results if c and c["similarity_score"] >= 0.3]
 
     for cand in candidates:
@@ -305,26 +329,43 @@ async def shortlist_candidates(
 
     candidates = sorted(candidates, key=lambda x: x["similarity_score"], reverse=True)
 
+    # Shortlisted resume URLs from this run
+    shortlisted_resume_urls = [c["resumeUrl"] for c in candidates]
+
+    # All applications for this internship
+    all_applications = list(applications_collection.find({"internshipId": internship_obj_id}))
+    all_resume_urls  = [app["resumeUrl"] for app in all_applications]
+
+    # ── FIX 2: Rejected = everyone not shortlisted (now OR previously) ────────
+    # Excludes already_shortlisted_urls so previous shortlists are never downgraded.
+    rejected_resume_urls = list(
+        set(all_resume_urls)
+        - set(shortlisted_resume_urls)
+        - already_shortlisted_urls
+    )
+
     if candidates:
         shortlist_collection.insert_many(candidates)
-
-        shortlisted_resume_urls = [c["resumeUrl"] for c in candidates]
-        all_applications = list(applications_collection.find({"internshipId": internship_obj_id}))
-        all_resume_urls = [app["resumeUrl"] for app in all_applications]
-
-        rejected_resume_urls = list(set(all_resume_urls) - set(shortlisted_resume_urls))
 
         applications_collection.update_many(
             {"resumeUrl": {"$in": shortlisted_resume_urls}},
             {"$set": {"status": "Shortlisted"}}
         )
 
+        sync_shortlisted_to_pipeline(candidates, internship_obj_id)
+
+    # ── FIX 3: Always mark non-shortlisted as Rejected ────────────────────────
+    # This runs even when NO candidate clears 0.3, so applications never stay
+    # stuck in "Applied" forever.
+    if rejected_resume_urls:
         applications_collection.update_many(
-            {"resumeUrl": {"$in": rejected_resume_urls}},
+            {
+                "resumeUrl": {"$in": rejected_resume_urls},
+                "status": {"$nin": ["Shortlisted"]},  # safety: never downgrade
+            },
             {"$set": {"status": "Rejected"}}
         )
-
-        sync_shortlisted_to_pipeline(candidates, internship_obj_id)
+        print(f"[{now()}] 🚫 Marked {len(rejected_resume_urls)} application(s) as Rejected.")
 
         # Send rejection notifications
         for resume_url in rejected_resume_urls:
