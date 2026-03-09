@@ -1,4 +1,5 @@
-// models/webapp-models/InternshipScheduleModel.js
+//File: InternshipScheduleModel.js
+
 const mongoose = require('mongoose');
 
 const slotSchema = new mongoose.Schema(

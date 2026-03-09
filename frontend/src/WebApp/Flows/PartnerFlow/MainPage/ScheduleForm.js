@@ -1,4 +1,5 @@
-// src/components/ScheduleForm.js
+//File: ScheduleForm.js
+
 import React, { useState, useEffect, useRef } from 'react';
 import { parseISO, isBefore, isToday } from 'date-fns';
 import {
@@ -115,7 +116,12 @@ const renderLocationFields = (prefix, location, handleChange) => (
   </div>
 );
 
-const ScheduleForm = ({ internshipId, onClose }) => {
+const ScheduleForm = ({
+  internshipId,
+  onClose,
+  initialInternshipMode = '',
+  initialPricingBucket = null
+}) => {
   // Form fields
   const [form, setForm] = useState({
     startDate: '',
@@ -123,7 +129,7 @@ const ScheduleForm = ({ internshipId, onClose }) => {
     workHours: '',
     defaultStartTimes: { online: '', offline: '', hybrid: '' },
     defaultEndTimes: { online: '', offline: '', hybrid: '' },
-    defaultType: '', // online / offline / hybrid
+    defaultType: initialInternshipMode ? normalizeInternshipMode(initialInternshipMode) : '', // online / offline / hybrid
     selectedDays: allWeekdays.slice(),
     newDate: '',
     onlineEventLink: '',
@@ -146,8 +152,9 @@ const ScheduleForm = ({ internshipId, onClose }) => {
   const readOnly = !!form.isClosed;
   const [isPersisted, setIsPersisted] = useState(false); // false until load/save
   const [aiGenerating, setAiGenerating] = useState(false);
-  const [pricingBucket, setPricingBucket] = useState(null); // null | free | stipend | paid
-  const [lockedInternshipType, setLockedInternshipType] = useState('');
+  const [pricingBucket, setPricingBucket] = useState(initialPricingBucket); // null | free | stipend | paid
+  const [lockedInternshipType, setLockedInternshipType] = useState(initialInternshipMode ? normalizeInternshipMode(initialInternshipMode) : '');
+  const [lockedClassification, setLockedClassification] = useState('');
   const visibleInternshipTypes = lockedInternshipType ? [lockedInternshipType] : [];
 
   // Default getters so preview toggles use the right source every time
@@ -181,6 +188,7 @@ const ScheduleForm = ({ internshipId, onClose }) => {
 
         setPricingBucket(detectPricingBucket(data));
         setLockedInternshipType(resolvedType);
+        setLockedClassification(data.classification || '');
 
         setForm(f => ({
           ...f,
@@ -191,8 +199,18 @@ const ScheduleForm = ({ internshipId, onClose }) => {
       })
       .catch(err => {
         setError(err.message);
-        setPricingBucket('free');
-        setLockedInternshipType('online');
+
+        if (initialPricingBucket === null) {
+          setPricingBucket('free');
+        }
+
+        if (!initialInternshipMode) {
+          setLockedInternshipType('online');
+          setForm(f => ({
+            ...f,
+            defaultType: 'online'
+          }));
+        }
       });
   }, [internshipId]);
 
@@ -677,21 +695,15 @@ const ScheduleForm = ({ internshipId, onClose }) => {
     }
   };
 
-  // ✅ ROUTE: Paid internships use ScheduleFormPaid.js
-  // 1) Optional: avoid UI flicker while pricingBucket is loading
-  if (pricingBucket === null) {
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-2xl shadow-2xl px-6 py-4">
-          <p className="text-gray-700 font-medium">Loading schedule...</p>
-        </div>
-      </div>
-    );
-  }
-
   // 2) Paid internships should use the separate component/file
   if (pricingBucket === 'paid') {
-    return <ScheduleFormPaid internshipId={internshipId} onClose={onClose} />;
+    return (
+      <ScheduleFormPaid
+        internshipId={internshipId}
+        initialInternshipMode={initialInternshipMode || lockedInternshipType}
+        onClose={onClose}
+      />
+    );
   }
 
   return (
@@ -796,29 +808,40 @@ const ScheduleForm = ({ internshipId, onClose }) => {
 
               {/* Internship Type */}
               <div className="bg-gray-50 p-5 rounded-xl border border-gray-200 space-y-6">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">Internship Type</h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-0">Internship Type</h3>
 
-                {/* 1) Type Selector */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {visibleInternshipTypes.map(type => (
-                    <div key={type} className="flex items-center">
-                      <input
-                        type="radio"
-                        id={`type-${type}`}
-                        name="defaultType"
-                        value={type}
-                        checked={form.defaultType === type}
-                        onChange={handleFormChange}
-                        className="h-5 w-5 text-indigo-600 focus:ring-indigo-500 -mt-0"
-                      />
-                      <label
-                        htmlFor={`type-${type}`}
-                        className="ml-2 text-sm font-medium text-gray-700 capitalize"
-                      >
-                        {type}
-                      </label>
-                    </div>
-                  ))}
+                  <div className="flex items-center gap-4 pr-3">
+                    {lockedClassification && (
+                      <div className="flex items-center">
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs font-medium ${lockedClassification === "Basic"
+                            ? "bg-slate-100 text-slate-800"
+                            : lockedClassification === "Intermediate"
+                              ? "bg-amber-100 text-amber-800"
+                              : "bg-rose-100 text-rose-800"
+                            }`}
+                        >
+                          {lockedClassification}
+                        </span>
+                      </div>
+                    )}
+
+                    {visibleInternshipTypes.map(type => (
+                      <div key={type} className="flex items-center">
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${type === "online"
+                            ? "bg-blue-100 text-blue-800"
+                            : type === "offline"
+                              ? "bg-green-100 text-green-800"
+                              : "bg-purple-100 text-purple-800"
+                            }`}
+                        >
+                          {type}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
                 {/* 2 + 3) Default Times + Default Meeting Link – combined only for online type */}
@@ -1165,7 +1188,8 @@ const ScheduleForm = ({ internshipId, onClose }) => {
                 {form.scheduleMode === 'automated' && (
                   <p className="text-sm text-gray-500">
                     Automated Schedule will auto-fill <b>Section Summary</b> for each scheduled day
-                    based on the internship you posted.
+                    based on the internship you posted and its <b>Classification</b> level
+                    (<b>Basic</b>, <b>Intermediate</b>, <b>Advanced</b>).
                   </p>
                 )}
               </div>

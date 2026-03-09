@@ -166,6 +166,14 @@ const InternshipList = () => {
     return `${days}d ago`;
   };
 
+  const getPricingBucketFromInternship = (internship) => {
+    const raw = String(internship?.internshipType || "").trim().toUpperCase();
+
+    if (raw === "PAID") return "paid";
+    if (raw === "STIPEND") return "stipend";
+    return "free";
+  };
+
   const fetchApplications = async (internshipId) => {
     if (!hasPremiumAccess()) {
       toast.error(`Please upgrade to Premium Basic or higher to view applications`);
@@ -373,12 +381,18 @@ const InternshipList = () => {
     }
   };
 
-  const handleSchedule = (internshipId) => {
+  const handleSchedule = (internship) => {
     if (!hasFullPremiumAccess()) {
       toast.error(`Please upgrade to Premium Plus to schedule interviews`);
       return;
     }
-    setSelectedInternshipForSchedule(internshipId);
+
+    setSelectedInternshipForSchedule({
+      _id: internship._id,
+      internshipMode: internship.internshipMode || "",
+      pricingBucket: getPricingBucketFromInternship(internship),
+    });
+
     setScheduleFormOpen(true);
   };
 
@@ -470,13 +484,12 @@ const InternshipList = () => {
           Internships Posted by Partner
         </h2>
         {partnerData && (
-          <div className={`px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 ${
-            partnerData.isPremium
-              ? partnerData.planType === "Premium Plus"
-                ? "bg-purple-100 text-purple-800"
-                : "bg-blue-100 text-blue-800"
-              : "bg-gray-100 text-gray-800"
-          }`}>
+          <div className={`px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 ${partnerData.isPremium
+            ? partnerData.planType === "Premium Plus"
+              ? "bg-purple-100 text-purple-800"
+              : "bg-blue-100 text-blue-800"
+            : "bg-gray-100 text-gray-800"
+            }`}>
             {partnerData.isPremium && (
               <FontAwesomeIcon icon={faCrown} className={
                 partnerData.planType === "Premium Plus" ? "text-purple-500" : "text-blue-500"
@@ -576,9 +589,8 @@ const InternshipList = () => {
                   <button
                     onClick={() => fetchApplications(internship._id)}
                     disabled={loadingApplications[internship._id]}
-                    className={`flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:from-blue-600 hover:to-indigo-700 transform hover:scale-105 transition duration-200 ${
-                      loadingApplications[internship._id] ? "opacity-50 cursor-not-allowed" : ""
-                    }`}
+                    className={`flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:from-blue-600 hover:to-indigo-700 transform hover:scale-105 transition duration-200 ${loadingApplications[internship._id] ? "opacity-50 cursor-not-allowed" : ""
+                      }`}
                   >
                     {loadingApplications[internship._id] ? "Loading..." : (
                       <><FontAwesomeIcon icon={faEye} /> View Applications</>
@@ -592,9 +604,8 @@ const InternshipList = () => {
                   <button
                     onClick={() => handleShortlist(internship._id, internship.jobDescription, internship.qualifications || [])}
                     disabled={loadingShortlist}
-                    className={`flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-green-400 to-teal-500 text-white font-semibold rounded-lg shadow-lg hover:from-green-500 hover:to-teal-600 transform hover:scale-105 transition duration-200 ${
-                      loadingShortlist ? "opacity-50 cursor-not-allowed" : ""
-                    }`}
+                    className={`flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-green-400 to-teal-500 text-white font-semibold rounded-lg shadow-lg hover:from-green-500 hover:to-teal-600 transform hover:scale-105 transition duration-200 ${loadingShortlist ? "opacity-50 cursor-not-allowed" : ""
+                      }`}
                   >
                     {loadingShortlist ? "Shortlisting..." : (
                       <><FontAwesomeIcon icon={faStar} /> Shortlist</>
@@ -608,9 +619,8 @@ const InternshipList = () => {
                   <button
                     onClick={() => showShortlisted(internship._id)}
                     disabled={loadingShortlist}
-                    className={`flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:from-purple-600 hover:to-indigo-700 transform hover:scale-105 transition duration-200 ${
-                      loadingShortlist ? "opacity-50 cursor-not-allowed" : ""
-                    }`}
+                    className={`flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:from-purple-600 hover:to-indigo-700 transform hover:scale-105 transition duration-200 ${loadingShortlist ? "opacity-50 cursor-not-allowed" : ""
+                      }`}
                   >
                     {loadingShortlist ? "Loading..." : (
                       <><FontAwesomeIcon icon={faDownload} /> Shortlisted Resumes</>
@@ -636,7 +646,7 @@ const InternshipList = () => {
                 {hasFullPremiumAccess() ? (
                   <>
                     <button
-                      onClick={() => handleSchedule(internship._id)}
+                      onClick={() => handleSchedule(internship)}
                       className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-white font-semibold rounded-lg shadow-lg hover:from-yellow-500 hover:to-orange-600 transform hover:scale-105 transition duration-200"
                     >
                       <FontAwesomeIcon icon={faClock} /> Internship Schedule
@@ -687,11 +697,10 @@ const InternshipList = () => {
               key={pageNum}
               onClick={() => fetchInternships(partnerIdRef.current, pageNum)}
               disabled={loadingMore}
-              className={`px-4 py-2 rounded-lg font-semibold transition ${
-                pageNum === page
-                  ? "bg-blue-600 text-white shadow"
-                  : "border border-gray-300 text-gray-700 hover:bg-gray-100"
-              }`}
+              className={`px-4 py-2 rounded-lg font-semibold transition ${pageNum === page
+                ? "bg-blue-600 text-white shadow"
+                : "border border-gray-300 text-gray-700 hover:bg-gray-100"
+                }`}
             >
               {pageNum}
             </button>
@@ -719,31 +728,39 @@ const InternshipList = () => {
           (applications[modalData.internshipId] || []).length === 0
             ? <p className="p-6 text-center text-gray-600">No applications yet.</p>
             : <ApplicationsTable
-                applications={applications[modalData.internshipId]}
-                onStatusUpdate={updateApplicationStatus}
-              />
+              applications={applications[modalData.internshipId]}
+              onStatusUpdate={updateApplicationStatus}
+            />
         )}
 
         {modalData.type === "shortlisted" && !modalData.loading && (
           (shortlistedCandidates[modalData.internshipId] || []).length === 0
             ? <p className="p-6 text-center text-gray-600">No candidates shortlisted yet.</p>
             : <ShortlistedTable
-                candidates={shortlistedCandidates[modalData.internshipId]}
-                internshipId={modalData.internshipId}
-                onSendOffer={handleSendOffer}
-              />
+              candidates={shortlistedCandidates[modalData.internshipId]}
+              internshipId={modalData.internshipId}
+              onSendOffer={handleSendOffer}
+            />
         )}
       </Modal>
 
       <Modal
         isOpen={scheduleFormOpen}
-        onClose={() => setScheduleFormOpen(false)}
+        onClose={() => {
+          setScheduleFormOpen(false);
+          setSelectedInternshipForSchedule(null);
+        }}
         title="Create Internship Schedule"
       >
-        {selectedInternshipForSchedule && (
+        {selectedInternshipForSchedule?._id && (
           <ScheduleForm
-            internshipId={selectedInternshipForSchedule}
-            onClose={() => setScheduleFormOpen(false)}
+            internshipId={selectedInternshipForSchedule._id}
+            initialInternshipMode={selectedInternshipForSchedule.internshipMode}
+            initialPricingBucket={selectedInternshipForSchedule.pricingBucket}
+            onClose={() => {
+              setScheduleFormOpen(false);
+              setSelectedInternshipForSchedule(null);
+            }}
           />
         )}
       </Modal>

@@ -1,3 +1,5 @@
+//File: internshipPostModel.js
+
 const mongoose = require("mongoose");
 
 const internshipPostingSchema = new mongoose.Schema(

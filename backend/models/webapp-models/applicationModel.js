@@ -1,3 +1,5 @@
+//File: applicationModel.js
+
 const mongoose = require("mongoose");
 
 const applicationSchema = new mongoose.Schema({
@@ -17,7 +19,7 @@ const applicationSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ["Applied", "Under Review", "Accepted", "Rejected", "Shortlisted", "Viewed", "Pending", "In Progress", "Completed"],
+    enum: ["Applied", "Under Review", "Accepted", "Rejected", "Viewed", "Pending", "In Progress", "Completed"],
     default: "Applied"
   },
   appliedDate: {

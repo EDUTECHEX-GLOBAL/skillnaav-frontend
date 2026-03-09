@@ -1,3 +1,5 @@
+//File: scheduleController.js
+
 const InternshipSchedule = require('../models/webapp-models/InternshipScheduleModel');
 const { addScheduleToGoogleCalendar } = require('../controllers/GoogleController');
 const Student = require('../models/webapp-models/userModel'); // <-- replace with your actual student model
@@ -405,6 +407,67 @@ function clampSummary(text = "", max = 200) {
   return t.length > max ? t.slice(0, max - 1).trim() : t;
 }
 
+// ✅ ADD THIS (just below clampSummary)
+function getClassificationGuidance(classification = "") {
+  const c = String(classification || "").trim().toLowerCase();
+
+  if (c === "basic") {
+    return [
+      "- Keep the work beginner-friendly and foundation-oriented.",
+      "- Use simple terminology and small guided tasks.",
+      "- Focus on onboarding, tool familiarization, observation, basic practice, and simple outcomes.",
+      "- Avoid advanced ownership, architecture, optimization, or expert-level wording."
+    ].join("\n");
+  }
+
+  if (c === "intermediate") {
+    return [
+      "- Assume the intern knows the basics and can do guided hands-on work.",
+      "- Include practical tasks, moderate analysis, structured problem-solving, and collaboration.",
+      "- Focus on applying concepts, completing assigned tasks, and producing usable outputs.",
+      "- Avoid expert-only research, strategy ownership, or very advanced technical depth."
+    ].join("\n");
+  }
+
+  return [
+    "- Treat the internship as advanced and outcome-driven.",
+    "- Use deeper analysis, independent execution, optimization, evaluation, ownership, and measurable results.",
+    "- Include complex problem-solving, stronger decision-making, and polished deliverables.",
+    "- Keep the wording realistic for an advanced internship, while still concise."
+  ].join("\n");
+}
+
+// ✅ ADD THIS (just below getClassificationGuidance)
+function getFallbackSummaryByClassification(phasePrefix = "Setup:", classification = "") {
+  const c = String(classification || "").trim().toLowerCase();
+
+  const fallbackMap = {
+    basic: {
+      "Setup:": "Setup: set up tools, understand basics, and follow guided onboarding tasks.",
+      "Practice:": "Practice: work on a simple hands-on task and apply core concepts step by step.",
+      "Outcome:": "Outcome: complete a basic deliverable and document key learnings clearly."
+    },
+    intermediate: {
+      "Setup:": "Setup: review workflow, align on goals, and prepare for practical task execution.",
+      "Practice:": "Practice: complete structured hands-on work and apply concepts with moderate independence.",
+      "Outcome:": "Outcome: finalize a practical output and summarize results with clear observations."
+    },
+    advanced: {
+      "Setup:": "Setup: align on objectives, tools, and scope for deeper task ownership.",
+      "Practice:": "Practice: execute complex work, analyze outcomes, and refine the approach independently.",
+      "Outcome:": "Outcome: deliver a strong result, validate impact, and document final recommendations."
+    },
+    generic: {
+      "Setup:": "Setup: set up tools and understand today’s goals.",
+      "Practice:": "Practice: complete a hands-on task and capture learnings.",
+      "Outcome:": "Outcome: finalize output and document results clearly."
+    }
+  };
+
+  const bucket = fallbackMap[c] || fallbackMap.generic;
+  return bucket[phasePrefix] || bucket["Setup:"];
+}
+
 async function runWithConcurrency(items, concurrency, handler) {
   let idx = 0;
   const workers = new Array(Math.max(1, concurrency)).fill(0).map(async () => {
@@ -500,6 +563,8 @@ const generateAiSectionSummaries = async (req, res) => {
         : [],
     };
 
+    const classificationGuidance = getClassificationGuidance(compactContext.classification);
+
     // ✅ milestone + day mapping (prompt rules)
     const N = Number(totalDays || days.length || 0);
     const earlyEnd = Math.max(1, Math.round(N * 0.33));
@@ -553,13 +618,17 @@ Return ONLY valid JSON array (no markdown, no extra text), exactly:
 Rules:
 - MUST include an item for EVERY input day in THIS request (same dates, no missing).
 - Each sectionSummary must be 1–2 lines, max 200 characters.
+- Do NOT repeat the same sectionSummary across days.
+- Use dayNumber to maintain progress across the full internship (dayNumber is global).
+
 Phase format (MANDATORY):
 - If dayNumber <= ${earlyEnd}, sectionSummary MUST start with "Setup:" and focus on setup + understanding.
 - If ${earlyEnd} < dayNumber <= ${middleEnd}, sectionSummary MUST start with "Practice:" and focus on practice + hands-on work.
 - If dayNumber > ${middleEnd}, sectionSummary MUST start with "Outcome:" and focus on outcomes + results.
-- Do NOT repeat the same sectionSummary across days.
-- Use dayNumber to maintain progress across the full internship (dayNumber is global).
-- classification controls difficulty: Basic / Intermediate / Advanced
+
+Classification-specific rules (MANDATORY):
+- Current internship classification: ${compactContext.classification || "Not provided"}
+${classificationGuidance}
 
 Milestone requirements:
 - If a milestone date is in this chunk, that day's summary MUST include the milestone label word:
@@ -608,13 +677,10 @@ ${JSON.stringify(chunk, null, 2)}
 
       // fallback only if missing
       if (!text || !text.trim()) {
-        if (phasePrefix === "Setup:") {
-          text = "Setup: set up tools and understand today’s goals.";
-        } else if (phasePrefix === "Practice:") {
-          text = "Practice: complete a hands-on task and capture learnings.";
-        } else {
-          text = "Outcome: finalize output and document results clearly.";
-        }
+        text = getFallbackSummaryByClassification(
+          phasePrefix,
+          compactContext.classification
+        );
       } else {
         // Ensure the output follows required phase prefix (in case AI forgets)
         if (!/^(Setup:|Practice:|Outcome:)\s*/i.test(String(text).trim())) {

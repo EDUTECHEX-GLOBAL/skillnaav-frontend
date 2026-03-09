@@ -1,3 +1,5 @@
+//File: internshipPostRoutes.js
+
 const express = require("express");
 const InternshipPosting = require("../../models/webapp-models/internshipPostModel.js");
 const notifyUser = require("../../utils/notifyUser.js");
@@ -21,9 +23,9 @@ router.get("/", async (req, res) => {
 router.get("/approved", async (req, res) => {
   const isPremiumUser = req.query.isPremium === "true";
   const { sector } = req.query;
-  const page  = parseInt(req.query.page)  || 1;
+  const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 6;
-  const skip  = (page - 1) * limit;
+  const skip = (page - 1) * limit;
 
   try {
     const filter = { deleted: false, adminApproved: true };
@@ -39,7 +41,7 @@ router.get("/approved", async (req, res) => {
       i.internshipType = (i.internshipType || "FREE").toUpperCase();
     });
 
-    const premiumPriority    = { PAID: 3, STIPEND: 2, FREE: 1 };
+    const premiumPriority = { PAID: 3, STIPEND: 2, FREE: 1 };
     const nonPremiumPriority = { FREE: 3, STIPEND: 2, PAID: 1 };
     const priority = isPremiumUser ? premiumPriority : nonPremiumPriority;
 
@@ -82,24 +84,24 @@ router.get("/bin", async (req, res) => {
 router.get("/partner/:partnerId", async (req, res) => {
   try {
     const { partnerId } = req.params;
-    const page           = parseInt(req.query.page)  || 1;
-    const limit          = parseInt(req.query.limit) || 12;
-    const search         = req.query.search          || "";
-    const sortField      = req.query.sort            || "jobTitle";
-    const sortOrder      = req.query.order === "desc" ? -1 : 1;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 12;
+    const search = req.query.search || "";
+    const sortField = req.query.sort || "jobTitle";
+    const sortOrder = req.query.order === "desc" ? -1 : 1;
     const internshipType = req.query.internshipType;
 
     const filter = {
       partnerId,
       ...(internshipType && { internshipType }),
       $or: [
-        { jobTitle:      { $regex: search, $options: "i" } },
-        { companyName:   { $regex: search, $options: "i" } },
-        { organization:  { $regex: search, $options: "i" } },
+        { jobTitle: { $regex: search, $options: "i" } },
+        { companyName: { $regex: search, $options: "i" } },
+        { organization: { $regex: search, $options: "i" } },
       ],
     };
 
-    const total       = await InternshipPosting.countDocuments(filter);
+    const total = await InternshipPosting.countDocuments(filter);
     const internships = await InternshipPosting.find(filter)
       .sort({ [sortField]: sortOrder })
       .skip((page - 1) * limit)
@@ -156,8 +158,8 @@ router.post("/", async (req, res) => {
     const finalMode = (internshipMode || "ONLINE").toUpperCase();
     const finalComp = { type: internshipType };
     if (["PAID", "STIPEND"].includes(internshipType)) {
-      finalComp.amount    = compensationDetails?.amount   ?? 0;
-      finalComp.currency  = compensationDetails?.currency ?? "USD";
+      finalComp.amount = compensationDetails?.amount ?? 0;
+      finalComp.currency = compensationDetails?.currency ?? "USD";
       finalComp.frequency = compensationDetails?.frequency ?? "MONTHLY";
     } else {
       finalComp.amount = 0; finalComp.currency = null; finalComp.frequency = null;
@@ -206,27 +208,27 @@ router.put("/:id", async (req, res) => {
     const updatedInternship = await InternshipPosting.findByIdAndUpdate(
       req.params.id,
       {
-        ...(jobTitle       && { jobTitle }),
-        ...(companyName    && { companyName }),
+        ...(jobTitle && { jobTitle }),
+        ...(companyName && { companyName }),
         ...((location || city || state || country) && {
           location: (location || [city, state, country].filter(Boolean).join(", "))
         }),
-        ...(country        && { country }),
-        ...(state          && { state }),
-        ...(city           && { city }),
+        ...(country && { country }),
+        ...(state && { state }),
+        ...(city && { city }),
         ...(jobDescription && { jobDescription }),
-        ...(startDate      && { startDate }),
+        ...(startDate && { startDate }),
         ...(endDateOrDuration && { endDateOrDuration }),
-        ...(duration       && { duration }),
-        ...(salaryDetails  && { salaryDetails }),
+        ...(duration && { duration }),
+        ...(salaryDetails && { salaryDetails }),
         ...(qualifications && { qualifications }),
-        ...(sector         && { sector }),
+        ...(sector && { sector }),
         ...(classification && { classification }),
-        ...(contactInfo    && { contactInfo }),
-        ...(imgUrl         && { imgUrl }),
+        ...(contactInfo && { contactInfo }),
+        ...(imgUrl && { imgUrl }),
         ...(studentApplied !== undefined && { studentApplied }),
-        ...(adminApproved  !== undefined && { adminApproved }),
-        ...(partnerId      && { partnerId }),
+        ...(adminApproved !== undefined && { adminApproved }),
+        ...(partnerId && { partnerId }),
         ...(applicationOpen !== undefined && { applicationOpen }),
       },
       { new: true }
@@ -275,7 +277,7 @@ router.patch("/:id/reject", async (req, res) => {
     const internship = await InternshipPosting.findById(req.params.id);
     if (!internship) return res.status(404).json({ message: "Internship not found" });
 
-    internship.adminApproved   = false;
+    internship.adminApproved = false;
     internship.rejectionReason = req.body.reason || "";
     await internship.save();
 
