@@ -19,17 +19,39 @@ router.get("/", async (req, res) => {
   }
 });
 
-// ─── GET all approved internships (paginated, sorted, priority-ordered) ───────
+// ─── GET all approved internships (paginated, searchable, sorted, priority-ordered) ───────
 router.get("/approved", async (req, res) => {
   const isPremiumUser = req.query.isPremium === "true";
-  const { sector } = req.query;
-  const page = parseInt(req.query.page) || 1;
+  const { sector, search } = req.query;
+  const page  = parseInt(req.query.page)  || 1;
   const limit = parseInt(req.query.limit) || 6;
-  const skip = (page - 1) * limit;
+  const skip  = (page - 1) * limit;
 
   try {
     const filter = { deleted: false, adminApproved: true };
+
+    // ── Sector filter ────────────────────────────────────────────────────────
     if (sector) filter.sector = sector;
+
+    // ── Search filter (title, company, location, skills, sector) ────────────
+    // Case-insensitive regex across useful text fields so the frontend
+    // search bar works without a separate endpoint.
+    if (search && search.trim()) {
+      const rx = { $regex: search.trim(), $options: "i" };
+      filter.$or = [
+        { jobTitle:    rx },
+        { companyName: rx },
+        { location:    rx },
+        { skills:      rx },
+        { sector:      rx },
+      ];
+    }
+
+    // ── Count BEFORE pagination ──────────────────────────────────────────────
+    // Returning totalCount gives the frontend an exact, stable page count
+    // so pagination never jumps (was the root cause of the "2 → 4 → 2" bug).
+    const totalCount = await InternshipPosting.countDocuments(filter);
+    const totalPages = Math.ceil(totalCount / limit) || 1;
 
     let internships = await InternshipPosting.find(filter)
       .sort({ createdAt: -1 })
@@ -41,7 +63,8 @@ router.get("/approved", async (req, res) => {
       i.internshipType = (i.internshipType || "FREE").toUpperCase();
     });
 
-    const premiumPriority = { PAID: 3, STIPEND: 2, FREE: 1 };
+    // ── Priority sort ────────────────────────────────────────────────────────
+    const premiumPriority    = { PAID: 3, STIPEND: 2, FREE: 1 };
     const nonPremiumPriority = { FREE: 3, STIPEND: 2, PAID: 1 };
     const priority = isPremiumUser ? premiumPriority : nonPremiumPriority;
 
@@ -49,6 +72,7 @@ router.get("/approved", async (req, res) => {
       (a, b) => (priority[b.internshipType] || 0) - (priority[a.internshipType] || 0)
     );
 
+    // ── Light shuffle (20% chance per pair, preserves rough priority order) ──
     for (let i = internships.length - 1; i > 0; i--) {
       if (Math.random() < 0.2) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -56,10 +80,13 @@ router.get("/approved", async (req, res) => {
       }
     }
 
-    const totalCount = await InternshipPosting.countDocuments(filter);
-    const hasMore = skip + internships.length < totalCount;
-
-    res.json({ data: internships, page, hasMore });
+    res.json({
+      data:      internships,
+      page,
+      totalCount,  // ✅ exact count — frontend uses this for stable pagination
+      totalPages,  // ✅ pre-computed — frontend can use either field
+      hasMore:   skip + internships.length < totalCount, // kept for backwards compat
+    });
   } catch (error) {
     console.error("Error fetching approved internships:", error);
     res.status(500).json({ message: "Error fetching approved internships", error: error.message });
@@ -181,7 +208,7 @@ router.post("/", async (req, res) => {
       qualifications, contactInfo, imgUrl, applicationOpen,
       studentApplied: false,
       adminApproved: false,
-      adminReviewed: false,   // ✅ consistent field name
+      adminReviewed: false,
       partnerId,
       deleted: false,
     });
@@ -300,9 +327,6 @@ router.patch("/:id/reject", async (req, res) => {
 });
 
 // ─── POST mark internship as reviewed ────────────────────────────────────────
-// Uses findByIdAndUpdate to avoid Mongoose strict-mode blocking unknown fields.
-// If adminReviewed is missing from your schema, add it as:
-//   adminReviewed: { type: Boolean, default: false }
 router.post("/:id/review", async (req, res) => {
   try {
     const updated = await InternshipPosting.findByIdAndUpdate(
@@ -315,7 +339,6 @@ router.post("/:id/review", async (req, res) => {
       return res.status(404).json({ message: "Internship not found." });
     }
 
-    console.log(`✅ Internship ${req.params.id} marked as reviewed`);
     res.status(200).json({
       message: "Internship marked as reviewed.",
       adminReviewed: updated.adminReviewed,
@@ -343,7 +366,6 @@ router.patch("/:id/restore", async (req, res) => {
 });
 
 // ─── DELETE soft-delete internship ───────────────────────────────────────────
-// NOTE: Only ONE delete route — the duplicate findByIdAndDelete route has been removed.
 router.delete("/:id", async (req, res) => {
   try {
     const { id } = req.params;

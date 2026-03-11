@@ -1,23 +1,15 @@
 /**
  * backend/routes/webapp-routes/Airoutes.js
- *
- * Path map from THIS file:
- *   ../../middleware/authMiddleware   → backend/middleware/authMiddleware.js  ✅
- *   ../../controllers/aiController   → backend/controllers/aiController.js   ✅
- *
- * Add to server.js:
- *   app.use('/api/ai', require('./routes/webapp-routes/Airoutes'));
- *
- * Run once if not already installed:
- *   npm install multer
  */
 
 const express = require('express');
 const multer  = require('multer');
 const router  = express.Router();
 
-// ✅ Destructure so a missing export fails loudly at startup, not silently at runtime
-const { authenticate }      = require('../../middlewares/authMiddleware');
+// authenticate  → Student or Partner  (authMiddleware.js)
+// protectSchool → SchoolAdmin only    (protectSchool.js — already used by schoolAdminRoutes.js)
+const { authenticate }   = require('../../middlewares/authMiddleware');
+const { protectSchool }  = require('../../middlewares/protectSchool');
 const {
   shortlistCandidates,
   getShortlistedByAdmin,
@@ -28,7 +20,6 @@ const {
   assignInstructors,
 } = require('../../controllers/Aicontroller');
 
-// multer: memory storage, PDF/DOCX only, 10MB max
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
@@ -44,11 +35,17 @@ const upload = multer({
 });
 
 // ── Shortlisting ──────────────────────────────────────────────────────────────
-router.post('/partner/shortlist',                authenticate, upload.none(), shortlistCandidates);
-router.get('/partner/shortlisted/by-admin',      authenticate, getShortlistedByAdmin);
-router.get('/partner/shortlisted/:internshipId', authenticate, getShortlisted);
+// Called by Partner dashboard → Partner token → authenticate ✅
+router.post('/partner/shortlist',                authenticate,  upload.none(), shortlistCandidates);
 
-// ── Skill Analysis (Bedrock) ──────────────────────────────────────────────────
+// Called by School Admin dashboard → schoolAdminToken → protectSchool ✅
+// FIXED: was 'authenticate' (Student/Partner only) → 401 NOT_FOUND for SchoolAdmin
+router.get('/partner/shortlisted/by-admin',      protectSchool, getShortlistedByAdmin);
+
+// Called by Partner → authenticate ✅
+router.get('/partner/shortlisted/:internshipId', authenticate,  getShortlisted);
+
+// ── Skill Analysis ────────────────────────────────────────────────────────────
 router.post('/analyze-skills', authenticate, upload.single('file'), analyzeSkills);
 
 // ── Resume + CV ───────────────────────────────────────────────────────────────

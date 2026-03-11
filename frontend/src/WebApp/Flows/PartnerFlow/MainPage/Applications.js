@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -12,6 +12,9 @@ import {
   faCrown,
   faTimes,
   faCalendarAlt,
+  faPaperPlane,
+  faSearch,
+  faBriefcase,
 } from "@fortawesome/free-solid-svg-icons";
 import Modal from "./Modal";
 import ScheduleForm from "./ScheduleForm";
@@ -33,6 +36,7 @@ const InternshipList = () => {
   const [loadingApplications, setLoadingApplications] = useState({});
   const [shortlistedCandidates, setShortlistedCandidates] = useState({});
   const [loadingShortlist, setLoadingShortlist] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
   const [modalData, setModalData] = useState({
     open: false,
     internshipId: null,
@@ -51,6 +55,12 @@ const InternshipList = () => {
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const debounceRef = useRef(null);
 
   // Ref to hold partner ID so pagination buttons can access it without stale closure
   const partnerIdRef = useRef(null);
@@ -66,59 +76,93 @@ const InternshipList = () => {
     internshipId: null,
   });
 
-  // ─── fetchInternships at component scope so pagination can call it ────────
-  const fetchInternships = async (pid, pageNum = 1) => {
-    if (!pid) return;
+  // ─── fetchInternships — useCallback so it's stable across renders ─────────
+  // BUG FIX 1: Was a plain async function defined inside render scope.
+  // That meant every render created a new reference, and pagination buttons
+  // captured stale closures over `page`. Now it's a stable useCallback with
+  // no dependencies (all values are passed as arguments or read from refs).
+const fetchInternships = useCallback(async (pid, pageNum = 1, query = '', isInitialLoad = false) => {
+  if (!pid) return;
 
-    pageNum === 1 ? setLoading(true) : setLoadingMore(true);
+  if (isInitialLoad) {
+    setLoading(true);       // full page spinner — only on first ever load
+  } else {
+    setIsSearching(true);   // subtle inline indicator — search/pagination
+  }
 
+  if (pageNum > 1) setLoadingMore(true);
+  setError(null);
+
+  try {
+    const params = { page: pageNum, limit: 6 };
+    if (query.trim()) params.search = query.trim();
+
+    const response = await axios.get(`/api/interns/partner/${pid}`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      params,
+    });
+
+    const newData = response.data.data || [];
+    const tp = Number(response.data.totalPages) || 1;
+    const tc = Number(response.data.total) || 0;
+
+    setInternships(newData);
+    setPage(pageNum);
+    setTotalPages(tp);
+    setTotalCount(tc);
+    setHasMore(pageNum < tp);
+    setDebouncedQuery(query || '');
+  } catch (err) {
+    console.error("Error fetching internships:", err);
+    if (isInitialLoad || pageNum === 1) {
+      setInternships([]);
+      setError("Failed to load internships. Please try again.");
+    } else {
+      toast.error("Failed to load page. Please try again.");
+    }
+  } finally {
+    setLoading(false);
+    setIsSearching(false);
+    setLoadingMore(false);
+  }
+}, []);
+
+// 3. Pass isInitialLoad=true only from the useEffect (first mount)
+useEffect(() => {
+  const fetchPartnerData = async () => {
     try {
-      const response = await axios.get(`/api/interns/partner/${pid}`, {
+      const response = await axios.get(`/api/partners/profile`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        params: { page: pageNum, limit: 6 },
       });
+      setPartnerData(response.data);
 
-      const newData = response.data.data || [];
-      const tp = response.data.totalPages || 1;
-
-      setInternships(newData);
-      setPage(pageNum);
-      setTotalPages(tp);
-      setHasMore(pageNum < tp);
+      if (response.data?._id) {
+        partnerIdRef.current = response.data._id;
+        fetchInternships(response.data._id, 1, '', true); // ← isInitialLoad = true
+      } else {
+        throw new Error("Partner ID not found in profile");
+      }
     } catch (err) {
-      console.error("Error fetching internships:", err);
-      if (pageNum === 1) setInternships([]);
-    } finally {
+      console.error("Failed to fetch partner data:", err);
+      setError("Unable to load partner profile");
       setLoading(false);
-      setLoadingMore(false);
     }
   };
 
-  useEffect(() => {
-    const fetchPartnerData = async () => {
-      try {
-        const response = await axios.get(`/api/partners/profile`, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        });
-        setPartnerData(response.data);
+  fetchPartnerData();
+}, [fetchInternships]);
 
-        if (response.data?._id) {
-          partnerIdRef.current = response.data._id;
-          fetchInternships(response.data._id, 1);
-        } else {
-          throw new Error("Partner ID not found in profile");
-        }
-      } catch (err) {
-        console.error("Failed to fetch partner data:", err);
-        setError("Unable to load partner profile");
-        setLoading(false);
-      }
-    };
-
-    fetchPartnerData();
-  }, []);
+// 4. handleSearchChange stays the same — just calls fetchInternships normally (isInitialLoad defaults to false)
+const handleSearchChange = (e) => {
+  const q = e.target.value;
+  setSearchQuery(q);
+  clearTimeout(debounceRef.current);
+  debounceRef.current = setTimeout(() => {
+    if (partnerIdRef.current) {
+      fetchInternships(partnerIdRef.current, 1, q); // no isInitialLoad flag
+    }
+  }, 350);
+};
 
   const toggleApplicationOpen = async (internshipId, newStatus) => {
     try {
@@ -136,7 +180,7 @@ const InternshipList = () => {
     } catch (error) {
       console.error("Failed to update application status:", error);
       toast.error("Failed to update application status. Please try again.");
-
+      // Revert optimistic update on failure
       setInternships(prev =>
         prev.map(intern =>
           intern._id === internshipId ? { ...intern, applicationOpen: !newStatus } : intern
@@ -168,7 +212,6 @@ const InternshipList = () => {
 
   const getPricingBucketFromInternship = (internship) => {
     const raw = String(internship?.internshipType || "").trim().toUpperCase();
-
     if (raw === "PAID") return "paid";
     if (raw === "STIPEND") return "stipend";
     return "free";
@@ -248,7 +291,6 @@ const InternshipList = () => {
     } catch (err) {
       console.error("Shortlisting error:", err);
       toast.error("Shortlisting failed. Please try again.");
-      setError(err.message);
     } finally {
       setLoadingShortlist(false);
       setModalData((prev) => ({ ...prev, loading: false }));
@@ -267,9 +309,7 @@ const InternshipList = () => {
     try {
       const { data } = await axios.get(
         `${AI_API}/partner/shortlisted/${internshipId}`,
-        {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        }
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
       );
       setShortlistedCandidates((prev) => ({
         ...prev,
@@ -277,7 +317,6 @@ const InternshipList = () => {
       }));
     } catch (err) {
       toast.error("Failed to load shortlisted candidates.");
-      setError(err.message);
     } finally {
       setLoadingShortlist(false);
       setModalData((prev) => ({ ...prev, loading: false }));
@@ -297,10 +336,14 @@ const InternshipList = () => {
         return updated;
       });
     } catch (err) {
-      setError(err.message);
+      toast.error("Failed to update application status.");
     }
   };
 
+  // BUG FIX 3: handleSendOffer set state but there was no modal/UI rendering
+  // the offer form. The selectedStudent state was set but never displayed,
+  // so partners could never actually send offers. Added an "offerModal" state
+  // and a dedicated modal below to render the form.
   const handleSendOffer = (student) => {
     const internship = internships.find(i => i._id === modalData.internshipId);
     setSelectedStudent({ ...student, internship_id: modalData.internshipId });
@@ -315,9 +358,7 @@ const InternshipList = () => {
       .get(`/api/templates?partnerId=${partnerData?._id}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
-      .then((res) => {
-        setTemplates(res.data);
-      })
+      .then((res) => setTemplates(res.data))
       .catch(err => {
         console.error("Error fetching templates:", err);
         toast.error("Failed to load templates");
@@ -356,19 +397,13 @@ const InternshipList = () => {
           : (typeof internship?.qualifications === 'string'
             ? internship.qualifications.match(/[A-Z]?[a-z]+/g)
             : []),
-        contactInfo: {
-          name: "HR Manager",
-          email: "hr@company.com",
-          phone: "9876543210",
-        },
+        contactInfo: { name: "HR Manager", email: "hr@company.com", phone: "9876543210" },
         noticePeriod: "2 weeks",
         schoolAdminId: schoolAdminId || null,
       };
 
       await axios.post(`/api/offer-letters`, payload, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
 
       toast.success("Offer sent successfully!");
@@ -386,13 +421,11 @@ const InternshipList = () => {
       toast.error(`Please upgrade to Premium Plus to schedule interviews`);
       return;
     }
-
     setSelectedInternshipForSchedule({
       _id: internship._id,
       internshipMode: internship.internshipMode || "",
       pricingBucket: getPricingBucketFromInternship(internship),
     });
-
     setScheduleFormOpen(true);
   };
 
@@ -424,7 +457,6 @@ const InternshipList = () => {
 
       toast.success("Schedule closed permanently!");
       setConfirmCloseOpen(false);
-
       setInternships(prev =>
         prev.map(i => i._id === internshipId ? { ...i, isScheduleClosed: true } : i)
       );
@@ -484,12 +516,13 @@ const InternshipList = () => {
           Internships Posted by Partner
         </h2>
         {partnerData && (
-          <div className={`px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 ${partnerData.isPremium
-            ? partnerData.planType === "Premium Plus"
-              ? "bg-purple-100 text-purple-800"
-              : "bg-blue-100 text-blue-800"
-            : "bg-gray-100 text-gray-800"
-            }`}>
+          <div className={`px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 ${
+            partnerData.isPremium
+              ? partnerData.planType === "Premium Plus"
+                ? "bg-purple-100 text-purple-800"
+                : "bg-blue-100 text-blue-800"
+              : "bg-gray-100 text-gray-800"
+          }`}>
             {partnerData.isPremium && (
               <FontAwesomeIcon icon={faCrown} className={
                 partnerData.planType === "Premium Plus" ? "text-purple-500" : "text-blue-500"
@@ -505,6 +538,68 @@ const InternshipList = () => {
             )}
           </div>
         )}
+      </div>
+
+      {/* ─── Search bar + count strip ─────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6 p-4 bg-gray-50 rounded-xl border border-gray-100">
+        {/* Search input */}
+        <div className="relative flex-1">
+  <FontAwesomeIcon
+    icon={faSearch}
+    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none"
+  />
+  <input
+    type="text"
+    value={searchQuery}
+    onChange={handleSearchChange}
+    placeholder="Search by title, company, location…"
+    className="w-full pl-9 pr-9 py-2.5 text-sm rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent bg-white placeholder-gray-400 transition"
+  />
+  {/* Inline search spinner — doesn't unmount anything */}
+  {isSearching && (
+    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+      <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+    </div>
+  )}
+  {!isSearching && searchQuery && (
+    <button
+      onClick={() => {
+        setSearchQuery('');
+        clearTimeout(debounceRef.current);
+        if (partnerIdRef.current) fetchInternships(partnerIdRef.current, 1, '');
+      }}
+      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition"
+      title="Clear search"
+    >
+      <FontAwesomeIcon icon={faTimes} className="text-xs" />
+    </button>
+  )}
+</div>
+
+        {/* Count badge */}
+        <div className="flex items-center gap-2 shrink-0">
+          <FontAwesomeIcon icon={faBriefcase} className="text-blue-400 text-sm" />
+          {loading ? (
+            <span className="inline-block w-28 h-4 bg-gray-200 rounded animate-pulse" />
+          ) : (
+            <span className="text-sm text-gray-600">
+              {totalCount > 0 ? (
+                <>
+                  <span className="font-semibold text-gray-800">{totalCount}</span>
+                  {" internship"}{totalCount !== 1 ? "s" : ""}
+                  {debouncedQuery && <span className="text-gray-400"> for "<em>{debouncedQuery}</em>"</span>}
+                  {totalPages > 1 && (
+                    <span className="ml-2 text-gray-400 text-xs">· Page {page} of {totalPages}</span>
+                  )}
+                </>
+              ) : debouncedQuery ? (
+                <span className="text-gray-400">No results for "<em>{debouncedQuery}</em>"</span>
+              ) : (
+                <span className="text-gray-400">No internships posted yet</span>
+              )}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* ─── Internship Cards ─────────────────────────────────────────────── */}
@@ -589,8 +684,9 @@ const InternshipList = () => {
                   <button
                     onClick={() => fetchApplications(internship._id)}
                     disabled={loadingApplications[internship._id]}
-                    className={`flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:from-blue-600 hover:to-indigo-700 transform hover:scale-105 transition duration-200 ${loadingApplications[internship._id] ? "opacity-50 cursor-not-allowed" : ""
-                      }`}
+                    className={`flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:from-blue-600 hover:to-indigo-700 transform hover:scale-105 transition duration-200 ${
+                      loadingApplications[internship._id] ? "opacity-50 cursor-not-allowed" : ""
+                    }`}
                   >
                     {loadingApplications[internship._id] ? "Loading..." : (
                       <><FontAwesomeIcon icon={faEye} /> View Applications</>
@@ -604,8 +700,9 @@ const InternshipList = () => {
                   <button
                     onClick={() => handleShortlist(internship._id, internship.jobDescription, internship.qualifications || [])}
                     disabled={loadingShortlist}
-                    className={`flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-green-400 to-teal-500 text-white font-semibold rounded-lg shadow-lg hover:from-green-500 hover:to-teal-600 transform hover:scale-105 transition duration-200 ${loadingShortlist ? "opacity-50 cursor-not-allowed" : ""
-                      }`}
+                    className={`flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-green-400 to-teal-500 text-white font-semibold rounded-lg shadow-lg hover:from-green-500 hover:to-teal-600 transform hover:scale-105 transition duration-200 ${
+                      loadingShortlist ? "opacity-50 cursor-not-allowed" : ""
+                    }`}
                   >
                     {loadingShortlist ? "Shortlisting..." : (
                       <><FontAwesomeIcon icon={faStar} /> Shortlist</>
@@ -619,8 +716,9 @@ const InternshipList = () => {
                   <button
                     onClick={() => showShortlisted(internship._id)}
                     disabled={loadingShortlist}
-                    className={`flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:from-purple-600 hover:to-indigo-700 transform hover:scale-105 transition duration-200 ${loadingShortlist ? "opacity-50 cursor-not-allowed" : ""
-                      }`}
+                    className={`flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:from-purple-600 hover:to-indigo-700 transform hover:scale-105 transition duration-200 ${
+                      loadingShortlist ? "opacity-50 cursor-not-allowed" : ""
+                    }`}
                   >
                     {loadingShortlist ? "Loading..." : (
                       <><FontAwesomeIcon icon={faDownload} /> Shortlisted Resumes</>
@@ -682,33 +780,31 @@ const InternshipList = () => {
       {/* ─── Pagination ───────────────────────────────────────────────────── */}
       {totalPages > 1 && (
         <div className="flex justify-center items-center gap-2 mt-8 flex-wrap">
-          {/* Prev button */}
           <button
-            onClick={() => fetchInternships(partnerIdRef.current, page - 1)}
+            onClick={() => fetchInternships(partnerIdRef.current, page - 1, debouncedQuery)}
             disabled={page === 1 || loadingMore}
             className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 font-medium hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition"
           >
             ← Prev
           </button>
 
-          {/* Page number buttons */}
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
             <button
               key={pageNum}
-              onClick={() => fetchInternships(partnerIdRef.current, pageNum)}
+              onClick={() => fetchInternships(partnerIdRef.current, pageNum, debouncedQuery)}
               disabled={loadingMore}
-              className={`px-4 py-2 rounded-lg font-semibold transition ${pageNum === page
-                ? "bg-blue-600 text-white shadow"
-                : "border border-gray-300 text-gray-700 hover:bg-gray-100"
-                }`}
+              className={`px-4 py-2 rounded-lg font-semibold transition ${
+                pageNum === page
+                  ? "bg-blue-600 text-white shadow"
+                  : "border border-gray-300 text-gray-700 hover:bg-gray-100"
+              }`}
             >
               {pageNum}
             </button>
           ))}
 
-          {/* Next button */}
           <button
-            onClick={() => fetchInternships(partnerIdRef.current, page + 1)}
+            onClick={() => fetchInternships(partnerIdRef.current, page + 1, debouncedQuery)}
             disabled={!hasMore || loadingMore}
             className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 font-medium hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition"
           >
@@ -717,7 +813,7 @@ const InternshipList = () => {
         </div>
       )}
 
-      {/* ─── Modals ───────────────────────────────────────────────────────── */}
+      {/* ─── Applications / Shortlisted Modal ────────────────────────────── */}
       <Modal
         isOpen={modalData.open}
         onClose={closeModal}
@@ -728,22 +824,96 @@ const InternshipList = () => {
           (applications[modalData.internshipId] || []).length === 0
             ? <p className="p-6 text-center text-gray-600">No applications yet.</p>
             : <ApplicationsTable
-              applications={applications[modalData.internshipId]}
-              onStatusUpdate={updateApplicationStatus}
-            />
+                applications={applications[modalData.internshipId]}
+                onStatusUpdate={updateApplicationStatus}
+              />
         )}
 
         {modalData.type === "shortlisted" && !modalData.loading && (
           (shortlistedCandidates[modalData.internshipId] || []).length === 0
             ? <p className="p-6 text-center text-gray-600">No candidates shortlisted yet.</p>
             : <ShortlistedTable
-              candidates={shortlistedCandidates[modalData.internshipId]}
-              internshipId={modalData.internshipId}
-              onSendOffer={handleSendOffer}
-            />
+                candidates={shortlistedCandidates[modalData.internshipId]}
+                internshipId={modalData.internshipId}
+                onSendOffer={handleSendOffer}
+              />
         )}
       </Modal>
 
+      {/* ─── BUG FIX 3: Offer Letter Modal ───────────────────────────────── */}
+      {/* This modal was completely missing. handleSendOffer() set selectedStudent
+          state but nothing rendered it, so partners could never actually send
+          offer letters. This modal wires up the form. */}
+      <Modal
+        isOpen={!!selectedStudent}
+        onClose={() => setSelectedStudent(null)}
+        title={`Send Offer Letter to ${selectedStudent?.name || ""}`}
+      >
+        {selectedStudent && (
+          <div className="p-6 space-y-4">
+            <div>
+              <p className="text-sm text-gray-500 mb-1">Candidate</p>
+              <p className="font-medium text-gray-800">{selectedStudent.name}</p>
+              <p className="text-sm text-gray-500">{selectedStudent.email}</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Select Template <span className="text-red-500">*</span>
+              </label>
+              {templates.length === 0 ? (
+                <p className="text-sm text-amber-600">
+                  No templates found. Please create a template first.
+                </p>
+              ) : (
+                <select
+                  value={templateId}
+                  onChange={(e) => setTemplateId(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                >
+                  <option value="">-- Choose a template --</option>
+                  {templates.map((t) => (
+                    <option key={t._id} value={t._id}>
+                      {t.name || t.title || t._id}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Joining Date <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                value={joiningDate}
+                onChange={(e) => setJoiningDate(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => setSelectedStudent(null)}
+                className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSendOfferLetter}
+                disabled={sendingOffer || !templateId || !joiningDate}
+                className="flex items-center gap-2 px-5 py-2 text-sm bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-semibold rounded-lg shadow hover:from-blue-600 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              >
+                <FontAwesomeIcon icon={faPaperPlane} />
+                {sendingOffer ? "Sending..." : "Send Offer"}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* ─── Schedule Form Modal ──────────────────────────────────────────── */}
       <Modal
         isOpen={scheduleFormOpen}
         onClose={() => {
@@ -765,6 +935,7 @@ const InternshipList = () => {
         )}
       </Modal>
 
+      {/* ─── Time Slots Modal ─────────────────────────────────────────────── */}
       <Modal
         isOpen={timeSlotsModal.open}
         onClose={() => setTimeSlotsModal({ open: false, internshipId: null })}

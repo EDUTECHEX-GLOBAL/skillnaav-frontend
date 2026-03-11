@@ -85,19 +85,40 @@ const EmptyRow = ({ text, onAdd }) => (
 );
 
 // ── Completion ring ───────────────────────────────────────────────────────────
-const Ring = ({ score }) => {
-  const r = 32, circ = 2 * Math.PI * r;
+const Ring = ({ score, profileImage }) => {
+  const size = 88;
+  const r = 38;
+  const circ = 2 * Math.PI * r;
   const offset = circ - (score / 100) * circ;
   const color = score >= 75 ? "#16a34a" : score >= 45 ? "#d97706" : "#dc2626";
+  const labelColor = score >= 75 ? "text-green-600" : score >= 45 ? "text-amber-600" : "text-red-500";
+
   return (
-    <div className="relative inline-flex items-center justify-center">
-      <svg width="80" height="80" className="-rotate-90">
-        <circle cx="40" cy="40" r={r} fill="none" stroke="#f1f5f9" strokeWidth="7" />
-        <circle cx="40" cy="40" r={r} fill="none" stroke={color} strokeWidth="7"
-          strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
-          style={{ transition: "stroke-dashoffset 0.7s ease" }} />
-      </svg>
-      <span className="absolute font-bold text-base" style={{ color }}>{score}%</span>
+    <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
+      {/* Ring + photo */}
+      <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>
+        <svg width={size} height={size} className="-rotate-90" style={{ position: "absolute", top: 0, left: 0 }}>
+          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#f1f5f9" strokeWidth="7" />
+          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth="7"
+            strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
+            style={{ transition: "stroke-dashoffset 0.7s ease" }} />
+        </svg>
+        {/* Profile photo or fallback avatar — fills the inside of the ring */}
+        <div className="rounded-full overflow-hidden bg-gray-100 border-2 border-white shadow-sm"
+          style={{ width: size - 18, height: size - 18 }}>
+          {profileImage ? (
+            <img src={profileImage} alt="Profile" className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-100 to-indigo-200">
+              <svg className="w-8 h-8 text-indigo-400" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z" />
+              </svg>
+            </div>
+          )}
+        </div>
+      </div>
+      {/* Percentage below the ring */}
+      <span className={`text-sm font-bold ${labelColor}`}>{score}%</span>
     </div>
   );
 };
@@ -285,7 +306,7 @@ const SmartProfile = () => {
       {/* ── Profile Completion Card ─────────────────────────────────────────── */}
       <Card>
         <div className="p-5 flex items-center gap-5">
-          <Ring score={data?.profileCompletionScore || 0} />
+          <Ring score={data?.profileCompletionScore || 0} profileImage={data?.profileImage} />
           <div className="flex-1">
             <p className="font-semibold text-gray-800">Profile Strength</p>
             <p className="text-gray-500 text-sm mt-0.5">
@@ -650,46 +671,3 @@ const EditModal = ({ modal, onSave, onClose, saving }) => {
 };
 
 export default SmartProfile;
-
-/*
-═══════════════════════════════════════════════════════════════════════════════
-HOW TO INTEGRATE WITH EXISTING ProfileForm.jsx
-═══════════════════════════════════════════════════════════════════════════════
-
-OPTION A — Tab-based layout in your route/page:
-
-  import ProfileForm from "./ProfileForm";
-  import SmartProfile from "./SmartProfile";
-
-  const ProfilePage = () => {
-    const [tab, setTab] = useState("basic");
-    return (
-      <div>
-        <div className="flex gap-2 mb-4">
-          <button onClick={() => setTab("basic")}   className={tab==="basic"   ? "active" : ""}>Basic Info</button>
-          <button onClick={() => setTab("career")}  className={tab==="career"  ? "active" : ""}>Career Portfolio</button>
-        </div>
-        {tab === "basic"  && <ProfileForm />}
-        {tab === "career" && <SmartProfile />}
-      </div>
-    );
-  };
-
-OPTION B — Stack them vertically:
-
-  const ProfilePage = () => (
-    <>
-      <ProfileForm />
-      <SmartProfile />
-    </>
-  );
-
-═══════════════════════════════════════════════════════════════════════════════
-API ROUTES TO REGISTER IN server.js:
-═══════════════════════════════════════════════════════════════════════════════
-
-  const studentProfileRoutes = require("./routes/webapp-routes/studentProfileRoutes");
-  app.use("/api/student-profile", studentProfileRoutes);
-
-═══════════════════════════════════════════════════════════════════════════════
-*/

@@ -111,6 +111,21 @@ const sendOfferLetter = async (req, res) => {
     const fileName = `offer-${studentId}-${Date.now()}.pdf`;
     const s3Url = await uploadOfferLetterBuffer(pdfBuffer, fileName);
 
+    // Resolve schoolAdminId: prefer the one from req.body, fall back to the
+    // internship's own schoolAdmin field so it's never stored as null.
+    let resolvedSchoolAdminId = null;
+    if (schoolAdminId && mongoose.Types.ObjectId.isValid(schoolAdminId)) {
+      resolvedSchoolAdminId = new mongoose.Types.ObjectId(schoolAdminId);
+    } else {
+      // Fallback: fetch from the internship document itself
+      const internshipDoc = await Internship.findById(internshipObjId).select('schoolAdmin').lean();
+      const fallback = internshipDoc?.schoolAdmin;
+      if (fallback && mongoose.Types.ObjectId.isValid(String(fallback))) {
+        resolvedSchoolAdminId = new mongoose.Types.ObjectId(String(fallback));
+        console.log(`[offerLetter] schoolAdminId missing in request — resolved from internship: ${resolvedSchoolAdminId}`);
+      }
+    }
+
     const offerDoc = {
       studentId: studentObjId,
       internshipId: internshipObjId,
@@ -123,9 +138,7 @@ const sendOfferLetter = async (req, res) => {
       status: 'Sent',
       s3Url,
       qualifications: qualifications || [],
-      schoolAdminId: schoolAdminId && mongoose.Types.ObjectId.isValid(schoolAdminId)
-        ? new mongoose.Types.ObjectId(schoolAdminId)
-        : null
+      schoolAdminId: resolvedSchoolAdminId,
     };
 
     const offerLetter = await OfferLetter.create(offerDoc);
@@ -332,17 +345,50 @@ const updateOfferStatus = async (req, res) => {
 };
 
 const getOffersByInternship = async (req, res) => {
-  const { internshipId } = req.params;
-  const { schoolAdminId } = req.query;
+  try {
+    const { internshipId } = req.params;
+    const { schoolAdminId } = req.query;
 
-  const query = { internshipId: new mongoose.Types.ObjectId(internshipId) };
+    if (!mongoose.Types.ObjectId.isValid(internshipId)) {
+      return res.status(400).json({ error: 'Invalid internship ID' });
+    }
 
-  if (schoolAdminId && mongoose.Types.ObjectId.isValid(schoolAdminId)) {
-    query.schoolAdminId = new mongoose.Types.ObjectId(schoolAdminId);
+    const internshipObjId = new mongoose.Types.ObjectId(internshipId);
+    let query;
+
+    if (schoolAdminId && mongoose.Types.ObjectId.isValid(schoolAdminId)) {
+      const adminObjId = new mongoose.Types.ObjectId(schoolAdminId);
+
+      // Return offers that belong to this schoolAdmin OR have schoolAdminId: null
+      // (legacy records created before schoolAdminId tracking was added)
+      query = {
+        internshipId: internshipObjId,
+        $or: [
+          { schoolAdminId: adminObjId },
+          { schoolAdminId: null },
+          { schoolAdminId: { $exists: false } },
+        ],
+      };
+
+      // Silently backfill null records so future queries become exact-match
+      OfferLetter.updateMany(
+        {
+          internshipId: internshipObjId,
+          $or: [{ schoolAdminId: null }, { schoolAdminId: { $exists: false } }],
+        },
+        { $set: { schoolAdminId: adminObjId } }
+      ).catch(err => console.error('[offerLetter] schoolAdminId backfill error:', err));
+
+    } else {
+      query = { internshipId: internshipObjId };
+    }
+
+    const offers = await OfferLetter.find(query);
+    return res.status(200).json({ offers });
+  } catch (err) {
+    console.error('getOffersByInternship error:', err);
+    return res.status(500).json({ error: err.message });
   }
-
-  const offers = await OfferLetter.find(query);
-  return res.status(200).json({ offers });
 };
 
 // Add this function to your offerLetterController.js

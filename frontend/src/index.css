@@ -1,11 +1,15 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* ── Font imports MUST come before @tailwind directives ─────────────────────── */
 @import "@fontsource/inter/400.css";
 @import "@fontsource/inter/600.css";
 @import "@fontsource/inter/700.css";
 
-/* input */
+/* Poppins is loaded via Google Fonts in public/index.html — see instructions below */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Global input / textarea defaults ───────────────────────────────────────── */
 input,
 textarea {
   height: 40px;
@@ -19,26 +23,25 @@ input:focus {
   outline: none;
   border: 2px solid rgb(86, 65, 65);
 }
+
 textarea {
   height: 100px;
   padding: 10px;
 }
 
-/* ── custom utility ─────────────────────────────────────────── */
+/* ── Scrollbar utilities ─────────────────────────────────────────────────────── */
 @layer utilities {
   .scrollbar-none {
-    /* Firefox / IE / Edge */
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
   .scrollbar-none::-webkit-scrollbar {
-    /* Chrome / Safari / Opera */
     width: 0 !important;
     height: 0 !important;
     background: transparent;
   }
 }
-/* index.css */
+
 .hide-scrollbar::-webkit-scrollbar {
   display: none;
 }
@@ -46,6 +49,8 @@ textarea {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* ── Toast z-index ───────────────────────────────────────────────────────────── */
 .Toastify__toast-container {
   z-index: 99999 !important;
 }
