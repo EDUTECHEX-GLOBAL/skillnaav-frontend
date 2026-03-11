@@ -9,6 +9,9 @@ const Application = require("../../models/webapp-models/applicationModel.js");
 const SavedJob = require("../../models/webapp-models/SavedJobModel.js");
 const Partner = require("../../models/webapp-models/partnerModel.js");
 
+const escapeRegex = (value = "") =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 // ─── GET all internship postings (excluding deleted) ──────────────────────────
 router.get("/", async (req, res) => {
   try {
@@ -23,9 +26,9 @@ router.get("/", async (req, res) => {
 router.get("/approved", async (req, res) => {
   const isPremiumUser = req.query.isPremium === "true";
   const { sector, search } = req.query;
-  const page  = parseInt(req.query.page)  || 1;
+  const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 6;
-  const skip  = (page - 1) * limit;
+  const skip = (page - 1) * limit;
 
   try {
     const filter = { deleted: false, adminApproved: true };
@@ -39,11 +42,11 @@ router.get("/approved", async (req, res) => {
     if (search && search.trim()) {
       const rx = { $regex: search.trim(), $options: "i" };
       filter.$or = [
-        { jobTitle:    rx },
+        { jobTitle: rx },
         { companyName: rx },
-        { location:    rx },
-        { skills:      rx },
-        { sector:      rx },
+        { location: rx },
+        { skills: rx },
+        { sector: rx },
       ];
     }
 
@@ -64,7 +67,7 @@ router.get("/approved", async (req, res) => {
     });
 
     // ── Priority sort ────────────────────────────────────────────────────────
-    const premiumPriority    = { PAID: 3, STIPEND: 2, FREE: 1 };
+    const premiumPriority = { PAID: 3, STIPEND: 2, FREE: 1 };
     const nonPremiumPriority = { FREE: 3, STIPEND: 2, PAID: 1 };
     const priority = isPremiumUser ? premiumPriority : nonPremiumPriority;
 
@@ -81,11 +84,11 @@ router.get("/approved", async (req, res) => {
     }
 
     res.json({
-      data:      internships,
+      data: internships,
       page,
       totalCount,  // ✅ exact count — frontend uses this for stable pagination
       totalPages,  // ✅ pre-computed — frontend can use either field
-      hasMore:   skip + internships.length < totalCount, // kept for backwards compat
+      hasMore: skip + internships.length < totalCount, // kept for backwards compat
     });
   } catch (error) {
     console.error("Error fetching approved internships:", error);
@@ -113,23 +116,77 @@ router.get("/partner/:partnerId", async (req, res) => {
     const { partnerId } = req.params;
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 12;
-    const search = req.query.search || "";
+    const search = (req.query.search || "").trim();
+    const escapedSearch = escapeRegex(search);
     const sortField = req.query.sort || "jobTitle";
     const sortOrder = req.query.order === "desc" ? -1 : 1;
     const internshipType = req.query.internshipType;
 
-    const filter = {
+    const baseQuery = {
       partnerId,
       ...(internshipType && { internshipType }),
-      $or: [
-        { jobTitle: { $regex: search, $options: "i" } },
-        { companyName: { $regex: search, $options: "i" } },
-        { organization: { $regex: search, $options: "i" } },
-      ],
     };
 
-    const total = await InternshipPosting.countDocuments(filter);
-    const internships = await InternshipPosting.find(filter)
+    const searchFilter = escapedSearch
+      ? {
+        $or: [
+          { jobTitle: { $regex: escapedSearch, $options: "i" } },
+          { companyName: { $regex: escapedSearch, $options: "i" } },
+          { location: { $regex: escapedSearch, $options: "i" } },
+          { country: { $regex: escapedSearch, $options: "i" } },
+          { state: { $regex: escapedSearch, $options: "i" } },
+          { city: { $regex: escapedSearch, $options: "i" } },
+          { jobDescription: { $regex: escapedSearch, $options: "i" } },
+          { endDateOrDuration: { $regex: escapedSearch, $options: "i" } },
+          { duration: { $regex: escapedSearch, $options: "i" } },
+          { sector: { $regex: escapedSearch, $options: "i" } },
+          { internshipType: { $regex: escapedSearch, $options: "i" } },
+          { internshipMode: { $regex: escapedSearch, $options: "i" } },
+          { classification: { $regex: escapedSearch, $options: "i" } },
+          { qualifications: { $regex: escapedSearch, $options: "i" } },
+          { "contactInfo.name": { $regex: escapedSearch, $options: "i" } },
+          { "contactInfo.email": { $regex: escapedSearch, $options: "i" } },
+          { "contactInfo.phone": { $regex: escapedSearch, $options: "i" } },
+          { "compensationDetails.type": { $regex: escapedSearch, $options: "i" } },
+          { "compensationDetails.currency": { $regex: escapedSearch, $options: "i" } },
+          { "compensationDetails.frequency": { $regex: escapedSearch, $options: "i" } },
+          { "compensationDetails.benefits": { $regex: escapedSearch, $options: "i" } },
+          { "compensationDetails.additionalCosts.description": { $regex: escapedSearch, $options: "i" } },
+          {
+            $expr: {
+              $regexMatch: {
+                input: {
+                  $dateToString: {
+                    format: "%Y-%m-%d",
+                    date: "$startDate",
+                  },
+                },
+                regex: escapedSearch,
+                options: "i",
+              },
+            },
+          },
+          {
+            $expr: {
+              $regexMatch: {
+                input: {
+                  $ifNull: [{ $toString: "$compensationDetails.amount" }, ""],
+                },
+                regex: escapedSearch,
+                options: "i",
+              },
+            },
+          },
+        ],
+      }
+      : {};
+
+    const finalQuery = escapedSearch
+      ? { $and: [baseQuery, searchFilter] }
+      : baseQuery;
+
+    const total = await InternshipPosting.countDocuments(finalQuery);
+    const internships = await InternshipPosting.find(finalQuery)
       .sort({ [sortField]: sortOrder })
       .skip((page - 1) * limit)
       .limit(limit);
