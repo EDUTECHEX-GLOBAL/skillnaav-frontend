@@ -6,10 +6,11 @@ import Profile from "./Profile";
 import Support from "./Support";
 import YourJobPosts from "./YourJobPosts";
 import PostAJob from "./PostAJob";
-import PartnerPremiumPage from "./PartnerPremiumPage"; // Import the PartnerPremiumPage component
-import OfferTemplateManager from "./OfferTemplateManager"; // Import the OfferTemplateManager component
-import StipendDetails from "./StipendDetails"; // Import the StipendDetails component
+import PartnerPremiumPage from "./PartnerPremiumPage";
+import OfferTemplateManager from "./OfferTemplateManager";
+import StipendDetails from "./StipendDetails";
 import InstructureManagement from "./InstructureManagement";
+import InternshipPayments from "./InternshipPayments"; // ✅ New
 
 const BodyContent = () => {
   const { selectedTab } = useTabContext();
@@ -45,7 +46,11 @@ const BodyContent = () => {
       content = <OfferTemplateManager />;
       break;
     case "stipend-details":
-      content = <StipendDetails />; // Render the StipendDetails component
+      content = <StipendDetails />;
+      break;
+    // ✅ New — Payments received for paid internships
+    case "internship-payments":
+      content = <InternshipPayments />;
       break;
     case "logout":
       content = <div>You have been logged out. Please log in again.</div>;
@@ -56,15 +61,10 @@ const BodyContent = () => {
 
   return (
     <div className="flex flex-col lg:flex-row p-4 flex-1">
-      {/* Desktop View - Flex layout */}
-      <div className="lg:flex-1 hidden lg:block">
-        {content}
-      </div>
-
-      {/* Mobile View - Full screen layout */}
-      <div className="lg:hidden flex-1">
-        {content}
-      </div>
+      {/* Desktop */}
+      <div className="lg:flex-1 hidden lg:block">{content}</div>
+      {/* Mobile */}
+      <div className="lg:hidden flex-1">{content}</div>
     </div>
   );
 };

@@ -10,12 +10,12 @@ import {
   faFileAlt,
   faMoneyBillWave,
   faUsers,
+  faFileInvoiceDollar, // ✅ New — for Internship Payments tab
 } from "@fortawesome/free-solid-svg-icons";
 import { useTabContext } from "./UserHomePageContext/HomePageContext";
 import { useNavigate } from "react-router-dom";
 import { useFeedback } from "../../../../context/FeedbackContext";
 import { partnerFlowQuestions } from "../../../../components/FeedbackModal/questionSets";
-
 import axios from "axios";
 
 const Sidebar = ({ isOpen, onClose }) => {
@@ -23,18 +23,12 @@ const Sidebar = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
   const [selectedTab, setSelectedTab] = React.useState("your-job-posts");
 
-  // Feedback context (partner flow)
   const { openFeedback } = useFeedback();
 
-  // performLogout declared first (avoids TDZ)
   const performLogout = async () => {
     const sessionId = localStorage.getItem("sessionId");
     const token = (() => {
-      try {
-        return JSON.parse(localStorage.getItem("userToken"));
-      } catch {
-        return null;
-      }
+      try { return JSON.parse(localStorage.getItem("userToken")); } catch { return null; }
     })();
 
     if (sessionId && token) {
@@ -46,7 +40,6 @@ const Sidebar = ({ isOpen, onClose }) => {
         );
       } catch (err) {
         console.warn("Logout session API failed:", err?.response?.data || err?.message || err);
-        // continue with client-side cleanup
       }
     }
 
@@ -54,10 +47,9 @@ const Sidebar = ({ isOpen, onClose }) => {
       localStorage.removeItem("sessionId");
       localStorage.removeItem("userToken");
       localStorage.removeItem("userInfo");
-      localStorage.removeItem("token"); // in case partner login saved `token`
+      localStorage.removeItem("token");
       localStorage.removeItem("partnerId");
       localStorage.removeItem("adminApproved");
-      // keep other app-wide keys intact
     } catch (err) {
       console.warn("LocalStorage cleanup error:", err);
     }
@@ -65,57 +57,48 @@ const Sidebar = ({ isOpen, onClose }) => {
     navigate("/partner/login");
   };
 
-  // logout flow with 1-minute gating + feedback check (partner)
- // make sure partnerFlowQuestions is imported at top
-const handleLogoutTrigger = async () => {
-  // --- NEW: enforce 1 minute since login before showing feedback modal ---
-  const loginTime = Number(localStorage.getItem("loginTime"));
-  const oneMinutePassed = !isNaN(loginTime) && (Date.now() - loginTime >= 60000);
+  const handleLogoutTrigger = async () => {
+    const loginTime = Number(localStorage.getItem("loginTime"));
+    const oneMinutePassed = !isNaN(loginTime) && (Date.now() - loginTime >= 60000);
 
-  if (!oneMinutePassed) {
-    // Less than 1 minute since login → skip feedback and logout immediately
-    return performLogout();
-  }
-  // --- END login gating ---
+    if (!oneMinutePassed) {
+      return performLogout();
+    }
 
-  const sessionUser = JSON.parse(localStorage.getItem("userInfo")) || null;
-  const userId = sessionUser?._id;
+    const sessionUser = JSON.parse(localStorage.getItem("userInfo")) || null;
+    const userId = sessionUser?._id;
 
-  // If userId missing, open feedback with null user and perform logout in callback
-  if (!userId) {
+    if (!userId) {
+      openFeedback({
+        flow: "partner",
+        questions: partnerFlowQuestions,
+        triggerInfo: { type: "logout", page: window.location.pathname },
+        user: null,
+        postSubmitCallback: () => performLogout(),
+      });
+      return;
+    }
+
+    try {
+      const resp = await axios.get("/api/feedback/check", {
+        params: { userId, flow: "partner" },
+      });
+      if (resp.data?.alreadySubmitted) {
+        performLogout();
+        return;
+      }
+    } catch (err) {
+      console.warn("Feedback check failed, opening modal");
+    }
+
     openFeedback({
       flow: "partner",
       questions: partnerFlowQuestions,
       triggerInfo: { type: "logout", page: window.location.pathname },
-      user: null,
+      user: sessionUser,
       postSubmitCallback: () => performLogout(),
     });
-    return;
-  }
-
-  try {
-    const resp = await axios.get("/api/feedback/check", {
-      params: { userId, flow: "partner" },
-    });
-
-    if (resp.data?.alreadySubmitted) {
-      performLogout();
-      return;
-    }
-  } catch (err) {
-    console.warn("Feedback check failed, opening modal");
-  }
-
-  openFeedback({
-    flow: "partner",
-    questions: partnerFlowQuestions,
-    triggerInfo: { type: "logout", page: window.location.pathname },
-    user: sessionUser,
-    postSubmitCallback: () => performLogout(),
-  });
-};
-
-
+  };
 
   const handleTabClick = (tab) => {
     if (tab === "logout") {
@@ -127,16 +110,17 @@ const handleLogoutTrigger = async () => {
     }
   };
 
-  // ✅ Added new sidebar menu item for stipend details
   const menuItems = [
-    { id: "your-job-posts", label: "Internship Posts", icon: faBriefcase },
-    { id: "post-a-job", label: "Post An Internship", icon: faPlus },
-    { id: "messages", label: "Messages", icon: faEnvelope },
-    { id: "applications", label: "Applications", icon: faFileAlt },
-    { id: "instructors", label: "Instructor Management", icon: faUsers },
-    { id: "offer-templates", label: "Offer Templates", icon: faFileAlt },
-    { id: "stipend-details", label: "Stipend Details", icon: faMoneyBillWave },
-    { id: "profile", label: "Profile", icon: faUser },
+    { id: "your-job-posts",        label: "Internship Posts",     icon: faBriefcase         },
+    { id: "post-a-job",            label: "Post An Internship",   icon: faPlus              },
+    { id: "messages",              label: "Messages",             icon: faEnvelope          },
+    { id: "applications",          label: "Applications",         icon: faFileAlt           },
+    { id: "instructors",           label: "Instructor Management",icon: faUsers             },
+    { id: "offer-templates",       label: "Offer Templates",      icon: faFileAlt           },
+    { id: "stipend-details",       label: "Stipend Details",      icon: faMoneyBillWave     },
+    // ✅ New — Internship Payments tab (for paid internships)
+    { id: "internship-payments",   label: "Internship Payments",  icon: faFileInvoiceDollar },
+    { id: "profile",               label: "Profile",              icon: faUser              },
   ];
 
   const actionItems = [
@@ -158,13 +142,13 @@ const handleLogoutTrigger = async () => {
     return (
       <button
         onClick={() => handleTabClick(item.id)}
-        className={`flex items-center p-3 rounded-lg w-full text-left font-semibold ${isSelected ? selectedColor : defaultColor
-          } ${item.hoverBg || "hover:bg-gray-100"}`}
+        className={`flex items-center p-3 rounded-lg w-full text-left font-semibold ${
+          isSelected ? selectedColor : defaultColor
+        } ${item.hoverBg || "hover:bg-gray-100"}`}
       >
         <FontAwesomeIcon
           icon={item.icon}
-          className={`w-5 h-5 mr-3 ${isSelected ? "text-teal-500" : "text-gray-600"
-            }`}
+          className={`w-5 h-5 mr-3 ${isSelected ? "text-teal-500" : "text-gray-600"}`}
         />
         <span className={`${isSelected ? "text-teal-500" : "text-gray-700"}`}>
           {item.label}
@@ -180,7 +164,7 @@ const handleLogoutTrigger = async () => {
         <div
           className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
           onClick={onClose}
-        ></div>
+        />
       )}
 
       {/* Sidebar */}
@@ -195,7 +179,7 @@ const handleLogoutTrigger = async () => {
         `}
         style={{ height: "calc(100vh - 96px)" }}
       >
-        {/* Scrollable area only for the list */}
+        {/* Scrollable list */}
         <div className="flex-1 overflow-y-auto hide-scrollbar px-3 pt-4">
           <ul className="space-y-2">
             {menuItems.map((item) => (
@@ -213,9 +197,7 @@ const handleLogoutTrigger = async () => {
 
         {/* Sticky bottom Upgrade box */}
         <div className="p-4 bg-teal-100 rounded-lg m-3">
-          <h3 className="text-teal-700 text-sm font-semibold">
-            UPGRADE TO PREMIUM
-          </h3>
+          <h3 className="text-teal-700 text-sm font-semibold">UPGRADE TO PREMIUM</h3>
           <p className="text-xs text-teal-600 mt-1">
             Your team has used 80% of your available space. Need more?
           </p>

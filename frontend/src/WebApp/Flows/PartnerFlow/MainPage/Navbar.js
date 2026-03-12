@@ -268,7 +268,7 @@ const Navbar = ({ onToggleSidebar }) => {
         <button onClick={onToggleSidebar} className="md:hidden text-gray-700 focus:outline-none">
           <FontAwesomeIcon icon={faBars} className="text-xl" />
         </button>
-        <img src={logo} alt="Skillnaav Logo" className="h-14 object-contain" />
+       <img src={logo} alt="Skillnaav Logo" className="h-14 w-auto object-contain" width="120" height="56" />
       </div>
 
       {/* Right Section: User info + Dropdown */}

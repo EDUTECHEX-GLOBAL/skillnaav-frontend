@@ -1,4 +1,4 @@
-// routes/paymentRoutes.js
+// routes/internshipPaymentRoutes.js
 const express = require('express');
 const router = express.Router();
 const {
@@ -6,28 +6,34 @@ const {
   capturePayPalPayment,
   getPaymentStatus,
   getStudentPayments,
-  getPaymentsForInternship, // ✅ New
-  getPaymentsForPartner,    // ✅ New
-  getPaymentsListForInternship // ✅ New
+  getPaymentsForInternship,
+  getPaymentsForPartner,
+  getPaymentsListForInternship,
+  getPaymentsForPartnerDetailed, // ✅ New
 } = require('../../controllers/internshipPaymentController');
 
-// ==================== PayPal Routes ====================
+// ─── PayPal Payment Flow ───────────────────────────────────────────────────────
 router.post('/create-paypal-order', createPayPalOrder);
 router.post('/capture-paypal-payment', capturePayPalPayment);
 router.get('/status/:offerId', getPaymentStatus);
 
-// ✅ Get payment history for a specific student
+// ─── Student Payment History ───────────────────────────────────────────────────
 router.get('/student/:studentId', getStudentPayments);
 
-// ==================== Admin Payment Analytics ====================
-// ✅ Get payment summary for a specific internship
+// ─── Admin / Analytics ────────────────────────────────────────────────────────
+// Summary (totals only) for a specific internship
 router.get('/admin/internship/:internshipId', getPaymentsForInternship);
 
-// ✅ Get payment summary for all internships of a specific partner
+// Summary (totals only) for all internships of a partner
 router.get('/admin/partner/:partnerId', getPaymentsForPartner);
-// ✅ Get payment list for a specific internship
 
-router.get("/:internshipId/payments", getPaymentsListForInternship);
+// Detailed list for a specific internship
+router.get('/:internshipId/payments', getPaymentsListForInternship);
 
+// ─── Partner Dashboard ─────────────────────────────────────────────────────────
+// ✅ Detailed list of ALL payments for a partner (all statuses, all internships)
+// Used by InternshipPayments.jsx tab in the partner flow.
+// Optional query param: ?status=COMPLETED
+router.get('/partner/:partnerId/detailed', getPaymentsForPartnerDetailed);
 
 module.exports = router;
