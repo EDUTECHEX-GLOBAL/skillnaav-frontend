@@ -6,7 +6,7 @@ const notifyUser = require('../utils/notifyUser');
 const sendNotification = require('../utils/Notification');
 const InternshipSchedule = require('../models/webapp-models/InternshipScheduleModel');
 const Partnerwebapp = require('../models/webapp-models/partnerModel'); // Import partner model if needed
-const OfferTemplate = require('../models/webapp-models/OfferTemplateModel'); // Import OfferTemplate model
+// const OfferTemplate = require('../models/webapp-models/OfferTemplateModel'); // Import OfferTemplate model
 const Payment = require('../models/webapp-models/internshipPaymentModel'); // Import payment model
 const Internship = require('../models/webapp-models/internshipPostModel');
 
@@ -89,7 +89,25 @@ const sendOfferLetter = async (req, res) => {
       }
     }
 
-    // ✅ Generate PDF with template
+    // ✅ Fetch the internship to use as a fallback for contactInfo and schoolAdmin
+    const internshipDoc = await Internship.findById(internshipObjId)
+      .select('schoolAdmin contactInfo')
+      .lean();
+
+    // Merge: prefer contactInfo from request body; fall back to internship's stored contactInfo
+    const resolvedContactInfo = {
+      name: contactInfo?.name && contactInfo.name !== "HR Manager"
+        ? contactInfo.name
+        : internshipDoc?.contactInfo?.name || contactInfo?.name || "HR Manager",
+      email: contactInfo?.email && contactInfo.email !== "hr@company.com"
+        ? contactInfo.email
+        : internshipDoc?.contactInfo?.email || contactInfo?.email || "",
+      phone: contactInfo?.phone && contactInfo.phone !== "9876543210"
+        ? contactInfo.phone
+        : internshipDoc?.contactInfo?.phone || contactInfo?.phone || "",
+    };
+
+    // ✅ Generate PDF with SkillNaav + partner logos and real contactInfo
     const pdfBuffer = await generateOfferPDFBuffer({
       name,
       email,
@@ -103,22 +121,23 @@ const sendOfferLetter = async (req, res) => {
       compensationDetails,
       jobDescription,
       qualifications,
-      contactInfo,
+      contactInfo: resolvedContactInfo,
       noticePeriod,
-      template // ✅ passed to generator
+      // Partner branding — pulled from the partner document
+      partnerLogoUrl:    partner.logoUrl    || partner.logo    || null,
+      partnerBrandColor: partner.brandColor || partner.primaryColor || null,
+      // No longer needed but kept for backwards compat if template had backgroundImageUrl
+      backgroundImageUrl: template?.backgroundImageUrl || null,
     });
 
     const fileName = `offer-${studentId}-${Date.now()}.pdf`;
     const s3Url = await uploadOfferLetterBuffer(pdfBuffer, fileName);
 
-    // Resolve schoolAdminId: prefer the one from req.body, fall back to the
-    // internship's own schoolAdmin field so it's never stored as null.
+    // Resolve schoolAdminId: prefer the one from req.body, fall back to the internship document
     let resolvedSchoolAdminId = null;
     if (schoolAdminId && mongoose.Types.ObjectId.isValid(schoolAdminId)) {
       resolvedSchoolAdminId = new mongoose.Types.ObjectId(schoolAdminId);
     } else {
-      // Fallback: fetch from the internship document itself
-      const internshipDoc = await Internship.findById(internshipObjId).select('schoolAdmin').lean();
       const fallback = internshipDoc?.schoolAdmin;
       if (fallback && mongoose.Types.ObjectId.isValid(String(fallback))) {
         resolvedSchoolAdminId = new mongoose.Types.ObjectId(String(fallback));

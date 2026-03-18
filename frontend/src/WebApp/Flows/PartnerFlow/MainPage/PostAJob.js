@@ -1,6 +1,6 @@
 //File: PostAJob.js
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import axios from "axios";
 
 import { useTabContext } from "./UserHomePageContext/HomePageContext";
@@ -22,42 +22,40 @@ const CA_PROVINCES = [
   "Quebec", "Saskatchewan", "Yukon"
 ];
 
-// City RapidAPI endpoint
-const CITY_API_URL = "https://wft-geo-db.p.rapidapi.com/v1/geo/cities";
-
 const PostAJob = () => {
   const { saveJob } = useTabContext();
 
-  // Define your top sectors
+  // Sector options — values match backend enum exactly
   const topSectors = [
-    { id: "advanced-ai", name: "Advanced AI & Autonomous Systems" },
+    { id: "advanced-ai",       name: "Advanced AI & Autonomous Systems" },
     { id: "quantum-computing", name: "Quantum Computing & Next-Gen Computing" },
-    { id: "climate-tech", name: "Climate Tech & Carbon Capture" },
-    { id: "biotech", name: "Biotechnology & Synthetic Biology" },
+    { id: "climate-tech",      name: "Climate Tech & Carbon Capture" },
+    { id: "biotech",           name: "Biotechnology & Synthetic Biology" },
     { id: "materials-science", name: "Advanced Materials Science" },
   ];
 
+  // All dropdown fields default to "" so their placeholder option shows on load
   const [formData, setFormData] = useState({
     jobTitle: "",
     companyName: "",
-    sector: topSectors[0].id,
+    sector: "",         // enum: advanced-ai | quantum-computing | climate-tech | biotech | materials-science
     city: "",
-    country: "United States", // default to US
+    country: "",        // enum: "United States" | "Canada"
     state: "",
     jobType: "Internship",
     jobDescription: "",
     startDate: "",
     endDateOrDuration: "",
     duration: "",
-    internshipType: "FREE",
-    classification: "",
+    internshipType: "", // enum: FREE | STIPEND | PAID
+    classification: "", // enum: Basic | Intermediate | Advanced
     compensationDetails: {
-      type: "FREE",
+      type: "",
       amount: null,
-      currency: "USD",
-      frequency: "MONTHLY",
+      currency: "",     // enum: USD | CAD | EUR | INR | GBP
+      frequency: "",    // enum: MONTHLY | WEEKLY | ONE_TIME
     },
-    mode: "Online",
+    mode: "",           // sent as .toUpperCase() → ONLINE | OFFLINE | HYBRID
     qualifications: [],
     contactInfo: { name: "", email: "", phone: "" },
     imgUrl: "",
@@ -66,58 +64,39 @@ const PostAJob = () => {
     applicationOpen: true,
   });
 
-  // kept and used states
   const [citySuggestions, setCitySuggestions] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [successMessage, setSuccessMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
   const [userType, setUserType] = useState("");
-  const [partnerInternships, setPartnerInternships] = useState([]);
   const [freemiumAlert, setFreemiumAlert] = useState("");
+  const cityDebounceRef = useRef(null);
 
   // Derived list/labels for State/Province based on selected country
   const stateList = formData.country === "Canada" ? CA_PROVINCES : US_STATES;
   const stateLabel = formData.country === "Canada" ? "Province / Territory" : "State";
 
-  // Load user plan and existing posts
   useEffect(() => {
     try {
       const ui = JSON.parse(localStorage.getItem("userInfo"));
       if (ui) setUserType(ui.planType);
-
-      const pid = localStorage.getItem("partnerId");
-      if (pid) {
-        axios
-          .get(`/api/interns/partner/${pid}`)
-          .then((res) => setPartnerInternships(res.data || []))
-          .catch(console.error);
-      }
     } catch (err) {
-      // ignore parse errors
       console.error("PostAJob: failed reading localStorage", err);
     }
   }, []);
 
-  // City autocomplete (country-filtered)
-  const debouncedSearchCities = useCallback(
+  // City search — calls backend proxy /api/cities (API key stays server-side)
+  const searchCities = useCallback(
     async (q) => {
-      if (!q) {
-        setCitySuggestions([]);
-        return;
-      }
+      if (!q || q.trim().length < 2) { setCitySuggestions([]); return; }
       try {
         const countryIds =
           formData.country === "Canada" ? "CA" :
-            formData.country === "United States" ? "US" :
-              "US,CA";
+          formData.country === "United States" ? "US" : "US,CA";
 
-        const resp = await axios.get(CITY_API_URL, {
-          headers: {
-            // Replace with your RapidAPI key or route through your backend for security
-            "X-RapidAPI-Key": "YOUR_RAPIDAPI_KEY",
-            "X-RapidAPI-Host": "wft-geo-db.p.rapidapi.com",
-          },
-          params: { namePrefix: q, limit: 10, minPopulation: 100000, countryIds },
+        const resp = await axios.get("/api/cities", {
+          params: { namePrefix: q.trim(), limit: 10, minPopulation: 100000, countryIds },
         });
         setCitySuggestions(resp.data?.data || []);
       } catch (err) {
@@ -131,7 +110,8 @@ const PostAJob = () => {
   const handleCityInputChange = (e) => {
     const { value } = e.target;
     setFormData((p) => ({ ...p, city: value }));
-    debouncedSearchCities(value);
+    clearTimeout(cityDebounceRef.current);
+    cityDebounceRef.current = setTimeout(() => searchCities(value), 300);
   };
 
   const handleCitySelect = (name) => {
@@ -139,7 +119,6 @@ const PostAJob = () => {
     setCitySuggestions([]);
   };
 
-  // General change handler
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => {
@@ -147,31 +126,26 @@ const PostAJob = () => {
         return {
           ...prev,
           internshipType: value,
-          compensationDetails: { ...prev.compensationDetails, type: value },
+          compensationDetails: {
+            ...prev.compensationDetails,
+            type: value,
+            // Reset amount/currency/frequency when switching to FREE
+            ...(value === "FREE" && { amount: null, currency: "", frequency: "" }),
+          },
         };
       }
       if (name.startsWith("compensationDetails.")) {
         const field = name.split(".")[1];
-        return {
-          ...prev,
-          compensationDetails: { ...prev.compensationDetails, [field]: value },
-        };
+        return { ...prev, compensationDetails: { ...prev.compensationDetails, [field]: value } };
       }
       if (name.startsWith("contactInfo.")) {
         const field = name.split(".")[1];
-        return {
-          ...prev,
-          contactInfo: { ...prev.contactInfo, [field]: value },
-        };
-      }
-      if (name === "sector") {
-        return { ...prev, sector: value };
+        return { ...prev, contactInfo: { ...prev.contactInfo, [field]: value } };
       }
       return { ...prev, [name]: value };
     });
   };
 
-  // Qualifications
   const handleQualificationsChange = (e) => {
     setFormData((p) => ({
       ...p,
@@ -182,20 +156,16 @@ const PostAJob = () => {
   const handleFileUpload = async (event) => {
     const file = event.target.files && event.target.files[0];
     if (!file) return;
-
     setUploading(true);
     const reader = new FileReader();
     reader.onloadend = () => setPreviewUrl(reader.result);
     reader.readAsDataURL(file);
-
     try {
       const data = new FormData();
       data.append("image", file);
-
       const res = await axios.post("/api/upload/job-image", data, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-
       if (res.data?.success) {
         setFormData((prev) => ({ ...prev, imgUrl: res.data.imageUrl }));
       } else {
@@ -208,74 +178,60 @@ const PostAJob = () => {
     }
   };
 
-  // Duration calculator — pure function that accepts dates (stable callback)
+  // Duration calc — uses total day diff (avoids negative-day bug)
   const calculateDuration = useCallback((startDate, endDateOrDuration) => {
     if (!startDate || !endDateOrDuration) {
       setFormData((prev) => ({ ...prev, duration: "" }));
       return;
     }
-
     const start = new Date(startDate);
     const end = new Date(endDateOrDuration);
-
     if (isNaN(start.getTime()) || isNaN(end.getTime())) {
       setFormData((prev) => ({ ...prev, duration: "" }));
       return;
     }
-
     if (end <= start) {
       setFormData((prev) => ({ ...prev, duration: "Invalid duration" }));
       return;
     }
-
-    const months =
-      end.getMonth() -
-      start.getMonth() +
-      12 * (end.getFullYear() - start.getFullYear());
-    const days = end.getDate() - start.getDate();
-
+    const totalDays = Math.floor((end - start) / (1000 * 60 * 60 * 24));
+    const months = Math.floor(totalDays / 30);
+    const days = totalDays % 30;
     const durationText =
       months > 0
         ? `${months} month${months > 1 ? "s" : ""}${days > 0 ? ` and ${days} day${days > 1 ? "s" : ""}` : ""}`
-        : `${days} day${days > 1 ? "s" : ""}`;
-
+        : `${totalDays} day${totalDays > 1 ? "s" : ""}`;
     setFormData((prev) => ({ ...prev, duration: durationText }));
-  }, []); // no formData in deps because we pass values in
+  }, []);
 
-  // Call the calculator whenever the date fields change
   useEffect(() => {
     calculateDuration(formData.startDate, formData.endDateOrDuration);
   }, [formData.startDate, formData.endDateOrDuration, calculateDuration]);
 
-
+  // All dropdowns reset to "" so placeholders reappear after submit
   const resetForm = () => {
     setFormData({
       jobTitle: "",
       companyName: "",
-      sector: topSectors[0].id,
+      sector: "",
       city: "",
-      country: "United States",
+      country: "",
       state: "",
       jobType: "Internship",
       jobDescription: "",
       startDate: "",
       endDateOrDuration: "",
       duration: "",
-      internshipType: "FREE",
-      compensationDetails: {
-        type: "FREE",
-        amount: null,
-        currency: "USD",
-        frequency: "MONTHLY",
-      },
+      internshipType: "",
+      classification: "",
+      compensationDetails: { type: "", amount: null, currency: "", frequency: "" },
+      mode: "",
       qualifications: [],
       contactInfo: { name: "", email: "", phone: "" },
       imgUrl: "",
       studentApplied: false,
       adminApproved: false,
       applicationOpen: true,
-      classification: "",
-      mode: "Online",
     });
     setPreviewUrl(null);
   };
@@ -283,12 +239,8 @@ const PostAJob = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const pid = localStorage.getItem("partnerId");
-    if (!pid) {
-      console.error("No partner ID");
-      return;
-    }
+    if (!pid) { console.error("No partner ID"); return; }
 
-    // Simple freemium restriction example so setter is used and there's meaningful behavior
     if (userType === "Freemium" && formData.internshipType === "PAID") {
       setFreemiumAlert("Upgrade required to post paid internships.");
       setTimeout(() => setFreemiumAlert(""), 3500);
@@ -297,7 +249,7 @@ const PostAJob = () => {
 
     const payload = {
       ...formData,
-      internshipMode: (formData.mode || "Online").toUpperCase(), // ✅ save selected mode in DB
+      internshipMode: (formData.mode || "ONLINE").toUpperCase(), // ONLINE | OFFLINE | HYBRID
       location: formData.state
         ? `${formData.city}, ${formData.state}, ${formData.country}`
         : `${formData.city}, ${formData.country}`,
@@ -312,116 +264,73 @@ const PostAJob = () => {
       setTimeout(() => setSuccessMessage(""), 3000);
     } catch (err) {
       console.error("Error posting internship:", err);
+      setErrorMessage("Failed to post internship. Please try again.");
+      setTimeout(() => setErrorMessage(""), 3500);
     }
   };
 
-  // use partnerInternships length in an sr-only span to avoid unused var warning
-  const partnerCount = partnerInternships.length;
+  const inputCls = "w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring focus:ring-teal-500";
+  const locationInputCls = "!mt-0 w-full h-12 box-border p-3 border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 focus:ring-offset-white";
 
   return (
     <div className="max-w-4xl font-poppins mx-auto p-6 bg-white rounded-lg shadow-lg mt-8">
-      <h2 className="text-2xl font-semibold text-gray-800 mb-4">
-        Post an Internship
-      </h2>
+      <h2 className="text-2xl font-semibold text-gray-800 mb-4">Post an Internship</h2>
+
       <form onSubmit={handleSubmit} className="space-y-6">
+
         {/* Job Title */}
         <div>
-          <label className="block text-gray-700 font-medium mb-2">
-            Job Title
-          </label>
-          <input
-            type="text"
-            name="jobTitle"
-            value={formData.jobTitle}
-            onChange={handleChange}
-            required
-            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring focus:ring-teal-500"
-            placeholder="Enter job title"
-          />
+          <label className="block text-gray-700 font-medium mb-2">Job Title</label>
+          <input type="text" name="jobTitle" value={formData.jobTitle}
+            onChange={handleChange} required className={inputCls} placeholder="Enter job title" />
         </div>
 
         {/* Company Name */}
         <div>
-          <label className="block text-gray-700 font-medium mb-2">
-            Company Name
-          </label>
-          <input
-            type="text"
-            name="companyName"
-            value={formData.companyName}
-            onChange={handleChange}
-            required
-            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring focus:ring-teal-500"
-            placeholder="Enter company name"
-          />
+          <label className="block text-gray-700 font-medium mb-2">Company Name</label>
+          <input type="text" name="companyName" value={formData.companyName}
+            onChange={handleChange} required className={inputCls} placeholder="Enter company name" />
         </div>
 
-        {/* Sector Dropdown */}
+        {/* Sector — value matches backend enum (e.g. "advanced-ai") */}
         <div>
-          <label className="block text-gray-700 font-medium mb-2">
-            Sector
-          </label>
-          <select
-            name="sector"
-            value={formData.sector}
-            onChange={handleChange}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring focus:ring-teal-500"
-            required
-          >
+          <label className="block text-gray-700 font-medium mb-2">Sector</label>
+          <select name="sector" value={formData.sector} onChange={handleChange} required className={inputCls}>
+            <option value="" disabled>Select a Sector</option>
             {topSectors.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
+              <option key={s.id} value={s.id}>{s.name}</option>
             ))}
           </select>
         </div>
 
+        {/* Classification — value matches backend enum: Basic | Intermediate | Advanced */}
         <div>
-          <label className="block text-gray-700 font-medium mb-2">
-            Internship Classification
-          </label>
-          <select
-            name="classification"
-            value={formData.classification}
-            onChange={handleChange}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring focus:ring-teal-500"
-            required
-          >
-            <option value="" disabled>
-              Select Classification
-            </option>
+          <label className="block text-gray-700 font-medium mb-2">Internship Classification</label>
+          <select name="classification" value={formData.classification} onChange={handleChange} required className={inputCls}>
+            <option value="" disabled>Select Classification</option>
             <option value="Basic">Basic</option>
             <option value="Intermediate">Intermediate</option>
             <option value="Advanced">Advanced</option>
           </select>
         </div>
 
+        {/* Location */}
         <div>
-          <label className="block text-gray-700 font-medium mb-2">
-            Location
-          </label>
-
-          {/* ✅ REPLACE OLD GRID WITH THIS NEW GRID */}
+          <label className="block text-gray-700 font-medium mb-2">Location</label>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
-            {/* Country (US/CA only) */}
+
+            {/* Country — value matches backend enum: "United States" | "Canada" */}
             <div className="flex flex-col gap-1">
-              <label htmlFor="country" className="block text-gray-700 text-sm">
-                Country *
-              </label>
+              <label htmlFor="country" className="block text-gray-700 text-sm">Country *</label>
               <select
-                id="country"
-                name="country"
-                value={formData.country}
+                id="country" name="country" value={formData.country}
                 onChange={(e) => {
-                  const value = e.target.value;
-                  setFormData((p) => ({ ...p, country: value, state: "" }));
+                  setFormData((p) => ({ ...p, country: e.target.value, state: "" }));
                   setCitySuggestions([]);
                 }}
-                required
-                className="!mt-0 w-full h-12 box-border p-3 border border-gray-300 rounded-lg bg-white text-gray-900
-          focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 focus:ring-offset-white"
+                required className={locationInputCls}
               >
-                <option value="">Select</option>
+                <option value="" disabled>Select Country</option>
                 <option value="United States">United States</option>
                 <option value="Canada">Canada</option>
               </select>
@@ -429,50 +338,27 @@ const PostAJob = () => {
 
             {/* State / Province */}
             <div className="flex flex-col gap-1">
-              <label htmlFor="state" className="block text-gray-700 text-sm">
-                {stateLabel} *
-              </label>
-              <select
-                id="state"
-                name="state"
-                value={formData.state}
-                onChange={handleChange}
-                required
-                className="!mt-0 w-full h-12 box-border p-3 border border-gray-300 rounded-lg bg-white text-gray-900
-          focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 focus:ring-offset-white"
-              >
-                <option value="" disabled>Select</option>
+              <label htmlFor="state" className="block text-gray-700 text-sm">{stateLabel} *</label>
+              <select id="state" name="state" value={formData.state}
+                onChange={handleChange} required className={locationInputCls}>
+                <option value="" disabled>Select {stateLabel}</option>
                 {stateList.map((s) => (
                   <option key={s} value={s}>{s}</option>
                 ))}
               </select>
             </div>
 
-            {/* City */}
+            {/* City — autocomplete via /api/cities */}
             <div className="relative flex flex-col gap-1">
-              <label htmlFor="city" className="block text-gray-700 text-sm">
-                City *
-              </label>
-
+              <label htmlFor="city" className="block text-gray-700 text-sm">City *</label>
               <input
-                id="city"
-                type="text"
-                name="city"
-                value={formData.city}
-                onChange={handleCityInputChange}
-                autoComplete="address-level2"
-                required
-                className="!mt-0 w-full h-12 box-border p-3 border border-gray-300 rounded-lg bg-white text-gray-900
-          focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 focus:ring-offset-white
-          relative z-[15]"
-                placeholder="Start typing city"
+                id="city" type="text" name="city" value={formData.city}
+                onChange={handleCityInputChange} autoComplete="address-level2"
+                required placeholder="Start typing city"
+                className={`${locationInputCls} relative z-[15]`}
               />
-
               {citySuggestions.length > 0 && (
-                <ul
-                  className="absolute z-[20] left-0 top-full w-full mt-2 max-h-48 overflow-y-auto
-            bg-white border border-gray-300 rounded-lg shadow-lg"
-                >
+                <ul className="absolute z-[20] left-0 top-full w-full mt-2 max-h-48 overflow-y-auto bg-white border border-gray-300 rounded-lg shadow-lg">
                   {citySuggestions.map((city) => (
                     <li
                       key={city.wikiDataId || city.id || city.name}
@@ -488,196 +374,110 @@ const PostAJob = () => {
           </div>
         </div>
 
+        {/* Job Description */}
         <div>
-          <label className="block text-gray-700 font-medium mb-2">
-            Job Description
-          </label>
-          <textarea
-            name="jobDescription"
-            value={formData.jobDescription}
-            onChange={handleChange}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring focus:ring-teal-500"
-            placeholder="Describe the job responsibilities, requirements, etc."
-            rows="4"
-            required
-          />
+          <label className="block text-gray-700 font-medium mb-2">Job Description</label>
+          <textarea name="jobDescription" value={formData.jobDescription}
+            onChange={handleChange} required rows="4" className={inputCls}
+            placeholder="Describe the job responsibilities, requirements, etc." />
         </div>
 
+        {/* Start Date — min = today */}
         <div>
-          <label className="block text-gray-700 font-medium mb-2">
-            Start Date
-          </label>
-          <input
-            type="date"
-            name="startDate"
-            value={formData.startDate}
-            onChange={handleChange}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring focus:ring-teal-500"
-            required
-          />
+          <label className="block text-gray-700 font-medium mb-2">Start Date</label>
+          <input type="date" name="startDate" value={formData.startDate}
+            onChange={handleChange} required
+            min={new Date().toISOString().split("T")[0]}
+            className={inputCls} />
         </div>
 
+        {/* End Date — min = startDate */}
         <div>
-          <label className="block text-gray-700 font-medium mb-2">
-            End Date
-          </label>
-          <input
-            type="date"
-            name="endDateOrDuration"
-            value={formData.endDateOrDuration}
-            onChange={handleChange}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring focus:ring-teal-500"
-            required
-          />
+          <label className="block text-gray-700 font-medium mb-2">End Date</label>
+          <input type="date" name="endDateOrDuration" value={formData.endDateOrDuration}
+            onChange={handleChange} required
+            min={formData.startDate || new Date().toISOString().split("T")[0]}
+            className={inputCls} />
         </div>
 
+        {/* Calculated Duration (read-only) */}
         <div>
-          <label className="block text-gray-700 font-medium mb-2">
-            Calculated Duration
-          </label>
-          <input
-            type="text"
-            name="duration"
-            value={formData.duration}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring focus:ring-teal-500"
-            placeholder="Duration will be calculated"
-            readOnly
-          />
+          <label className="block text-gray-700 font-medium mb-2">Calculated Duration</label>
+          <input type="text" name="duration" value={formData.duration}
+            readOnly placeholder="Duration will be calculated" className={inputCls} />
         </div>
 
+        {/* Mode — value sent as .toUpperCase() → ONLINE | OFFLINE | HYBRID */}
         <div>
-          <label className="block text-gray-700 font-medium mb-2">
-            Mode of Internship
-          </label>
-          <select
-            name="mode"
-            value={formData.mode}
-            onChange={handleChange}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring focus:ring-teal-500"
-            required
-          >
+          <label className="block text-gray-700 font-medium mb-2">Mode of Internship</label>
+          <select name="mode" value={formData.mode} onChange={handleChange} required className={inputCls}>
+            <option value="" disabled>Select Mode</option>
             <option value="Online">Online</option>
             <option value="Offline">Offline</option>
             <option value="Hybrid">Hybrid</option>
           </select>
         </div>
 
+        {/* Qualifications */}
         <div>
-          <label className="block text-gray-700 font-medium mb-2">
-            Qualifications
-          </label>
-          <input
-            type="text"
-            name="qualifications"
+          <label className="block text-gray-700 font-medium mb-2">Qualifications</label>
+          <input type="text" name="qualifications"
             value={formData.qualifications.join(", ")}
-            onChange={handleQualificationsChange}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring focus:ring-teal-500"
-            placeholder="Enter required qualifications, separated by commas"
-            required
-          />
+            onChange={handleQualificationsChange} required className={inputCls}
+            placeholder="Enter required qualifications, separated by commas" />
         </div>
 
+        {/* Contact Information */}
         <div>
-          <label className="block text-gray-700 font-medium mb-2">
-            Contact Information
-          </label>
+          <label className="block text-gray-700 font-medium mb-2">Contact Information</label>
           <div className="space-y-2">
-            <input
-              type="text"
-              name="contactInfo.name"
-              value={formData.contactInfo.name}
-              onChange={handleChange}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring focus:ring-teal-500"
-              placeholder="Contact Name"
-              required
-            />
-            <input
-              type="email"
-              name="contactInfo.email"
-              value={formData.contactInfo.email}
-              onChange={handleChange}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring focus:ring-teal-500"
-              placeholder="Contact Email"
-              required
-            />
-            <input
-              type="tel"
-              name="contactInfo.phone"
-              value={formData.contactInfo.phone}
-              onChange={handleChange}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring focus:ring-teal-500"
-              placeholder="Contact Phone"
-              required
-            />
+            <input type="text" name="contactInfo.name" value={formData.contactInfo.name}
+              onChange={handleChange} required className={inputCls} placeholder="Contact Name" />
+            <input type="email" name="contactInfo.email" value={formData.contactInfo.email}
+              onChange={handleChange} required className={inputCls} placeholder="Contact Email" />
+            <input type="tel" name="contactInfo.phone" value={formData.contactInfo.phone}
+              onChange={handleChange} required className={inputCls} placeholder="Contact Phone" />
           </div>
         </div>
 
+        {/* Upload Image */}
         <div>
-          <label className="block text-gray-700 font-medium mb-2">
-            Upload Image
-          </label>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleFileUpload}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring focus:ring-teal-500"
-          />
-          {uploading && <p>Uploading image...</p>}
-          {previewUrl && (
-            <img
-              src={previewUrl}
-              alt="Preview"
-              className="mt-2 max-h-40 rounded-lg"
-            />
-          )}
+          <label className="block text-gray-700 font-medium mb-2">Upload Image</label>
+          <input type="file" accept="image/*" onChange={handleFileUpload} className={inputCls} />
+          {uploading && <p className="text-sm text-gray-500 mt-1">Uploading image...</p>}
+          {previewUrl && <img src={previewUrl} alt="Preview" className="mt-2 max-h-40 rounded-lg" />}
         </div>
 
-        {/* Internship Type and Compensation */}
+        {/* Internship Type — value matches backend enum: FREE | STIPEND | PAID */}
         <div>
-          <label className="block text-gray-700 font-medium mb-2">
-            Internship Type
-          </label>
-          <select
-            name="internshipType"
-            value={formData.internshipType}
-            onChange={handleChange}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring focus:ring-teal-500"
-            required
-          >
+          <label className="block text-gray-700 font-medium mb-2">Internship Type</label>
+          <select name="internshipType" value={formData.internshipType} onChange={handleChange} required className={inputCls}>
+            <option value="" disabled>Select Internship Type</option>
             <option value="FREE">Free</option>
             <option value="STIPEND">Stipend</option>
-            <option value="PAID" disabled={userType === "Freemium"}>Paid</option>
+            <option value="PAID" disabled={userType === "Freemium"}>
+              Paid{userType === "Freemium" ? " (Upgrade required)" : ""}
+            </option>
           </select>
         </div>
 
-        {formData.internshipType !== "FREE" && (
+        {/* Compensation Details — shown only for STIPEND or PAID */}
+        {(formData.internshipType === "STIPEND" || formData.internshipType === "PAID") && (
           <div className="space-y-4">
             <div>
-              <label className="block text-gray-700 font-medium mb-2">
-                Amount
-              </label>
-              <input
-                type="number"
-                name="compensationDetails.amount"
+              <label className="block text-gray-700 font-medium mb-2">Amount</label>
+              <input type="number" name="compensationDetails.amount"
                 value={formData.compensationDetails.amount || ""}
-                onChange={handleChange}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring focus:ring-teal-500"
-                placeholder="Enter amount"
-                required={formData.internshipType !== "FREE"}
-              />
+                onChange={handleChange} required min="0" className={inputCls} placeholder="Enter amount" />
             </div>
 
+            {/* Currency — value matches backend enum: USD | CAD | EUR | INR | GBP */}
             <div>
-              <label className="block text-gray-700 font-medium mb-2">
-                Currency
-              </label>
-              <select
-                name="compensationDetails.currency"
+              <label className="block text-gray-700 font-medium mb-2">Currency</label>
+              <select name="compensationDetails.currency"
                 value={formData.compensationDetails.currency}
-                onChange={handleChange}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring focus:ring-teal-500"
-                required={formData.internshipType !== "FREE"}
-              >
+                onChange={handleChange} required className={inputCls}>
+                <option value="" disabled>Select Currency</option>
                 <option value="USD">USD</option>
                 <option value="CAD">CAD</option>
                 <option value="EUR">EUR</option>
@@ -686,17 +486,13 @@ const PostAJob = () => {
               </select>
             </div>
 
+            {/* Frequency — value matches backend enum: MONTHLY | WEEKLY | ONE_TIME */}
             <div>
-              <label className="block text-gray-700 font-medium mb-2">
-                Frequency
-              </label>
-              <select
-                name="compensationDetails.frequency"
+              <label className="block text-gray-700 font-medium mb-2">Frequency</label>
+              <select name="compensationDetails.frequency"
                 value={formData.compensationDetails.frequency}
-                onChange={handleChange}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring focus:ring-teal-500"
-                required={formData.internshipType !== "FREE"}
-              >
+                onChange={handleChange} required className={inputCls}>
+                <option value="" disabled>Select Frequency</option>
                 <option value="MONTHLY">Monthly</option>
                 <option value="WEEKLY">Weekly</option>
                 <option value="ONE_TIME">One Time</option>
@@ -705,44 +501,44 @@ const PostAJob = () => {
           </div>
         )}
 
+        {/* Open for Applications */}
         <div>
           <label className="inline-flex items-center space-x-2">
-            <input
-              type="checkbox"
-              name="applicationOpen"
-              checked={formData.applicationOpen}
-              onChange={(e) =>
-                setFormData((p) => ({ ...p, applicationOpen: e.target.checked }))
-              }
-              className="form-checkbox h-5 w-5 text-teal-600"
-            />
+            <input type="checkbox" name="applicationOpen" checked={formData.applicationOpen}
+              onChange={(e) => setFormData((p) => ({ ...p, applicationOpen: e.target.checked }))}
+              className="form-checkbox h-5 w-5 text-teal-600" />
             <span className="text-gray-700 font-medium">Open for Applications</span>
           </label>
         </div>
 
+        {/* Submit */}
         <div>
-          <button
-            type="submit"
-            className="w-full py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700 focus:outline-none focus:ring focus:ring-teal-500"
-          >
+          <button type="submit"
+            className="w-full py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700 focus:outline-none focus:ring focus:ring-teal-500">
             Post Internship
           </button>
         </div>
 
-        {/* hidden, accessible usage of partnerCount to avoid unused var */}
-        <span className="sr-only" aria-hidden="true">{partnerCount}</span>
       </form>
 
-      {/* success + freemium alerts */}
+      {/* Success toast */}
       {successMessage && (
         <div className="fixed top-20 right-10 z-[9999] bg-green-500 text-white py-3 px-6 rounded-lg shadow-lg transition-all duration-300">
           {successMessage}
         </div>
       )}
 
+      {/* Freemium upgrade alert */}
       {freemiumAlert && (
-        <div className="fixed top-28 right-10 z-[9999] bg-red-500 text-white py-3 px-6 rounded-lg shadow-lg transition-all duration-300">
+        <div className="fixed top-28 right-10 z-[9999] bg-orange-500 text-white py-3 px-6 rounded-lg shadow-lg transition-all duration-300">
           {freemiumAlert}
+        </div>
+      )}
+
+      {/* Error toast */}
+      {errorMessage && (
+        <div className="fixed top-36 right-10 z-[9999] bg-red-600 text-white py-3 px-6 rounded-lg shadow-lg transition-all duration-300">
+          {errorMessage}
         </div>
       )}
     </div>

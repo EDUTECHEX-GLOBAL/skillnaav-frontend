@@ -2,16 +2,15 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 
-const BulkSendOffer = ({ selectedStudents, internshipId, onCancel, onSuccess }) =>  {
-  const [offerDetails, setOfferDetails] = useState({
-    joiningDate: "",
-    position: "",
-    templateId: "",
-  });
+const BulkSendOffer = ({ selectedStudents: rawStudents, internshipId, onCancel, onSuccess }) => {
+  // Guard: filter out any undefined/null entries that .find() may have injected
+  const selectedStudents = (rawStudents || []).filter(Boolean);
+
+  const [joiningDate, setJoiningDate] = useState("");
+  const [position, setPosition] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState(null);
   const [internship, setInternship] = useState(null);
-  const [templates, setTemplates] = useState([]);
   const partnerId = localStorage.getItem("partnerId");
 
   useEffect(() => {
@@ -22,39 +21,21 @@ const BulkSendOffer = ({ selectedStudents, internshipId, onCancel, onSuccess }) 
         });
         const data = res.data;
         setInternship(data);
-        setOfferDetails((prev) => ({
-          ...prev,
-          position: data.jobTitle,
-          joiningDate: data.startDate ? new Date(data.startDate).toISOString().split("T")[0] : "",
-        }));
+        setPosition(data.jobTitle || "");
+        setJoiningDate(data.startDate ? new Date(data.startDate).toISOString().split("T")[0] : "");
       } catch (err) {
         console.error("Error loading internship:", err);
       }
     };
-
-    const fetchTemplates = async () => {
-      try {
-        const res = await axios.get(`/api/templates?partnerId=${partnerId}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        });
-        setTemplates(res.data);
-      } catch (err) {
-        console.error("Failed to fetch templates:", err);
-      }
-    };
-
     fetchInternship();
-    fetchTemplates();
-  }, [internshipId, partnerId]);
+  }, [internshipId]);
 
-// Fix Bug 7: validate schoolAdminId before sending
   const getValidSchoolAdminId = () => {
     const raw = localStorage.getItem("schoolAdminId");
     return raw && /^[a-f\d]{24}$/i.test(raw) ? raw : null;
   };
 
   const sendOfferToStudent = async (student) => {
-    // Fix Bug 1: guard against undefined/null student entries
     if (!student || !student.student_id || !student.email) {
       console.warn("Skipping invalid student entry:", student);
       return;
@@ -67,9 +48,8 @@ const BulkSendOffer = ({ selectedStudents, internshipId, onCancel, onSuccess }) 
         name: student.name,
         email: student.email,
         internshipId,
-        templateId: offerDetails.templateId,
-        position: offerDetails.position,
-        startDate: offerDetails.joiningDate,
+        position,
+        startDate: joiningDate,
         company: internship?.companyName,
         location: internship?.location,
         duration: internship?.duration || internship?.endDateOrDuration,
@@ -78,34 +58,31 @@ const BulkSendOffer = ({ selectedStudents, internshipId, onCancel, onSuccess }) 
         jobDescription: internship?.jobDescription,
         qualifications: Array.isArray(internship?.qualifications)
           ? internship.qualifications
-          : (internship?.qualifications || "").split(",").map((q) => q.trim()),
-        // Fix Bug 6: use real partner/internship contact info, not hardcoded placeholders
+          : (internship?.qualifications || "").split(",").map((q) => q.trim()).filter(Boolean),
+        // contactInfo resolved on backend from internship document
         contactInfo: {
-          name: internship?.contactPerson || "HR Manager",
-          email: internship?.contactEmail || "",
-          phone: internship?.contactPhone || "",
+          name:  internship?.contactInfo?.name  || "",
+          email: internship?.contactInfo?.email || "",
+          phone: internship?.contactInfo?.phone || "",
         },
         schoolAdminId: getValidSchoolAdminId(),
       },
-      {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      }
+      { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
     );
   };
 
   const handleSendBulk = async () => {
-    if (!offerDetails.templateId || !offerDetails.joiningDate) {
-      setError("Please select template and joining date");
+    if (!joiningDate) {
+      setError("Please select a joining date");
       return;
     }
     setIsSending(true);
     setError(null);
 
-    // Fix Bug 5: use Promise.allSettled so one failure doesn't abort the rest
     const validStudents = selectedStudents.filter((s) => s && s.student_id && s.email);
     const results = await Promise.allSettled(validStudents.map((s) => sendOfferToStudent(s)));
 
-    const succeeded = results.filter((r) => r.status === "fulfilled").length;
+    const succeeded  = results.filter((r) => r.status === "fulfilled").length;
     const failedCount = results.filter((r) => r.status === "rejected").length;
 
     if (failedCount === 0) {
@@ -114,7 +91,6 @@ const BulkSendOffer = ({ selectedStudents, internshipId, onCancel, onSuccess }) 
     } else if (succeeded > 0) {
       toast.warn(`${succeeded} sent, ${failedCount} failed. Please retry the failed ones.`);
       setError(`${failedCount} offer(s) failed to send. The rest were sent successfully.`);
-      // Still mark the succeeded ones in parent state
       const failedIndexes = new Set(
         results.map((r, i) => (r.status === "rejected" ? i : -1)).filter((i) => i >= 0)
       );
@@ -128,64 +104,61 @@ const BulkSendOffer = ({ selectedStudents, internshipId, onCancel, onSuccess }) 
     setIsSending(false);
   };
 
-
-  
-
   return (
     <div>
+      {/* Sending to N students */}
+      <div className="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-lg">
+        <p className="text-sm text-blue-700 font-medium">
+          Sending offer letters to{" "}
+          <span className="font-bold">{selectedStudents.length}</span> student
+          {selectedStudents.length !== 1 ? "s" : ""}
+        </p>
+        <p className="text-xs text-blue-500 mt-0.5">
+          Offer PDF will include SkillNaav + your company logo automatically.
+        </p>
+      </div>
+
+      {/* Position */}
       <div className="mb-4">
-        <label className="block font-semibold mb-1">Position</label>
+        <label className="block font-semibold mb-1 text-sm text-gray-700">Position</label>
         <input
           type="text"
-          value={offerDetails.position}
-          onChange={(e) => setOfferDetails((prev) => ({ ...prev, position: e.target.value }))}
-          className="w-full border rounded px-3 py-2"
+          value={position}
+          onChange={(e) => setPosition(e.target.value)}
+          className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
         />
       </div>
 
+      {/* Joining Date */}
       <div className="mb-4">
-        <label className="block font-semibold mb-1">Joining Date</label>
+        <label className="block font-semibold mb-1 text-sm text-gray-700">
+          Joining Date <span className="text-red-500">*</span>
+        </label>
         <input
           type="date"
-          value={offerDetails.joiningDate}
-          onChange={(e) => setOfferDetails((prev) => ({ ...prev, joiningDate: e.target.value }))}
-          className="w-full border rounded px-3 py-2"
+          value={joiningDate}
+          onChange={(e) => setJoiningDate(e.target.value)}
+          className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
           min={new Date().toISOString().split("T")[0]}
         />
       </div>
 
-      <div className="mb-4">
-        <label className="block font-semibold mb-1">Offer Template</label>
-        <select
-          value={offerDetails.templateId}
-          onChange={(e) => setOfferDetails((prev) => ({ ...prev, templateId: e.target.value }))}
-          className="w-full border rounded px-3 py-2"
-        >
-          <option value="">Select a template</option>
-          {templates.map((tpl) => (
-            <option key={tpl._id} value={tpl._id}>
-              {tpl.name || tpl.title}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {error && <div className="text-red-600 mb-4">{error}</div>}
+      {error && <div className="text-red-600 mb-4 text-sm bg-red-50 p-2 rounded">{error}</div>}
 
       <div className="flex justify-end gap-3">
         <button
           onClick={onCancel}
           disabled={isSending}
-          className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-100"
+          className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-100 text-sm"
         >
           Cancel
         </button>
         <button
           onClick={handleSendBulk}
-          disabled={isSending || !offerDetails.templateId || !offerDetails.joiningDate}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center disabled:opacity-50"
+          disabled={isSending || !joiningDate}
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center disabled:opacity-50 text-sm"
         >
-          {isSending ? "Sending..." : "Send Offers"}
+          {isSending ? "Sending..." : `Send ${selectedStudents.length} Offer${selectedStudents.length !== 1 ? "s" : ""}`}
         </button>
       </div>
     </div>

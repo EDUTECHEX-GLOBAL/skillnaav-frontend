@@ -114,6 +114,47 @@ def extract_text_from_docx(docx_file):
         return ""
 
 # === Core Resume Processing ===
+def compute_ats_similarity(text: str, job_embedding) -> float:
+    """
+    Smarter ATS scoring:
+    1. Extract skill keywords found in the resume and encode them as a dense phrase.
+    2. Split the resume into overlapping ~200-word chunks and encode each.
+    3. Return the MAX cosine similarity across all chunks + keyword phrase.
+    This avoids the 'full-doc dilution' problem where a long resume scores low
+    against a short job description.
+    """
+    if not text or not text.strip():
+        return 0.0
+
+    # ── Skill keyword extraction ───────────────────────────────────────────────
+    lower = text.lower()
+    found_skills = [kw for kw in SKILL_KEYWORDS if re.search(rf"\b{re.escape(kw)}\b", lower)]
+    skill_phrase = " ".join(found_skills) if found_skills else ""
+
+    # ── Chunk the resume (200-word windows, 50-word stride) ───────────────────
+    words = text.split()
+    chunks = []
+    window, stride = 200, 50
+    for i in range(0, max(1, len(words) - window + 1), stride):
+        chunk = " ".join(words[i: i + window])
+        if chunk.strip():
+            chunks.append(chunk)
+    # Always add the first 300 words (header / summary area) as a separate chunk
+    chunks.append(" ".join(words[:300]))
+    if skill_phrase:
+        chunks.append(skill_phrase)
+
+    # Deduplicate
+    chunks = list(dict.fromkeys(c for c in chunks if c.strip()))
+
+    # ── Encode all chunks at once (batched → fast) ────────────────────────────
+    chunk_embeddings = embedder.encode(chunks, convert_to_tensor=True, batch_size=32)
+    sims = util.cos_sim(chunk_embeddings, job_embedding)   # shape: (N, 1)
+    best = float(sims.max().item())
+
+    return best
+
+
 async def process_resume(resume_url, job_embedding):
     application = await asyncio.get_event_loop().run_in_executor(
         None, lambda: applications_collection.find_one({"resumeUrl": resume_url})
@@ -131,7 +172,6 @@ async def process_resume(resume_url, job_embedding):
 
     if not school_admin_id:
         print(f"[{now()}] ⚠️ Missing schoolAdmin in application: {resume_url}")
-        # return None  # Optionally skip
 
     file_stream = await asyncio.get_event_loop().run_in_executor(None, download_resume_from_s3, resume_url)
     if not file_stream:
@@ -147,9 +187,10 @@ async def process_resume(resume_url, job_embedding):
         print(f"[{now()}] Unsupported file type: {ext}")
         return None
 
-    embedding = embedder.encode(text, convert_to_tensor=True)
-    similarity = util.cos_sim(embedding, job_embedding).item()
-    print(f"[{now()}] Similarity score for {email}: {similarity:.4f}")
+    similarity = await asyncio.get_event_loop().run_in_executor(
+        None, compute_ats_similarity, text, job_embedding
+    )
+    print(f"[{now()}] ATS score for {email}: {similarity:.4f} ({similarity*100:.1f}%)")
 
     return {
         "student_id": student_id,
@@ -278,6 +319,15 @@ async def shortlist_candidates(
 
     print(f"[{now()}] shortlist -> internship_id='{internship_id}' resumes={len(resumes)} skills={job_skills_list}")
 
+    # ── ATS threshold (partner input, 0–100 → converted to 0–1) ──────────────
+    try:
+        ats_pct = float(form.get("ats_threshold", 30))
+        ats_pct = max(0.0, min(100.0, ats_pct))
+    except (ValueError, TypeError):
+        ats_pct = 30.0
+    ats_threshold = ats_pct / 100.0
+    print(f"[{now()}] ATS threshold → {ats_pct}% ({ats_threshold:.2f})")
+
     # Validate internship_id
     try:
         internship_obj_id = ObjectId(internship_id)
@@ -287,8 +337,9 @@ async def shortlist_candidates(
     if not resumes:
         raise HTTPException(status_code=400, detail="No resumes provided.")
 
-    # Compose job text and get embedding
-    job_text = job_description + " " + " ".join(job_skills_list)
+    # Compose enriched job text — repeat skills 3× so they dominate the embedding
+    skills_text = " ".join(job_skills_list)
+    job_text = f"{job_description} {skills_text} {skills_text} {skills_text}".strip()
     job_embedding = embedder.encode(job_text, convert_to_tensor=True)
 
     # ── FIX 1: Skip resumes whose application is already Shortlisted ─────────
@@ -319,11 +370,12 @@ async def shortlist_candidates(
     tasks = [process_resume(url, job_embedding) for url in pending_resumes]
     results = await asyncio.gather(*tasks)
 
-    # Filter by similarity threshold
-    candidates = [c for c in results if c and c["similarity_score"] >= 0.3]
+    # Filter by partner-defined ATS threshold
+    candidates = [c for c in results if c and c["similarity_score"] >= ats_threshold]
 
     for cand in candidates:
         cand["internship_id"] = internship_obj_id
+        cand["ats_score_pct"] = round(cand["similarity_score"] * 100, 1)
         if cand.get("school_admin_id") and ObjectId.is_valid(str(cand["school_admin_id"])):
             cand["school_admin_id"] = ObjectId(cand["school_admin_id"])
 

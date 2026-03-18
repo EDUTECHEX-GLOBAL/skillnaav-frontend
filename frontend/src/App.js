@@ -1,191 +1,119 @@
-import React, { useEffect, useCallback } from "react";
+import React, { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import "@fontsource/inter/400.css";
 import "@fontsource/inter/600.css";
 import "@fontsource/inter/700.css";
-import Home from "./pages/Home";
-import axios from "axios";
-import { useDispatch, useSelector } from "react-redux";
-import { HideLoading, SetSkillNaavData } from "./redux/rootSlice";
-import Admin from "./pages/Admin";
-import Login from "./pages/Admin/Login";
+import PageLoader from "./components/PageLoader";
 
-import PricingPage from "./pages/PricingPage";
-import FeaturesPage from "./pages/FeaturesPage";
-import TeamPage from "./pages/TeamPage";
-import FaqPage from "./pages/FaqPage";
-import ContactPage from "./pages/ContactPage";
-import VisionPage from "./pages/VisionPage";
+import { useSelector } from "react-redux";
 
-import UserCreateAccount from "./WebApp/Flows/UserFlow/SignUpLogin/UserCreateAccount";
-import UserLogin from "./WebApp/Flows/UserFlow/SignUpLogin/UserLogin";
-import UserFlow from "./WebApp/Flows/UserFlow/UserFlow";
-import UserMainPage from "./WebApp/Flows/UserFlow/MainPage/UserMainPage";
-import UserProfileForm from "./WebApp/Flows/UserFlow/SignUpLogin/UserProfileBuilding/UserProfileForm";
-import UserProfilePicture from "./WebApp/Flows/UserFlow/SignUpLogin/UserProfileBuilding/UserProfilePicture";
-import UserforgotPassword from "./WebApp/Flows/UserFlow/SignUpLogin/UserforgotPassword";
-import GoogleUserProfileForm from "./WebApp/Flows/UserFlow/SignUpLogin/UserProfileBuilding/GoogleUserProfileForm";
-// import GoogleUserProfilePicture from "./WebApp/Flows/UserFlow/SignUpLogin/UserProfileBuilding/GoogleUserProfilePicture";
-import SkillnaavAnalysis from "./WebApp/Flows/UserFlow/MainPage/SkillnaavAnalysis";
+// ---------- LAZY IMPORTS ----------
+const Home = lazy(() => import("./pages/Home/Home"));
+const Admin = lazy(() => import("./pages/Admin"));
+const Login = lazy(() => import("./pages/Admin/Login"));
 
-import PartnerFlow from "./WebApp/Flows/PartnerFlow/PartnerFlow";
-import PartnerCreateAccount from "./WebApp/Flows/PartnerFlow/SignUpLogin/PartnerCreateAccount";
-import PartnerLogin from "./WebApp/Flows/PartnerFlow/SignUpLogin/PartnerLogin";
-// import PartnerProfileForm from "./WebApp/Flows/PartnerFlow/SignUpLogin/UserProfileBuilding/PartnerProfileForm";
-import PartnerProfilePicture from "./WebApp/Flows/PartnerFlow/SignUpLogin/UserProfileBuilding/PartnerProfilePicture";
-import PartnerMainPage from "./WebApp/Flows/PartnerFlow/MainPage/PartnerMainPage";
-import PartnerforgotPassword from "./WebApp/Flows/PartnerFlow/SignUpLogin/PartnerforgotPassword";
-// import AdminFlow from "./WebApp/Flows/AdminFlow/AdminFlow";
-import AdminCreateAccount from "./WebApp/Flows/AdminFlow/SignUpLogin/AdminCreateAccount";
-import AdminLogin from "./WebApp/Flows/AdminFlow/SignUpLogin/AdminLogin";
-import AdminLoginOtp from "./WebApp/Flows/AdminFlow/SignUpLogin/AdminLoginOtp";
+const PricingPage = lazy(() => import("./pages/PricingPage"));
+const FeaturesPage = lazy(() => import("./pages/FeaturesPage"));
+const TeamPage = lazy(() => import("./pages/TeamPage"));
+const FaqPage = lazy(() => import("./pages/FaqPage"));
+const ContactPage = lazy(() => import("./pages/ContactPage"));
+const VisionPage = lazy(() => import("./pages/VisionPage"));
 
-import AdminForgotPassword from "./WebApp/Flows/AdminFlow/SignUpLogin/AdminForgotPassword";
-import AdminResetPassword from "./WebApp/Flows/AdminFlow/SignUpLogin/AdminResetPassword";
+const UserCreateAccount = lazy(() => import("./WebApp/Flows/UserFlow/SignUpLogin/UserCreateAccount"));
+const UserLogin = lazy(() => import("./WebApp/Flows/UserFlow/SignUpLogin/UserLogin"));
+const UserFlow = lazy(() => import("./WebApp/Flows/UserFlow/UserFlow"));
+const UserMainPage = lazy(() => import("./WebApp/Flows/UserFlow/MainPage/UserMainPage"));
+const UserProfileForm = lazy(() => import("./WebApp/Flows/UserFlow/SignUpLogin/UserProfileBuilding/UserProfileForm"));
+const UserProfilePicture = lazy(() => import("./WebApp/Flows/UserFlow/SignUpLogin/UserProfileBuilding/UserProfilePicture"));
+const UserforgotPassword = lazy(() => import("./WebApp/Flows/UserFlow/SignUpLogin/UserforgotPassword"));
+const GoogleUserProfileForm = lazy(() => import("./WebApp/Flows/UserFlow/SignUpLogin/UserProfileBuilding/GoogleUserProfileForm"));
 
-import AdminProfileForm from "./WebApp/Flows/AdminFlow/SignUpLogin/AdminProfileBuilding/AdminProfileForm";
-import AdminProfilePicture from "./WebApp/Flows/AdminFlow/SignUpLogin/AdminProfileBuilding/AdminProfilePicture";
-import AdminMainPage from "./WebApp/Flows/AdminFlow/MainPage/AdminMainPage";
-import TryforFree from "./WebApp/TryforFree";
+const SkillnaavAnalysis = lazy(() => import("./WebApp/Flows/UserFlow/MainPage/SkillnaavAnalysis"));
 
-import SchoolAdminFlow from "./WebApp/Flows/SchoolAdminFlow/SchoolAdminFlow";
-import SchoolAdminResetPassword from "./WebApp/Flows/SchoolAdminFlow/SignUpLogin/SchoolAdminResetPassword";
-import SchoolAdminForgotPassword from "./WebApp/Flows/SchoolAdminFlow/SignUpLogin/SchoolAdminForgotPassword";
+const PartnerFlow = lazy(() => import("./WebApp/Flows/PartnerFlow/PartnerFlow"));
+const PartnerCreateAccount = lazy(() => import("./WebApp/Flows/PartnerFlow/SignUpLogin/PartnerCreateAccount"));
+const PartnerLogin = lazy(() => import("./WebApp/Flows/PartnerFlow/SignUpLogin/PartnerLogin"));
+const PartnerProfilePicture = lazy(() => import("./WebApp/Flows/PartnerFlow/SignUpLogin/UserProfileBuilding/PartnerProfilePicture"));
+const PartnerMainPage = lazy(() => import("./WebApp/Flows/PartnerFlow/MainPage/PartnerMainPage"));
+const PartnerforgotPassword = lazy(() => import("./WebApp/Flows/PartnerFlow/SignUpLogin/PartnerforgotPassword"));
 
-// ---------- NEW IMPORTS ----------
+const AdminCreateAccount = lazy(() => import("./WebApp/Flows/AdminFlow/SignUpLogin/AdminCreateAccount"));
+const AdminLogin = lazy(() => import("./WebApp/Flows/AdminFlow/SignUpLogin/AdminLogin"));
+const AdminLoginOtp = lazy(() => import("./WebApp/Flows/AdminFlow/SignUpLogin/AdminLoginOtp"));
+const AdminForgotPassword = lazy(() => import("./WebApp/Flows/AdminFlow/SignUpLogin/AdminForgotPassword"));
+const AdminResetPassword = lazy(() => import("./WebApp/Flows/AdminFlow/SignUpLogin/AdminResetPassword"));
+const AdminProfileForm = lazy(() => import("./WebApp/Flows/AdminFlow/SignUpLogin/AdminProfileBuilding/AdminProfileForm"));
+const AdminProfilePicture = lazy(() => import("./WebApp/Flows/AdminFlow/SignUpLogin/AdminProfileBuilding/AdminProfilePicture"));
+const AdminMainPage = lazy(() => import("./WebApp/Flows/AdminFlow/MainPage/AdminMainPage"));
+
+const TryforFree = lazy(() => import("./WebApp/TryforFree"));
+
+const SchoolAdminFlow = lazy(() => import("./WebApp/Flows/SchoolAdminFlow/SchoolAdminFlow"));
+const SchoolAdminResetPassword = lazy(() => import("./WebApp/Flows/SchoolAdminFlow/SignUpLogin/SchoolAdminResetPassword"));
+const SchoolAdminForgotPassword = lazy(() => import("./WebApp/Flows/SchoolAdminFlow/SignUpLogin/SchoolAdminForgotPassword"));
+
+// ---------- CONTEXT ----------
 import FeedbackProvider from "./context/FeedbackContext";
 import FeedbackModal from "./components/FeedbackModal/FeedbackModal";
-// ---------- END NEW IMPORTS ----------
-
-//  import InternshipDetail from "./WebApp/Flows/UserFlow/MainPage/InternshipDetail";
-// ---- NEW IMPORTS for auth/refresh support ----
-// Create this small file earlier: src/lib/auth.js (in-memory store)
-// import { setAccessToken } from "./lib/auth"; // adjust path if different
-// Optionally, use the api axios wrapper everywhere in app
-// import api from "./lib/api"; // if you created the api wrapper
 
 function App() {
-  const { skillnaavData, reloadData } = useSelector((state) => state.root);
-  const dispatch = useDispatch();
-
-  // Fetch SkillNaav static data (unchanged) — memoized to satisfy hook lint rule
-  const getSkillNaavData = useCallback(async () => {
-    try {
-      const response = await axios.get("/api/skillnaav/get-skillnaav-data");
-      dispatch(SetSkillNaavData(response.data));
-      dispatch(HideLoading());
-    } catch (error) {
-      console.error("Error fetching SkillNaav data:", error);
-      dispatch(HideLoading());
-    }
-  }, [dispatch]);
-
-  useEffect(() => {
-    if (!skillnaavData || reloadData) {
-      getSkillNaavData();
-    }
-  }, [skillnaavData, reloadData, getSkillNaavData]);
-
-  // ---- NEW: Try refresh on app start so components have an access token ----
-  // useEffect(() => {
-  //   (async () => {
-  //     try {
-  //       // Call refresh endpoint — browser will send httpOnly refresh cookie automatically
-  //       const res = await axios.post("/api/auth/refresh", {}, { withCredentials: true });
-
-  //       // server should return { accessToken: "..." } (or token)
-  //       const newToken = res?.data?.accessToken || res?.data?.token || null;
-
-  //       if (newToken) {
-  //         // Set in-memory token (api wrapper reads from this)
-  //         setAccessToken(newToken);
-
-  //         // Optional: persist raw token (NOT recommended long-term). If you do, keep it as raw string:
-  //         // localStorage.setItem('userToken', newToken);
-
-  //         // Optionally also set userInfo if server returns user
-  //         if (res.data.user) {
-  //           localStorage.setItem("userInfo", JSON.stringify(res.data.user));
-  //         }
-  //       }
-  //     } catch (err) {
-  //       // No active session — ignore, user remains logged out
-  //       // console.debug("No active refresh session:", err.message);
-  //     }
-  //   })();
-  // }, []); // run only once on mount
-
   return (
-    /* Wrap the app in FeedbackProvider so any component can open the modal via useFeedback() */
     <FeedbackProvider>
       <BrowserRouter>
-        <Routes>
-          {/* Skillnaav Website Routes */}
-          <Route path="/" element={<Home />} />
-          <Route path="/admin" element={<Admin />} />
-          <Route path="/admin-login" element={<Login />} />
-          <Route path="/features" element={<FeaturesPage />} />
-          <Route path="/team" element={<TeamPage />} />
-          <Route path="/pricing" element={<PricingPage />} />
-          <Route path="/faqs" element={<FaqPage />} />
-          <Route path="/contact" element={<ContactPage />} />
-          <Route path="/vision" element={<VisionPage />} />
-          {/* <Route
-    path="/internship/:id"
-    element={
-      <TabProvider>
-        <InternshipDetail />
-      </TabProvider>
-    }
-  /> */}
-          <Route path="*" element={<Navigate to="/" replace />} />
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
+            {/* Website */}
+            <Route path="/" element={<Home />} />
+            <Route path="/admin" element={<Admin />} />
+            <Route path="/admin-login" element={<Login />} />
+            <Route path="/features" element={<FeaturesPage />} />
+            <Route path="/team" element={<TeamPage />} />
+            <Route path="/pricing" element={<PricingPage />} />
+            <Route path="/faqs" element={<FaqPage />} />
+            <Route path="/contact" element={<ContactPage />} />
+            <Route path="/vision" element={<VisionPage />} />
 
-          {/* Skillnaav Web App Routes */}
-          {/* User Flow */}
-          <Route path="/user" element={<UserFlow />} />
-          <Route path="/user-create-account" element={<UserCreateAccount />} />
-          <Route path="/user/login" element={<UserLogin />} />
-          <Route path="/user-profile-form" element={<UserProfileForm />} />
-          <Route path="/user-profile-picture" element={<UserProfilePicture />} />
-          <Route path="/user-main-page" element={<UserMainPage />} />
-          <Route path="/user-forgot-password" element={<UserforgotPassword />} />
-          <Route path="/google-user-profileform" element={<GoogleUserProfileForm />} />
+            {/* User */}
+            <Route path="/user" element={<UserFlow />} />
+            <Route path="/user-create-account" element={<UserCreateAccount />} />
+            <Route path="/user/login" element={<UserLogin />} />
+            <Route path="/user-profile-form" element={<UserProfileForm />} />
+            <Route path="/user-profile-picture" element={<UserProfilePicture />} />
+            <Route path="/user-main-page" element={<UserMainPage />} />
+            <Route path="/user-forgot-password" element={<UserforgotPassword />} />
+            <Route path="/google-user-profileform" element={<GoogleUserProfileForm />} />
 
-          <Route path="/skillnaav-analysis" element={<SkillnaavAnalysis />} />
+            <Route path="/skillnaav-analysis" element={<SkillnaavAnalysis />} />
 
-          {/* Partner Flow */}
-          <Route path="/partner" element={<PartnerFlow />} />
-          <Route path="/partner-create-account" element={<PartnerCreateAccount />} />
-          <Route path="/partner/login" element={<PartnerLogin />} />
-          {/* <Route path="/partner-profile-form" element={<PartnerProfileForm />} /> */}
-          <Route path="/partner-profile-picture" element={<PartnerProfilePicture />} />
-          <Route path="/partner-main-page" element={<PartnerMainPage />} />
+            {/* Partner */}
+            <Route path="/partner" element={<PartnerFlow />} />
+            <Route path="/partner-create-account" element={<PartnerCreateAccount />} />
+            <Route path="/partner/login" element={<PartnerLogin />} />
+            <Route path="/partner-profile-picture" element={<PartnerProfilePicture />} />
+            <Route path="/partner-main-page" element={<PartnerMainPage />} />
+            <Route path="/partner-forgot-password" element={<PartnerforgotPassword />} />
 
-          <Route path="/partner-forgot-password" element={<PartnerforgotPassword />} />
+            {/* Admin */}
+            <Route path="/admin-create-account" element={<AdminCreateAccount />} />
+            <Route path="/admin/login" element={<AdminLogin />} />
+            <Route path="/admin/login-otp" element={<AdminLoginOtp />} />
+            <Route path="/admin/forgot-password" element={<AdminForgotPassword />} />
+            <Route path="/admin/reset-password" element={<AdminResetPassword />} />
+            <Route path="/admin-profile-form" element={<AdminProfileForm />} />
+            <Route path="/admin-profile-picture" element={<AdminProfilePicture />} />
+            <Route path="/admin-main-page" element={<AdminMainPage />} />
 
-          {/* Admin Flow */}
-          {/* <Route path="/admin-account" element={<AdminFlow />} /> */}
-          <Route path="/admin-create-account" element={<AdminCreateAccount />} />
-          <Route path="/admin/login" element={<AdminLogin />} />
-          <Route path="/admin/login-otp" element={<AdminLoginOtp />} />
+            {/* School */}
+            <Route path="/schooladmin/*" element={<SchoolAdminFlow />} />
+            <Route path="/schooladmin/reset-password/:token" element={<SchoolAdminResetPassword />} />
+            <Route path="/schooladmin/forgot-password" element={<SchoolAdminForgotPassword />} />
 
-          <Route path="/admin/forgot-password" element={<AdminForgotPassword />} />
-          <Route path="/admin/reset-password" element={<AdminResetPassword />} />
+            <Route path="/choose-role" element={<TryforFree />} />
 
-          <Route path="/admin-profile-form" element={<AdminProfileForm />} />
-          <Route path="/admin-profile-picture" element={<AdminProfilePicture />} />
-          <Route path="/admin-main-page" element={<AdminMainPage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
 
-          {/* School Admin Flow */}
-          <Route path="/schooladmin/*" element={<SchoolAdminFlow />} />
-          <Route path="/schooladmin/reset-password/:token" element={<SchoolAdminResetPassword />} />
-          <Route path="/schooladmin/forgot-password" element={<SchoolAdminForgotPassword />} />
-
-          {/* Try for free */}
-          <Route path="/choose-role" element={<TryforFree />} />
-        </Routes>
-
-        {/* Mount the FeedbackModal once (it reads its state from FeedbackContext) */}
         <FeedbackModal />
       </BrowserRouter>
     </FeedbackProvider>

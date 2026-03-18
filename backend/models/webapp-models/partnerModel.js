@@ -12,6 +12,10 @@ const partnerwebappSchema = mongoose.Schema(
     institutionId: { type: String, required: true },
 
     profileImage: { type: String },
+    logoUrl: {
+  type: String,
+  default: "",
+},
 
     adminApproved: { type: Boolean, default: false },
 

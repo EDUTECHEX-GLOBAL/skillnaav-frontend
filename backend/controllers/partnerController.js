@@ -249,6 +249,7 @@ const getPartnerProfile = asyncHandler(async (req, res) => {
         universityName: partner.universityName,
         institutionId: partner.institutionId,
         profileImage: partner.profileImage, // Include image
+        logoUrl: partner.logoUrl,
         adminApproved: partner.adminApproved,
         isPremium: partner.isPremium,
         planType: partner.planType,

@@ -1,8 +1,11 @@
-import React, { Suspense, lazy, useMemo } from "react";
+import React, { Suspense, lazy, useEffect } from "react";
 import Navbar from "../../components/Navbar";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 import { Skeleton } from "antd";
+import axios from "axios";
+import { SetSkillNaavData, HideLoading } from "../../redux/rootSlice";
 
+// Lazy components
 const Discover = lazy(() => import("../../components/Discover"));
 const Vision = lazy(() => import("../../components/Vision"));
 const Features = lazy(() => import("../../components/Features"));
@@ -14,30 +17,32 @@ const Footer = lazy(() => import("../../components/Footer"));
 
 function Home() {
   const { skillnaavData } = useSelector((state) => state.root);
+  const dispatch = useDispatch();
 
-  const memoizedData = useMemo(() => skillnaavData, [skillnaavData]);
+  // ✅ API CALL ONLY FOR HOME PAGE
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await axios.get("/api/skillnaav/get-skillnaav-data");
+        dispatch(SetSkillNaavData(response.data));
+        dispatch(HideLoading());
+      } catch (error) {
+        console.error("Error fetching SkillNaav data:", error);
+        dispatch(HideLoading());
+      }
+    };
 
-  const cachedComponents = useMemo(
-    () => ({
-      Discover,
-      Vision,
-      Features,
-      Team,
-      Pricing,
-      Faq,
-      Contact,
-      Footer,
-    }),
-    []
-  );
+    if (!skillnaavData) {
+      fetchData();
+    }
+  }, [skillnaavData, dispatch]);
 
   return (
     <div className="font-inter">
       <Navbar />
+
       <div className="pt-20">
-        {" "}
-        {/* Adjust this value based on your navbar height */}
-        {memoizedData ? (
+        {skillnaavData ? (
           <Suspense
             fallback={
               <div className="px-[20px] lg:px-20 mx-auto">
@@ -46,6 +51,7 @@ function Home() {
             }
           >
             <Discover />
+
             <div className="px-[20px] lg:px-20 mx-auto">
               <Vision className="mt-16" />
               <Features className="mt-16" />

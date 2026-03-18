@@ -15,6 +15,10 @@ import {
   faPaperPlane,
   faSearch,
   faBriefcase,
+  faChevronDown,
+  faChevronUp,
+  faToggleOn,
+  faToggleOff,
 } from "@fortawesome/free-solid-svg-icons";
 import Modal from "./Modal";
 import ScheduleForm from "./ScheduleForm";
@@ -25,6 +29,21 @@ import InternshipScheduleViewer from "./InternshipScheduleViewer";
 import TimeSlotsSelected from "./TimeSlotsSelected";
 
 const AI_API = "/api/ai";
+
+// ─── Type badge ───────────────────────────────────────────────────────────────
+const TypeBadge = ({ type }) => {
+  const cfg = {
+    PAID:    { cls: "bg-emerald-100 text-emerald-700 border-emerald-200",  label: "Paid" },
+    STIPEND: { cls: "bg-blue-100 text-blue-700 border-blue-200",           label: "Stipend" },
+    FREE:    { cls: "bg-gray-100 text-gray-500 border-gray-200",           label: "Free" },
+  }[(type || "").toUpperCase()] || { cls: "bg-gray-100 text-gray-500 border-gray-200", label: type };
+
+  return (
+    <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${cfg.cls}`}>
+      {cfg.label}
+    </span>
+  );
+};
 
 const InternshipList = () => {
   const [internships, setInternships] = useState([]);
@@ -46,145 +65,115 @@ const InternshipList = () => {
 
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [joiningDate, setJoiningDate] = useState("");
-  const [templateId, setTemplateId] = useState("");
-  const [templates, setTemplates] = useState([]);
   const [sendingOffer, setSendingOffer] = useState(false);
 
-  // Pagination state
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
 
-  // Search state
-  const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const debounceRef = useRef(null);
 
-  // Ref to hold partner ID so pagination buttons can access it without stale closure
+  const [descExpanded, setDescExpanded] = useState({});
+  const [qualExpanded, setQualExpanded] = useState({});
+
   const partnerIdRef = useRef(null);
 
   const [scheduleFormOpen, setScheduleFormOpen] = useState(false);
   const [selectedInternshipForSchedule, setSelectedInternshipForSchedule] = useState(null);
+  const [atsModalOpen, setAtsModalOpen] = useState(false);
+  const [atsThreshold, setAtsThreshold] = useState(30);
+  const [pendingShortlistInternship, setPendingShortlistInternship] = useState(null);
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
   const [scheduleViewerOpen, setScheduleViewerOpen] = useState(false);
   const [selectedInternshipForView, setSelectedInternshipForView] = useState(null);
+  const [timeSlotsModal, setTimeSlotsModal] = useState({ open: false, internshipId: null });
 
-  const [timeSlotsModal, setTimeSlotsModal] = useState({
-    open: false,
-    internshipId: null,
-  });
+  // ─── Fetch internships ───────────────────────────────────────────────────────
+  const fetchInternships = useCallback(async (pid, pageNum = 1, query = "", isInitialLoad = false) => {
+    if (!pid) return;
+    if (isInitialLoad) setLoading(true);
+    else setIsSearching(true);
+    if (pageNum > 1) setLoadingMore(true);
+    setError(null);
 
-  // ─── fetchInternships — useCallback so it's stable across renders ─────────
-  // BUG FIX 1: Was a plain async function defined inside render scope.
-  // That meant every render created a new reference, and pagination buttons
-  // captured stale closures over `page`. Now it's a stable useCallback with
-  // no dependencies (all values are passed as arguments or read from refs).
-const fetchInternships = useCallback(async (pid, pageNum = 1, query = '', isInitialLoad = false) => {
-  if (!pid) return;
-
-  if (isInitialLoad) {
-    setLoading(true);       // full page spinner — only on first ever load
-  } else {
-    setIsSearching(true);   // subtle inline indicator — search/pagination
-  }
-
-  if (pageNum > 1) setLoadingMore(true);
-  setError(null);
-
-  try {
-    const params = { page: pageNum, limit: 6 };
-    if (query.trim()) params.search = query.trim();
-
-    const response = await axios.get(`/api/interns/partner/${pid}`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      params,
-    });
-
-    const newData = response.data.data || [];
-    const tp = Number(response.data.totalPages) || 1;
-    const tc = Number(response.data.total) || 0;
-
-    setInternships(newData);
-    setPage(pageNum);
-    setTotalPages(tp);
-    setTotalCount(tc);
-    setHasMore(pageNum < tp);
-    setDebouncedQuery(query || '');
-  } catch (err) {
-    console.error("Error fetching internships:", err);
-    if (isInitialLoad || pageNum === 1) {
-      setInternships([]);
-      setError("Failed to load internships. Please try again.");
-    } else {
-      toast.error("Failed to load page. Please try again.");
-    }
-  } finally {
-    setLoading(false);
-    setIsSearching(false);
-    setLoadingMore(false);
-  }
-}, []);
-
-// 3. Pass isInitialLoad=true only from the useEffect (first mount)
-useEffect(() => {
-  const fetchPartnerData = async () => {
     try {
-      const response = await axios.get(`/api/partners/profile`, {
+      const params = { page: pageNum, limit: 6 };
+      if (query.trim()) params.search = query.trim();
+
+      const response = await axios.get(`/api/interns/partner/${pid}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        params,
       });
-      setPartnerData(response.data);
 
-      if (response.data?._id) {
-        partnerIdRef.current = response.data._id;
-        fetchInternships(response.data._id, 1, '', true); // ← isInitialLoad = true
-      } else {
-        throw new Error("Partner ID not found in profile");
-      }
+      setInternships(response.data.data || []);
+      setPage(pageNum);
+      setTotalPages(Number(response.data.totalPages) || 1);
+      setTotalCount(Number(response.data.total) || 0);
+      setHasMore(pageNum < (Number(response.data.totalPages) || 1));
+      setDebouncedQuery(query || "");
     } catch (err) {
-      console.error("Failed to fetch partner data:", err);
-      setError("Unable to load partner profile");
+      console.error("Error fetching internships:", err);
+      if (isInitialLoad || pageNum === 1) {
+        setInternships([]);
+        setError("Failed to load internships. Please try again.");
+      } else {
+        toast.error("Failed to load page. Please try again.");
+      }
+    } finally {
       setLoading(false);
+      setIsSearching(false);
+      setLoadingMore(false);
     }
+  }, []);
+
+  useEffect(() => {
+    const fetchPartnerData = async () => {
+      try {
+        const response = await axios.get(`/api/partners/profile`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        });
+        setPartnerData(response.data);
+        if (response.data?._id) {
+          partnerIdRef.current = response.data._id;
+          fetchInternships(response.data._id, 1, "", true);
+        } else throw new Error("Partner ID not found in profile");
+      } catch (err) {
+        console.error("Failed to fetch partner data:", err);
+        setError("Unable to load partner profile");
+        setLoading(false);
+      }
+    };
+    fetchPartnerData();
+  }, [fetchInternships]);
+
+  const handleSearchChange = (e) => {
+    const q = e.target.value;
+    setSearchQuery(q);
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      if (partnerIdRef.current) fetchInternships(partnerIdRef.current, 1, q);
+    }, 350);
   };
-
-  fetchPartnerData();
-}, [fetchInternships]);
-
-// 4. handleSearchChange stays the same — just calls fetchInternships normally (isInitialLoad defaults to false)
-const handleSearchChange = (e) => {
-  const q = e.target.value;
-  setSearchQuery(q);
-  clearTimeout(debounceRef.current);
-  debounceRef.current = setTimeout(() => {
-    if (partnerIdRef.current) {
-      fetchInternships(partnerIdRef.current, 1, q); // no isInitialLoad flag
-    }
-  }, 350);
-};
 
   const toggleApplicationOpen = async (internshipId, newStatus) => {
     try {
-      setInternships(prev =>
-        prev.map(intern =>
-          intern._id === internshipId ? { ...intern, applicationOpen: newStatus } : intern
-        )
+      setInternships((prev) =>
+        prev.map((i) => i._id === internshipId ? { ...i, applicationOpen: newStatus } : i)
       );
-
-      await axios.put(`/api/interns/${internshipId}`, { applicationOpen: newStatus }, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-      });
-
-      toast.success(`Internship applications are now ${newStatus ? "open" : "closed"}.`);
-    } catch (error) {
-      console.error("Failed to update application status:", error);
-      toast.error("Failed to update application status. Please try again.");
-      // Revert optimistic update on failure
-      setInternships(prev =>
-        prev.map(intern =>
-          intern._id === internshipId ? { ...intern, applicationOpen: !newStatus } : intern
-        )
+      await axios.put(
+        `/api/interns/${internshipId}`,
+        { applicationOpen: newStatus },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+      );
+      toast.success(`Applications are now ${newStatus ? "open" : "closed"}.`);
+    } catch {
+      toast.error("Failed to update. Please try again.");
+      setInternships((prev) =>
+        prev.map((i) => i._id === internshipId ? { ...i, applicationOpen: !newStatus } : i)
       );
     }
   };
@@ -200,12 +189,10 @@ const handleSearchChange = (e) => {
   };
 
   const calculateDaysAgo = (date) => {
-    const posted = new Date(date);
-    const now = new Date();
-    const diff = now - posted;
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    if (days === 0) return hours === 0 ? "Just now" : `${hours} hour${hours > 1 ? "s" : ""} ago`;
+    const diff = Date.now() - new Date(date);
+    const days = Math.floor(diff / 86400000);
+    const hours = Math.floor(diff / 3600000);
+    if (days === 0) return hours === 0 ? "Just now" : `${hours}h ago`;
     if (days === 1) return "Yesterday";
     return `${days}d ago`;
   };
@@ -219,77 +206,63 @@ const handleSearchChange = (e) => {
 
   const fetchApplications = async (internshipId) => {
     if (!hasPremiumAccess()) {
-      toast.error(`Please upgrade to Premium Basic or higher to view applications`);
+      toast.error("Upgrade to Premium Basic or higher to view applications");
       return;
     }
-
     try {
-      setLoadingApplications(prev => ({ ...prev, [internshipId]: true }));
+      setLoadingApplications((prev) => ({ ...prev, [internshipId]: true }));
       setModalData({ open: true, internshipId, type: "applications", loading: true });
       const { data } = await axios.get(`/api/applications/internship/${internshipId}`);
-      setApplications(prev => ({
+      setApplications((prev) => ({
         ...prev,
         [internshipId]: Array.isArray(data.applications) ? data.applications : [],
       }));
     } catch (err) {
-      console.warn("Could not fetch applications:", err.message);
-      setApplications(prev => ({ ...prev, [internshipId]: [] }));
+      setApplications((prev) => ({ ...prev, [internshipId]: [] }));
       toast.error("Failed to load applications.");
     } finally {
-      setLoadingApplications(prev => ({ ...prev, [internshipId]: false }));
-      setModalData(prev => ({ ...prev, loading: false }));
+      setLoadingApplications((prev) => ({ ...prev, [internshipId]: false }));
+      setModalData((prev) => ({ ...prev, loading: false }));
     }
   };
 
-  const handleShortlist = async (id, description, skills) => {
+  // Opens the ATS threshold modal before running shortlist
+  const openAtsModal = (internship) => {
     if (!hasPremiumAccess()) {
-      toast.error(`Please upgrade to Premium Basic or higher to shortlist candidates`);
+      toast.error("Upgrade to Premium Basic or higher to shortlist candidates");
       return;
     }
+    setPendingShortlistInternship(internship);
+    setAtsThreshold(30); // reset to default each time
+    setAtsModalOpen(true);
+  };
 
+  const handleShortlist = async (id, description, skills, threshold) => {
+    setAtsModalOpen(false);
     setLoadingShortlist(true);
     setModalData({ open: true, internshipId: id, type: "shortlisted", loading: true });
-
     try {
       let resumes = [];
-
-      if (!applications[id] || applications[id].length === 0) {
-        try {
-          const { data } = await axios.get(`/api/applications/internship/${id}`);
-          const fetchedApplications = Array.isArray(data.applications) ? data.applications : [];
-          setApplications(prev => ({ ...prev, [id]: fetchedApplications }));
-          resumes = fetchedApplications.map((s) => s.resumeUrl).filter(Boolean);
-        } catch (err) {
-          console.error("Error fetching applications for shortlisting:", err);
-        }
+      if (!applications[id]?.length) {
+        const { data } = await axios.get(`/api/applications/internship/${id}`);
+        const fetched = Array.isArray(data.applications) ? data.applications : [];
+        setApplications((prev) => ({ ...prev, [id]: fetched }));
+        resumes = fetched.map((s) => s.resumeUrl).filter(Boolean);
       } else {
         resumes = applications[id].map((s) => s.resumeUrl).filter(Boolean);
       }
-
       const formData = new FormData();
       formData.append("job_description", description || "");
       formData.append("job_skills", JSON.stringify(skills || []));
       resumes.forEach((url) => formData.append("resumes", url));
       formData.append("internship_id", id);
-
-      const { data } = await axios.post(
-        `${AI_API}/partner/shortlist`,
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
-      );
-
-      setShortlistedCandidates((prev) => ({
-        ...prev,
-        [id]: data.shortlisted_candidates || [],
-      }));
-      toast.success("Candidates shortlisted successfully!");
-    } catch (err) {
-      console.error("Shortlisting error:", err);
+      formData.append("ats_threshold", String(threshold ?? 30));
+      const { data } = await axios.post(`${AI_API}/partner/shortlist`, formData, {
+        headers: { "Content-Type": "multipart/form-data", Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      setShortlistedCandidates((prev) => ({ ...prev, [id]: data.shortlisted_candidates || [] }));
+      toast.success(`Candidates shortlisted (ATS ≥ ${threshold ?? 30}%)!`);
+    } catch {
       toast.error("Shortlisting failed. Please try again.");
     } finally {
       setLoadingShortlist(false);
@@ -299,23 +272,17 @@ const handleSearchChange = (e) => {
 
   const showShortlisted = async (internshipId) => {
     if (!hasPremiumAccess()) {
-      toast.error(`Please upgrade to Premium Basic or higher to view shortlisted candidates`);
+      toast.error("Upgrade to Premium Basic or higher to view shortlisted candidates");
       return;
     }
-
     setLoadingShortlist(true);
     setModalData({ open: true, internshipId, type: "shortlisted", loading: true });
-
     try {
-      const { data } = await axios.get(
-        `${AI_API}/partner/shortlisted/${internshipId}`,
-        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
-      );
-      setShortlistedCandidates((prev) => ({
-        ...prev,
-        [internshipId]: data.shortlisted_candidates,
-      }));
-    } catch (err) {
+      const { data } = await axios.get(`${AI_API}/partner/shortlisted/${internshipId}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      setShortlistedCandidates((prev) => ({ ...prev, [internshipId]: data.shortlisted_candidates }));
+    } catch {
       toast.error("Failed to load shortlisted candidates.");
     } finally {
       setLoadingShortlist(false);
@@ -329,87 +296,56 @@ const handleSearchChange = (e) => {
       setApplications((prev) => {
         const updated = { ...prev };
         Object.keys(updated).forEach((key) => {
-          updated[key] = updated[key].map((s) =>
-            s._id === studentId ? { ...s, status } : s
-          );
+          updated[key] = updated[key].map((s) => s._id === studentId ? { ...s, status } : s);
         });
         return updated;
       });
-    } catch (err) {
+    } catch {
       toast.error("Failed to update application status.");
     }
   };
 
-  // BUG FIX 3: handleSendOffer set state but there was no modal/UI rendering
-  // the offer form. The selectedStudent state was set but never displayed,
-  // so partners could never actually send offers. Added an "offerModal" state
-  // and a dedicated modal below to render the form.
   const handleSendOffer = (student) => {
-    const internship = internships.find(i => i._id === modalData.internshipId);
+    const internship = internships.find((i) => i._id === modalData.internshipId);
     setSelectedStudent({ ...student, internship_id: modalData.internshipId });
-    setJoiningDate(
-      internship?.startDate
-        ? new Date(internship.startDate).toISOString().split("T")[0]
-        : ""
-    );
-    setTemplateId("");
-
-    axios
-      .get(`/api/templates?partnerId=${partnerData?._id}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      })
-      .then((res) => setTemplates(res.data))
-      .catch(err => {
-        console.error("Error fetching templates:", err);
-        toast.error("Failed to load templates");
-      });
+    setJoiningDate(internship?.startDate ? new Date(internship.startDate).toISOString().split("T")[0] : "");
   };
 
   const handleSendOfferLetter = async () => {
-    if (!templateId || !joiningDate) {
-      toast.warn("Template and joining date are required.");
-      return;
-    }
-
+    if (!joiningDate) { toast.warn("Please select a joining date."); return; }
     try {
       setSendingOffer(true);
-
-      const internship = internships.find(i => i._id === selectedStudent?.internship_id);
-      const schoolAdminId = localStorage.getItem("schoolAdminId");
-
-      const payload = {
+      const internship = internships.find((i) => i._id === selectedStudent?.internship_id);
+      await axios.post(`/api/offer-letters`, {
         partnerId: partnerData?._id,
         student_id: selectedStudent?._id,
         internshipId: internship?._id,
-        templateId,
         name: selectedStudent?.name,
         email: selectedStudent?.email,
         position: internship?.jobTitle,
         company: internship?.companyName,
         location: internship?.location,
-        duration: internship?.endDateOrDuration,
+        duration: internship?.duration || internship?.endDateOrDuration,
         startDate: joiningDate,
         internshipType: internship?.internshipType,
         compensationDetails: internship?.compensationDetails,
         jobDescription: internship?.jobDescription,
         qualifications: Array.isArray(internship?.qualifications)
           ? internship.qualifications
-          : (typeof internship?.qualifications === 'string'
-            ? internship.qualifications.match(/[A-Z]?[a-z]+/g)
-            : []),
-        contactInfo: { name: "HR Manager", email: "hr@company.com", phone: "9876543210" },
+          : typeof internship?.qualifications === "string"
+          ? internship.qualifications.split(",").map((q) => q.trim()).filter(Boolean) : [],
+        // contactInfo is resolved on the backend from the internship document
+        contactInfo: {
+          name:  internship?.contactInfo?.name  || "",
+          email: internship?.contactInfo?.email || "",
+          phone: internship?.contactInfo?.phone || "",
+        },
         noticePeriod: "2 weeks",
-        schoolAdminId: schoolAdminId || null,
-      };
-
-      await axios.post(`/api/offer-letters`, payload, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      });
-
+        schoolAdminId: localStorage.getItem("schoolAdminId") || null,
+      }, { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } });
       toast.success("Offer sent successfully!");
       setSelectedStudent(null);
     } catch (err) {
-      console.error("Offer letter error:", err);
       toast.error(err.response?.data?.error || "Failed to send offer letter");
     } finally {
       setSendingOffer(false);
@@ -417,10 +353,7 @@ const handleSearchChange = (e) => {
   };
 
   const handleSchedule = (internship) => {
-    if (!hasFullPremiumAccess()) {
-      toast.error(`Please upgrade to Premium Plus to schedule interviews`);
-      return;
-    }
+    if (!hasFullPremiumAccess()) { toast.error("Upgrade to Premium Plus to schedule interviews"); return; }
     setSelectedInternshipForSchedule({
       _id: internship._id,
       internshipMode: internship.internshipMode || "",
@@ -430,480 +363,542 @@ const handleSearchChange = (e) => {
   };
 
   const openScheduleViewer = (internshipId) => {
-    if (!hasPremiumAccess()) {
-      toast.error("Please upgrade to Premium Basic or higher to view schedules");
-      return;
-    }
+    if (!hasPremiumAccess()) { toast.error("Upgrade to Premium Basic or higher to view schedules"); return; }
     setSelectedInternshipForView(internshipId);
     setScheduleViewerOpen(true);
   };
 
   const openTimeSlotsSelected = (internshipId) => {
-    if (!hasFullPremiumAccess()) {
-      toast.error("Please upgrade to Premium Plus to view accepted students");
-      return;
-    }
+    if (!hasFullPremiumAccess()) { toast.error("Upgrade to Premium Plus to view accepted students"); return; }
     setTimeSlotsModal({ open: true, internshipId });
   };
 
   const handleConfirmClose = async (internshipId) => {
     try {
-      await axios.put('/api/schedule/close', {
-        internshipId,
-        partnerId: localStorage.getItem("partnerId")
-      }, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-      });
-
+      await axios.put("/api/schedule/close",
+        { internshipId, partnerId: localStorage.getItem("partnerId") },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+      );
       toast.success("Schedule closed permanently!");
       setConfirmCloseOpen(false);
-      setInternships(prev =>
-        prev.map(i => i._id === internshipId ? { ...i, isScheduleClosed: true } : i)
-      );
+      setInternships((prev) => prev.map((i) => i._id === internshipId ? { ...i, isScheduleClosed: true } : i));
     } catch (err) {
       toast.error(err.response?.data?.error || "Failed to close schedule");
     }
   };
 
-  const closeModal = () =>
-    setModalData({ open: false, internshipId: null, type: null, loading: false });
+  const closeModal = () => setModalData({ open: false, internshipId: null, type: null, loading: false });
 
+  // ─── Premium lock ────────────────────────────────────────────────────────────
   const showPremiumLock = (featureName, requiredPlan = "Premium Basic") => (
     <div className="relative group">
       <button
-        className="flex items-center gap-2 px-5 py-2 bg-gray-400 text-white font-semibold rounded-lg shadow-lg cursor-not-allowed"
         disabled
+        className="flex items-center gap-2 px-4 py-2 bg-gray-200 text-gray-400 text-sm font-semibold rounded-lg cursor-not-allowed border border-gray-300"
       >
-        <FontAwesomeIcon icon={faLock} /> {featureName}
+        <FontAwesomeIcon icon={faLock} className="text-xs" /> {featureName}
       </button>
-      <div className="absolute z-10 hidden group-hover:block bg-gray-800 text-white text-xs rounded py-1 px-2 bottom-full mb-2 whitespace-nowrap">
-        {requiredPlan === "Premium Basic"
-          ? "Upgrade to Premium Basic to access this feature"
-          : "Upgrade to Premium Plus to access this feature"}
+      <div className="absolute z-20 hidden group-hover:block bg-gray-900 text-white text-xs rounded-lg py-1.5 px-3 bottom-full mb-2 whitespace-nowrap shadow-lg">
+        Upgrade to {requiredPlan} to access this feature
+        <div className="absolute top-full left-4 border-4 border-transparent border-t-gray-900" />
       </div>
     </div>
   );
 
+  // ─── Loading / error ─────────────────────────────────────────────────────────
   if (loading)
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen text-gray-700 bg-gray-100">
-        <div className="flex flex-col items-center p-6 bg-white rounded-lg shadow-xl">
-          <div className="w-16 h-16 border-4 border-dashed rounded-full border-blue-500 animate-spin mb-4"></div>
-          <p className="text-xl font-semibold">Loading internships...</p>
-          <p className="text-sm text-gray-500 mt-1">Please wait a moment.</p>
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
+        <div className="flex flex-col items-center p-8 bg-white rounded-2xl shadow-xl gap-4">
+          <div className="w-14 h-14 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-lg font-semibold text-gray-800">Loading internships...</p>
+          <p className="text-sm text-gray-400">Please wait a moment.</p>
         </div>
       </div>
     );
 
   if (error)
     return (
-      <div className="text-center text-lg text-red-500">
-        {error}
-        <button
-          onClick={() => window.location.reload()}
-          className="ml-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-        >
+      <div className="flex flex-col items-center justify-center min-h-[40vh] gap-4">
+        <p className="text-red-500 font-medium">{error}</p>
+        <button onClick={() => window.location.reload()}
+          className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-semibold">
           Retry
         </button>
       </div>
     );
 
+  // ─── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div className="font-poppins max-w-7xl mx-auto p-6 bg-white shadow-lg rounded-lg">
-      {/* ─── Header ─────────────────────────────────────────────────────────── */}
+    <div className="font-poppins max-w-5xl mx-auto px-4 py-6">
+
+      {/* ── Page Header ── */}
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-3xl font-semibold text-gray-900">
-          Internships Posted by Partner
-        </h2>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">My Internships</h2>
+          <p className="text-sm text-gray-400 mt-0.5">Manage your posted internships and candidates</p>
+        </div>
         {partnerData && (
-          <div className={`px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 ${
+          <div className={`px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 ${
             partnerData.isPremium
               ? partnerData.planType === "Premium Plus"
-                ? "bg-purple-100 text-purple-800"
-                : "bg-blue-100 text-blue-800"
-              : "bg-gray-100 text-gray-800"
+                ? "bg-purple-100 text-purple-700"
+                : "bg-blue-100 text-blue-700"
+              : "bg-gray-100 text-gray-600"
           }`}>
             {partnerData.isPremium && (
               <FontAwesomeIcon icon={faCrown} className={
                 partnerData.planType === "Premium Plus" ? "text-purple-500" : "text-blue-500"
               } />
             )}
-            {partnerData.planType === "Freemium" && "Free Partner"}
-            {partnerData.planType === "Premium Basic" && "Premium Basic"}
-            {partnerData.planType === "Premium Plus" && "Premium Plus"}
+            {partnerData.planType === "Freemium" ? "Free Plan" : partnerData.planType}
             {partnerData.premiumExpiration && partnerData.isPremium && (
-              <span className="text-xs ml-2">
-                (Expires: {new Date(partnerData.premiumExpiration).toLocaleDateString()})
+              <span className="opacity-60 ml-1">
+                · Expires {new Date(partnerData.premiumExpiration).toLocaleDateString()}
               </span>
             )}
           </div>
         )}
       </div>
 
-      {/* ─── Search bar + count strip ─────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6 p-4 bg-gray-50 rounded-xl border border-gray-100">
-        {/* Search input */}
+      {/* ── Search + count ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-5 p-3 bg-gray-50 rounded-xl border border-gray-100">
         <div className="relative flex-1">
-  <FontAwesomeIcon
-    icon={faSearch}
-    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none"
-  />
-  <input
-    type="text"
-    value={searchQuery}
-    onChange={handleSearchChange}
-    placeholder="Search by title, company, location…"
-    className="w-full pl-9 pr-9 py-2.5 text-sm rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent bg-white placeholder-gray-400 transition"
-  />
-  {/* Inline search spinner — doesn't unmount anything */}
-  {isSearching && (
-    <div className="absolute right-3 top-1/2 -translate-y-1/2">
-      <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
-    </div>
-  )}
-  {!isSearching && searchQuery && (
-    <button
-      onClick={() => {
-        setSearchQuery('');
-        clearTimeout(debounceRef.current);
-        if (partnerIdRef.current) fetchInternships(partnerIdRef.current, 1, '');
-      }}
-      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition"
-      title="Clear search"
-    >
-      <FontAwesomeIcon icon={faTimes} className="text-xs" />
-    </button>
-  )}
-</div>
-
-        {/* Count badge */}
-        <div className="flex items-center gap-2 shrink-0">
-          <FontAwesomeIcon icon={faBriefcase} className="text-blue-400 text-sm" />
-          {loading ? (
-            <span className="inline-block w-28 h-4 bg-gray-200 rounded animate-pulse" />
-          ) : (
-            <span className="text-sm text-gray-600">
-              {totalCount > 0 ? (
-                <>
-                  <span className="font-semibold text-gray-800">{totalCount}</span>
-                  {" internship"}{totalCount !== 1 ? "s" : ""}
-                  {debouncedQuery && <span className="text-gray-400"> for "<em>{debouncedQuery}</em>"</span>}
-                  {totalPages > 1 && (
-                    <span className="ml-2 text-gray-400 text-xs">· Page {page} of {totalPages}</span>
-                  )}
-                </>
-              ) : debouncedQuery ? (
-                <span className="text-gray-400">No results for "<em>{debouncedQuery}</em>"</span>
-              ) : (
-                <span className="text-gray-400">No internships posted yet</span>
-              )}
+          <FontAwesomeIcon icon={faSearch}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={handleSearchChange}
+            placeholder="Search by title, company, location…"
+            className="w-full pl-9 pr-9 py-2 text-sm rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white placeholder-gray-400 transition"
+          />
+          {isSearching && (
+            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+              <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
+          {!isSearching && searchQuery && (
+            <button
+              onClick={() => { setSearchQuery(""); clearTimeout(debounceRef.current); if (partnerIdRef.current) fetchInternships(partnerIdRef.current, 1, ""); }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition"
+            >
+              <FontAwesomeIcon icon={faTimes} className="text-xs" />
+            </button>
+          )}
+        </div>
+        <div className="flex items-center gap-2 shrink-0 text-sm text-gray-500">
+          <FontAwesomeIcon icon={faBriefcase} className="text-blue-400" />
+          {totalCount > 0 ? (
+            <span>
+              <span className="font-semibold text-gray-800">{totalCount}</span>
+              {" internship"}{totalCount !== 1 ? "s" : ""}
+              {debouncedQuery && <span className="text-gray-400"> for "<em>{debouncedQuery}</em>"</span>}
+              {totalPages > 1 && <span className="text-gray-400 text-xs ml-1.5">· Page {page} of {totalPages}</span>}
             </span>
+          ) : debouncedQuery ? (
+            <span className="text-gray-400">No results for "<em>{debouncedQuery}</em>"</span>
+          ) : (
+            <span className="text-gray-400">No internships posted yet</span>
           )}
         </div>
       </div>
 
-      {/* ─── Internship Cards ─────────────────────────────────────────────── */}
+      {/* ── Cards ── */}
       {internships.length === 0 ? (
-        <div className="text-center text-gray-500 text-lg mt-10">
-          🚫 No internships posted yet. Post one to see candidates here.
+        <div className="flex flex-col items-center justify-center py-20 text-gray-400 gap-3">
+          <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center">
+            <FontAwesomeIcon icon={faBriefcase} className="text-2xl text-gray-300" />
+          </div>
+          <p className="text-base font-medium text-gray-500">No internships posted yet</p>
+          <p className="text-sm text-gray-400">Post an internship to see candidates here</p>
         </div>
       ) : (
-        internships.map((internship) => {
-          const compensationText =
-            internship.internshipType === "STIPEND"
-              ? `${internship.compensationDetails?.amount} ${internship.compensationDetails?.currency} per ${internship.compensationDetails?.frequency?.toLowerCase()}`
-              : internship.internshipType === "FREE"
+        <div className="space-y-4">
+          {internships.map((internship) => {
+            const compensationText =
+              internship.internshipType === "STIPEND"
+                ? `${internship.compensationDetails?.amount} ${internship.compensationDetails?.currency} / ${internship.compensationDetails?.frequency?.toLowerCase()}`
+                : internship.internshipType === "FREE"
                 ? "Unpaid / Free"
                 : internship.internshipType === "PAID"
-                  ? `Student Pays: ${internship.compensationDetails?.amount} ${internship.compensationDetails?.currency}`
-                  : "N/A";
+                ? `Student Pays: ${internship.compensationDetails?.amount} ${internship.compensationDetails?.currency}`
+                : "N/A";
 
-          const isPaidInternship = (internship?.internshipType || "").toUpperCase() === "PAID";
+            const isPaidInternship = (internship?.internshipType || "").toUpperCase() === "PAID";
 
-          return (
-            <div
-              key={internship._id}
-              className="mb-6 p-6 border border-gray-300 rounded-lg shadow-sm hover:shadow-md transition duration-300 ease-in-out"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-4">
-                  <img
-                    src={internship.imgUrl || "https://via.placeholder.com/150"}
-                    alt={internship.companyName}
-                    className="w-16 h-16 rounded-full object-cover shadow-md"
-                  />
-                  <div>
-                    <h3 className="text-xl font-semibold text-gray-900">{internship.jobTitle}</h3>
-                    <p className="text-gray-600 text-sm mt-0.5">
-                      {internship.companyName} • {calculateDaysAgo(internship.createdAt)}
-                    </p>
+            const quals = Array.isArray(internship.qualifications)
+              ? internship.qualifications
+              : internship.qualifications
+                ?.match(/[A-Z]?[^.!?]*[.!?]*/g)
+                ?.map((s) => s.trim()).filter(Boolean) || [];
+
+            const showAllQuals = qualExpanded[internship._id];
+            const visibleQuals = showAllQuals ? quals : quals.slice(0, 3);
+            const isDescExpanded = descExpanded[internship._id];
+
+            return (
+              <div
+                key={internship._id}
+                className="bg-white border border-gray-200 rounded-2xl shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden"
+              >
+                {/* ── Card Top Bar ── */}
+                <div className="flex items-start justify-between px-5 pt-5 pb-4 gap-4 flex-wrap">
+                  {/* Logo + Title */}
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-12 h-12 rounded-xl overflow-hidden bg-gray-100 border border-gray-200 flex-shrink-0">
+                      {internship.imgUrl ? (
+                        <img src={internship.imgUrl} alt={internship.companyName}
+                          className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <FontAwesomeIcon icon={faBriefcase} className="text-gray-400 text-lg" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-base font-bold text-gray-900 truncate">{internship.jobTitle}</h3>
+                        <TypeBadge type={internship.internshipType} />
+                      </div>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {internship.companyName}
+                        <span className="mx-1.5">·</span>
+                        {calculateDaysAgo(internship.createdAt)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Toggle */}
+                  <div className="flex items-center gap-2.5 flex-shrink-0">
+                    <button
+                      onClick={() => toggleApplicationOpen(internship._id, !internship.applicationOpen)}
+                      className="relative flex-shrink-0"
+                      title={internship.applicationOpen ? "Close applications" : "Open applications"}
+                    >
+                      <div className={`w-12 h-6 rounded-full transition-colors duration-300 ${
+                        internship.applicationOpen
+                          ? "bg-gradient-to-r from-teal-400 to-cyan-500"
+                          : "bg-gradient-to-r from-red-400 to-pink-500"
+                      }`}>
+                        <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-300 ${
+                          internship.applicationOpen ? "translate-x-6" : "translate-x-0.5"
+                        }`} />
+                      </div>
+                    </button>
+                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+                      internship.applicationOpen
+                        ? "bg-teal-50 text-teal-700 border border-teal-200"
+                        : "bg-red-50 text-red-600 border border-red-200"
+                    }`}>
+                      {internship.applicationOpen ? "Open" : "Closed"}
+                    </span>
                   </div>
                 </div>
 
-                <label className="inline-flex relative items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={internship.applicationOpen}
-                    onChange={() => toggleApplicationOpen(internship._id, !internship.applicationOpen)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-14 h-8 bg-gradient-to-r from-red-500 to-pink-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-teal-300 rounded-full peer peer-checked:bg-gradient-to-r peer-checked:from-teal-500 peer-checked:to-cyan-600 transition-colors duration-300"></div>
-                  <span className="ml-3 text-sm font-semibold text-gray-900">
-                    {internship.applicationOpen ? "Open" : "Closed"}
-                  </span>
-                </label>
-              </div>
+                {/* ── Divider ── */}
+                <div className="border-t border-gray-100 mx-5" />
 
-              <div className="text-gray-600 mb-4">
-                <p className="flex items-center mb-2">
-                  <FontAwesomeIcon icon={faMapMarkerAlt} className="mr-2" />
-                  {internship.location} • {internship.jobType}
-                </p>
-                <p className="flex items-center mb-2">
-                  <FontAwesomeIcon icon={faClock} className="mr-2" />
-                  {new Date(internship.startDate).toLocaleDateString()} – {new Date(internship.endDateOrDuration).toLocaleDateString()}
-                </p>
-                <p className="flex items-center mb-2">
-                  <FontAwesomeIcon icon={faDollarSign} className="mr-2" />
-                  {compensationText}
-                </p>
-                <p className="mt-2">
-                  <strong>Job Description:</strong>{" "}
-                  {internship.jobDescription || "Not provided"}
-                </p>
-                <p className="mt-1">
-                  <strong>Qualifications:</strong>{" "}
-                  {Array.isArray(internship.qualifications)
-                    ? internship.qualifications.join(", ")
-                    : internship.qualifications?.match(/[A-Z]?[a-z]+/g)?.join(", ") || "Not provided"}
-                </p>
-              </div>
+                {/* ── Card Meta ── */}
+                <div className="px-5 py-3 space-y-1.5">
+                  <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-gray-500">
+                    <span className="flex items-center gap-1.5">
+                      <FontAwesomeIcon icon={faMapMarkerAlt} className="text-gray-400" />
+                      {internship.location || "—"}
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <FontAwesomeIcon icon={faClock} className="text-gray-400" />
+                      {internship.startDate
+                        ? new Date(internship.startDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+                        : "—"}
+                      {" – "}
+                      {internship.endDateOrDuration
+                        ? (() => {
+                            const d = new Date(internship.endDateOrDuration);
+                            return isNaN(d) ? internship.endDateOrDuration : d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+                          })()
+                        : "—"}
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <FontAwesomeIcon icon={faDollarSign} className="text-gray-400" />
+                      {compensationText}
+                    </span>
+                  </div>
+                </div>
 
-              <div className="flex flex-wrap gap-4 mt-4">
-                {hasPremiumAccess() ? (
-                  <button
-                    onClick={() => fetchApplications(internship._id)}
-                    disabled={loadingApplications[internship._id]}
-                    className={`flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:from-blue-600 hover:to-indigo-700 transform hover:scale-105 transition duration-200 ${
-                      loadingApplications[internship._id] ? "opacity-50 cursor-not-allowed" : ""
-                    }`}
-                  >
-                    {loadingApplications[internship._id] ? "Loading..." : (
-                      <><FontAwesomeIcon icon={faEye} /> View Applications</>
-                    )}
-                  </button>
-                ) : (
-                  showPremiumLock("View Applications", "Premium Basic")
-                )}
-
-                {hasPremiumAccess() || hasFullPremiumAccess() ? (
-                  <button
-                    onClick={() => handleShortlist(internship._id, internship.jobDescription, internship.qualifications || [])}
-                    disabled={loadingShortlist}
-                    className={`flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-green-400 to-teal-500 text-white font-semibold rounded-lg shadow-lg hover:from-green-500 hover:to-teal-600 transform hover:scale-105 transition duration-200 ${
-                      loadingShortlist ? "opacity-50 cursor-not-allowed" : ""
-                    }`}
-                  >
-                    {loadingShortlist ? "Shortlisting..." : (
-                      <><FontAwesomeIcon icon={faStar} /> Shortlist</>
-                    )}
-                  </button>
-                ) : (
-                  showPremiumLock("Shortlist", "Premium Basic")
-                )}
-
-                {hasPremiumAccess() || hasFullPremiumAccess() ? (
-                  <button
-                    onClick={() => showShortlisted(internship._id)}
-                    disabled={loadingShortlist}
-                    className={`flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:from-purple-600 hover:to-indigo-700 transform hover:scale-105 transition duration-200 ${
-                      loadingShortlist ? "opacity-50 cursor-not-allowed" : ""
-                    }`}
-                  >
-                    {loadingShortlist ? "Loading..." : (
-                      <><FontAwesomeIcon icon={faDownload} /> Shortlisted Resumes</>
-                    )}
-                  </button>
-                ) : (
-                  showPremiumLock("Shortlisted Resumes", "Premium Basic")
-                )}
-
-                {isPaidInternship && (
-                  hasFullPremiumAccess() ? (
+                {/* ── Description ── */}
+                <div className="px-5 pb-3">
+                  <p className="text-xs font-semibold text-gray-700 mb-1">Description</p>
+                  <p className={`text-xs text-gray-500 leading-relaxed ${!isDescExpanded ? "line-clamp-2" : ""}`}>
+                    {internship.jobDescription || "No description provided."}
+                  </p>
+                  {internship.jobDescription?.length > 140 && (
                     <button
-                      onClick={() => openTimeSlotsSelected(internship._id)}
-                      className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-slate-600 to-gray-800 text-white font-semibold rounded-lg shadow-lg hover:from-slate-700 hover:to-gray-900 transform hover:scale-105 transition duration-200"
+                      onClick={() => setDescExpanded((prev) => ({ ...prev, [internship._id]: !prev[internship._id] }))}
+                      className="mt-1 text-xs text-blue-500 hover:text-blue-700 font-medium flex items-center gap-1 transition"
                     >
-                      <FontAwesomeIcon icon={faCalendarAlt} /> Time Slots Selected
+                      {isDescExpanded ? (
+                        <><FontAwesomeIcon icon={faChevronUp} className="text-[10px]" /> Show less</>
+                      ) : (
+                        <><FontAwesomeIcon icon={faChevronDown} className="text-[10px]" /> Read more</>
+                      )}
                     </button>
-                  ) : (
-                    showPremiumLock("Time Slots Selected", "Premium Plus")
-                  )
+                  )}
+                </div>
+
+                {/* ── Qualifications ── */}
+                {quals.length > 0 && (
+                  <div className="px-5 pb-4">
+                    <p className="text-xs font-semibold text-gray-700 mb-1.5">Qualifications</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {visibleQuals.map((q, i) => (
+                        <span key={i}
+                          className="text-[11px] bg-indigo-50 text-indigo-600 border border-indigo-100 px-2.5 py-0.5 rounded-full">
+                          {q}
+                        </span>
+                      ))}
+                      {quals.length > 3 && (
+                        <button
+                          onClick={() => setQualExpanded((prev) => ({ ...prev, [internship._id]: !prev[internship._id] }))}
+                          className="text-[11px] text-blue-500 hover:text-blue-700 font-semibold self-center transition"
+                        >
+                          {showAllQuals ? "Show less" : `+${quals.length - 3} more`}
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 )}
 
-                {hasFullPremiumAccess() ? (
-                  <>
+                {/* ── Action Buttons ── */}
+                <div className="border-t border-gray-100 px-5 py-3 flex flex-wrap gap-2 bg-gray-50 rounded-b-2xl">
+                  {hasPremiumAccess() ? (
                     <button
-                      onClick={() => handleSchedule(internship)}
-                      className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-white font-semibold rounded-lg shadow-lg hover:from-yellow-500 hover:to-orange-600 transform hover:scale-105 transition duration-200"
+                      onClick={() => fetchApplications(internship._id)}
+                      disabled={loadingApplications[internship._id]}
+                      className={`flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-xs font-semibold rounded-lg shadow hover:from-blue-600 hover:to-indigo-700 transition active:scale-95 ${
+                        loadingApplications[internship._id] ? "opacity-60 cursor-not-allowed" : ""
+                      }`}
                     >
-                      <FontAwesomeIcon icon={faClock} /> Internship Schedule
+                      <FontAwesomeIcon icon={faEye} />
+                      {loadingApplications[internship._id] ? "Loading..." : "View Applications"}
                     </button>
+                  ) : showPremiumLock("View Applications", "Premium Basic")}
 
-                    {hasPremiumAccess() ? (
+                  {hasPremiumAccess() || hasFullPremiumAccess() ? (
+                    <button
+                      onClick={() => openAtsModal(internship)}
+                      disabled={loadingShortlist}
+                      className={`flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs font-semibold rounded-lg shadow hover:from-emerald-600 hover:to-teal-600 transition active:scale-95 ${
+                        loadingShortlist ? "opacity-60 cursor-not-allowed" : ""
+                      }`}
+                    >
+                      <FontAwesomeIcon icon={faStar} />
+                      {loadingShortlist ? "Shortlisting..." : "Shortlist"}
+                    </button>
+                  ) : showPremiumLock("Shortlist", "Premium Basic")}
+
+                  {hasPremiumAccess() || hasFullPremiumAccess() ? (
+                    <button
+                      onClick={() => showShortlisted(internship._id)}
+                      disabled={loadingShortlist}
+                      className={`flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-purple-500 to-violet-600 text-white text-xs font-semibold rounded-lg shadow hover:from-purple-600 hover:to-violet-700 transition active:scale-95 ${
+                        loadingShortlist ? "opacity-60 cursor-not-allowed" : ""
+                      }`}
+                    >
+                      <FontAwesomeIcon icon={faDownload} />
+                      {loadingShortlist ? "Loading..." : "Shortlisted Resumes"}
+                    </button>
+                  ) : showPremiumLock("Shortlisted Resumes", "Premium Basic")}
+
+                  {isPaidInternship && (
+                    hasFullPremiumAccess() ? (
                       <button
-                        onClick={() => openScheduleViewer(internship._id)}
-                        className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-cyan-500 to-sky-600 text-white font-semibold rounded-lg shadow-lg hover:from-cyan-600 hover:to-sky-700 transform hover:scale-105 transition duration-200"
+                        onClick={() => openTimeSlotsSelected(internship._id)}
+                        className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-slate-600 to-gray-700 text-white text-xs font-semibold rounded-lg shadow hover:from-slate-700 hover:to-gray-800 transition active:scale-95"
                       >
-                        <FontAwesomeIcon icon={faCalendarAlt} /> View Schedule
+                        <FontAwesomeIcon icon={faCalendarAlt} /> Time Slots
                       </button>
-                    ) : (
-                      showPremiumLock("View Schedule", "Premium Basic")
-                    )}
+                    ) : showPremiumLock("Time Slots Selected", "Premium Plus")
+                  )}
 
-                    <button
-                      onClick={() => setConfirmCloseOpen(internship._id)}
-                      className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-red-500 to-pink-600 text-white font-semibold rounded-lg shadow-lg hover:from-red-600 hover:to-pink-700 transform hover:scale-105 transition duration-200"
-                    >
-                      <FontAwesomeIcon icon={faTimes} /> Close Schedule
-                    </button>
-                  </>
-                ) : (
-                  showPremiumLock("Schedule", "Premium Plus")
-                )}
+                  {hasFullPremiumAccess() ? (
+                    <>
+                      <button
+                        onClick={() => handleSchedule(internship)}
+                        className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-amber-400 to-orange-500 text-white text-xs font-semibold rounded-lg shadow hover:from-amber-500 hover:to-orange-600 transition active:scale-95"
+                      >
+                        <FontAwesomeIcon icon={faClock} /> Schedule
+                      </button>
+
+                      {hasPremiumAccess() ? (
+                        <button
+                          onClick={() => openScheduleViewer(internship._id)}
+                          className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-cyan-500 to-sky-500 text-white text-xs font-semibold rounded-lg shadow hover:from-cyan-600 hover:to-sky-600 transition active:scale-95"
+                        >
+                          <FontAwesomeIcon icon={faCalendarAlt} /> View Schedule
+                        </button>
+                      ) : showPremiumLock("View Schedule", "Premium Basic")}
+
+                      <button
+                        onClick={() => setConfirmCloseOpen(internship._id)}
+                        className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-red-500 to-rose-500 text-white text-xs font-semibold rounded-lg shadow hover:from-red-600 hover:to-rose-600 transition active:scale-95"
+                      >
+                        <FontAwesomeIcon icon={faTimes} /> Close Schedule
+                      </button>
+                    </>
+                  ) : showPremiumLock("Schedule", "Premium Plus")}
+                </div>
               </div>
-            </div>
-          );
-        })
+            );
+          })}
+        </div>
       )}
 
-      {/* ─── Pagination ───────────────────────────────────────────────────── */}
+      {/* ── Pagination ── */}
       {totalPages > 1 && (
         <div className="flex justify-center items-center gap-2 mt-8 flex-wrap">
           <button
             onClick={() => fetchInternships(partnerIdRef.current, page - 1, debouncedQuery)}
             disabled={page === 1 || loadingMore}
-            className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 font-medium hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition"
+            className="px-4 py-2 rounded-lg border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
           >
             ← Prev
           </button>
-
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
             <button
               key={pageNum}
               onClick={() => fetchInternships(partnerIdRef.current, pageNum, debouncedQuery)}
               disabled={loadingMore}
-              className={`px-4 py-2 rounded-lg font-semibold transition ${
+              className={`w-9 h-9 rounded-lg text-sm font-semibold transition ${
                 pageNum === page
                   ? "bg-blue-600 text-white shadow"
-                  : "border border-gray-300 text-gray-700 hover:bg-gray-100"
+                  : "border border-gray-200 text-gray-600 hover:bg-gray-50"
               }`}
             >
               {pageNum}
             </button>
           ))}
-
           <button
             onClick={() => fetchInternships(partnerIdRef.current, page + 1, debouncedQuery)}
             disabled={!hasMore || loadingMore}
-            className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 font-medium hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition"
+            className="px-4 py-2 rounded-lg border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
           >
             {loadingMore ? "Loading..." : "Next →"}
           </button>
         </div>
       )}
 
-      {/* ─── Applications / Shortlisted Modal ────────────────────────────── */}
+      {/* ── Applications / Shortlisted Modal ── */}
       <Modal
         isOpen={modalData.open}
         onClose={closeModal}
         title={modalData.type === "applications" ? "Applications" : "Shortlisted Candidates"}
         isLoading={modalData.loading}
+        preventBackdropClose={
+          modalData.loading || loadingShortlist || !!loadingApplications[modalData.internshipId]
+        }
       >
         {modalData.type === "applications" && !modalData.loading && (
-          (applications[modalData.internshipId] || []).length === 0
-            ? <p className="p-6 text-center text-gray-600">No applications yet.</p>
-            : <ApplicationsTable
-                applications={applications[modalData.internshipId]}
-                onStatusUpdate={updateApplicationStatus}
-              />
+          (applications[modalData.internshipId] || []).length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 gap-3 text-gray-400">
+              <FontAwesomeIcon icon={faEye} className="text-3xl text-gray-200" />
+              <p className="text-sm font-medium">No applications yet</p>
+            </div>
+          ) : (
+            <ApplicationsTable
+              applications={applications[modalData.internshipId]}
+              onStatusUpdate={updateApplicationStatus}
+            />
+          )
         )}
-
         {modalData.type === "shortlisted" && !modalData.loading && (
-          (shortlistedCandidates[modalData.internshipId] || []).length === 0
-            ? <p className="p-6 text-center text-gray-600">No candidates shortlisted yet.</p>
-            : <ShortlistedTable
-                candidates={shortlistedCandidates[modalData.internshipId]}
-                internshipId={modalData.internshipId}
-                onSendOffer={handleSendOffer}
-              />
+          (shortlistedCandidates[modalData.internshipId] || []).length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 gap-3 text-gray-400">
+              <FontAwesomeIcon icon={faStar} className="text-3xl text-gray-200" />
+              <p className="text-sm font-medium">No candidates shortlisted yet</p>
+            </div>
+          ) : (
+            <ShortlistedTable
+              candidates={shortlistedCandidates[modalData.internshipId]}
+              internshipId={modalData.internshipId}
+              onSendOffer={handleSendOffer}
+            />
+          )
         )}
       </Modal>
 
-      {/* ─── BUG FIX 3: Offer Letter Modal ───────────────────────────────── */}
-      {/* This modal was completely missing. handleSendOffer() set selectedStudent
-          state but nothing rendered it, so partners could never actually send
-          offer letters. This modal wires up the form. */}
+      {/* ── Offer Letter Modal ── */}
       <Modal
         isOpen={!!selectedStudent}
         onClose={() => setSelectedStudent(null)}
-        title={`Send Offer Letter to ${selectedStudent?.name || ""}`}
+        title="Send Offer Letter"
+        preventBackdropClose={sendingOffer}
       >
         {selectedStudent && (
-          <div className="p-6 space-y-4">
-            <div>
-              <p className="text-sm text-gray-500 mb-1">Candidate</p>
-              <p className="font-medium text-gray-800">{selectedStudent.name}</p>
-              <p className="text-sm text-gray-500">{selectedStudent.email}</p>
+          <div className="p-6 space-y-5">
+            {/* Candidate info */}
+            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
+              <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                <span className="text-indigo-600 font-bold text-sm">
+                  {selectedStudent.name?.charAt(0)?.toUpperCase() || "?"}
+                </span>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-800">{selectedStudent.name}</p>
+                <p className="text-xs text-gray-400">{selectedStudent.email}</p>
+              </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Select Template <span className="text-red-500">*</span>
-              </label>
-              {templates.length === 0 ? (
-                <p className="text-sm text-amber-600">
-                  No templates found. Please create a template first.
-                </p>
+            {/* Logo preview — shows what will appear on the PDF */}
+            <div className="flex items-center gap-4 p-3 bg-blue-50 border border-blue-100 rounded-xl">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-md bg-blue-600 flex items-center justify-center">
+                  <span className="text-white text-[10px] font-bold">SN</span>
+                </div>
+                <span className="text-xs text-blue-700 font-medium">SkillNaav</span>
+              </div>
+              <span className="text-gray-300 text-sm">+</span>
+              {partnerData?.logoUrl ? (
+                <img src={partnerData.logoUrl} alt={partnerData.companyName}
+                  className="h-8 object-contain rounded" />
               ) : (
-                <select
-                  value={templateId}
-                  onChange={(e) => setTemplateId(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                >
-                  <option value="">-- Choose a template --</option>
-                  {templates.map((t) => (
-                    <option key={t._id} value={t._id}>
-                      {t.name || t.title || t._id}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-8 h-8 rounded-md bg-gray-200 flex items-center justify-center">
+                    <span className="text-gray-500 text-[10px] font-bold">
+                      {partnerData?.companyName?.charAt(0) || "P"}
+                    </span>
+                  </div>
+                  <span className="text-xs text-gray-500">{partnerData?.companyName || "Your Company"}</span>
+                </div>
               )}
+              <span className="ml-auto text-[11px] text-blue-500 font-medium">PDF header logos</span>
             </div>
 
+            {/* Joining Date */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
                 Joining Date <span className="text-red-500">*</span>
               </label>
               <input
                 type="date"
                 value={joiningDate}
                 onChange={(e) => setJoiningDate(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                min={new Date().toISOString().split("T")[0]}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
               />
             </div>
 
-            <div className="flex justify-end gap-3 pt-2">
+            <div className="flex justify-end gap-3 pt-1">
               <button
                 onClick={() => setSelectedStudent(null)}
-                className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition"
+                className="px-4 py-2 text-sm rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSendOfferLetter}
-                disabled={sendingOffer || !templateId || !joiningDate}
-                className="flex items-center gap-2 px-5 py-2 text-sm bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-semibold rounded-lg shadow hover:from-blue-600 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                disabled={sendingOffer || !joiningDate}
+                className="flex items-center gap-2 px-5 py-2 text-sm bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-semibold rounded-xl shadow hover:from-blue-600 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition active:scale-95"
               >
                 <FontAwesomeIcon icon={faPaperPlane} />
                 {sendingOffer ? "Sending..." : "Send Offer"}
@@ -913,13 +908,10 @@ const handleSearchChange = (e) => {
         )}
       </Modal>
 
-      {/* ─── Schedule Form Modal ──────────────────────────────────────────── */}
+      {/* ── Schedule Form Modal ── */}
       <Modal
         isOpen={scheduleFormOpen}
-        onClose={() => {
-          setScheduleFormOpen(false);
-          setSelectedInternshipForSchedule(null);
-        }}
+        onClose={() => { setScheduleFormOpen(false); setSelectedInternshipForSchedule(null); }}
         title="Create Internship Schedule"
       >
         {selectedInternshipForSchedule?._id && (
@@ -927,23 +919,18 @@ const handleSearchChange = (e) => {
             internshipId={selectedInternshipForSchedule._id}
             initialInternshipMode={selectedInternshipForSchedule.internshipMode}
             initialPricingBucket={selectedInternshipForSchedule.pricingBucket}
-            onClose={() => {
-              setScheduleFormOpen(false);
-              setSelectedInternshipForSchedule(null);
-            }}
+            onClose={() => { setScheduleFormOpen(false); setSelectedInternshipForSchedule(null); }}
           />
         )}
       </Modal>
 
-      {/* ─── Time Slots Modal ─────────────────────────────────────────────── */}
+      {/* ── Time Slots Modal ── */}
       <Modal
         isOpen={timeSlotsModal.open}
         onClose={() => setTimeSlotsModal({ open: false, internshipId: null })}
         title="Time Slots Selected"
       >
-        {timeSlotsModal.internshipId && (
-          <TimeSlotsSelected internshipId={timeSlotsModal.internshipId} />
-        )}
+        {timeSlotsModal.internshipId && <TimeSlotsSelected internshipId={timeSlotsModal.internshipId} />}
       </Modal>
 
       <ConfirmCloseSchedule
@@ -954,13 +941,119 @@ const handleSearchChange = (e) => {
 
       <InternshipScheduleViewer
         isOpen={scheduleViewerOpen}
-        onClose={() => {
-          setScheduleViewerOpen(false);
-          setSelectedInternshipForView(null);
-        }}
+        onClose={() => { setScheduleViewerOpen(false); setSelectedInternshipForView(null); }}
         internshipId={selectedInternshipForView}
         partnerId={partnerData?._id || localStorage.getItem("partnerId")}
       />
+
+    {/* ── ATS Threshold Modal ── */}
+{atsModalOpen && pendingShortlistInternship && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4">
+    <div className="bg-white rounded-2xl border border-gray-100 w-full max-w-sm p-6 space-y-5">
+
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div>
+          <h3 className="text-base font-medium text-gray-900">Set ATS threshold</h3>
+          <p className="text-xs text-gray-400 mt-1 leading-relaxed">
+            Only resumes at or above this score will be shortlisted.
+          </p>
+        </div>
+        <button
+          onClick={() => { setAtsModalOpen(false); setPendingShortlistInternship(null); }}
+          className="text-gray-300 hover:text-gray-500 transition text-xl leading-none mt-[-2px]"
+        >
+          ×
+        </button>
+      </div>
+
+      {/* Internship pill */}
+      <div className="flex items-center gap-2.5 bg-gray-50 rounded-xl px-3.5 py-2.5 border border-gray-100">
+        <div className="w-7 h-7 rounded-md bg-blue-50 flex items-center justify-center flex-shrink-0">
+          <svg className="w-3.5 h-3.5 text-blue-500" fill="none" viewBox="0 0 16 16">
+            <rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+            <path d="M5 8h6M5 5.5h6M5 10.5h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+          </svg>
+        </div>
+        <span className="text-sm text-gray-600 font-medium truncate">
+          {pendingShortlistInternship.jobTitle} — {pendingShortlistInternship.companyName}
+        </span>
+      </div>
+
+      {/* Score + Slider */}
+      <div className="space-y-3.5">
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-gray-500">Minimum ATS score</span>
+          <div className="flex items-center gap-1 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5">
+            <span className="text-xl font-medium text-emerald-700 min-w-[36px] text-right leading-none">
+              {atsThreshold}
+            </span>
+            <span className="text-sm font-medium text-emerald-600">%</span>
+          </div>
+        </div>
+
+        <input
+          type="range"
+          min={0}
+          max={100}
+          step={5}
+          value={atsThreshold}
+          onChange={(e) => setAtsThreshold(Number(e.target.value))}
+          className="w-full accent-emerald-500 cursor-pointer"
+        />
+
+        <div className="flex justify-between text-[11px] text-gray-400 px-0.5">
+          <span>0% — all</span>
+          <span>50%</span>
+          <span>100% — strict</span>
+        </div>
+      </div>
+
+      {/* Hint badge */}
+      <div className={`flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 border text-xs font-medium ${
+        atsThreshold >= 70
+          ? "bg-green-50 border-green-100 text-green-700"
+          : atsThreshold >= 40
+          ? "bg-amber-50 border-amber-100 text-amber-700"
+          : "bg-blue-50 border-blue-100 text-blue-600"
+      }`}>
+        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+          atsThreshold >= 70 ? "bg-green-500" : atsThreshold >= 40 ? "bg-amber-500" : "bg-blue-400"
+        }`} />
+        {atsThreshold >= 70
+          ? "Strict — only highly relevant resumes will pass"
+          : atsThreshold >= 40
+          ? "Balanced — good mix of quality and quantity"
+          : "Relaxed — more candidates will be included"}
+      </div>
+
+      {/* Actions */}
+      <div className="grid grid-cols-2 gap-2.5 pt-1">
+        <button
+          onClick={() => { setAtsModalOpen(false); setPendingShortlistInternship(null); }}
+          className="py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={() =>
+            handleShortlist(
+              pendingShortlistInternship._id,
+              pendingShortlistInternship.jobDescription,
+              pendingShortlistInternship.qualifications || [],
+              atsThreshold
+            )
+          }
+          className="py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium transition active:scale-95 flex items-center justify-center gap-2"
+        >
+          <FontAwesomeIcon icon={faStar} className="text-xs" />
+          Shortlist
+        </button>
+      </div>
+
+    </div>
+  </div>
+)}
     </div>
   );
 };

@@ -1,24 +1,16 @@
+// File: OfferLetter.js
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faPaperPlane,
-  faSpinner,
-  faTimes
-} from "@fortawesome/free-solid-svg-icons";
+import { faPaperPlane, faSpinner, faTimes } from "@fortawesome/free-solid-svg-icons";
 import { toast } from "react-toastify";
 
 const SendOfferLetter = ({ student, internshipId, onSuccess, onCancel }) => {
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState(null);
   const [internship, setInternship] = useState(null);
-  const [templates, setTemplates] = useState([]);
-
-  const [offerDetails, setOfferDetails] = useState({
-    joiningDate: "",
-    position: "",
-    templateId: "",
-  });
+  const [joiningDate, setJoiningDate] = useState("");
+  const [position, setPosition] = useState("");
 
   const partnerId = localStorage.getItem("partnerId");
 
@@ -26,48 +18,29 @@ const SendOfferLetter = ({ student, internshipId, onSuccess, onCancel }) => {
     const fetchInternship = async () => {
       try {
         const response = await axios.get(`/api/interns/${internshipId}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         });
         const data = response.data;
         setInternship(data);
-        setOfferDetails((prev) => ({
-          ...prev,
-          position: data.jobTitle,
-          joiningDate: data.startDate
-            ? new Date(data.startDate).toISOString().split("T")[0]
-            : "",
-        }));
+        setPosition(data.jobTitle || "");
+        setJoiningDate(
+          data.startDate ? new Date(data.startDate).toISOString().split("T")[0] : ""
+        );
       } catch (err) {
         console.error("Error fetching internship:", err);
         setError(err.response?.data?.message || "Failed to load internship details");
       }
     };
-
     if (internshipId) fetchInternship();
   }, [internshipId]);
-
-  useEffect(() => {
-    const fetchTemplates = async () => {
-      if (!partnerId) return;
-      try {
-        const res = await axios.get(`/api/templates?partnerId=${partnerId}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-        });
-        setTemplates(res.data);
-      } catch (err) {
-        console.error("Failed to fetch templates:", err);
-      }
-    };
-    fetchTemplates();
-  }, [partnerId]);
 
   const handleSendOffer = async () => {
     try {
       setIsSending(true);
       setError(null);
 
-      if (!student || !offerDetails.templateId || !offerDetails.joiningDate || !internship) {
-        throw new Error("Please fill in all fields");
+      if (!student || !joiningDate || !internship) {
+        throw new Error("Please fill in all required fields");
       }
 
       const response = await axios.post(
@@ -78,9 +51,8 @@ const SendOfferLetter = ({ student, internshipId, onSuccess, onCancel }) => {
           name: student.name,
           email: student.email,
           internshipId,
-          templateId: offerDetails.templateId,
-          position: offerDetails.position,
-          startDate: offerDetails.joiningDate,
+          position,
+          startDate: joiningDate,
           company: internship.companyName,
           location: internship.location,
           duration: internship.duration || internship.endDateOrDuration,
@@ -89,31 +61,26 @@ const SendOfferLetter = ({ student, internshipId, onSuccess, onCancel }) => {
           jobDescription: internship.jobDescription,
           qualifications: Array.isArray(internship.qualifications)
             ? internship.qualifications
-            : (internship.qualifications || "").split(",").map(q => q.trim()),
-          // Fix Bug 6: use real contact info from internship, not hardcoded placeholders
+            : (internship.qualifications || "").split(",").map((q) => q.trim()).filter(Boolean),
           contactInfo: {
-            name: internship.contactPerson || "HR Manager",
-            email: internship.contactEmail || "",
-            phone: internship.contactPhone || "",
+            name:  internship.contactInfo?.name  || "",
+            email: internship.contactInfo?.email || "",
+            phone: internship.contactInfo?.phone || "",
           },
-          // Fix Bug 7: validate schoolAdminId before sending
           schoolAdminId: (() => {
             const raw = localStorage.getItem("schoolAdminId");
             return raw && /^[a-f\d]{24}$/i.test(raw) ? raw : null;
           })(),
         },
-        {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-        }
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
       );
 
       toast.success("Offer sent successfully!");
       if (onSuccess) onSuccess(response.data);
-
     } catch (err) {
-      const errorMsg = err.response?.data?.error || err.message || "Failed to send offer letter";
-      setError(errorMsg);
-      toast.error(errorMsg);
+      const msg = err.response?.data?.error || err.message || "Failed to send offer letter";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setIsSending(false);
     }
@@ -121,41 +88,48 @@ const SendOfferLetter = ({ student, internshipId, onSuccess, onCancel }) => {
 
   return (
     <div>
+      {/* Header */}
       <div className="flex justify-between items-center mb-4">
         <h4 className="font-semibold text-lg">Send Offer Letter</h4>
-        <button 
-          onClick={onCancel}
-          className="text-gray-500 hover:text-gray-700"
-        >
+        <button onClick={onCancel} className="text-gray-500 hover:text-gray-700">
           <FontAwesomeIcon icon={faTimes} />
         </button>
       </div>
 
       {error && (
-        <div className="text-red-500 mb-4 p-2 bg-red-50 rounded">
-          {error}
-        </div>
+        <div className="text-red-500 mb-4 p-2 bg-red-50 rounded text-sm">{error}</div>
       )}
 
       {!internship ? (
-        <div className="flex items-center justify-center p-4">
+        <div className="flex items-center justify-center p-4 text-gray-500 text-sm">
           <FontAwesomeIcon icon={faSpinner} spin className="mr-2" />
           Loading internship details...
         </div>
       ) : (
         <>
           {/* Internship Summary */}
-          <div className="mb-4 bg-blue-50 p-3 rounded">
+          <div className="mb-4 bg-blue-50 p-3 rounded text-sm">
             <p className="font-medium">{internship.jobTitle}</p>
-            <p>Company: {internship.companyName}</p>
-            <p>Location: {internship.location}</p>
-            <p>Duration: {internship.duration || internship.endDateOrDuration}</p>
+            <p className="text-gray-600">Company: {internship.companyName}</p>
+            <p className="text-gray-600">Location: {internship.location}</p>
+            <p className="text-gray-600">Duration: {internship.duration || internship.endDateOrDuration}</p>
           </div>
 
           {/* Candidate Info */}
-          <div className="mb-4 bg-gray-50 p-3 rounded">
+          <div className="mb-4 bg-gray-50 p-3 rounded text-sm">
             <p className="font-medium">Candidate: {student.name}</p>
-            <p>Email: {student.email}</p>
+            <p className="text-gray-600">Email: {student.email}</p>
+          </div>
+
+          {/* PDF Logo Preview */}
+          <div className="mb-4 flex items-center gap-3 p-3 bg-indigo-50 border border-indigo-100 rounded-lg">
+            <div className="w-8 h-8 rounded bg-blue-600 flex items-center justify-center">
+              <span className="text-white text-[10px] font-bold">SN</span>
+            </div>
+            <span className="text-xs text-indigo-600 font-medium">SkillNaav</span>
+            <span className="text-gray-300">+</span>
+            <span className="text-xs text-gray-600 font-medium">{internship.companyName}</span>
+            <span className="ml-auto text-[11px] text-indigo-400">logos on PDF</span>
           </div>
 
           {/* Form */}
@@ -164,41 +138,22 @@ const SendOfferLetter = ({ student, internshipId, onSuccess, onCancel }) => {
               <label className="block text-sm font-medium mb-1">Position</label>
               <input
                 type="text"
-                value={offerDetails.position}
-                onChange={(e) =>
-                  setOfferDetails((prev) => ({ ...prev, position: e.target.value }))
-                }
-                className="w-full border px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={position}
+                onChange={(e) => setPosition(e.target.value)}
+                className="w-full border px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Joining Date</label>
+              <label className="block text-sm font-medium mb-1">
+                Joining Date <span className="text-red-500">*</span>
+              </label>
               <input
                 type="date"
-                value={offerDetails.joiningDate}
-                onChange={(e) =>
-                  setOfferDetails((prev) => ({ ...prev, joiningDate: e.target.value }))
-                }
-                className="w-full border px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={joiningDate}
+                onChange={(e) => setJoiningDate(e.target.value)}
                 min={new Date().toISOString().split("T")[0]}
+                className="w-full border px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Offer Template</label>
-              <select
-                className="w-full border px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={offerDetails.templateId}
-                onChange={(e) =>
-                  setOfferDetails((prev) => ({ ...prev, templateId: e.target.value }))
-                }
-              >
-                <option value="">-- Select a Template --</option>
-                {templates.map((tpl) => (
-                  <option key={tpl._id} value={tpl._id}>
-                    {tpl.name || tpl.title}
-                  </option>
-                ))}
-              </select>
             </div>
           </div>
 
@@ -207,14 +162,14 @@ const SendOfferLetter = ({ student, internshipId, onSuccess, onCancel }) => {
             <button
               onClick={onCancel}
               disabled={isSending}
-              className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+              className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-100 disabled:opacity-50 text-sm"
             >
               Back to List
             </button>
             <button
               onClick={handleSendOffer}
-              disabled={isSending || !offerDetails.templateId || !offerDetails.joiningDate}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 flex items-center"
+              disabled={isSending || !joiningDate}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 flex items-center text-sm"
             >
               {isSending ? (
                 <>

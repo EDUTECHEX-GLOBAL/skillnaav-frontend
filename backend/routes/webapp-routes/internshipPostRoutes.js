@@ -329,28 +329,34 @@ router.put("/:id", async (req, res) => {
 // ─── PATCH approve internship ─────────────────────────────────────────────────
 router.patch("/:id/approve", async (req, res) => {
   try {
-    const internship = await InternshipPosting.findById(req.params.id);
+    const internship = await InternshipPosting.findByIdAndUpdate(
+      req.params.id,
+      { $set: { adminApproved: true } },
+      { new: true, runValidators: false } // ← skips validation on unrelated fields
+    );
+
     if (!internship) return res.status(404).json({ message: "Internship not found" });
 
-    internship.adminApproved = true;
-    await internship.save();
-
-    const emailContent = `
-      Congratulations! Your internship posting "${internship.jobTitle}" has been approved!
-      Company: ${internship.companyName}
-      Location: ${internship.location}
-      Description: ${internship.jobDescription}
-      Start Date: ${internship.startDate}
-      End Date/Duration: ${internship.endDateOrDuration}
-    `;
-    try {
-      await notifyUser(internship.contactInfo.email, "Internship Approved", emailContent);
-    } catch (emailError) {
-      console.error("Failed to send approval email:", emailError);
+    const recipientEmail = internship.contactInfo?.email;
+    if (recipientEmail) {
+      const emailContent = `
+        Congratulations! Your internship posting "${internship.jobTitle}" has been approved!
+        Company: ${internship.companyName}
+        Location: ${internship.location}
+        Description: ${internship.jobDescription}
+        Start Date: ${internship.startDate}
+        End Date/Duration: ${internship.endDateOrDuration}
+      `;
+      try {
+        await notifyUser(recipientEmail, "Internship Approved", emailContent);
+      } catch (emailError) {
+        console.error("Failed to send approval email:", emailError);
+      }
     }
 
     res.json({ message: "Internship approved successfully", internship });
   } catch (error) {
+    console.error("Approve route error:", error);
     res.status(500).json({ message: "Server Error: Unable to approve internship", error: error.message });
   }
 });
@@ -358,27 +364,32 @@ router.patch("/:id/approve", async (req, res) => {
 // ─── PATCH reject internship ──────────────────────────────────────────────────
 router.patch("/:id/reject", async (req, res) => {
   try {
-    const internship = await InternshipPosting.findById(req.params.id);
+    const internship = await InternshipPosting.findByIdAndUpdate(
+      req.params.id,
+      { $set: { adminApproved: false, rejectionReason: req.body.reason || "" } },
+      { new: true, runValidators: false }
+    );
+
     if (!internship) return res.status(404).json({ message: "Internship not found" });
 
-    internship.adminApproved = false;
-    internship.rejectionReason = req.body.reason || "";
-    await internship.save();
-
-    const emailContent = `
-      We regret to inform you that your internship posting "${internship.jobTitle}" has been rejected.
-      Reason: ${req.body.reason || "No specific reason provided."}
-      Company: ${internship.companyName}
-      Location: ${internship.location}
-    `;
-    try {
-      await notifyUser(internship.contactInfo.email, "Internship Rejected", emailContent);
-    } catch (emailError) {
-      console.error("Failed to send rejection email:", emailError);
+    const recipientEmail = internship.contactInfo?.email;
+    if (recipientEmail) {
+      const emailContent = `
+        We regret to inform you that your internship posting "${internship.jobTitle}" has been rejected.
+        Reason: ${req.body.reason || "No specific reason provided."}
+        Company: ${internship.companyName}
+        Location: ${internship.location}
+      `;
+      try {
+        await notifyUser(recipientEmail, "Internship Rejected", emailContent);
+      } catch (emailError) {
+        console.error("Failed to send rejection email:", emailError);
+      }
     }
 
     res.json({ message: "Internship rejected successfully", internship });
   } catch (error) {
+    console.error("Reject route error:", error);
     res.status(500).json({ message: "Server Error: Unable to reject internship", error: error.message });
   }
 });
@@ -409,11 +420,13 @@ router.post("/:id/review", async (req, res) => {
 // ─── PATCH restore soft-deleted internship ────────────────────────────────────
 router.patch("/:id/restore", async (req, res) => {
   try {
-    const internship = await InternshipPosting.findById(req.params.id);
-    if (!internship) return res.status(404).json({ message: "Internship not found" });
+    const internship = await InternshipPosting.findByIdAndUpdate(
+      req.params.id,
+      { $set: { deleted: false } },
+      { new: true, runValidators: false }
+    );
 
-    internship.deleted = false;
-    await internship.save();
+    if (!internship) return res.status(404).json({ message: "Internship not found" });
 
     res.status(200).json({ message: "Internship restored successfully", internship });
   } catch (error) {

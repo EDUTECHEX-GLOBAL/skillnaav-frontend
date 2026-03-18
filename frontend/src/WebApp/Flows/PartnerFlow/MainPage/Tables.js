@@ -461,6 +461,7 @@ export const ShortlistedTable = ({ candidates, internshipId }) => {
                   </th>
                   <th className="px-6 py-3 text-center">Name</th>
                   <th className="px-6 py-3 text-center">Email</th>
+                  <th className="px-6 py-3 text-center">ATS Score</th>
                   <th className="px-6 py-3 text-center">Resume</th>
                   <th className="px-6 py-3 text-center">Offer Status</th>
                   <th className="px-6 py-3 text-center">Actions</th>
@@ -481,6 +482,21 @@ export const ShortlistedTable = ({ candidates, internshipId }) => {
                       </td>
                       <td className="px-6 py-4">{student.name || "N/A"}</td>
                       <td className="px-6 py-4">{student.email || "N/A"}</td>
+                      <td className="px-6 py-4">
+                        {student.ats_score_pct != null ? (
+                          <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                            student.ats_score_pct >= 70
+                              ? "bg-green-100 text-green-700"
+                              : student.ats_score_pct >= 50
+                              ? "bg-yellow-100 text-yellow-800"
+                              : "bg-red-100 text-red-700"
+                          }`}>
+                            {student.ats_score_pct}%
+                          </span>
+                        ) : (
+                          <span className="text-gray-400 text-xs">—</span>
+                        )}
+                      </td>
                       <td className="px-6 py-4">
                         <a href={student.resumeUrl} target="_blank" rel="noopener noreferrer"
                           className="text-blue-600 hover:underline">View Resume</a>
@@ -799,16 +815,18 @@ export const ShortlistedTable = ({ candidates, internshipId }) => {
         </Modal>
       )}
 
-      {showBulkModal && (
-        <Modal isOpen onClose={() => setShowBulkModal(false)} title={`Send Offers to ${selectedStudents.length} Students`}>
-          <BulkSendOffer
-            selectedStudents={selectedStudents.map((id) => uniqueCandidates.find((s) => s.student_id === id))}
-            internshipId={internshipId}
-            onCancel={() => setShowBulkModal(false)}
-            onSuccess={handleBulkOfferSuccess}
-          />
-        </Modal>
-      )}
+     {showBulkModal && (
+  <Modal isOpen onClose={() => setShowBulkModal(false)} title={`Send Offers to ${selectedStudents.length} Students`}>
+    <BulkSendOffer
+      selectedStudents={selectedStudents
+        .map((id) => uniqueCandidates.find((s) => s.student_id === id))
+        .filter(Boolean)}
+      internshipId={internshipId}
+      onCancel={() => setShowBulkModal(false)}
+      onSuccess={handleBulkOfferSuccess}
+    />
+  </Modal>
+)}
 
       {showScheduleModal && scheduleTarget && (
         <Modal isOpen onClose={() => setShowScheduleModal(false)} title="Schedule Interview">

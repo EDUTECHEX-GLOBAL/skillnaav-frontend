@@ -80,7 +80,7 @@ const NotificationRoutes = require("./routes/webapp-routes/NotificatioRoutes");
 const googleRoutes = require("./routes/webapp-routes/googleRoutes");
 
 const offerLetterRoutes = require("./routes/webapp-routes/offerLetterRoutes");
-const offerTemplateRoutes = require("./routes/webapp-routes/offerTemplateRoutes");
+// const offerTemplateRoutes = require("./routes/webapp-routes/offerTemplateRoutes");
 const scheduleRoutes = require("./routes/webapp-routes/scheduleRoutes");
 const uploadRoutes = require("./routes/uploadRoutes");
 
@@ -104,6 +104,10 @@ const resumeRoutes = require("./routes/webapp-routes/resumeRoutes");
 const resumeParserRoutes = require("./routes/webapp-routes/resumeParserRoutes");
 const studentProfileRoutes = require("./routes/webapp-routes/StudentprofileRoutes");
 const cvRoutes = require("./routes/webapp-routes/cv");
+const cityRoutes = require("./routes/webapp-routes/cityRoutes");
+
+
+
 
 
 const curriculumRoutes = require("./routes/webapp-routes/schoolAdmin/curriculumRoutes");
@@ -127,7 +131,7 @@ app.use("/api/google", googleRoutes);
 app.use("/api/offer-letters", offerLetterRoutes);
 app.use("/api/notifications", NotificationRoutes);
 app.use("/api/schedule", scheduleRoutes);
-app.use("/api/templates", offerTemplateRoutes);
+
 
 app.use("/api/partner/payments", partnerPaymentRoutes);
 app.use("/api/internship/payments", internshipPaymentRoutes);
@@ -150,6 +154,8 @@ app.use("/api/resume", resumeParserRoutes);
 app.use("/api/student-profile", studentProfileRoutes);
 app.use("/api/cv", cvRoutes);
 app.use('/api/ai', require('./routes/webapp-routes/Airoutes'));
+app.use("/api/cities", cityRoutes);
+
 app.use("/api/curriculum", curriculumRoutes);
 
 
