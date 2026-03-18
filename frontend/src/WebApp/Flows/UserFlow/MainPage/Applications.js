@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -20,30 +20,61 @@ const Applications = () => {
   /* ================================
      FETCH APPLICATIONS
   ================================= */
-  useEffect(() => {
-    const fetchDashboardApplications = async () => {
-      try {
-        if (!studentId) {
-          setError("Student ID not found. Please login again.");
-          setLoading(false);
-          return;
-        }
-
-        const { data } = await axios.get(
-          `/api/applications/student/${studentId}/dashboard`
-        );
-
-        setApplications(data.applications || []);
-      } catch (err) {
-        console.error("❌ Failed to fetch applications:", err);
-        setError("Failed to load applications.");
-      } finally {
+  const fetchDashboardApplications = useCallback(async () => {
+    try {
+      if (!studentId) {
+        setError("Student ID not found. Please login again.");
         setLoading(false);
+        return;
       }
+
+      const { data } = await axios.get(
+        `/api/applications/student/${studentId}/dashboard`
+      );
+
+      setApplications(data.applications || []);
+    } catch (err) {
+      console.error("Failed to fetch applications:", err);
+      setError("Failed to load applications.");
+    } finally {
+      setLoading(false);
+    }
+  }, [studentId]);
+
+  // Initial fetch
+  useEffect(() => {
+    fetchDashboardApplications();
+  }, [fetchDashboardApplications]);
+
+  /* ================================
+     ✅ REFRESH ON ASSESSMENT COMPLETION
+     Listen for the custom event dispatched by ProctoredAssessment
+     after a successful submit, so pipeline status updates immediately.
+  ================================= */
+  useEffect(() => {
+    const handleAssessmentCompleted = () => {
+      // Small delay to let the backend update pipeline status
+      setTimeout(() => {
+        fetchDashboardApplications();
+      }, 1500);
     };
 
-    fetchDashboardApplications();
-  }, [studentId]);
+    window.addEventListener("assessmentCompleted", handleAssessmentCompleted);
+
+    // Also refresh when the user switches back to this tab
+    // (covers the case where assessment opens in a different tab/view)
+    const handleVisibility = () => {
+      if (!document.hidden) {
+        fetchDashboardApplications();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      window.removeEventListener("assessmentCompleted", handleAssessmentCompleted);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [fetchDashboardApplications]);
 
   /* ================================
      FINAL STATUS RESOLVER (L3 > L2 > L1 > DB status)
@@ -70,10 +101,8 @@ const Applications = () => {
     if (pipeline.l1?.status === "shortlisted") return "Shortlisted";
     if (pipeline.l1?.status === "rejected") return "Rejected";
 
-    // ✅ No pipeline stage matched — fall back to the raw DB status on the
-    // application document. This covers the case where partner.py already set
-    // status="Shortlisted" or "Rejected" but a CandidatePipeline row doesn't
-    // exist yet (e.g. right after shortlisting before L2 is triggered).
+    // No pipeline stage matched — fall back to the raw DB status on the
+    // application document.
     if (appStatus && appStatus !== "Applied") return appStatus;
 
     return "Applied";
@@ -99,7 +128,7 @@ const Applications = () => {
   /* ================================
      ASSESSMENT CTA (ONLY L2)
   ================================= */
-  const renderAssessmentCTA = (pipeline) => {
+  const renderAssessmentCTA = (pipeline, appId) => {
     if (!pipeline) return null;
 
     const { l2, l3 } = pipeline;
@@ -113,7 +142,7 @@ const Applications = () => {
       case "sent":
         return (
           <button
-            className="mt-3 w-full bg-purple-600 text-white py-2 rounded hover:bg-purple-700"
+            className="mt-3 w-full bg-purple-600 text-white py-2 rounded hover:bg-purple-700 transition"
             onClick={() => openAssessment(l2.assessmentId)}
           >
             Start Assessment
@@ -123,7 +152,7 @@ const Applications = () => {
       case "started":
         return (
           <button
-            className="mt-3 w-full bg-yellow-500 text-white py-2 rounded hover:bg-yellow-600"
+            className="mt-3 w-full bg-yellow-500 text-white py-2 rounded hover:bg-yellow-600 transition"
             onClick={() => openAssessment(l2.assessmentId)}
           >
             Resume Assessment
@@ -143,14 +172,14 @@ const Applications = () => {
 
       case "passed":
         return (
-          <div className="mt-3 text-green-600 font-semibold">
+          <div className="mt-3 text-green-600 font-semibold text-center">
             ✅ Assessment Cleared
           </div>
         );
 
       case "rejected":
         return (
-          <div className="mt-3 text-red-600 font-semibold">
+          <div className="mt-3 text-red-600 font-semibold text-center">
             ❌ Assessment Failed
           </div>
         );
@@ -254,9 +283,10 @@ const Applications = () => {
             const job = app.internship;
             if (!job) return null;
 
-            // ✅ Pass app.status as the fallback so Shortlisted/Rejected from
-            // partner.py shows up even when no CandidatePipeline row exists yet.
-            const finalStatus = resolveApplicationStatus(app.pipeline, app.status);
+            const finalStatus = resolveApplicationStatus(
+              app.pipeline,
+              app.status
+            );
 
             return (
               <div key={app._id} className="bg-white rounded-lg shadow-lg p-4">
@@ -269,9 +299,7 @@ const Applications = () => {
                       className="rounded-full w-12 h-12 mr-4"
                     />
                     <div>
-                      <h3 className="text-lg font-semibold">
-                        {job.jobTitle}
-                      </h3>
+                      <h3 className="text-lg font-semibold">{job.jobTitle}</h3>
                       <p className="text-gray-500">
                         {job.companyName || "Unknown Company"}
                       </p>
@@ -309,7 +337,7 @@ const Applications = () => {
 
                 {/* ACTIONS */}
                 <div className="space-y-2">
-                  {renderAssessmentCTA(app.pipeline)}
+                  {renderAssessmentCTA(app.pipeline, app._id)}
                   {renderInterviewInfo(app.pipeline)}
 
                   <button

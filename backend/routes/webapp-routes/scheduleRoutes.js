@@ -37,6 +37,12 @@ router.put('/close', async (req, res) => {
       return res.status(400).json({ error: 'Schedule is already closed' });
     }
 
+    if (!Array.isArray(schedule.timetable) || schedule.timetable.length === 0) {
+      return res.status(400).json({
+        error: 'First create the internship schedule, then only you can close the internship schedule.'
+      });
+    }
+
     schedule.isClosed = true;
     await schedule.save();
 

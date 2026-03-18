@@ -1,3 +1,5 @@
+//File: BodyContent.js
+
 import React from "react";
 import { useTabContext } from "./UserHomePageContext/HomePageContext";
 import Message from "./Message";
@@ -8,6 +10,7 @@ import YourJobPosts from "./YourJobPosts";
 import PostAJob from "./PostAJob";
 import PartnerPremiumPage from "./PartnerPremiumPage";
 import OfferTemplateManager from "./OfferTemplateManager";
+import CustomInternshipCertificateManager from "./CustomInternshipCertificateManager";
 import StipendDetails from "./StipendDetails";
 import InstructureManagement from "./InstructureManagement";
 import InternshipPayments from "./InternshipPayments"; // ✅ New
@@ -44,6 +47,9 @@ const BodyContent = () => {
       break;
     case "offer-templates":
       content = <OfferTemplateManager />;
+      break;
+    case "custom-internship-certificate":
+      content = <CustomInternshipCertificateManager />;
       break;
     case "stipend-details":
       content = <StipendDetails />;

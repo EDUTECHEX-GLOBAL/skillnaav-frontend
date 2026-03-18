@@ -1,4 +1,5 @@
-// backend/routes/webapp-routes/instructureManagementRoutes.js
+//File: InstructureManagementRoutes.js
+
 const express = require("express");
 const path = require("path");
 const fs = require("fs");

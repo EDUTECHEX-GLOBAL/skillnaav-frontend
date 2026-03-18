@@ -1,4 +1,5 @@
-// backend/controllers/InstructureManagementController.js
+//File: InstructureManagementController.js
+
 const fs = require("fs");
 const path = require("path");
 const Instructure = require("../models/webapp-models/InstructureManagementModel");

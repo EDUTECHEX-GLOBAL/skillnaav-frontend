@@ -54,7 +54,7 @@ const imageUploader = (subfolder, maxSizeMB = 3) => {
   return createUploader(
     process.env.AWS_IMAGE_BUCKET,
     subfolder,
-    /jpe?g|png|webp/,
+    /jpe?g|png|webp|heic|heif/,
     maxSizeMB * 1024 * 1024
   );
 };

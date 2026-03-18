@@ -1,3 +1,5 @@
+//File: Applications.js
+
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -30,12 +32,22 @@ import TimeSlotsSelected from "./TimeSlotsSelected";
 
 const AI_API = "/api/ai";
 
+const getDefaultCloseScheduleModalState = () => ({
+  open: false,
+  internshipId: null,
+  title: "Close Internship Schedule",
+  message: "Are you sure that you want to close the current internship schedule?",
+  confirmLabel: "Yes",
+  cancelLabel: "No",
+  hideConfirm: false,
+});
+
 // ─── Type badge ───────────────────────────────────────────────────────────────
 const TypeBadge = ({ type }) => {
   const cfg = {
-    PAID:    { cls: "bg-emerald-100 text-emerald-700 border-emerald-200",  label: "Paid" },
-    STIPEND: { cls: "bg-blue-100 text-blue-700 border-blue-200",           label: "Stipend" },
-    FREE:    { cls: "bg-gray-100 text-gray-500 border-gray-200",           label: "Free" },
+    PAID: { cls: "bg-emerald-100 text-emerald-700 border-emerald-200", label: "Paid" },
+    STIPEND: { cls: "bg-blue-100 text-blue-700 border-blue-200", label: "Stipend" },
+    FREE: { cls: "bg-gray-100 text-gray-500 border-gray-200", label: "Free" },
   }[(type || "").toUpperCase()] || { cls: "bg-gray-100 text-gray-500 border-gray-200", label: type };
 
   return (
@@ -87,7 +99,7 @@ const InternshipList = () => {
   const [atsModalOpen, setAtsModalOpen] = useState(false);
   const [atsThreshold, setAtsThreshold] = useState(30);
   const [pendingShortlistInternship, setPendingShortlistInternship] = useState(null);
-  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
+  const [closeScheduleModal, setCloseScheduleModal] = useState(getDefaultCloseScheduleModalState);
   const [scheduleViewerOpen, setScheduleViewerOpen] = useState(false);
   const [selectedInternshipForView, setSelectedInternshipForView] = useState(null);
   const [timeSlotsModal, setTimeSlotsModal] = useState({ open: false, internshipId: null });
@@ -333,10 +345,10 @@ const InternshipList = () => {
         qualifications: Array.isArray(internship?.qualifications)
           ? internship.qualifications
           : typeof internship?.qualifications === "string"
-          ? internship.qualifications.split(",").map((q) => q.trim()).filter(Boolean) : [],
+            ? internship.qualifications.split(",").map((q) => q.trim()).filter(Boolean) : [],
         // contactInfo is resolved on the backend from the internship document
         contactInfo: {
-          name:  internship?.contactInfo?.name  || "",
+          name: internship?.contactInfo?.name || "",
           email: internship?.contactInfo?.email || "",
           phone: internship?.contactInfo?.phone || "",
         },
@@ -373,16 +385,115 @@ const InternshipList = () => {
     setTimeSlotsModal({ open: true, internshipId });
   };
 
-  const handleConfirmClose = async (internshipId) => {
+  const resetCloseScheduleModal = () => {
+    setCloseScheduleModal(getDefaultCloseScheduleModalState());
+  };
+
+  const openCloseScheduleConfirmation = (internshipId) => {
+    setCloseScheduleModal({
+      open: true,
+      internshipId,
+      title: "Close Internship Schedule",
+      message: "Are you sure that you want to close the current internship schedule?",
+      confirmLabel: "Yes",
+      cancelLabel: "No",
+      hideConfirm: false,
+    });
+  };
+
+  const openCreateScheduleRequiredPopup = () => {
+    setCloseScheduleModal({
+      open: true,
+      internshipId: null,
+      title: "Internship Schedule Required",
+      message: "First create the internship schedule, then only you can close the internship schedule.",
+      confirmLabel: "Yes",
+      cancelLabel: "OK",
+      hideConfirm: true,
+    });
+  };
+
+  const openAlreadyClosedSchedulePopup = () => {
+    setCloseScheduleModal({
+      open: true,
+      internshipId: null,
+      title: "Internship Schedule Closed",
+      message: "The internship schedule is already closed.",
+      confirmLabel: "Yes",
+      cancelLabel: "OK",
+      hideConfirm: true,
+    });
+  };
+
+  const handleCloseScheduleClick = async (internshipId) => {
+    const partnerId = partnerData?._id || localStorage.getItem("partnerId");
+
+    if (!partnerId) {
+      toast.error("Partner profile is not available. Please refresh and try again.");
+      return;
+    }
+
     try {
-      await axios.put("/api/schedule/close",
-        { internshipId, partnerId: localStorage.getItem("partnerId") },
-        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
-      );
-      toast.success("Schedule closed permanently!");
-      setConfirmCloseOpen(false);
-      setInternships((prev) => prev.map((i) => i._id === internshipId ? { ...i, isScheduleClosed: true } : i));
+      const response = await axios.get('/api/schedule/get-schedule', {
+        params: { internshipId, partnerId },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+
+      if (response.data?.isClosed) {
+        openAlreadyClosedSchedulePopup();
+        return;
+      }
+
+      const hasCreatedSchedule =
+        Array.isArray(response.data?.timetable) && response.data.timetable.length > 0;
+
+      if (!hasCreatedSchedule) {
+        openCreateScheduleRequiredPopup();
+        return;
+      }
+
+      openCloseScheduleConfirmation(internshipId);
     } catch (err) {
+      if (err.response?.status === 404) {
+        openCreateScheduleRequiredPopup();
+        return;
+      }
+
+      toast.error(
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        "Failed to verify internship schedule"
+      );
+    }
+  };
+
+  const handleConfirmClose = async (internshipId) => {
+    const partnerId = partnerData?._id || localStorage.getItem("partnerId");
+
+    if (!internshipId || !partnerId) {
+      toast.error("Partner profile is not available. Please refresh and try again.");
+      return;
+    }
+
+    try {
+      await axios.put('/api/schedule/close', {
+        internshipId,
+        partnerId
+      }, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      });
+
+      toast.success("Schedule closed permanently!");
+      resetCloseScheduleModal();
+      setInternships(prev =>
+        prev.map(i => i._id === internshipId ? { ...i, isScheduleClosed: true } : i)
+      );
+    } catch (err) {
+      if (err.response?.data?.error === "Schedule is already closed") {
+        openAlreadyClosedSchedulePopup();
+        return;
+      }
+
       toast.error(err.response?.data?.error || "Failed to close schedule");
     }
   };
@@ -439,13 +550,12 @@ const InternshipList = () => {
           <p className="text-sm text-gray-400 mt-0.5">Manage your posted internships and candidates</p>
         </div>
         {partnerData && (
-          <div className={`px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 ${
-            partnerData.isPremium
-              ? partnerData.planType === "Premium Plus"
-                ? "bg-purple-100 text-purple-700"
-                : "bg-blue-100 text-blue-700"
-              : "bg-gray-100 text-gray-600"
-          }`}>
+          <div className={`px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 ${partnerData.isPremium
+            ? partnerData.planType === "Premium Plus"
+              ? "bg-purple-100 text-purple-700"
+              : "bg-blue-100 text-blue-700"
+            : "bg-gray-100 text-gray-600"
+            }`}>
             {partnerData.isPremium && (
               <FontAwesomeIcon icon={faCrown} className={
                 partnerData.planType === "Premium Plus" ? "text-purple-500" : "text-blue-500"
@@ -520,10 +630,10 @@ const InternshipList = () => {
               internship.internshipType === "STIPEND"
                 ? `${internship.compensationDetails?.amount} ${internship.compensationDetails?.currency} / ${internship.compensationDetails?.frequency?.toLowerCase()}`
                 : internship.internshipType === "FREE"
-                ? "Unpaid / Free"
-                : internship.internshipType === "PAID"
-                ? `Student Pays: ${internship.compensationDetails?.amount} ${internship.compensationDetails?.currency}`
-                : "N/A";
+                  ? "Unpaid / Free"
+                  : internship.internshipType === "PAID"
+                    ? `Student Pays: ${internship.compensationDetails?.amount} ${internship.compensationDetails?.currency}`
+                    : "N/A";
 
             const isPaidInternship = (internship?.internshipType || "").toUpperCase() === "PAID";
 
@@ -576,21 +686,18 @@ const InternshipList = () => {
                       className="relative flex-shrink-0"
                       title={internship.applicationOpen ? "Close applications" : "Open applications"}
                     >
-                      <div className={`w-12 h-6 rounded-full transition-colors duration-300 ${
-                        internship.applicationOpen
-                          ? "bg-gradient-to-r from-teal-400 to-cyan-500"
-                          : "bg-gradient-to-r from-red-400 to-pink-500"
-                      }`}>
-                        <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-300 ${
-                          internship.applicationOpen ? "translate-x-6" : "translate-x-0.5"
-                        }`} />
+                      <div className={`w-12 h-6 rounded-full transition-colors duration-300 ${internship.applicationOpen
+                        ? "bg-gradient-to-r from-teal-400 to-cyan-500"
+                        : "bg-gradient-to-r from-red-400 to-pink-500"
+                        }`}>
+                        <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-300 ${internship.applicationOpen ? "translate-x-6" : "translate-x-0.5"
+                          }`} />
                       </div>
                     </button>
-                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
-                      internship.applicationOpen
-                        ? "bg-teal-50 text-teal-700 border border-teal-200"
-                        : "bg-red-50 text-red-600 border border-red-200"
-                    }`}>
+                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${internship.applicationOpen
+                      ? "bg-teal-50 text-teal-700 border border-teal-200"
+                      : "bg-red-50 text-red-600 border border-red-200"
+                      }`}>
                       {internship.applicationOpen ? "Open" : "Closed"}
                     </span>
                   </div>
@@ -614,9 +721,9 @@ const InternshipList = () => {
                       {" – "}
                       {internship.endDateOrDuration
                         ? (() => {
-                            const d = new Date(internship.endDateOrDuration);
-                            return isNaN(d) ? internship.endDateOrDuration : d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
-                          })()
+                          const d = new Date(internship.endDateOrDuration);
+                          return isNaN(d) ? internship.endDateOrDuration : d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+                        })()
                         : "—"}
                     </span>
                     <span className="flex items-center gap-1.5">
@@ -675,9 +782,8 @@ const InternshipList = () => {
                     <button
                       onClick={() => fetchApplications(internship._id)}
                       disabled={loadingApplications[internship._id]}
-                      className={`flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-xs font-semibold rounded-lg shadow hover:from-blue-600 hover:to-indigo-700 transition active:scale-95 ${
-                        loadingApplications[internship._id] ? "opacity-60 cursor-not-allowed" : ""
-                      }`}
+                      className={`flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-xs font-semibold rounded-lg shadow hover:from-blue-600 hover:to-indigo-700 transition active:scale-95 ${loadingApplications[internship._id] ? "opacity-60 cursor-not-allowed" : ""
+                        }`}
                     >
                       <FontAwesomeIcon icon={faEye} />
                       {loadingApplications[internship._id] ? "Loading..." : "View Applications"}
@@ -688,9 +794,8 @@ const InternshipList = () => {
                     <button
                       onClick={() => openAtsModal(internship)}
                       disabled={loadingShortlist}
-                      className={`flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs font-semibold rounded-lg shadow hover:from-emerald-600 hover:to-teal-600 transition active:scale-95 ${
-                        loadingShortlist ? "opacity-60 cursor-not-allowed" : ""
-                      }`}
+                      className={`flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs font-semibold rounded-lg shadow hover:from-emerald-600 hover:to-teal-600 transition active:scale-95 ${loadingShortlist ? "opacity-60 cursor-not-allowed" : ""
+                        }`}
                     >
                       <FontAwesomeIcon icon={faStar} />
                       {loadingShortlist ? "Shortlisting..." : "Shortlist"}
@@ -701,9 +806,8 @@ const InternshipList = () => {
                     <button
                       onClick={() => showShortlisted(internship._id)}
                       disabled={loadingShortlist}
-                      className={`flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-purple-500 to-violet-600 text-white text-xs font-semibold rounded-lg shadow hover:from-purple-600 hover:to-violet-700 transition active:scale-95 ${
-                        loadingShortlist ? "opacity-60 cursor-not-allowed" : ""
-                      }`}
+                      className={`flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-purple-500 to-violet-600 text-white text-xs font-semibold rounded-lg shadow hover:from-purple-600 hover:to-violet-700 transition active:scale-95 ${loadingShortlist ? "opacity-60 cursor-not-allowed" : ""
+                        }`}
                     >
                       <FontAwesomeIcon icon={faDownload} />
                       {loadingShortlist ? "Loading..." : "Shortlisted Resumes"}
@@ -740,8 +844,8 @@ const InternshipList = () => {
                       ) : showPremiumLock("View Schedule", "Premium Basic")}
 
                       <button
-                        onClick={() => setConfirmCloseOpen(internship._id)}
-                        className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-red-500 to-rose-500 text-white text-xs font-semibold rounded-lg shadow hover:from-red-600 hover:to-rose-600 transition active:scale-95"
+                        onClick={() => handleCloseScheduleClick(internship._id)}
+                        className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-red-500 to-pink-600 text-white font-semibold rounded-lg shadow-lg hover:from-red-600 hover:to-pink-700 transform hover:scale-105 transition duration-200"
                       >
                         <FontAwesomeIcon icon={faTimes} /> Close Schedule
                       </button>
@@ -769,11 +873,10 @@ const InternshipList = () => {
               key={pageNum}
               onClick={() => fetchInternships(partnerIdRef.current, pageNum, debouncedQuery)}
               disabled={loadingMore}
-              className={`w-9 h-9 rounded-lg text-sm font-semibold transition ${
-                pageNum === page
-                  ? "bg-blue-600 text-white shadow"
-                  : "border border-gray-200 text-gray-600 hover:bg-gray-50"
-              }`}
+              className={`w-9 h-9 rounded-lg text-sm font-semibold transition ${pageNum === page
+                ? "bg-blue-600 text-white shadow"
+                : "border border-gray-200 text-gray-600 hover:bg-gray-50"
+                }`}
             >
               {pageNum}
             </button>
@@ -934,9 +1037,14 @@ const InternshipList = () => {
       </Modal>
 
       <ConfirmCloseSchedule
-        isOpen={!!confirmCloseOpen}
-        onCancel={() => setConfirmCloseOpen(false)}
-        onConfirm={() => handleConfirmClose(confirmCloseOpen)}
+        isOpen={closeScheduleModal.open}
+        onCancel={resetCloseScheduleModal}
+        onConfirm={() => handleConfirmClose(closeScheduleModal.internshipId)}
+        title={closeScheduleModal.title}
+        message={closeScheduleModal.message}
+        confirmLabel={closeScheduleModal.confirmLabel}
+        cancelLabel={closeScheduleModal.cancelLabel}
+        hideConfirm={closeScheduleModal.hideConfirm}
       />
 
       <InternshipScheduleViewer
@@ -946,114 +1054,112 @@ const InternshipList = () => {
         partnerId={partnerData?._id || localStorage.getItem("partnerId")}
       />
 
-    {/* ── ATS Threshold Modal ── */}
-{atsModalOpen && pendingShortlistInternship && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4">
-    <div className="bg-white rounded-2xl border border-gray-100 w-full max-w-sm p-6 space-y-5">
+      {/* ── ATS Threshold Modal ── */}
+      {atsModalOpen && pendingShortlistInternship && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4">
+          <div className="bg-white rounded-2xl border border-gray-100 w-full max-w-sm p-6 space-y-5">
 
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h3 className="text-base font-medium text-gray-900">Set ATS threshold</h3>
-          <p className="text-xs text-gray-400 mt-1 leading-relaxed">
-            Only resumes at or above this score will be shortlisted.
-          </p>
-        </div>
-        <button
-          onClick={() => { setAtsModalOpen(false); setPendingShortlistInternship(null); }}
-          className="text-gray-300 hover:text-gray-500 transition text-xl leading-none mt-[-2px]"
-        >
-          ×
-        </button>
-      </div>
+            {/* Header */}
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-base font-medium text-gray-900">Set ATS threshold</h3>
+                <p className="text-xs text-gray-400 mt-1 leading-relaxed">
+                  Only resumes at or above this score will be shortlisted.
+                </p>
+              </div>
+              <button
+                onClick={() => { setAtsModalOpen(false); setPendingShortlistInternship(null); }}
+                className="text-gray-300 hover:text-gray-500 transition text-xl leading-none mt-[-2px]"
+              >
+                ×
+              </button>
+            </div>
 
-      {/* Internship pill */}
-      <div className="flex items-center gap-2.5 bg-gray-50 rounded-xl px-3.5 py-2.5 border border-gray-100">
-        <div className="w-7 h-7 rounded-md bg-blue-50 flex items-center justify-center flex-shrink-0">
-          <svg className="w-3.5 h-3.5 text-blue-500" fill="none" viewBox="0 0 16 16">
-            <rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.5"/>
-            <path d="M5 8h6M5 5.5h6M5 10.5h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-          </svg>
-        </div>
-        <span className="text-sm text-gray-600 font-medium truncate">
-          {pendingShortlistInternship.jobTitle} — {pendingShortlistInternship.companyName}
-        </span>
-      </div>
+            {/* Internship pill */}
+            <div className="flex items-center gap-2.5 bg-gray-50 rounded-xl px-3.5 py-2.5 border border-gray-100">
+              <div className="w-7 h-7 rounded-md bg-blue-50 flex items-center justify-center flex-shrink-0">
+                <svg className="w-3.5 h-3.5 text-blue-500" fill="none" viewBox="0 0 16 16">
+                  <rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.5" />
+                  <path d="M5 8h6M5 5.5h6M5 10.5h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                </svg>
+              </div>
+              <span className="text-sm text-gray-600 font-medium truncate">
+                {pendingShortlistInternship.jobTitle} — {pendingShortlistInternship.companyName}
+              </span>
+            </div>
 
-      {/* Score + Slider */}
-      <div className="space-y-3.5">
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-gray-500">Minimum ATS score</span>
-          <div className="flex items-center gap-1 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5">
-            <span className="text-xl font-medium text-emerald-700 min-w-[36px] text-right leading-none">
-              {atsThreshold}
-            </span>
-            <span className="text-sm font-medium text-emerald-600">%</span>
+            {/* Score + Slider */}
+            <div className="space-y-3.5">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-500">Minimum ATS score</span>
+                <div className="flex items-center gap-1 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5">
+                  <span className="text-xl font-medium text-emerald-700 min-w-[36px] text-right leading-none">
+                    {atsThreshold}
+                  </span>
+                  <span className="text-sm font-medium text-emerald-600">%</span>
+                </div>
+              </div>
+
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={5}
+                value={atsThreshold}
+                onChange={(e) => setAtsThreshold(Number(e.target.value))}
+                className="w-full accent-emerald-500 cursor-pointer"
+              />
+
+              <div className="flex justify-between text-[11px] text-gray-400 px-0.5">
+                <span>0% — all</span>
+                <span>50%</span>
+                <span>100% — strict</span>
+              </div>
+            </div>
+
+            {/* Hint badge */}
+            <div className={`flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 border text-xs font-medium ${atsThreshold >= 70
+              ? "bg-green-50 border-green-100 text-green-700"
+              : atsThreshold >= 40
+                ? "bg-amber-50 border-amber-100 text-amber-700"
+                : "bg-blue-50 border-blue-100 text-blue-600"
+              }`}>
+              <div className={`w-2 h-2 rounded-full flex-shrink-0 ${atsThreshold >= 70 ? "bg-green-500" : atsThreshold >= 40 ? "bg-amber-500" : "bg-blue-400"
+                }`} />
+              {atsThreshold >= 70
+                ? "Strict — only highly relevant resumes will pass"
+                : atsThreshold >= 40
+                  ? "Balanced — good mix of quality and quantity"
+                  : "Relaxed — more candidates will be included"}
+            </div>
+
+            {/* Actions */}
+            <div className="grid grid-cols-2 gap-2.5 pt-1">
+              <button
+                onClick={() => { setAtsModalOpen(false); setPendingShortlistInternship(null); }}
+                className="py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() =>
+                  handleShortlist(
+                    pendingShortlistInternship._id,
+                    pendingShortlistInternship.jobDescription,
+                    pendingShortlistInternship.qualifications || [],
+                    atsThreshold
+                  )
+                }
+                className="py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium transition active:scale-95 flex items-center justify-center gap-2"
+              >
+                <FontAwesomeIcon icon={faStar} className="text-xs" />
+                Shortlist
+              </button>
+            </div>
+
           </div>
         </div>
-
-        <input
-          type="range"
-          min={0}
-          max={100}
-          step={5}
-          value={atsThreshold}
-          onChange={(e) => setAtsThreshold(Number(e.target.value))}
-          className="w-full accent-emerald-500 cursor-pointer"
-        />
-
-        <div className="flex justify-between text-[11px] text-gray-400 px-0.5">
-          <span>0% — all</span>
-          <span>50%</span>
-          <span>100% — strict</span>
-        </div>
-      </div>
-
-      {/* Hint badge */}
-      <div className={`flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 border text-xs font-medium ${
-        atsThreshold >= 70
-          ? "bg-green-50 border-green-100 text-green-700"
-          : atsThreshold >= 40
-          ? "bg-amber-50 border-amber-100 text-amber-700"
-          : "bg-blue-50 border-blue-100 text-blue-600"
-      }`}>
-        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
-          atsThreshold >= 70 ? "bg-green-500" : atsThreshold >= 40 ? "bg-amber-500" : "bg-blue-400"
-        }`} />
-        {atsThreshold >= 70
-          ? "Strict — only highly relevant resumes will pass"
-          : atsThreshold >= 40
-          ? "Balanced — good mix of quality and quantity"
-          : "Relaxed — more candidates will be included"}
-      </div>
-
-      {/* Actions */}
-      <div className="grid grid-cols-2 gap-2.5 pt-1">
-        <button
-          onClick={() => { setAtsModalOpen(false); setPendingShortlistInternship(null); }}
-          className="py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={() =>
-            handleShortlist(
-              pendingShortlistInternship._id,
-              pendingShortlistInternship.jobDescription,
-              pendingShortlistInternship.qualifications || [],
-              atsThreshold
-            )
-          }
-          className="py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium transition active:scale-95 flex items-center justify-center gap-2"
-        >
-          <FontAwesomeIcon icon={faStar} className="text-xs" />
-          Shortlist
-        </button>
-      </div>
-
-    </div>
-  </div>
-)}
+      )}
     </div>
   );
 };

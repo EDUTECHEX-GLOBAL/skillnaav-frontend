@@ -1,63 +1,87 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
-import { useProctoring } from "./useProctoring"; // ✅ Changed to named import
+import { useProctoring } from "./useProctoring";
+import ProctoringWarningBanner from "./ProctoringWarningBanner";
 
 const ProctoredAssessment = ({ assessment, studentId, onClose }) => {
-  const [answers, setAnswers] = useState(Array(assessment.questions.length).fill(null));
+  const [answers, setAnswers] = useState(
+    Array(assessment.questions.length).fill(null)
+  );
   const [submitting, setSubmitting] = useState(false);
   const [submission, setSubmission] = useState(null);
   const [showResults, setShowResults] = useState(false);
   const [isReady, setIsReady] = useState(false);
-  const [showWarning, setShowWarning] = useState(false);
-  const [warningMessage, setWarningMessage] = useState('');
   const containerRef = useRef(null);
   const [startTime, setStartTime] = useState(null);
 
-  const handleViolation = (violation, count) => {
-    setWarningMessage(`⚠️ Violation detected: ${violation.message}. Total violations: ${count}`);
-    setShowWarning(true);
-    setTimeout(() => setShowWarning(false), 5000);
+  // ─── In-app confirmation dialog (replaces alert for auto-submit) ───
+  const [confirmDialog, setConfirmDialog] = useState(null);
 
-    // Auto-submit after 3 violations
-    if (count >= 3) {
-      alert('Too many violations detected. Assessment will be auto-submitted.');
-      handleSubmit(true);
-    }
-  };
+  // ─── Track whether we already auto-submitted ─────────────────────
+  const autoSubmittedRef = useRef(false);
+
+  // ─── VIOLATION HANDLER ────────────────────────────────────────────
+  // This is the callback the hook calls after batching. Because the
+  // hook already de-dupes cascading events, `count` increments only
+  // once per real user action.
+  const handleViolation = useCallback(
+    (violation, count) => {
+      // Auto-submit after 3 REAL violations (not cascaded)
+      if (count >= 3 && !autoSubmittedRef.current) {
+        autoSubmittedRef.current = true;
+        // Show a non-blocking confirmation, then submit
+        setConfirmDialog({
+          title: "Assessment Auto-Submitted",
+          message: `Too many violations detected (${count}/3). Your assessment has been auto-submitted with the answers you've completed so far.`,
+          onConfirm: () => {
+            setConfirmDialog(null);
+            handleSubmit(true);
+          },
+        });
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [] // handleSubmit is stable via ref pattern below
+  );
 
   const {
     violations,
     stream,
     isFullscreen,
     videoRef,
+    warningMessage, // ← from the hook (replaces local state)
     startProctoring,
     stopProctoring,
     enterFullscreen,
     exitFullscreen,
-    violationCount
+    violationCount,
+    showWarning, // ← use this instead of alert()
   } = useProctoring(handleViolation);
 
-  // Check for existing submission
+  // ─── CHECK FOR EXISTING SUBMISSION ────────────────────────────────
   useEffect(() => {
     const fetchSubmission = async () => {
       try {
-        const res = await axios.get(`/api/assessments/submission/${studentId}/${assessment._id}`);
+        const res = await axios.get(
+          `/api/assessments/submission/${studentId}/${assessment._id}`
+        );
         if (res.data.submission) {
           setSubmission(res.data.submission);
           setShowResults(true);
         }
       } catch (err) {
-        // No submission found
+        // No submission found — that's fine
       }
     };
     fetchSubmission();
   }, [assessment._id, studentId]);
 
-  // Start proctoring and fullscreen
+  // ─── START ASSESSMENT ─────────────────────────────────────────────
   const handleStartAssessment = async () => {
     const mediaAccess = await startProctoring();
     if (!mediaAccess) {
-      alert('You must grant camera and microphone access to proceed.');
+      // startProctoring already shows an in-app warning via showWarning()
+      // so we just return — no alert() needed
       return;
     }
 
@@ -69,26 +93,30 @@ const ProctoredAssessment = ({ assessment, studentId, onClose }) => {
     setStartTime(Date.now());
   };
 
-  // Cleanup on unmount
+  // ─── CLEANUP ON UNMOUNT ───────────────────────────────────────────
   useEffect(() => {
     return () => {
       stopProctoring();
       exitFullscreen();
     };
-  }, [stopProctoring, exitFullscreen]); // ✅ Added dependencies
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
+  // ─── OPTION SELECT ────────────────────────────────────────────────
   const handleOptionSelect = (index, optionIndex) => {
     const newAnswers = [...answers];
     newAnswers[index] = optionIndex;
     setAnswers(newAnswers);
   };
 
+  // ─── SUBMIT ───────────────────────────────────────────────────────
   const handleSubmit = async (isAutoSubmit = false) => {
     if (!isAutoSubmit && answers.includes(null)) {
-      return alert("Please answer all questions.");
+      showWarning("Please answer all questions before submitting.", 4000);
+      return;
     }
 
-    const timeTaken = Math.floor((Date.now() - startTime) / 1000); // in seconds
+    const timeTaken = Math.floor((Date.now() - (startTime || Date.now())) / 1000);
 
     const payload = {
       assessmentId: assessment._id,
@@ -99,42 +127,51 @@ const ProctoredAssessment = ({ assessment, studentId, onClose }) => {
         studentAnswer: answers[i] ?? -1,
         correctAnswer: q.correctAnswer,
         marks: q.marks || 1,
-        topic: q.topic || null
+        topic: q.topic || null,
       })),
       timeTaken,
-      violations: violations,
-      violationCount: violationCount,
-      isAutoSubmit: isAutoSubmit,
+      violations,
+      violationCount,
+      isAutoSubmit,
       proctoringData: {
-        mode: 'real',
+        mode: "real",
         cameraEnabled: !!stream,
         microphoneEnabled: !!stream,
         fullscreenEnabled: isFullscreen,
-        startedAt: new Date(startTime)
-      }
+        startedAt: startTime ? new Date(startTime) : new Date(),
+      },
     };
 
     setSubmitting(true);
     try {
       const response = await axios.post("/api/assessments/submit", payload);
-      
-      // Show warnings if violations detected
+
       if (response.data.warnings) {
-        alert(response.data.warnings.message);
+        showWarning(response.data.warnings.message, 5000);
       }
 
-      const res = await axios.get(`/api/assessments/submission/${studentId}/${assessment._id}`);
+      const res = await axios.get(
+        `/api/assessments/submission/${studentId}/${assessment._id}`
+      );
       setSubmission(res.data.submission);
       setShowResults(true);
       stopProctoring();
       await exitFullscreen();
+
+      // ✅ Notify parent components that assessment was completed
+      // so Applications.js can refresh its data
+      window.dispatchEvent(new CustomEvent("assessmentCompleted"));
     } catch (err) {
       console.error(err);
-      if (err.response?.status === 400 && err.response?.data?.message?.includes('already submitted')) {
-        alert("You have already submitted this assessment.");
-        // Fetch and show existing submission
+      if (
+        err.response?.status === 400 &&
+        err.response?.data?.message?.includes("already submitted")
+      ) {
+        showWarning("You have already submitted this assessment.", 4000);
         try {
-          const res = await axios.get(`/api/assessments/submission/${studentId}/${assessment._id}`);
+          const res = await axios.get(
+            `/api/assessments/submission/${studentId}/${assessment._id}`
+          );
           setSubmission(res.data.submission);
           setShowResults(true);
           stopProctoring();
@@ -143,13 +180,14 @@ const ProctoredAssessment = ({ assessment, studentId, onClose }) => {
           console.error("Error fetching existing submission:", fetchErr);
         }
       } else {
-        alert("Failed to submit assessment. Please try again.");
+        showWarning("Failed to submit assessment. Please try again.", 5000);
       }
     } finally {
       setSubmitting(false);
     }
   };
 
+  // ─── EXIT ─────────────────────────────────────────────────────────
   const handleExit = async () => {
     stopProctoring();
     await exitFullscreen();
@@ -159,18 +197,27 @@ const ProctoredAssessment = ({ assessment, studentId, onClose }) => {
   const answeredCount = answers.filter((a) => a !== null).length;
   const totalQuestions = assessment.questions.length;
 
-  // Results view
+  /* ================================================================
+     RESULTS VIEW
+  ================================================================ */
   if (showResults && submission) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-90 z-50 p-4">
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[90vh] overflow-y-auto p-8">
           <div className="mb-6 text-center">
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">Assessment Results</h2>
+            <h2 className="text-3xl font-bold text-gray-900 mb-2">
+              Assessment Results
+            </h2>
             <p className="text-lg text-gray-600 mb-2">
-              Score: <span className="font-bold text-purple-600">{submission.score}/{submission.totalMarks}</span> ({Math.round(submission.percentage)}%)
+              Score:{" "}
+              <span className="font-bold text-purple-600">
+                {submission.score}/{submission.totalMarks}
+              </span>{" "}
+              ({Math.round(submission.percentage)}%)
             </p>
             <p className="text-sm text-gray-500">
-              Time Taken: {Math.floor(submission.timeTaken / 60)}m {submission.timeTaken % 60}s
+              Time Taken: {Math.floor(submission.timeTaken / 60)}m{" "}
+              {submission.timeTaken % 60}s
             </p>
             {submission.violationCount > 0 && (
               <p className="text-sm text-red-600 mt-2">
@@ -181,7 +228,10 @@ const ProctoredAssessment = ({ assessment, studentId, onClose }) => {
 
           <div className="overflow-y-auto max-h-[60vh]">
             {submission.responses.map((resp, idx) => (
-              <div key={idx} className="mb-6 p-5 border rounded-xl bg-gray-50 shadow-sm">
+              <div
+                key={idx}
+                className="mb-6 p-5 border rounded-xl bg-gray-50 shadow-sm"
+              >
                 <p className="font-semibold text-gray-700 mb-3 text-lg">
                   {idx + 1}. {resp.questionText}
                 </p>
@@ -205,8 +255,16 @@ const ProctoredAssessment = ({ assessment, studentId, onClose }) => {
                       <span>
                         <b>{label}</b>
                         {option}
-                        {isUser && <span className="ml-2 font-semibold">(Your Answer)</span>}
-                        {isCorrect && !isUser && <span className="ml-2 font-semibold text-green-700">(Correct)</span>}
+                        {isUser && (
+                          <span className="ml-2 font-semibold">
+                            (Your Answer)
+                          </span>
+                        )}
+                        {isCorrect && !isUser && (
+                          <span className="ml-2 font-semibold text-green-700">
+                            (Correct)
+                          </span>
+                        )}
                       </span>
                     </div>
                   );
@@ -228,17 +286,22 @@ const ProctoredAssessment = ({ assessment, studentId, onClose }) => {
     );
   }
 
-  // Pre-assessment instructions
+  /* ================================================================
+     PRE-ASSESSMENT INSTRUCTIONS
+  ================================================================ */
   if (!isReady) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-90 z-50 p-4">
+        {/* Hook-driven warning banner (shows camera errors, etc.) */}
+        <ProctoringWarningBanner message={warningMessage} />
+
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-8">
           <h2 className="text-3xl font-bold text-gray-900 mb-4 text-center">
             Proctored Assessment Instructions
           </h2>
-          
+
           <div className="mb-6 p-6 bg-yellow-50 border-l-4 border-yellow-500 rounded">
-            <h3 className="font-bold text-lg mb-3">⚠️ Important Rules:</h3>
+            <h3 className="font-bold text-lg mb-3">Important Rules:</h3>
             <ul className="space-y-2 text-gray-700">
               <li>✓ Camera and microphone will be monitored throughout</li>
               <li>✓ The assessment will run in fullscreen mode</li>
@@ -252,8 +315,16 @@ const ProctoredAssessment = ({ assessment, studentId, onClose }) => {
 
           <div className="mb-6">
             <h3 className="font-semibold text-lg mb-2">Assessment Details:</h3>
-            <p className="text-gray-600">Total Questions: {assessment.questions.length}</p>
-            <p className="text-gray-600">Total Marks: {assessment.questions.reduce((sum, q) => sum + (q.marks || 1), 0)}</p>
+            <p className="text-gray-600">
+              Total Questions: {assessment.questions.length}
+            </p>
+            <p className="text-gray-600">
+              Total Marks:{" "}
+              {assessment.questions.reduce(
+                (sum, q) => sum + (q.marks || 1),
+                0
+              )}
+            </p>
           </div>
 
           <div className="flex gap-4 justify-center">
@@ -267,7 +338,7 @@ const ProctoredAssessment = ({ assessment, studentId, onClose }) => {
               onClick={handleStartAssessment}
               className="px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition font-semibold"
             >
-              I Agree - Start Assessment
+              I Agree – Start Assessment
             </button>
           </div>
         </div>
@@ -275,26 +346,47 @@ const ProctoredAssessment = ({ assessment, studentId, onClose }) => {
     );
   }
 
-  // Main assessment view
+  /* ================================================================
+     MAIN ASSESSMENT VIEW
+  ================================================================ */
   return (
     <div
       ref={containerRef}
       className="fixed inset-0 bg-gradient-to-br from-purple-900 to-indigo-900 z-50 overflow-hidden"
     >
-      {/* Warning Banner */}
-      {showWarning && (
-        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-red-600 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-pulse">
-          {warningMessage}
+      {/* ✅ Hook-driven warning banner (replaces the old alert-based one) */}
+      <ProctoringWarningBanner message={warningMessage} />
+
+      {/* ✅ In-app confirmation dialog (replaces alert for auto-submit) */}
+      {confirmDialog && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-70 z-[60]">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 p-6 text-center">
+            <div className="text-4xl mb-3">⚠️</div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">
+              {confirmDialog.title}
+            </h3>
+            <p className="text-gray-600 mb-6">{confirmDialog.message}</p>
+            <button
+              onClick={confirmDialog.onConfirm}
+              className="px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition font-semibold"
+            >
+              OK
+            </button>
+          </div>
         </div>
       )}
 
       {/* Header */}
       <div className="bg-white shadow-lg p-4 flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Internship Assessment</h2>
-          <p className="text-sm text-gray-500">Stay focused - This session is being monitored</p>
+          <h2 className="text-2xl font-bold text-gray-900">
+            Internship Assessment
+          </h2>
+          <p className="text-sm text-gray-500">
+            Stay focused – This session is being monitored
+          </p>
         </div>
-        
+
         <div className="flex items-center gap-6">
           {/* Progress */}
           <div className="flex items-center gap-2">
@@ -302,7 +394,9 @@ const ProctoredAssessment = ({ assessment, studentId, onClose }) => {
             <div className="w-32 bg-gray-200 rounded-full h-2.5">
               <div
                 className="bg-purple-600 h-2.5 rounded-full transition-all"
-                style={{ width: `${(answeredCount / totalQuestions) * 100}%` }}
+                style={{
+                  width: `${(answeredCount / totalQuestions) * 100}%`,
+                }}
               />
             </div>
             <span className="text-sm font-semibold text-gray-700">
@@ -310,9 +404,25 @@ const ProctoredAssessment = ({ assessment, studentId, onClose }) => {
             </span>
           </div>
 
-          {/* Violation Counter */}
-          <div className="flex items-center gap-2 px-3 py-1 bg-red-50 rounded-lg">
-            <span className="text-sm font-semibold text-red-600">
+          {/* Violation Counter — color-coded severity */}
+          <div
+            className={`flex items-center gap-2 px-3 py-1 rounded-lg ${
+              violationCount === 0
+                ? "bg-green-50"
+                : violationCount < 3
+                ? "bg-yellow-50"
+                : "bg-red-50"
+            }`}
+          >
+            <span
+              className={`text-sm font-semibold ${
+                violationCount === 0
+                  ? "text-green-600"
+                  : violationCount < 3
+                  ? "text-yellow-600"
+                  : "text-red-600"
+              }`}
+            >
               Violations: {violationCount}/3
             </span>
           </div>
@@ -324,7 +434,10 @@ const ProctoredAssessment = ({ assessment, studentId, onClose }) => {
         {/* Questions Section */}
         <div className="flex-1 overflow-y-auto p-8 bg-white">
           {assessment.questions.map((q, i) => (
-            <div key={i} className="mb-8 p-6 border-2 rounded-xl bg-gray-50 shadow-md">
+            <div
+              key={i}
+              className="mb-8 p-6 border-2 rounded-xl bg-gray-50 shadow-md"
+            >
               <p className="font-bold text-gray-800 mb-4 text-lg">
                 Question {i + 1}: {q.questionText}
               </p>
@@ -359,7 +472,7 @@ const ProctoredAssessment = ({ assessment, studentId, onClose }) => {
         {/* Proctoring Sidebar */}
         <div className="w-80 bg-gray-900 text-white p-6 flex flex-col">
           <h3 className="text-xl font-bold mb-4">Live Monitoring</h3>
-          
+
           {/* Camera Feed */}
           <div className="mb-6">
             <video
@@ -375,7 +488,9 @@ const ProctoredAssessment = ({ assessment, studentId, onClose }) => {
 
           {/* Violation Log */}
           <div className="flex-1 overflow-y-auto mb-4">
-            <h4 className="font-semibold mb-2 text-purple-300">Violation Log:</h4>
+            <h4 className="font-semibold mb-2 text-purple-300">
+              Violation Log:
+            </h4>
             {violations.length === 0 ? (
               <p className="text-sm text-gray-400">No violations detected</p>
             ) : (

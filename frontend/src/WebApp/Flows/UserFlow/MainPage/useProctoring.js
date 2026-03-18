@@ -5,38 +5,109 @@ export const useProctoring = (onViolation) => {
   const [violations, setViolations] = useState([]);
   const [stream, setStream] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [warningMessage, setWarningMessage] = useState(null);
   const videoRef = useRef(null);
   const violationCountRef = useRef(0);
-  const lastViolationTimeRef = useRef(0);
 
-  // ✅ DEBOUNCE VIOLATIONS (prevent spam)
-  const VIOLATION_COOLDOWN = 3000; // 3 seconds
+  // ─── ANTI-CASCADE MECHANISM ────────────────────────────────────────
+  // A single user action (e.g. clicking away) fires MULTIPLE browser
+  // events (blur → visibilitychange → fullscreenchange) within the same
+  // tick. We batch all events that arrive within a short window into ONE
+  // violation.
+  const BATCH_WINDOW_MS = 1500;        // group events within 1.5s
+  const COOLDOWN_AFTER_VIOLATION = 5000; // 5s cooldown after a recorded violation
+  const pendingViolationsRef = useRef([]); // buffer during batch window
+  const batchTimerRef = useRef(null);
+  const lastRecordedTimeRef = useRef(0);
+  const isProcessingAlertRef = useRef(false); // flag to suppress events during warnings
+  const suppressUntilRef = useRef(0);         // timestamp until which events are ignored
 
-  const addViolation = useCallback((type, message) => {
-    const now = Date.now();
-    
-    // Prevent duplicate violations within cooldown period
-    if (now - lastViolationTimeRef.current < VIOLATION_COOLDOWN) {
-      return;
-    }
+  // ─── FLUSH: commit the batched violations as a SINGLE violation ────
+  const flushViolations = useCallback(() => {
+    const pending = pendingViolationsRef.current;
+    if (pending.length === 0) return;
 
-    lastViolationTimeRef.current = now;
+    // Pick the highest-severity event as the representative violation
+    const SEVERITY = {
+      FULLSCREEN_EXIT: 4,
+      TAB_SWITCH: 3,
+      WINDOW_BLUR: 2,
+      DEVTOOLS_OPEN: 5,
+      KEYBOARD_ATTEMPT: 1,
+      RIGHT_CLICK: 0,
+      COPY_PASTE: 0,
+    };
+
+    pending.sort((a, b) => (SEVERITY[b.type] || 0) - (SEVERITY[a.type] || 0));
+    const primary = pending[0];
+
+    // Build a combined description if multiple types fired
+    const uniqueTypes = [...new Set(pending.map(v => v.type))];
+    const combinedMessage =
+      uniqueTypes.length > 1
+        ? `${primary.message} (also detected: ${uniqueTypes.slice(1).join(', ')})`
+        : primary.message;
 
     const violation = {
-      type,
+      type: primary.type,
       timestamp: new Date().toISOString(),
-      message,
+      message: combinedMessage,
+      relatedEvents: uniqueTypes,
     };
 
     setViolations(prev => [...prev, violation]);
     violationCountRef.current += 1;
-    
+    lastRecordedTimeRef.current = Date.now();
+
     if (onViolation) {
       onViolation(violation, violationCountRef.current);
     }
+
+    // Clear the buffer
+    pendingViolationsRef.current = [];
+    batchTimerRef.current = null;
   }, [onViolation]);
 
-  // ✅ TAB SWITCH DETECTION
+  // ─── ADD VIOLATION (batched) ───────────────────────────────────────
+  const addViolation = useCallback((type, message) => {
+    const now = Date.now();
+
+    // 1) Suppress events while we're showing an in-app warning
+    if (isProcessingAlertRef.current) return;
+
+    // 2) Suppress events during the grace/cooldown window
+    if (now < suppressUntilRef.current) return;
+
+    // 3) Enforce cooldown after last recorded violation
+    if (now - lastRecordedTimeRef.current < COOLDOWN_AFTER_VIOLATION) {
+      // Still within cooldown — drop silently
+      return;
+    }
+
+    // 4) Buffer this event
+    pendingViolationsRef.current.push({ type, message, time: now });
+
+    // 5) Start (or restart) the batch timer
+    if (batchTimerRef.current) {
+      clearTimeout(batchTimerRef.current);
+    }
+    batchTimerRef.current = setTimeout(flushViolations, BATCH_WINDOW_MS);
+  }, [flushViolations]);
+
+  // ─── SHOW WARNING (replaces native alert to avoid triggering more events) ─
+  const showWarning = useCallback((msg, durationMs = 4000) => {
+    isProcessingAlertRef.current = true;
+    setWarningMessage(msg);
+
+    setTimeout(() => {
+      setWarningMessage(null);
+      isProcessingAlertRef.current = false;
+      // Give a small grace window after the warning dismisses
+      suppressUntilRef.current = Date.now() + 1500;
+    }, durationMs);
+  }, []);
+
+  // ─── TAB SWITCH DETECTION ─────────────────────────────────────────
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.hidden) {
@@ -48,36 +119,33 @@ export const useProctoring = (onViolation) => {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [addViolation]);
 
-  // ✅ WINDOW BLUR DETECTION (additional layer)
+  // ─── WINDOW BLUR DETECTION ────────────────────────────────────────
   useEffect(() => {
     const handleBlur = () => {
-      addViolation('WINDOW_BLUR', 'Assessment window lost focus');
+      // Only count blur if tab is NOT hidden (otherwise TAB_SWITCH covers it)
+      if (!document.hidden) {
+        addViolation('WINDOW_BLUR', 'Assessment window lost focus');
+      }
     };
 
     window.addEventListener('blur', handleBlur);
     return () => window.removeEventListener('blur', handleBlur);
   }, [addViolation]);
 
-  // ✅ PREVENT KEYBOARD SHORTCUTS
+  // ─── PREVENT KEYBOARD SHORTCUTS ───────────────────────────────────
   useEffect(() => {
     const preventShortcuts = (e) => {
-      const prohibitedKeys = [
-        'F11', 'F12', 'Escape',
-        ...(e.ctrlKey && ['t', 'w', 'n', 'Tab'] || []),
-        ...(e.altKey && ['Tab', 'F4'] || []),
-        ...(e.metaKey && ['Tab', 't', 'w'] || [])
-      ];
+      const prohibited =
+        ['F11', 'F12', 'Escape'].includes(e.key) ||
+        (e.ctrlKey && ['t', 'w', 'n', 'Tab'].includes(e.key)) ||
+        (e.altKey && ['Tab', 'F4'].includes(e.key)) ||
+        (e.metaKey && ['Tab', 't', 'w'].includes(e.key)) ||
+        (e.ctrlKey && e.shiftKey && e.key === 'I');
 
-      if (prohibitedKeys.includes(e.key)) {
+      if (prohibited) {
         e.preventDefault();
         e.stopPropagation();
-        addViolation('KEYBOARD_ATTEMPT', `Attempted to use prohibited key: ${e.key}`);
-      }
-
-      // Prevent Ctrl+Shift+I (DevTools)
-      if (e.ctrlKey && e.shiftKey && e.key === 'I') {
-        e.preventDefault();
-        addViolation('KEYBOARD_ATTEMPT', 'Attempted to open developer tools');
+        addViolation('KEYBOARD_ATTEMPT', `Attempted prohibited key: ${e.key}`);
       }
     };
 
@@ -85,7 +153,7 @@ export const useProctoring = (onViolation) => {
     return () => window.removeEventListener('keydown', preventShortcuts, true);
   }, [addViolation]);
 
-  // ✅ PREVENT CONTEXT MENU (right-click)
+  // ─── PREVENT CONTEXT MENU ─────────────────────────────────────────
   useEffect(() => {
     const preventContextMenu = (e) => {
       e.preventDefault();
@@ -96,35 +164,25 @@ export const useProctoring = (onViolation) => {
     return () => window.removeEventListener('contextmenu', preventContextMenu);
   }, [addViolation]);
 
-  // ✅ DETECT COPY/PASTE ATTEMPTS
+  // ─── DETECT COPY / PASTE / CUT ────────────────────────────────────
   useEffect(() => {
-    const handleCopy = (e) => {
+    const handler = (e) => {
       e.preventDefault();
-      addViolation('COPY_PASTE', 'Attempted to copy content');
+      addViolation('COPY_PASTE', `Attempted to ${e.type} content`);
     };
 
-    const handlePaste = (e) => {
-      e.preventDefault();
-      addViolation('COPY_PASTE', 'Attempted to paste content');
-    };
-
-    const handleCut = (e) => {
-      e.preventDefault();
-      addViolation('COPY_PASTE', 'Attempted to cut content');
-    };
-
-    document.addEventListener('copy', handleCopy);
-    document.addEventListener('paste', handlePaste);
-    document.addEventListener('cut', handleCut);
+    document.addEventListener('copy', handler);
+    document.addEventListener('paste', handler);
+    document.addEventListener('cut', handler);
 
     return () => {
-      document.removeEventListener('copy', handleCopy);
-      document.removeEventListener('paste', handlePaste);
-      document.removeEventListener('cut', handleCut);
+      document.removeEventListener('copy', handler);
+      document.removeEventListener('paste', handler);
+      document.removeEventListener('cut', handler);
     };
   }, [addViolation]);
 
-  // ✅ FULLSCREEN CHANGE DETECTION
+  // ─── FULLSCREEN CHANGE DETECTION ──────────────────────────────────
   useEffect(() => {
     const handleFullscreenChange = () => {
       const isCurrentlyFullscreen = !!(
@@ -138,30 +196,25 @@ export const useProctoring = (onViolation) => {
 
       if (!isCurrentlyFullscreen) {
         addViolation('FULLSCREEN_EXIT', 'Exited fullscreen mode');
+      } else {
+        // User re-entered fullscreen — suppress events for a grace period
+        suppressUntilRef.current = Date.now() + 2000;
       }
     };
 
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
-    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
-    document.addEventListener('msfullscreenchange', handleFullscreenChange);
-
-    return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
-      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
-      document.removeEventListener('msfullscreenchange', handleFullscreenChange);
-    };
+    const events = ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange', 'msfullscreenchange'];
+    events.forEach(evt => document.addEventListener(evt, handleFullscreenChange));
+    return () => events.forEach(evt => document.removeEventListener(evt, handleFullscreenChange));
   }, [addViolation]);
 
-  // ✅ DETECT DEVTOOLS (basic detection)
+  // ─── DEVTOOLS DETECTION (basic) ───────────────────────────────────
   useEffect(() => {
     const detectDevTools = () => {
       const threshold = 160;
-      const widthThreshold = window.outerWidth - window.innerWidth > threshold;
-      const heightThreshold = window.outerHeight - window.innerHeight > threshold;
+      const widthDiff = window.outerWidth - window.innerWidth > threshold;
+      const heightDiff = window.outerHeight - window.innerHeight > threshold;
 
-      if (widthThreshold || heightThreshold) {
+      if (widthDiff || heightDiff) {
         addViolation('DEVTOOLS_OPEN', 'Developer tools may be open');
       }
     };
@@ -170,100 +223,104 @@ export const useProctoring = (onViolation) => {
     return () => clearInterval(interval);
   }, [addViolation]);
 
-  // ✅ START PROCTORING (Camera + Mic)
+  // ─── START PROCTORING (Camera + Mic) ──────────────────────────────
   const startProctoring = async () => {
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { ideal: 640 },
-          height: { ideal: 480 },
-          facingMode: 'user'
-        },
-        audio: true
+        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
+        audio: true,
       });
 
       setStream(mediaStream);
-      
+
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
         videoRef.current.play();
       }
 
+      // Suppress any events that fire during the startup sequence
+      suppressUntilRef.current = Date.now() + 3000;
       return true;
     } catch (error) {
       console.error('Error accessing camera/microphone:', error);
-      
-      let message = 'Camera and microphone access is required to take this assessment.';
-      
+
+      let message = 'Camera and microphone access is required for this assessment.';
       if (error.name === 'NotAllowedError') {
-        message += '\n\nPlease allow camera and microphone permissions in your browser settings.';
+        message += ' Please allow permissions in your browser settings.';
       } else if (error.name === 'NotFoundError') {
-        message += '\n\nNo camera or microphone found. Please connect a device.';
+        message += ' No camera or microphone found.';
       } else if (error.name === 'NotReadableError') {
-        message += '\n\nCamera or microphone is already in use by another application.';
+        message += ' Device is in use by another application.';
       }
 
-      alert(message);
+      // Use our in-app warning instead of alert()
+      showWarning(message, 6000);
       return false;
     }
   };
 
-  // ✅ STOP PROCTORING
-  const stopProctoring = () => {
+  // ─── STOP PROCTORING ──────────────────────────────────────────────
+  const stopProctoring = useCallback(() => {
     if (stream) {
-      stream.getTracks().forEach(track => {
-        track.stop();
-      });
+      stream.getTracks().forEach(track => track.stop());
       setStream(null);
-      
-      if (videoRef.current) {
-        videoRef.current.srcObject = null;
-      }
+      if (videoRef.current) videoRef.current.srcObject = null;
     }
-  };
 
-  // ✅ ENTER FULLSCREEN
+    // Clear any pending batch timer
+    if (batchTimerRef.current) {
+      clearTimeout(batchTimerRef.current);
+      batchTimerRef.current = null;
+    }
+  }, [stream]);
+
+  // ─── ENTER FULLSCREEN ─────────────────────────────────────────────
   const enterFullscreen = async (element) => {
+    // Suppress events during the fullscreen transition
+    suppressUntilRef.current = Date.now() + 2000;
+
     try {
-      if (element.requestFullscreen) {
-        await element.requestFullscreen();
-      } else if (element.webkitRequestFullscreen) {
-        await element.webkitRequestFullscreen();
-      } else if (element.mozRequestFullScreen) {
-        await element.mozRequestFullScreen();
-      } else if (element.msRequestFullscreen) {
-        await element.msRequestFullscreen();
+      const fn =
+        element.requestFullscreen ||
+        element.webkitRequestFullscreen ||
+        element.mozRequestFullScreen ||
+        element.msRequestFullscreen;
+
+      if (fn) {
+        await fn.call(element);
       } else {
         throw new Error('Fullscreen not supported');
       }
     } catch (error) {
       console.error('Error entering fullscreen:', error);
-      alert('Fullscreen mode is required for this assessment.');
+      showWarning('Fullscreen mode is required for this assessment.', 5000);
     }
   };
 
-  // ✅ EXIT FULLSCREEN
+  // ─── EXIT FULLSCREEN ──────────────────────────────────────────────
   const exitFullscreen = async () => {
+    // Suppress events during exit transition
+    suppressUntilRef.current = Date.now() + 2000;
+
     try {
-      if (document.exitFullscreen) {
-        await document.exitFullscreen();
-      } else if (document.webkitExitFullscreen) {
-        await document.webkitExitFullscreen();
-      } else if (document.mozCancelFullScreen) {
-        await document.mozCancelFullScreen();
-      } else if (document.msExitFullscreen) {
-        await document.msExitFullscreen();
-      }
+      const fn =
+        document.exitFullscreen ||
+        document.webkitExitFullscreen ||
+        document.mozCancelFullScreen ||
+        document.msExitFullscreen;
+
+      if (fn) await fn.call(document);
     } catch (error) {
       console.error('Error exiting fullscreen:', error);
     }
   };
 
-  // ✅ CLEANUP ON UNMOUNT
+  // ─── CLEANUP ON UNMOUNT ───────────────────────────────────────────
   useEffect(() => {
     return () => {
       stopProctoring();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return {
@@ -271,11 +328,13 @@ export const useProctoring = (onViolation) => {
     stream,
     isFullscreen,
     videoRef,
+    warningMessage,       // ← NEW: use this to render an in-app warning banner
     startProctoring,
     stopProctoring,
     enterFullscreen,
     exitFullscreen,
     violationCount: violationCountRef.current,
-    addViolation, // ✅ Expose for manual violation logging
+    addViolation,
+    showWarning,          // ← NEW: trigger in-app warnings instead of alert()
   };
 };

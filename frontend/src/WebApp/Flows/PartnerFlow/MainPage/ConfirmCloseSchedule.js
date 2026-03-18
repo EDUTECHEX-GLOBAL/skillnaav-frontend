@@ -3,7 +3,16 @@ import React from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTimes } from "@fortawesome/free-solid-svg-icons";
 
-const ConfirmCloseSchedule = ({ isOpen, onConfirm, onCancel }) => {
+const ConfirmCloseSchedule = ({
+    isOpen,
+    onConfirm,
+    onCancel,
+    title = "Close Internship Schedule",
+    message = "Are you sure that you want to close the current internship schedule?",
+    confirmLabel = "Yes",
+    cancelLabel = "No",
+    hideConfirm = false,
+}) => {
     if (!isOpen) return null;
 
     return (
@@ -19,22 +28,27 @@ const ConfirmCloseSchedule = ({ isOpen, onConfirm, onCancel }) => {
                 </button>
 
                 {/* 🔹 Content (pushed down via pt on card) */}
-                <h2 className="text-lg font-medium mb-6 leading-relaxed">
-                    Are you sure that you want to close the current internship schedule?
+                <h2 className="text-lg font-semibold mb-3 leading-relaxed">
+                    {title}
                 </h2>
+                <p className="text-base font-medium mb-6 leading-relaxed text-gray-700">
+                    {message}
+                </p>
 
                 <div className="flex justify-center gap-4">
-                    <button
-                        className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-                        onClick={onConfirm}
-                    >
-                        Yes
-                    </button>
+                    {!hideConfirm && (
+                        <button
+                            className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                            onClick={onConfirm}
+                        >
+                            {confirmLabel}
+                        </button>
+                    )}
                     <button
                         className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
                         onClick={onCancel}
                     >
-                        No
+                        {cancelLabel}
                     </button>
                 </div>
             </div>

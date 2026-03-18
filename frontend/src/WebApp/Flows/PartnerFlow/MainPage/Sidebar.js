@@ -1,5 +1,8 @@
+//File: Sidebar.js
+
 import React from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+
 import {
   faUser,
   faBriefcase,
@@ -10,8 +13,10 @@ import {
   faFileAlt,
   faMoneyBillWave,
   faUsers,
+  faCertificate,
   faFileInvoiceDollar, // ✅ New — for Internship Payments tab
 } from "@fortawesome/free-solid-svg-icons";
+
 import { useTabContext } from "./UserHomePageContext/HomePageContext";
 import { useNavigate } from "react-router-dom";
 import { useFeedback } from "../../../../context/FeedbackContext";
@@ -111,16 +116,16 @@ const Sidebar = ({ isOpen, onClose }) => {
   };
 
   const menuItems = [
-    { id: "your-job-posts",        label: "Internship Posts",     icon: faBriefcase         },
-    { id: "post-a-job",            label: "Post An Internship",   icon: faPlus              },
-    { id: "messages",              label: "Messages",             icon: faEnvelope          },
-    { id: "applications",          label: "Applications",         icon: faFileAlt           },
-    { id: "instructors",           label: "Instructor Management",icon: faUsers             },
-    { id: "offer-templates",       label: "Offer Templates",      icon: faFileAlt           },
-    { id: "stipend-details",       label: "Stipend Details",      icon: faMoneyBillWave     },
-    // ✅ New — Internship Payments tab (for paid internships)
-    { id: "internship-payments",   label: "Internship Payments",  icon: faFileInvoiceDollar },
-    { id: "profile",               label: "Profile",              icon: faUser              },
+    { id: "your-job-posts", label: "Internship Posts", icon: faBriefcase },
+    { id: "post-a-job", label: "Post An Internship", icon: faPlus },
+    { id: "messages", label: "Messages", icon: faEnvelope },
+    { id: "applications", label: "Applications", icon: faFileAlt },
+    { id: "instructors", label: "Instructor Management", icon: faUsers },
+    { id: "offer-templates", label: "Offer Templates", icon: faFileAlt },
+    { id: "custom-internship-certificate", label: "Custom Internship Certificate", icon: faCertificate },
+    { id: "stipend-details", label: "Stipend Details", icon: faMoneyBillWave },
+    { id: "internship-payments", label: "Internship Payments", icon: faFileInvoiceDollar },
+    { id: "profile", label: "Profile", icon: faUser },
   ];
 
   const actionItems = [
@@ -142,9 +147,8 @@ const Sidebar = ({ isOpen, onClose }) => {
     return (
       <button
         onClick={() => handleTabClick(item.id)}
-        className={`flex items-center p-3 rounded-lg w-full text-left font-semibold ${
-          isSelected ? selectedColor : defaultColor
-        } ${item.hoverBg || "hover:bg-gray-100"}`}
+        className={`flex items-center p-3 rounded-lg w-full text-left font-semibold ${isSelected ? selectedColor : defaultColor
+          } ${item.hoverBg || "hover:bg-gray-100"}`}
       >
         <FontAwesomeIcon
           icon={item.icon}

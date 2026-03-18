@@ -28,8 +28,8 @@ const app = express();
 app.use("/api/payments/razorpay-webhook", express.raw({ type: "application/json" }));
 
 // ------------------- Middleware -------------------
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "15mb" }));
+app.use(express.urlencoded({ extended: true, limit: "15mb" }));
 
 // --- CORS ---
 const FRONTEND_ORIGIN = process.env.FRONTEND_BASE_URL || "http://localhost:3000";
@@ -91,6 +91,7 @@ const schoolAdminRoutes = require("./routes/webapp-routes/schoolAdmin/schoolAdmi
 const schoolAdminPaymentRoutes = require("./routes/webapp-routes/schoolAdmin/paymentRoutes");
 const schoolAdminLoginSessionRoutes = require("./routes/webapp-routes/schoolAdmin/LoginSessionRoutes");
 const stipendDetailsRoutes = require("./routes/webapp-routes/stipendDetailsRoutes");
+const customInternshipCertificateRoutes = require("./routes/webapp-routes/customInternshipCertificateRoutes");
 const assessmentRoutes = require("./routes/webapp-routes/assessmentRoutes");
 const feedback = require("./routes/webapp-routes/feedbackRoutes");
 const feedbackSummary = require("./routes/webapp-routes/feedbackSummary");
@@ -140,6 +141,7 @@ app.use("/api/school-admin", schoolAdminRoutes);
 app.use("/api/school-admin/payments", schoolAdminPaymentRoutes);
 app.use("/api/sessions", schoolAdminLoginSessionRoutes);
 app.use("/api/internship/stipend-details", stipendDetailsRoutes);
+app.use("/api/custom-internship-certificates", customInternshipCertificateRoutes);
 app.use("/api/assessments", assessmentRoutes);
 app.use("/api/feedback", feedback);
 app.use("/api/feedback", feedbackSummary);
