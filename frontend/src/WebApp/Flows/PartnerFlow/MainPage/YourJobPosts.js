@@ -223,11 +223,15 @@ const ViewModalBody = ({ internship: i, onEdit, onClose }) => (
 
       <div className="flex items-start gap-4 pr-10">
         {i.imgUrl ? (
-          <img
-            src={i.imgUrl}
-            alt={i.companyName}
-            className="w-14 h-14 rounded-xl object-contain bg-white p-1 shadow flex-shrink-0"
-          />
+       <img
+  src={i.imgUrl}
+  alt={i.companyName}
+  width="56"
+  height="56"
+  loading="eager"
+  fetchpriority="high"
+  className="w-14 h-14 rounded-xl object-contain bg-white p-1 shadow"
+/>
         ) : (
           <div className="w-14 h-14 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0 shadow">
             <FontAwesomeIcon icon={faBuilding} className="text-2xl text-white/80" />
@@ -825,7 +829,7 @@ const YourJobPosts = () => {
   };
 
   return (
-    <div className="p-6 rounded-lg shadow-md" style={{ fontFamily: "'Poppins', sans-serif" }}>
+    <div className="p-6 rounded-lg shadow-md min-h-screen" style={{ fontFamily: "'Poppins', sans-serif" }}>
 
       {/* Search + Sort Row */}
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
@@ -855,153 +859,175 @@ const YourJobPosts = () => {
             </button>
           )}
         </div>
-        <select
-          value={sortCriteria}
-          onChange={(e) => setSortCriteria(e.target.value)}
-          className="p-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-          style={{ fontFamily: "'Poppins', sans-serif" }}
-        >
+       <select
+  value={sortCriteria}
+  onChange={(e) => setSortCriteria(e.target.value)}
+  className="p-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 w-40 flex-shrink-0"
+  style={{ fontFamily: "'Poppins', sans-serif" }}
+>
+
           <option value="jobTitle">Sort by Title</option>
           <option value="companyName">Sort by Company</option>
           <option value="createdAt">Sort by Date</option>
         </select>
-        <button
-          onClick={() => setSortDirection((d) => (d === "asc" ? "desc" : "asc"))}
-          className="flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm text-gray-700 hover:bg-gray-100 font-medium"
-          style={{ fontFamily: "'Poppins', sans-serif" }}
-        >
+       <button
+  onClick={() => setSortDirection((d) => (d === "asc" ? "desc" : "asc"))}
+  className="flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm text-gray-700 hover:bg-gray-100 font-medium w-24 justify-center flex-shrink-0"
+  style={{ fontFamily: "'Poppins', sans-serif" }}
+>
           <FontAwesomeIcon icon={sortDirection === "asc" ? faArrowUpAZ : faArrowDownZA} className="text-xs" />
           {sortDirection === "asc" ? "Asc" : "Desc"}
         </button>
       </div>
 
       {/* Result count */}
-      {!loading && totalCount > 0 && (
-        <p className="text-xs text-gray-400 mb-3 flex items-center gap-1.5" style={{ fontFamily: "'Poppins', sans-serif" }}>
-          <FontAwesomeIcon icon={faLayerGroup} className="text-gray-300" />
-          {totalCount} result{totalCount !== 1 ? "s" : ""}
-          {committedQuery && <> for "<em className="text-gray-600">{committedQuery}</em>"</>}
+    <p className="text-xs text-gray-400 mb-3 flex items-center gap-1.5 min-h-[20px]" style={{ fontFamily: "'Poppins', sans-serif" }}>
+  {!loading && totalCount > 0 && (
+    <>
+      <FontAwesomeIcon icon={faLayerGroup} className="text-gray-300" />
+      {totalCount} result{totalCount !== 1 ? "s" : ""}
+      {committedQuery && <> for "<em className="text-gray-600">{committedQuery}</em>"</>}
+    </>
+  )}
+</p>
+
+   {/* Cards */}
+{loading ? (
+  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+    {Array.from({ length: 6 }).map((_, i) => (
+      <div key={i} className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col animate-pulse">
+        <div className="mb-4 w-full h-32 bg-gray-100 rounded-lg" />
+        <div className="h-4 bg-gray-200 rounded w-3/4 mb-2" />
+        <div className="h-3 bg-gray-100 rounded w-1/2 mb-3" />
+        <div className="flex gap-2 mb-4">
+          <div className="h-5 bg-gray-100 rounded-full w-16" />
+          <div className="h-5 bg-gray-100 rounded-full w-12" />
+        </div>
+        <div className="space-y-2 mb-4">
+          <div className="h-3 bg-gray-100 rounded w-full" />
+          <div className="h-3 bg-gray-100 rounded w-5/6" />
+        </div>
+        <div className="mt-auto pt-3 border-t border-gray-100 flex justify-between">
+          <div className="h-6 bg-gray-100 rounded-full w-20" />
+          <div className="h-6 bg-gray-200 rounded-lg w-24" />
+        </div>
+      </div>
+    ))}
+  </div>
+) : internships.length === 0 ? (
+  <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+    <FontAwesomeIcon icon={faBriefcase} className="text-4xl mb-3 opacity-30" />
+    <p className="text-sm" style={{ fontFamily: "'Poppins', sans-serif" }}>No internships found.</p>
+  </div>
+) : (
+  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+    {internships.map((internship) => (
+      <div
+        key={internship._id}
+        className="bg-white p-5 rounded-xl shadow-sm border border-gray-100
+                   hover:shadow-md hover:border-indigo-100 transition-all duration-200 flex flex-col"
+        style={{ fontFamily: "'Poppins', sans-serif" }}
+      >
+        {/* Logo / Image */}
+        {internship.imgUrl ? (
+          <div className="mb-4 w-full h-32 flex items-center justify-center bg-gray-50 rounded-lg border border-gray-100 overflow-hidden">
+            <img
+              src={internship.imgUrl}
+              alt={internship.jobTitle}
+              className="max-h-28 max-w-full object-contain p-2"
+              width="200"
+              height="112"
+              loading="lazy"
+            />
+          </div>
+        ) : (
+          <div className="mb-4 w-full h-32 flex items-center justify-center bg-gradient-to-br from-indigo-50 to-purple-50 rounded-lg border border-indigo-100">
+            <FontAwesomeIcon icon={faBuilding} className="text-4xl text-indigo-200" />
+          </div>
+        )}
+
+        {/* Title + Company */}
+        <h3 className="text-[15px] font-bold text-gray-900 leading-snug mb-0.5">
+          {internship.jobTitle}
+        </h3>
+        <p className="text-xs font-medium text-indigo-500 mb-3 flex items-center gap-1">
+          <FontAwesomeIcon icon={faBriefcase} className="text-[9px] text-indigo-300" />
+          {internship.companyName}
+          <span className="text-gray-300 mx-0.5">·</span>
+          <FontAwesomeIcon icon={faLocationDot} className="text-[9px] text-gray-300" />
+          <span className="text-gray-400 font-normal">{internship.location}</span>
         </p>
-      )}
 
-      {/* Cards */}
-      {loading ? (
-        <div className="flex justify-center items-center py-20">
-          <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+        {/* Badges */}
+        <div className="flex flex-wrap gap-1.5 mb-4">
+          <ModePill mode={internship.internshipMode} />
+          <TypePill type={internship.internshipType} />
+          {internship.classification && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-50 text-purple-600 border border-purple-200">
+              <FontAwesomeIcon icon={faBullseye} className="text-[9px]" />
+              {internship.classification}
+            </span>
+          )}
         </div>
-      ) : internships.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-gray-400">
-          <FontAwesomeIcon icon={faBriefcase} className="text-4xl mb-3 opacity-30" />
-          <p className="text-sm" style={{ fontFamily: "'Poppins', sans-serif" }}>No internships found.</p>
+
+        {/* Details */}
+        <div className="space-y-1.5 mb-4">
+          <p className="text-xs text-gray-600 flex items-center gap-1.5">
+            <FontAwesomeIcon icon={faClock} className="text-gray-300 w-3.5 text-center" />
+            <span className="font-semibold text-gray-700">Duration:</span>{" "}{internship.duration || "—"}
+          </p>
+          <p className="text-xs text-gray-600 flex items-center gap-1.5">
+            <FontAwesomeIcon icon={faCoins} className="text-gray-300 w-3.5 text-center" />
+            <span className="font-semibold text-gray-700">Compensation:</span>{" "}<CompLabel i={internship} />
+          </p>
+          {internship.sector && (
+            <p className="text-xs text-gray-600 flex items-center gap-1.5">
+              <FontAwesomeIcon icon={faIndustry} className="text-gray-300 w-3.5 text-center" />
+              <span className="font-semibold text-gray-700">Sector:</span>{" "}
+              <span className="text-indigo-600">{SECTOR_LABELS[internship.sector] || internship.sector}</span>
+            </p>
+          )}
         </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {internships.map((internship) => (
-            <div
-              key={internship._id}
-              className="bg-white p-5 rounded-xl shadow-sm border border-gray-100
-                         hover:shadow-md hover:border-indigo-100 transition-all duration-200 flex flex-col"
-              style={{ fontFamily: "'Poppins', sans-serif" }}
-            >
-              {/* Logo / Image */}
-              {internship.imgUrl ? (
-                <div className="mb-4 w-full h-32 flex items-center justify-center bg-gray-50 rounded-lg border border-gray-100 overflow-hidden">
-                  <img
-                    src={internship.imgUrl}
-                    alt={internship.jobTitle}
-                    className="max-h-28 max-w-full object-contain p-2"
-                  />
-                </div>
-              ) : (
-                <div className="mb-4 w-full h-32 flex items-center justify-center bg-gradient-to-br from-indigo-50 to-purple-50 rounded-lg border border-indigo-100">
-                  <FontAwesomeIcon icon={faBuilding} className="text-4xl text-indigo-200" />
-                </div>
-              )}
 
-              {/* Title + Company */}
-              <h3 className="text-[15px] font-bold text-gray-900 leading-snug mb-0.5">
-                {internship.jobTitle}
-              </h3>
-              <p className="text-xs font-medium text-indigo-500 mb-3 flex items-center gap-1">
-                <FontAwesomeIcon icon={faBriefcase} className="text-[9px] text-indigo-300" />
-                {internship.companyName}
-                <span className="text-gray-300 mx-0.5">·</span>
-                <FontAwesomeIcon icon={faLocationDot} className="text-[9px] text-gray-300" />
-                <span className="text-gray-400 font-normal">{internship.location}</span>
-              </p>
-
-              {/* Badges */}
-              <div className="flex flex-wrap gap-1.5 mb-4">
-                <ModePill mode={internship.internshipMode} />
-                <TypePill type={internship.internshipType} />
-                {internship.classification && (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-50 text-purple-600 border border-purple-200">
-                    <FontAwesomeIcon icon={faBullseye} className="text-[9px]" />
-                    {internship.classification}
-                  </span>
-                )}
-              </div>
-
-              {/* Details */}
-              <div className="space-y-1.5 mb-4">
-                <p className="text-xs text-gray-600 flex items-center gap-1.5">
-                  <FontAwesomeIcon icon={faClock} className="text-gray-300 w-3.5 text-center" />
-                  <span className="font-semibold text-gray-700">Duration:</span>{" "}{internship.duration || "—"}
-                </p>
-                <p className="text-xs text-gray-600 flex items-center gap-1.5">
-                  <FontAwesomeIcon icon={faCoins} className="text-gray-300 w-3.5 text-center" />
-                  <span className="font-semibold text-gray-700">Compensation:</span>{" "}<CompLabel i={internship} />
-                </p>
-                {internship.sector && (
-                  <p className="text-xs text-gray-600 flex items-center gap-1.5">
-                    <FontAwesomeIcon icon={faIndustry} className="text-gray-300 w-3.5 text-center" />
-                    <span className="font-semibold text-gray-700">Sector:</span>{" "}
-                    <span className="text-indigo-600">{SECTOR_LABELS[internship.sector] || internship.sector}</span>
-                  </p>
-                )}
-              </div>
-
-              {/* Card footer */}
-              <div className="mt-auto flex items-center justify-between pt-3 border-t border-gray-100">
-                <StatusPill adminReviewed={internship.adminReviewed} adminApproved={internship.adminApproved} />
-                <button
-                  onClick={() => openViewModal(internship)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-semibold
-                             rounded-lg hover:bg-indigo-700 active:scale-95 transition-all duration-150"
-                >
-                  View Details
-                  <FontAwesomeIcon icon={faArrowRight} className="text-[10px]" />
-                </button>
-              </div>
-            </div>
-          ))}
+        {/* Card footer */}
+        <div className="mt-auto flex items-center justify-between pt-3 border-t border-gray-100">
+          <StatusPill adminReviewed={internship.adminReviewed} adminApproved={internship.adminApproved} />
+          <button
+            onClick={() => openViewModal(internship)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-semibold
+                       rounded-lg hover:bg-indigo-700 active:scale-95 transition-all duration-150"
+          >
+            View Details
+            <FontAwesomeIcon icon={faArrowRight} className="text-[10px]" />
+          </button>
         </div>
-      )}
+      </div>
+    ))}
+  </div>
+)}
 
       {/* Pagination */}
-      <div className="flex justify-between items-center mt-5">
-        <button
-          onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-          disabled={currentPage === 1 || isSearching}
-          className="flex items-center gap-2 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 disabled:opacity-50 transition"
-          style={{ fontFamily: "'Poppins', sans-serif" }}
-        >
-          <FontAwesomeIcon icon={faChevronLeft} className="text-xs" />
-          Previous
-        </button>
-        <span className="text-sm text-gray-600 font-medium" style={{ fontFamily: "'Poppins', sans-serif" }}>
-          Page {currentPage} of {totalPages}
-        </span>
-        <button
-          onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-          disabled={currentPage === totalPages || isSearching}
-          className="flex items-center gap-2 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 disabled:opacity-50 transition"
-          style={{ fontFamily: "'Poppins', sans-serif" }}
-        >
-          Next
-          <FontAwesomeIcon icon={faChevronRight} className="text-xs" />
-        </button>
-      </div>
+     <div className="flex justify-between items-center mt-5 min-h-[40px]">
+  <button
+    onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+    disabled={currentPage === 1 || isSearching || loading}  // ✅ also disable during loading
+    className="flex items-center gap-2 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 disabled:opacity-50 transition"
+  >
+    <FontAwesomeIcon icon={faChevronLeft} className="text-xs" />
+    Previous
+  </button>
+  <span className="text-sm text-gray-600 font-medium min-w-[100px] text-center">
+    {loading ? "" : `Page ${currentPage} of ${totalPages}`}
+  </span>
+  <button
+    onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+    disabled={currentPage === totalPages || isSearching || loading}
+    className="flex items-center gap-2 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 disabled:opacity-50 transition"
+  >
+    Next
+    <FontAwesomeIcon icon={faChevronRight} className="text-xs" />
+  </button>
+</div>
 
       {/* ─── Modal ── */}
       <Modal

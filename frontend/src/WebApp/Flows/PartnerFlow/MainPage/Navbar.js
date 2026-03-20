@@ -274,33 +274,33 @@ const Navbar = ({ onToggleSidebar }) => {
       {/* Right Section: User info + Dropdown */}
       <div className="relative flex items-center ml-auto">
         {userInfo.name && (
-          <div className="flex flex-col items-end mr-3">
-            <span className="text-gray-800 text-sm">{userInfo.name}</span>
-
-            {userInfo.planType && (
-              <span className={`mt-1 px-2 py-0.5 text-xs font-medium rounded-full ${
-                userInfo.planType === "Freemium"
-                  ? "bg-gray-200 text-gray-700"
-                  : userInfo.planType === "Premium Basic"
-                  ? "bg-purple-200 text-purple-800"
-                  : userInfo.planType === "Premium Plus"
-                  ? "bg-orange-200 text-orange-800"
-                  : "bg-gray-100 text-gray-500"
-              }`}>
-                {userInfo.planType}
-              </span>
-            )}
-          </div>
+          <div className="flex flex-col items-end mr-3 min-w-[90px] min-h-[40px] justify-center">
+  <span className="text-gray-800 text-sm">
+    {userInfo.name || ""}
+  </span>
+  <span className={`mt-1 px-2 py-0.5 text-xs font-medium rounded-full transition-opacity duration-200
+    ${userInfo.planType ? "opacity-100" : "opacity-0"}
+    ${
+      userInfo.planType === "Freemium"       ? "bg-gray-200 text-gray-700"     :
+      userInfo.planType === "Premium Basic"  ? "bg-purple-200 text-purple-800" :
+      userInfo.planType === "Premium Plus"   ? "bg-orange-200 text-orange-800" :
+                                               "bg-gray-100 text-gray-500"
+    }`}>
+    {userInfo.planType || "Loading"}
+  </span>
+</div>
         )}
 
         {/* Profile Image / Fallback Icon */}
-        <button onClick={handleUserClick} className="focus:outline-none ml-2">
-          {userInfo.profileImage ? (
-            <img src={userInfo.profileImage} alt="Profile" className="w-10 h-10 rounded-full object-cover border border-gray-300" />
-          ) : (
-            <FontAwesomeIcon icon={faUser} className="w-6 h-6 text-gray-800" />
-          )}
-        </button>
+      <button onClick={handleUserClick} className="focus:outline-none ml-2 w-10 h-10 flex items-center justify-center flex-shrink-0">
+  {userInfo.profileImage ? (
+    <img src={userInfo.profileImage} alt="Profile" className="w-10 h-10 rounded-full object-cover border border-gray-300" />
+  ) : (
+    <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center border border-gray-200">
+      <FontAwesomeIcon icon={faUser} className="w-4 h-4 text-gray-500" />
+    </div>
+  )}
+</button>
 
         {/* Dropdown Menu */}
         {isDropdownOpen && (

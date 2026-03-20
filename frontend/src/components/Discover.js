@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { motion } from "framer-motion";
 import { Carousel } from "antd";
 import HeroImage from "../assets/app_mockup.png";
@@ -10,6 +10,7 @@ import Cnn from "../assets/CNN.svg";
 import Clutch from "../assets/Clutch.svg";
 import { useSelector } from "react-redux";
 
+
 const Gradient = "/Gradient.webp";
 
 const Discover = () => {
@@ -19,6 +20,17 @@ const Discover = () => {
     window.open("/choose-role", "_blank");
   };
 
+  // Add this useEffect at the top of the Discover component
+useEffect(() => {
+  const link = document.createElement("link");
+  link.rel = "preload";
+  link.as = "image";
+  link.href = "/Gradient.webp";
+  link.type = "image/webp";
+  link.setAttribute("fetchpriority", "high");
+  document.head.appendChild(link);
+  return () => document.head.removeChild(link);
+}, []);
   // ✅ Extract data — will be null/undefined until API loads
   const discover = skillnaavData?.discover?.[0];
   const discovercompimg = skillnaavData?.discovercompimg || [];

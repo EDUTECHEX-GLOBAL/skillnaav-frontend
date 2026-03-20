@@ -5,7 +5,7 @@ import "@fontsource/inter/600.css";
 import "@fontsource/inter/700.css";
 import PageLoader from "./components/PageLoader";
 
-import { useSelector } from "react-redux";
+
 
 // ---------- LAZY IMPORTS ----------
 const Home = lazy(() => import("./pages/Home/Home"));
@@ -59,7 +59,7 @@ import FeedbackModal from "./components/FeedbackModal/FeedbackModal";
 function App() {
   return (
     <FeedbackProvider>
-      <BrowserRouter>
+     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Suspense fallback={<PageLoader />}>
           <Routes>
             {/* Website */}

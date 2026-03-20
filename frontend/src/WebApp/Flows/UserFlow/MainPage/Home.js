@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import Homeimage from "../../../../assets-webapp/Home-Image.png";
+// import Homeimage from "../../../../assets-webapp/Home-Image.png";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faMapMarkerAlt, faClock, faDollarSign, faHeart, faGlobe } from "@fortawesome/free-solid-svg-icons";
 import ApplyCards from "./ApplyCards";
@@ -10,7 +10,7 @@ import Skillnaavlogo from "../../../../assets-webapp/Skillnaavlogo.png";
 import PremiumPage from "./PremiumPage";
 import { format } from "date-fns";
 
-
+const Homeimage = "/Home-Image.png";
 const MAX_FREE_APPLICATIONS = 5;
 
 const getSavedLimitByPlan = (planType) => {
@@ -40,15 +40,20 @@ const Home = () => {
   const [hasMore, setHasMore] = useState(true);
   const [loadingJobs, setLoadingJobs] = useState(false);
   const loadMoreRef = useRef(null);
-   const isRestoringScroll = useRef(false);
+  const isRestoringScroll = useRef(false);
 
 
   const navigate = useNavigate();
 
+  const loadingRef = useRef(false);
+  const hasMoreRef = useRef(true);
+
   const fetchJobData = async (pageNumber = 1) => {
     try {
-      if (loadingJobs || !hasMore) return;
+      // ✅ Use refs instead of stale state values
+      if (loadingRef.current || !hasMoreRef.current) return;
 
+      loadingRef.current = true;  // ✅ set ref immediately
       setLoadingJobs(true);
 
       const userInfo = JSON.parse(localStorage.getItem("userInfo")) || {};
@@ -64,15 +69,26 @@ const Home = () => {
         pageNumber === 1 ? data : [...prev, ...data]
       );
 
+      hasMoreRef.current = more;  // ✅ update ref immediately
       setHasMore(more);
       setPage(pageNumber);
     } catch (error) {
       console.error("Error fetching internships:", error);
     } finally {
+      loadingRef.current = false;  // ✅ reset ref immediately
       setLoadingJobs(false);
     }
   };
 
+  useEffect(() => {
+  const link = document.createElement("link");
+  link.rel = "preload";
+  link.as = "image";
+  link.href = "/Home-Image.png";
+  link.setAttribute("fetchpriority", "high");
+  document.head.appendChild(link);
+  return () => document.head.removeChild(link);
+}, []);
   // Fetch job data and user profile only once on mount
   useEffect(() => {
 
@@ -123,7 +139,7 @@ const Home = () => {
       ...job,
       jobId: job.jobId?.location ? job.jobId : job // Handle population
     }));
-    console.log("Normalized jobs:", normalized);
+
   }, [savedJobs]);
 
   useEffect(() => {
@@ -132,7 +148,7 @@ const Home = () => {
     const observer = new IntersectionObserver(
       (entries) => {
         const firstEntry = entries[0];
-        if (firstEntry.isIntersecting && hasMore && !loadingJobs) {
+        if (firstEntry.isIntersecting && hasMoreRef.current && !loadingRef.current) {
           fetchJobData(page + 1);
         }
       },
@@ -144,14 +160,14 @@ const Home = () => {
     return () => observer.disconnect();
   }, [page, hasMore, loadingJobs]);
 
-   
+
   // Handle View Details (with application limit check)
- const handleViewDetails = async (job) => {
+  const handleViewDetails = async (job) => {
     try {
       // Save scroll position before navigating
       sessionStorage.setItem("scrollPosition", window.scrollY.toString());
       sessionStorage.setItem("scrollTime", Date.now().toString());
-      
+
       const userInfo = JSON.parse(localStorage.getItem("userInfo"));
       if (!userInfo) return;
 
@@ -179,7 +195,7 @@ const Home = () => {
     if (!selectedJob && isRestoringScroll.current) {
       const savedPosition = sessionStorage.getItem("scrollPosition");
       const savedTime = sessionStorage.getItem("scrollTime");
-      
+
       // Only restore if saved less than 10 seconds ago
       if (savedPosition && savedTime && (Date.now() - parseInt(savedTime)) < 10000) {
         requestAnimationFrame(() => {
@@ -257,7 +273,14 @@ const Home = () => {
         <>
           {/* Header Section */}
           <div className="relative w-full h-60">
-            <img src={Homeimage} alt="Finding Your Dream Job" className="w-full h-full object-cover" />
+            <img
+              src={Homeimage}
+              alt="Finding Your Dream Job"
+              className="w-full h-full object-cover"
+              fetchpriority="high"
+              width="1200"
+              height="240"
+            />
           </div>
 
 
@@ -296,7 +319,18 @@ const Home = () => {
 
                   {/* Job Details */}
                   <div className="flex items-center mb-4">
-                    <img src={job.imgUrl} alt={`${job.companyName} logo`} className="w-12 h-12 rounded-full mr-4" />
+                    <img
+                      src={job.imgUrl}
+                      alt={`${job.companyName} logo`}
+                      className="w-12 h-12 rounded-full mr-4 object-cover"
+                      width="48"
+                      height="48"
+                      loading="lazy"
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = "/favicon-512x469.png"; // fallback to your logo
+                      }}
+                    />
                     <div>
                       <h3 className="text-xl font-semibold">{job.jobTitle}</h3>
                       <p className="text-gray-600">{job.companyName} • {calculatePostedTime(job.createdAt)}</p>
@@ -307,7 +341,7 @@ const Home = () => {
                     <p><FontAwesomeIcon icon={faMapMarkerAlt} /> {job.location}  {job.jobType}</p>
                     <p className="flex items-center">
                       <FontAwesomeIcon icon={faClock} className="mr-2" />
-                      {format(new Date(job.startDate), "dd MMM yyyy")} –{" "}
+                      {job.startDate ? format(new Date(job.startDate), "dd MMM yyyy") : "—"} –{" "}
                       {job.endDateOrDuration ? format(new Date(job.endDateOrDuration), "dd MMM yyyy") : "—"}
                     </p>
                     <div className="flex items-center gap-2 text-gray-600  text-sm md:text-base leading-none">
