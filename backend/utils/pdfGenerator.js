@@ -390,5 +390,5 @@ const generateOfferPDFBuffer = async (offerData) => {
     } catch (err) { reject(err); }
   });
 };
-
+//changes
 module.exports = generateOfferPDFBuffer;
