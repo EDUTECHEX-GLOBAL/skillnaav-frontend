@@ -11,6 +11,7 @@ const { Server } = require("socket.io");
 const connectDB = require("./config/dbConfig");
 const { notFound, errorHandler } = require("./middlewares/errorMiddleware");
 const cron = require("node-cron");
+const compression = require("compression");
 
 // Keep existing user cron (it auto-schedules on import)
 const checkPremiumExpiration = require("./utils/checkpremiumExipiration");
@@ -114,6 +115,7 @@ const cityRoutes = require("./routes/webapp-routes/cityRoutes");
 const curriculumRoutes = require("./routes/webapp-routes/schoolAdmin/curriculumRoutes");
 
 // ------------------- Use routes -------------------
+app.use(compression());
 app.use("/api/upload", uploadRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/interns", internRoutes);

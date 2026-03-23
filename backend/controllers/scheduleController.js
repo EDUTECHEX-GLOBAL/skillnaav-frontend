@@ -481,15 +481,18 @@ async function runWithConcurrency(items, concurrency, handler) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// AFTER (Nova Pro format)
 async function bedrockGenerateText({ prompt, maxTokens = 1200, retries = 2 }) {
   const modelId = process.env.BEDROCK_MODEL_ID;
   if (!modelId) throw new Error("Missing BEDROCK_MODEL_ID in .env");
 
   const body = JSON.stringify({
-    anthropic_version: "bedrock-2023-05-31",
-    max_tokens: maxTokens,
-    temperature: 0.3,
-    messages: [{ role: "user", content: [{ type: "text", text: prompt }] }],
+    messages: [{ role: "user", content: [{ text: prompt }] }],  // ← Nova format
+    inferenceConfig: {
+      max_new_tokens: maxTokens,
+      temperature: 0.3,
+      top_p: 0.9,
+    },
   });
 
   const command = new InvokeModelCommand({
@@ -502,7 +505,7 @@ async function bedrockGenerateText({ prompt, maxTokens = 1200, retries = 2 }) {
   try {
     const response = await bedrock.send(command);
     const json = JSON.parse(new TextDecoder().decode(response.body));
-    return json?.content?.[0]?.text || "";
+    return json?.output?.message?.content?.[0]?.text || "";   // ← Nova response path
   } catch (err) {
     const nameOrMsg = String(err?.name || err?.message || "");
     const throttled =
@@ -512,14 +515,12 @@ async function bedrockGenerateText({ prompt, maxTokens = 1200, retries = 2 }) {
       (err?.$metadata?.httpStatusCode === 429);
 
     if (throttled && retries > 0) {
-      // backoff: 800ms, 1600ms...
       await sleep((3 - retries) * 800);
       return bedrockGenerateText({ prompt, maxTokens, retries: retries - 1 });
     }
     throw err;
   }
 }
-
 const generateAiSectionSummaries = async (req, res) => {
   try {
     const { internshipId, totalDays, days } = req.body;

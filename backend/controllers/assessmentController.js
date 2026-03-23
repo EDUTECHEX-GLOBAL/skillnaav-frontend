@@ -32,9 +32,9 @@ exports.generateAIInternshipAssessment = async (req, res) => {
     }
 
     // ✅ Use the same env var as the partner flow
-    const modelId = process.env.ASSESSMENTBEDROCK_MODEL_ID || "anthropic.claude-3-haiku-20240307-v1:0";
+    const modelId = process.env.ASSESSMENTBEDROCK_MODEL_ID || "amazon.nova-pro-v1:0";
     const isClaudeModel = modelId.startsWith("anthropic.");
-
+    const isNovaModel = modelId.startsWith("amazon.nova");
     const questionPromptText = `You are an intelligent assessment generator for internship applicants.
 
 Create exactly 5 multiple-choice questions (MCQs) to test readiness for the internship below.
@@ -59,13 +59,19 @@ Return ONLY a valid JSON array — no explanation, no markdown, no extra text. U
     // ✅ Llama (meta.*) uses prompt/max_tokens_to_sample format
     const requestBody = isClaudeModel
       ? {
-          anthropic_version: "bedrock-2023-05-31",
-          max_tokens: 800,
-          temperature: 0.6,
-          top_p: 0.9,
-          messages: [{ role: "user", content: questionPromptText }],
+        anthropic_version: "bedrock-2023-05-31",
+        max_tokens: 800,
+        temperature: 0.6,
+        top_p: 0.9,
+        messages: [{ role: "user", content: questionPromptText }],
+      }
+      : isNovaModel
+        ? {
+          messages: [{ role: "user", content: [{ text: questionPromptText }] }],
+          inferenceConfig: { max_new_tokens: 800, temperature: 0.6, top_p: 0.9 },
         }
-      : {
+        : {
+          // Llama fallback
           prompt: `\n\nHuman: ${questionPromptText}\n\nAssistant:`,
           max_tokens_to_sample: 800,
           temperature: 0.6,
@@ -85,16 +91,22 @@ Return ONLY a valid JSON array — no explanation, no markdown, no extra text. U
     // ✅ Claude returns content[0].text — Llama returns generation or output_text
     const modelText = isClaudeModel
       ? rawOutput?.content?.[0]?.text || ""
-      : rawOutput?.output_text || rawOutput?.generation || "";
+      : isNovaModel
+        ? rawOutput?.output?.message?.content?.[0]?.text || ""
+        : rawOutput?.output_text || rawOutput?.generation || "";
 
     console.log("🤖 Raw model output:", modelText);
 
     let questions = [];
     try {
-      const match = modelText.match(/\[\s*{[\s\S]*?}\s*\]/);
-      if (!match) throw new Error("No valid JSON array found in AI output");
+      // SAFER — replace the match block above with this
+      const startIdx = modelText.indexOf('[');
+      const endIdx = modelText.lastIndexOf(']');
+      if (startIdx === -1 || endIdx === -1 || endIdx <= startIdx) {
+        throw new Error("No valid JSON array found in AI output");
+      }
+      questions = JSON.parse(modelText.substring(startIdx, endIdx + 1)).map((q, index) => {
 
-      questions = JSON.parse(match[0]).map((q, index) => {
         let correctAnswer = q.correctAnswer;
 
         if (Array.isArray(correctAnswer)) {
@@ -218,8 +230,8 @@ exports.submitAssessment = async (req, res) => {
       severity: v.type === 'TAB_SWITCH' || v.type === 'FULLSCREEN_EXIT'
         ? 'high'
         : v.type === 'KEYBOARD_ATTEMPT'
-        ? 'medium'
-        : 'low'
+          ? 'medium'
+          : 'low'
     }));
 
     const finalProctoringData = {

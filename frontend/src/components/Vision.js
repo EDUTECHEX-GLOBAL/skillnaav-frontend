@@ -4,10 +4,12 @@ import { useSelector } from "react-redux";
 const Vision = () => {
   const { skillnaavData } = useSelector((state) => state.root);
 
+  // ✅ Also check that visionhead has at least one element
   if (
     !skillnaavData ||
     !skillnaavData.visionhead ||
-    !skillnaavData.visionpoint
+    !skillnaavData.visionpoint ||
+    skillnaavData.visionhead.length === 0  // <-- ADD THIS CHECK
   ) {
     return null;
   }

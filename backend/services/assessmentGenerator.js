@@ -88,10 +88,10 @@ function validateQuestion(q, index) {
  */
 function extractQuestionConcept(question) {
   const q = question.toLowerCase().trim();
-  
+
   // Extract the main concept being asked about
   let concept = q;
-  
+
   // Remove question words and common phrases
   concept = concept
     .replace(/^(what|which|how|why|when|where|who|describe|explain|identify|which of the following)\s+(is|are|would|can|will|could|should|does|do|did)\s+/i, '')
@@ -100,28 +100,28 @@ function extractQuestionConcept(question) {
     .replace(/[^a-z0-9 ]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-  
+
   // Extract key noun phrases (3-5 word combinations)
   const words = concept.split(' ').filter(w => w.length > 3);
-  
+
   // Create multiple fingerprints of different lengths to catch variations
   const fingerprints = [];
-  
+
   // Primary fingerprint: first 5 significant words
   if (words.length >= 3) {
     fingerprints.push(words.slice(0, Math.min(5, words.length)).join(' '));
   }
-  
+
   // Secondary fingerprint: core 3-word phrase (skip first word which might vary)
   if (words.length >= 4) {
     fingerprints.push(words.slice(1, 4).join(' '));
   }
-  
+
   // Tertiary: last 3 words (often the actual topic)
   if (words.length >= 3) {
     fingerprints.push(words.slice(-3).join(' '));
   }
-  
+
   return {
     primary: fingerprints[0] || concept,
     secondary: fingerprints[1] || '',
@@ -136,12 +136,12 @@ function extractQuestionConcept(question) {
 function areQuestionsDuplicate(q1, q2) {
   const c1 = extractQuestionConcept(q1);
   const c2 = extractQuestionConcept(q2);
-  
+
   // Check primary fingerprint match
   if (c1.primary === c2.primary && c1.primary.length > 10) {
     return true;
   }
-  
+
   // Check if any fingerprints overlap significantly
   for (const fp1 of c1.allFingerprints) {
     for (const fp2 of c2.allFingerprints) {
@@ -151,14 +151,14 @@ function areQuestionsDuplicate(q1, q2) {
         const words2 = fp2.split(' ');
         const overlap = words1.filter(w => words2.includes(w)).length;
         const similarity = overlap / Math.max(words1.length, words2.length);
-        
+
         if (similarity > 0.7) {
           return true;
         }
       }
     }
   }
-  
+
   return false;
 }
 
@@ -168,11 +168,11 @@ function areQuestionsDuplicate(q1, q2) {
 function deduplicateQuestions(questions) {
   const unique = [];
   const seenConcepts = new Map();
-  
+
   for (const q of questions) {
     const concept = extractQuestionConcept(q.question);
     let isDuplicate = false;
-    
+
     // Check against all previously seen questions
     for (const [seenQ, seenConcept] of seenConcepts.entries()) {
       if (areQuestionsDuplicate(q.question, seenQ)) {
@@ -181,13 +181,13 @@ function deduplicateQuestions(questions) {
         break;
       }
     }
-    
+
     if (!isDuplicate) {
       unique.push(q);
       seenConcepts.set(q.question, concept);
     }
   }
-  
+
   return unique;
 }
 
@@ -233,7 +233,7 @@ function buildAssessmentPrompt({
 
   const diffGuide = DIFFICULTY_GUIDELINES[difficulty] || DIFFICULTY_GUIDELINES[2];
 
-  const focusText = focusArea 
+  const focusText = focusArea
     ? `\n🎯 FOCUS AREA: Prioritize questions about "${focusArea}" for this batch.\n`
     : '';
 
@@ -329,10 +329,12 @@ function parseAIResponse(text) {
   }
 
   // Strategy 2: Remove markdown code blocks
-  let cleaned = text
-    .replace(/```json\\s*/g, "")
-    .replace(/```\\s*/g, "")
-    .trim();
+ let cleaned = text
+  .replace(/```json\s*/g, "")
+  .replace(/```\s*/g, "")
+  .trim();
+
+
 
   try {
     const parsed = JSON.parse(cleaned);
@@ -342,7 +344,8 @@ function parseAIResponse(text) {
   }
 
   // Strategy 3: Extract JSON array with regex
-  const jsonMatch = cleaned.match(/\\[\\s*{[\\s\\S]*?}\\s*\\]/);
+const jsonMatch = cleaned.match(/\[\s*{[\s\S]*?}\s*\]/);
+
   if (jsonMatch) {
     try {
       const parsed = JSON.parse(jsonMatch[0]);
@@ -387,23 +390,23 @@ async function generateMcqBatch({
   const existingConcepts = excludeConcepts.map(q => {
     // Try to extract the core concept/topic
     const lowerQ = q.toLowerCase();
-    
+
     // Pattern 1: "what/which/how is/are X?" -> extract X
     let match = lowerQ.match(/(?:what|which|how|why)\s+(?:is|are|does|do|can|would)\s+(.+?)(?:\?|used|important|effective|appropriate)/i);
     if (match) return match[1].trim();
-    
+
     // Pattern 2: "purpose/role of X" -> extract X
     match = lowerQ.match(/(?:purpose|role|advantage|benefit|use)\s+of\s+(.+?)(?:\?|in|for)/i);
     if (match) return match[1].trim();
-    
+
     // Pattern 3: "how to handle/address X" -> extract X
     match = lowerQ.match(/(?:handle|address|solve|improve|optimize)\s+(.+?)(?:\?|in|using)/i);
     if (match) return match[1].trim();
-    
+
     // Pattern 4: "X technique/algorithm/method" -> extract X
     match = lowerQ.match(/(?:using|applying|implementing)\s+(.+?)(?:\s+technique|\s+algorithm|\s+method|\s+in|\?)/i);
     if (match) return match[1].trim();
-    
+
     // Fallback: just take key words
     return lowerQ
       .replace(/^(what|which|how|why|when|describe|explain|identify)\s+/i, '')
@@ -415,8 +418,8 @@ async function generateMcqBatch({
   }).filter(Boolean).slice(-20); // Keep last 20 to avoid prompt bloat
 
   const exclusionText =
-  existingConcepts.length > 0
-    ? `
+    existingConcepts.length > 0
+      ? `
 ⚠️ CRITICAL EXCLUSION RULES - GENERATE COMPLETELY NEW QUESTIONS:
 
 You have ALREADY asked about these concepts - DO NOT repeat them:
@@ -428,10 +431,10 @@ MANDATORY REQUIREMENTS:
 - DO NOT rephrase or reword existing concepts
 - If stuck, focus on: debugging, optimization, edge cases, real-world scenarios, comparisons, trade-offs
 `
-    : "";
+      : "";
 
-const diversityBoost = attemptNumber > 5
-  ? `
+  const diversityBoost = attemptNumber > 5
+    ? `
 🎯 DIVERSITY BOOST (Attempt ${attemptNumber}):
 Since this is attempt #${attemptNumber}, you MUST be more creative:
 - Use scenario-based questions with realistic examples
@@ -440,16 +443,16 @@ Since this is attempt #${attemptNumber}, you MUST be more creative:
 - Test debugging, optimization, or security aspects
 - Include comparison questions between different approaches
 `
-  : "";
+    : "";
 
-const relaxationText = relaxUniqueness
-  ? `
+  const relaxationText = relaxUniqueness
+    ? `
 🔓 RELAXED MODE:
 - You may reference similar technologies or concepts
 - BUT the specific question and learning objective must be UNIQUE
 - Focus on practical application, troubleshooting, or real-world scenarios
 `
-  : "";
+    : "";
 
 
   const prompt =
@@ -482,15 +485,13 @@ const relaxationText = relaxUniqueness
     contentType: "application/json",
     accept: "application/json",
     body: JSON.stringify({
-      anthropic_version: "bedrock-2023-05-31",
-      max_tokens: 8192,
-      temperature: finalTemperature,
-      messages: [{ role: "user", content: prompt }],
-      system:
-        "You are a strict JSON generator. You MUST output a COMPLETE, VALID JSON array. " +
-        "Do NOT stop early. Do NOT include commentary. " +
-        "Generate UNIQUE questions that have NOT been asked before. " +
-        "If you cannot finish, reduce detail but ALWAYS close the JSON array.",
+      messages: [{ role: "user", content: [{ text: prompt }] }],
+      system: [{ text: "You are a strict JSON generator. You MUST output a COMPLETE, VALID JSON array. Do NOT stop early. Do NOT include commentary. Generate UNIQUE questions that have NOT been asked before. If you cannot finish, reduce detail but ALWAYS close the JSON array." }],
+      inferenceConfig: {
+        max_new_tokens: 8192,
+        temperature: finalTemperature,
+        top_p: 0.9,
+      },
     }),
   });
 
@@ -503,7 +504,7 @@ const relaxationText = relaxUniqueness
   }
 
   const raw = JSON.parse(Buffer.from(response.body).toString("utf-8"));
-  const text = raw?.content?.[0]?.text || "";
+  const text = raw?.output?.message?.content?.[0]?.text || "";
 
   if (!text) {
     console.warn("⚠️ Empty response from Bedrock");
@@ -511,18 +512,29 @@ const relaxationText = relaxUniqueness
   }
 
   let parsed;
-  try {
-    parsed = parseAIResponse(text);
-  } catch (err) {
-    console.warn("⚠️ Partial/invalid JSON from AI. Retrying batch...");
-    return [];
-  }
+try {
+  parsed = parseAIResponse(text);
+} catch (err) {
+  console.warn("⚠️ Partial/invalid JSON from AI. Retrying batch...");
+  return [];
+}
 
-  if (!Array.isArray(parsed) || parsed.length === 0) {
-    return [];
-  }
+if (!Array.isArray(parsed) || parsed.length === 0) {
+  return [];
+}
 
-  return parsed;
+// ADD THIS — validate and filter bad questions
+const validQuestions = [];
+for (let i = 0; i < parsed.length; i++) {
+  const errors = validateQuestion(parsed[i], i);
+  if (errors.length > 0) {
+    console.warn(`⚠️ Skipping invalid question: ${errors.join(", ")}`);
+  } else {
+    validQuestions.push(parsed[i]);
+  }
+}
+
+return validQuestions; // was: return parsed
 }
 
 
@@ -553,10 +565,10 @@ async function generateUntilExactCount({
 
     // Rotate through skills to force diversity
     const focusSkill = skills.length > 0 ? skills[(attempt - 1) % skills.length] : null;
-    
+
     // Request more questions than needed to account for deduplication
     const batchSize = Math.min(Math.ceil(remaining * 1.3), 10);
-    
+
     console.log(`📦 Attempt ${attempt}/${maxAttempts}: Requesting ${batchSize} questions focusing on "${focusSkill}" (have ${allQuestions.length}/${questionCount})`);
 
     const batch = await generateMcqBatch({
@@ -572,15 +584,15 @@ async function generateUntilExactCount({
     });
 
     const beforeCount = allQuestions.length;
-    
+
     // First deduplicate within the batch itself
     const uniqueBatch = deduplicateQuestions(batch);
-    
+
     // Then deduplicate against existing questions
     allQuestions = deduplicateQuestions([...allQuestions, ...uniqueBatch]);
-    
+
     const addedCount = allQuestions.length - beforeCount;
-    
+
     console.log(`✅ Added ${addedCount} unique questions (total: ${allQuestions.length}/${questionCount})`);
 
     // Track consecutive failures
@@ -630,15 +642,15 @@ async function generateUntilExactCount({
       });
 
       const beforeCount = allQuestions.length;
-      
+
       // First deduplicate within the batch
       const uniqueTopUp = deduplicateQuestions(topUp);
-      
+
       // Then deduplicate against existing questions
       allQuestions = deduplicateQuestions([...allQuestions, ...uniqueTopUp]);
-      
+
       const addedCount = allQuestions.length - beforeCount;
-      
+
       console.log(`✅ Added ${addedCount} questions (total: ${allQuestions.length}/${questionCount})`);
 
       if (addedCount === 0) {
@@ -652,18 +664,18 @@ async function generateUntilExactCount({
   }
 
   console.log(`✨ Final count: ${allQuestions.length}/${questionCount} questions`);
-  
+
   // Final quality check: ensure no semantic duplicates slipped through
   console.log(`🔍 Running final duplicate check...`);
   const finalUnique = deduplicateQuestions(allQuestions);
-  
+
   if (finalUnique.length < allQuestions.length) {
     console.log(`⚠️ Removed ${allQuestions.length - finalUnique.length} semantic duplicates in final check`);
     allQuestions = finalUnique;
   } else {
     console.log(`✅ No duplicates found in final set`);
   }
-  
+
   return allQuestions.slice(0, questionCount);
 }
 
@@ -688,7 +700,7 @@ async function generateMcqSetAI({
 
   // Relaxed threshold: accept 70% instead of 90%
   const minAcceptable = Math.floor(questionCount * 0.7);
-  
+
   if (rawQuestions.length < minAcceptable) {
     throw new Error(
       `AI produced too few questions (${rawQuestions.length}/${questionCount}). Minimum required: ${minAcceptable}`
@@ -697,7 +709,7 @@ async function generateMcqSetAI({
 
   // If we don't have exactly the right count, warn but continue
   if (rawQuestions.length < questionCount) {
-    console.warn(`⚠️ Generated ${rawQuestions.length}/${questionCount} questions (${Math.round(rawQuestions.length/questionCount*100)}%)`);
+    console.warn(`⚠️ Generated ${rawQuestions.length}/${questionCount} questions (${Math.round(rawQuestions.length / questionCount * 100)}%)`);
   }
 
   return rawQuestions.map((q) => {
@@ -720,7 +732,7 @@ async function generateMcqSetAI({
 }
 
 
-module.exports = { 
+module.exports = {
   generateMcqSetAI,
   sha256WithSalt // Export for use in evaluator
 };
