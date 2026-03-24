@@ -897,9 +897,7 @@ const InternshipList = () => {
         onClose={closeModal}
         title={modalData.type === "applications" ? "Applications" : "Shortlisted Candidates"}
         isLoading={modalData.loading}
-        preventBackdropClose={
-          modalData.loading || loadingShortlist || !!loadingApplications[modalData.internshipId]
-        }
+        preventBackdropClose={true}
       >
         {modalData.type === "applications" && !modalData.loading && (
           (applications[modalData.internshipId] || []).length === 0 ? (

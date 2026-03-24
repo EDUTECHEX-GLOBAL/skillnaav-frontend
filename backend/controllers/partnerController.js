@@ -5,6 +5,10 @@ const notifyUser = require("../utils/notifyUser");
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const PartnerEmailVerification = require("../models/webapp-models/partnerVerificationModel");
+const { OAuth2Client } = require("google-auth-library"); // 🔥 NEW: Google OAuth client
+
+// 🔥 NEW: Initialize Google OAuth client (same Client ID used in the frontend)
+const googleClient = new OAuth2Client(process.env.GOOGLE_SIGNUP_CLIENT_ID);
 
 // Helper function to check required fields (not used in provided logic but kept for completeness)
 const areFieldsFilled = (fields) => fields.every((field) => field);
@@ -148,11 +152,145 @@ const registerPartner = asyncHandler(async (req, res) => {
     }
 });
 
+// 🔥 NEW: Google OAuth for Partners
+const googleAuthPartner = asyncHandler(async (req, res) => {
+    const { idToken } = req.body;
+console.log("GOOGLE_CLIENT_ID:", process.env.GOOGLE_SIGNUP_CLIENT_ID);
+    if (!idToken) {
+        res.status(400);
+        throw new Error("Google ID token is required.");
+    }
+
+    // 1. Verify the Google ID token
+    const ticket = await googleClient.verifyIdToken({
+        idToken,
+        audience: process.env.GOOGLE_SIGNUP_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    const { sub: googleId, email, name, picture } = payload;
+
+    // 2. Check if partner already exists
+    let partner = await Partnerwebapp.findOne({ email });
+
+    if (partner) {
+        // 2a. Existing partner — update googleId if not already set
+        if (!partner.googleId) {
+            partner.googleId = googleId;
+            partner.isGoogleUser = true;
+            await partner.save();
+        }
+
+        // Return login response
+        return res.json({
+            _id: partner._id,
+            name: partner.name,
+            email: partner.email,
+            profileImage: partner.profileImage,
+            isGoogleUser: partner.isGoogleUser,
+            universityName: partner.universityName,
+            institutionId: partner.institutionId,
+            isPremium: partner.isPremium ?? false,
+            planType: partner.planType ?? "Freemium",
+            premiumExpiration: partner.premiumExpiration ?? null,
+            adminApproved: partner.adminApproved,
+            status: partner.status,
+            // 🔥 If institutional info is still missing, tell the frontend
+            needsProfileCompletion: !partner.universityName || !partner.institutionId,
+            token: generateToken(partner._id),
+        });
+    }
+
+    // 3. New Google partner — create account, mark as needing profile completion
+    partner = await Partnerwebapp.create({
+        name,
+        email,
+        googleId,
+        isGoogleUser: true,
+        profileImage: picture || "",
+        adminApproved: false,
+        status: "Pending",
+        needsProfileCompletion: true, // 🔥 Must still fill universityName + institutionId
+    });
+
+    res.status(201).json({
+        _id: partner._id,
+        name: partner.name,
+        email: partner.email,
+        profileImage: partner.profileImage,
+        isGoogleUser: partner.isGoogleUser,
+        isPremium: partner.isPremium ?? false,
+        planType: partner.planType ?? "Freemium",
+        premiumExpiration: partner.premiumExpiration ?? null,
+        adminApproved: partner.adminApproved,
+        status: partner.status,
+        needsProfileCompletion: true,
+        token: generateToken(partner._id),
+    });
+});
+
+// 🔥 NEW: Complete Google partner profile (universityName + institutionId + profileImage)
+const completePartnerProfile = asyncHandler(async (req, res) => {
+    const { universityName, institutionId } = req.body;
+    const profileImageFile = req.file;
+
+    if (!req.user) {
+        res.status(401);
+        throw new Error("Not authenticated.");
+    }
+
+    if (!universityName || !institutionId) {
+        res.status(400);
+        throw new Error("University/Company name and Institutional ID are required.");
+    }
+
+    if (!profileImageFile) {
+        res.status(400);
+        throw new Error("Profile picture is required.");
+    }
+
+    const partner = await Partnerwebapp.findById(req.user._id);
+    if (!partner) {
+        res.status(404);
+        throw new Error("Partner not found.");
+    }
+
+    partner.universityName = universityName;
+    partner.institutionId = institutionId;
+    partner.profileImage = profileImageFile.location || profileImageFile.path;
+    partner.needsProfileCompletion = false;
+
+    const updated = await partner.save();
+
+    res.json({
+        _id: updated._id,
+        name: updated.name,
+        email: updated.email,
+        universityName: updated.universityName,
+        institutionId: updated.institutionId,
+        profileImage: updated.profileImage,
+        isGoogleUser: updated.isGoogleUser,
+        isPremium: updated.isPremium,
+        planType: updated.planType,
+        premiumExpiration: updated.premiumExpiration ?? null,
+        adminApproved: updated.adminApproved,
+        status: updated.status,
+        needsProfileCompletion: false,
+        token: generateToken(updated._id),
+    });
+});
+
 // Authenticate partner - ALLOW LOGIN REGARDLESS OF APPROVAL STATUS
 const authPartner = asyncHandler(async (req, res) => {
     const { email, password } = req.body;
 
     const partner = await Partnerwebapp.findOne({ email });
+
+    // 🔥 GUARD: If this is a Google-only account, block password login
+    if (partner && partner.isGoogleUser && !partner.password) {
+        res.status(400);
+        throw new Error("This account was registered with Google. Please use Google Sign-In.");
+    }
 
     if (partner && await partner.matchPassword(password)) {
 
@@ -248,7 +386,7 @@ const getPartnerProfile = asyncHandler(async (req, res) => {
         email: partner.email,
         universityName: partner.universityName,
         institutionId: partner.institutionId,
-        profileImage: partner.profileImage, // Include image
+        profileImage: partner.profileImage,
         logoUrl: partner.logoUrl,
         adminApproved: partner.adminApproved,
         isPremium: partner.isPremium,
@@ -415,6 +553,8 @@ const updatePartnerPlan = asyncHandler(async (req, res) => {
 module.exports = {
     registerPartner,
     authPartner,
+    googleAuthPartner,        // 🔥 NEW
+    completePartnerProfile,   // 🔥 NEW
     updatePartnerProfile,
     getAllPartners,
     approvePartner,

@@ -7,15 +7,25 @@ const partnerwebappSchema = mongoose.Schema(
   {
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
-    universityName: { type: String, required: true },
-    institutionId: { type: String, required: true },
+
+    // 🔥 Password is optional for Google users
+    password: { type: String, required: false },
+
+    universityName: { type: String },
+    institutionId: { type: String },
 
     profileImage: { type: String },
     logoUrl: {
-  type: String,
-  default: "",
-},
+      type: String,
+      default: "",
+    },
+
+    // 🔥 Google OAuth fields
+    googleId: { type: String, default: null },
+    isGoogleUser: { type: Boolean, default: false },
+
+    // Flag to track if Google partner still needs to fill institutional info
+    needsProfileCompletion: { type: Boolean, default: false },
 
     adminApproved: { type: Boolean, default: false },
 
@@ -52,18 +62,22 @@ partnerwebappSchema.index({ premiumExpiration: 1 });
 // If you want to be explicit (email already has unique:true)
 partnerwebappSchema.index({ email: 1 }, { unique: true });
 
-// Hash password before saving
+// 🔥 PASSWORD HASHING — safe for Google users
 partnerwebappSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) {
-    return next();
-  }
+  // Skip hashing if no password exists (Google users)
+  if (!this.password) return next();
+
+  // Hash only when password is modified
+  if (!this.isModified("password")) return next();
+
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
   next();
 });
 
-// Compare hashed password with entered password
+// 🔥 Compare hashed password (Google users skip this)
 partnerwebappSchema.methods.matchPassword = async function (enteredPassword) {
+  if (!this.password) return false; // Google users don't login via password
   return await bcrypt.compare(enteredPassword, this.password);
 };
 

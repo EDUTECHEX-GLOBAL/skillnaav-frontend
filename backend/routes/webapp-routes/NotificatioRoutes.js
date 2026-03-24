@@ -4,19 +4,27 @@ const {
   createNotification,
   getNotificationsByStudent,
   markNotificationAsRead,
+  markAllNotificationsRead,
   deleteNotification,
 } = require("../../controllers/NotificationController");
 
-// ✅ Create/send a notification (can be called from partner.py)
+// ── IMPORTANT: Express matches routes top-to-bottom.
+//    Fixed paths (/read-all) MUST come before param paths (/:id) or they
+//    will be swallowed by the param route as if "read-all" is an ID.
+
+// Create / send a notification
 router.post("/", createNotification);
 
-// 🔁 Get all notifications for a student
-router.get("/:studentId", getNotificationsByStudent);
+// Mark ALL as read (body: { studentId })  ← must be before /:studentId
+router.put("/read-all", markAllNotificationsRead);
 
-// ✅ Mark one notification as read
+// Mark ONE as read
 router.put("/read/:notificationId", markNotificationAsRead);
 
-// ❌ Delete notification
+// Get all notifications for a student
+router.get("/:studentId", getNotificationsByStudent);
+
+// Delete a notification
 router.delete("/:notificationId", deleteNotification);
 
 module.exports = router;

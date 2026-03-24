@@ -250,7 +250,7 @@ async function sendAssessment(req, res) {
       studentId: assessment.studentId,
       title: "Level 2 Assessment Assigned",
       message: `Your Level 2 assessment has been assigned. Please complete it within ${assessment.timing.timeLimitMinutes} minutes.`,
-      link: `/student/assessments/${assessment._id}`,
+      link: `/user-main-page?openTab=applications`,
       type: "general",
     });
 

@@ -8,6 +8,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
 import partner2Image from "../../../../assets-webapp/partner2_img.jpg";
 import ForgotPasswordModal from "../SignUpLogin/PartnerforgotPassword";
+import { GoogleLogin } from "@react-oauth/google"; // 🔥 NEW
 
 const validationSchema = Yup.object({
   email: Yup.string().email("Invalid email address").required("Required"),
@@ -34,14 +35,10 @@ const PartnerLogin = () => {
   
       // Save token and adminApproved status to localStorage
       localStorage.setItem("token", data.token);
-      localStorage.setItem("adminApproved", data.adminApproved); // Save adminApproved status
+      localStorage.setItem("adminApproved", data.adminApproved);
       localStorage.setItem("partnerId", data._id);
-      console.log("Partner ID:", data._id);
       localStorage.setItem("userInfo", JSON.stringify(data));
-
-      // --- RECORD LOGIN TIME (used by feedback gating) ---
       localStorage.setItem("loginTime", Date.now().toString());
-      // ---------------------------------------------------
       
       setLoading(false);
       navigate("/partner-main-page");
@@ -53,6 +50,51 @@ const PartnerLogin = () => {
           : "Something went wrong"
       );
       setSubmitting(false);
+    }
+  };
+
+  // 🔥 NEW: Google Login handler
+  const handleGoogleLogin = async (credentialResponse) => {
+    try {
+      const idToken = credentialResponse.credential;
+
+      const res = await axios.post("/api/partners/google-auth", { idToken });
+
+      localStorage.setItem("token", res.data.token);
+      localStorage.setItem("adminApproved", res.data.adminApproved);
+      localStorage.setItem("partnerId", res.data._id);
+      localStorage.setItem("userInfo", JSON.stringify({
+        _id: res.data._id,
+        name: res.data.name,
+        email: res.data.email,
+        profileImage: res.data.profileImage,
+        isGoogleUser: res.data.isGoogleUser,
+        universityName: res.data.universityName,
+        institutionId: res.data.institutionId,
+        isPremium: res.data.isPremium ?? false,
+        planType: res.data.planType ?? "Freemium",
+        premiumExpiration: res.data.premiumExpiration ?? null,
+        adminApproved: res.data.adminApproved,
+        status: res.data.status,
+      }));
+      localStorage.setItem("loginTime", Date.now().toString());
+
+      // 🔥 If Google partner hasn't filled institutional info yet, redirect to complete profile
+ if (res.data.needsProfileCompletion) {
+  navigate("/partner-create-account", {
+    state: {                              // 🔥 ADD state
+      googleSignup: true,
+      name: res.data.name,
+      email: res.data.email,
+      token: res.data.token,
+    }
+  });
+} else {
+  navigate("/partner-main-page");
+}
+    } catch (err) {
+      console.error(err);
+      setError("Google login failed. Please try again.");
     }
   };
   
@@ -182,8 +224,14 @@ const PartnerLogin = () => {
             <hr className="w-full border-gray-300" />
           </div>
 
+          {/* 🔥 NEW: Google Login Button */}
+          <GoogleLogin
+            onSuccess={handleGoogleLogin}
+            onError={() => setError("Google login failed")}
+          />
+
           {/* Sign Up */}
-          <p className="text-center text-sm">
+          <p className="text-center text-sm mt-4">
             Don't have an account?{" "}
             <Link
               to="/partner-create-account"

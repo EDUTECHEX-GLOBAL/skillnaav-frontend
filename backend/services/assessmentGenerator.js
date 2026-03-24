@@ -473,7 +473,7 @@ Since this is attempt #${attemptNumber}, you MUST be more creative:
 
   const modelId =
     process.env.ASSESSMENTBEDROCK_MODEL_ID ||
-    "anthropic.claude-3-haiku-20240307-v1:0";
+    "amazon.nova-pro-v1:0";
 
   // Increase temperature after multiple failed attempts to boost creativity
   const baseTemperature = 0.7;

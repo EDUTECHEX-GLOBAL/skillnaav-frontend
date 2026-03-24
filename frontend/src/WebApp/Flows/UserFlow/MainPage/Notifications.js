@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import { BellIcon, CheckCircleIcon } from "@heroicons/react/24/solid";
 import { EllipsisVerticalIcon } from "@heroicons/react/24/outline";
@@ -48,7 +48,6 @@ const Notifications = ({ onNavigate }) => {
   }, []);
 
   // ── Close menu on outside click ────────────────────────────────────────────
-  // We attach to document and check openMenuId so we don't need a ref per card
   useEffect(() => {
     if (!openMenuId) return;
     const onDocClick = () => setOpenMenuId(null);
@@ -56,49 +55,119 @@ const Notifications = ({ onNavigate }) => {
     return () => document.removeEventListener("click", onDocClick);
   }, [openMenuId]);
 
-  // ── Shared navigation helper (deduplicates the repeated logic) ────────────
+  // ── Dispatch openTab event (with small delay when navigating away) ─────────
+  const dispatchOpenTab = useCallback((tab, delayed = false) => {
+    const fire = () =>
+      window.dispatchEvent(
+        new CustomEvent("openTab", { detail: { tab, fromNotification: true } })
+      );
+    if (delayed) {
+      // Wait for the target page component to mount before firing the event
+      setTimeout(fire, 150);
+    } else {
+      fire();
+    }
+  }, []);
+
+  // ── Shared navigation helper ───────────────────────────────────────────────
   const navigateToLink = useCallback(
     (link) => {
       if (!link) return;
 
-      const isAbsolute = /^https?:\/\//i.test(link);
-
-      if (isAbsolute) {
+      // ── 1. Fully absolute URL ──────────────────────────────────────────────
+      if (/^https?:\/\//i.test(link)) {
         const url = new URL(link);
+
         if (url.origin === window.location.origin) {
+          // Same-origin absolute URL → treat like an internal path
           const openTab = url.searchParams.get("openTab");
-          if (openTab)
-            window.dispatchEvent(
-              new CustomEvent("openTab", { detail: { tab: openTab, fromNotification: true } })
-            );
-          navigate(url.pathname + url.search + url.hash);
+          const targetPath = url.pathname + url.search + url.hash;
+
+          if (url.pathname !== window.location.pathname) {
+            // Navigating to a different page; dispatch after mount
+            navigate(targetPath);
+            if (openTab) dispatchOpenTab(openTab, true);
+          } else {
+            // Already on the target page; fire immediately
+            if (openTab) dispatchOpenTab(openTab, false);
+            navigate(targetPath);
+          }
         } else {
+          // Cross-origin → open in new tab
           window.open(link, "_blank", "noopener,noreferrer");
         }
         return;
       }
 
+      // ── 2. Root-relative path  e.g. "/student/dashboard?openTab=offers" ───
       if (link.startsWith("/")) {
+        // ── 2a. Legacy assessment deep-link  /student/assessments/:id ──────
+        //    Old notifications stored this path. Navigate to Applications tab
+        //    so the student can start the assessment from their card themselves.
+        const assessmentMatch = link.match(/\/student\/assessments\/([a-f0-9]{24})/i);
+        if (assessmentMatch) {
+          navigate("/user-main-page?openTab=applications");
+          dispatchOpenTab("applications", true);
+          return;
+        }
+
         const urlObj = new URL(link, window.location.origin);
         const openTab = urlObj.searchParams.get("openTab");
-        if (openTab)
-          window.dispatchEvent(
-            new CustomEvent("openTab", { detail: { tab: openTab, fromNotification: true } })
-          );
-        navigate(urlObj.pathname + urlObj.search + urlObj.hash);
+        const targetPath = urlObj.pathname + urlObj.search + urlObj.hash;
+
+        if (urlObj.pathname !== window.location.pathname) {
+          navigate(targetPath);
+          if (openTab) dispatchOpenTab(openTab, true);
+        } else {
+          if (openTab) dispatchOpenTab(openTab, false);
+          navigate(targetPath);
+        }
         return;
       }
 
-      if (link.startsWith("#") || /recommend/i.test(link)) {
-        window.dispatchEvent(
-          new CustomEvent("openTab", { detail: { tab: "recommendations", fromNotification: true } })
-        );
+      // ── 3. Hash-only fragment  e.g. "#offers" ─────────────────────────────
+      if (link.startsWith("#")) {
+        const tab = link.slice(1); // strip leading #
+        dispatchOpenTab(tab, false);
         return;
       }
 
+      // ── 4. Named tab shorthand  e.g. "recommendations", "offers", "assessment"
+      //    Plain strings with no slash/protocol — treat directly as tab names.
+      const knownTabs = [
+        "recommendations", "offers", "profile",
+        "interviews", "placements", "assessment", "applications",
+      ];
+      if (knownTabs.some((t) => link.toLowerCase().includes(t))) {
+        const matched = knownTabs.find((t) => link.toLowerCase().includes(t));
+        dispatchOpenTab(matched, false);
+        return;
+      }
+
+      // ── 5. Relative path without leading slash  e.g. "dashboard/offers" ───
+      if (!link.includes("://") && !link.startsWith("mailto:")) {
+        try {
+          const urlObj = new URL(link, window.location.href);
+          const openTab = urlObj.searchParams.get("openTab");
+          const targetPath = urlObj.pathname + urlObj.search + urlObj.hash;
+
+          if (urlObj.pathname !== window.location.pathname) {
+            navigate(targetPath);
+            if (openTab) dispatchOpenTab(openTab, true);
+          } else {
+            if (openTab) dispatchOpenTab(openTab, false);
+            navigate(targetPath);
+          }
+          return;
+        } catch {
+          // Malformed URL — fall through
+        }
+      }
+
+      // ── 6. Fallback: let the browser handle it ─────────────────────────────
       window.location.href = link;
     },
-    [navigate]
+    [navigate, dispatchOpenTab]
   );
 
   // ── Mark single as read ────────────────────────────────────────────────────
@@ -117,7 +186,9 @@ const Notifications = ({ onNavigate }) => {
   const markAllRead = async () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
     try {
-      await axios.put(`/api/notifications/read-all`);
+      const userInfo = JSON.parse(localStorage.getItem("userInfo"));
+      const studentId = userInfo?._id;
+      await axios.put(`/api/notifications/read-all`, { studentId });
     } catch (err) {
       console.error("Error marking all read:", err);
     }
@@ -142,6 +213,40 @@ const Notifications = ({ onNavigate }) => {
     }
   };
 
+  // ── Download helper ────────────────────────────────────────────────────────
+  // For same-origin links use fetch+blob so the browser actually downloads.
+  // For cross-origin links fall back to window.open (download attr is ignored
+  // by the browser on cross-origin resources).
+  const handleDownload = useCallback(async (link, filename = "document") => {
+    if (!link) return;
+    try {
+      const isAbsolute = /^https?:\/\//i.test(link);
+      const isSameOrigin =
+        !isAbsolute || new URL(link).origin === window.location.origin;
+
+      if (isSameOrigin) {
+        const response = await fetch(link, { credentials: "include" });
+        if (!response.ok) throw new Error("Network response was not ok");
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = blobUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(blobUrl);
+      } else {
+        // Cross-origin: best-effort via new tab (browser decides whether to download)
+        window.open(link, "_blank", "noopener,noreferrer");
+      }
+    } catch (err) {
+      console.error("Download failed:", err);
+      // Last-resort fallback
+      window.open(link, "_blank", "noopener,noreferrer");
+    }
+  }, []);
+
   // ── Label helpers ──────────────────────────────────────────────────────────
   const linkLabel = (type) =>
     type === "offer" ? "📄 View Offer Letter" : "📄 View Recommendation";
@@ -151,6 +256,9 @@ const Notifications = ({ onNavigate }) => {
 
   const menuDownloadLabel = (type) =>
     type === "offer" ? "Download Offer Letter" : "Download Recommendation";
+
+  const downloadFilename = (type) =>
+    type === "offer" ? "offer-letter.pdf" : "recommendation.pdf";
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -245,7 +353,6 @@ const Notifications = ({ onNavigate }) => {
               )}
 
               {/* ── Per-card context menu ──────────────────────────────────── */}
-              {/* stopPropagation on the wrapper so li onClick doesn't fire */}
               <div
                 className="absolute top-3 right-3 z-10"
                 onClick={(e) => e.stopPropagation()}
@@ -281,16 +388,10 @@ const Notifications = ({ onNavigate }) => {
 
                         <button
                           onClick={() => {
-                            try {
-                              const a = document.createElement("a");
-                              a.href = notification.link;
-                              a.download = "";
-                              document.body.appendChild(a);
-                              a.click();
-                              a.remove();
-                            } catch (err) {
-                              console.error("Download failed:", err);
-                            }
+                            handleDownload(
+                              notification.link,
+                              downloadFilename(notification.type)
+                            );
                             setOpenMenuId(null);
                           }}
                           className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"

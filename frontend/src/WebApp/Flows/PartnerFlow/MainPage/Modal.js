@@ -25,7 +25,7 @@ const Modal = ({ isOpen, onClose, title, children, isLoading, preventBackdropClo
         <div className="sticky top-0 bg-white flex items-center justify-between px-6 py-4 border-b border-gray-100 z-10 rounded-t-2xl">
           <button
             onClick={onClose}
-            disabled={isLoading || preventBackdropClose}
+            disabled={isLoading}
             className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 font-medium transition disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <FontAwesomeIcon icon={faArrowLeft} className="text-xs" /> Back
@@ -33,7 +33,7 @@ const Modal = ({ isOpen, onClose, title, children, isLoading, preventBackdropClo
           <h2 className="text-base font-bold text-gray-900">{title}</h2>
           <button
             onClick={onClose}
-            disabled={isLoading || preventBackdropClose}
+            disabled={isLoading}
             className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 transition disabled:opacity-40 disabled:cursor-not-allowed"
             aria-label="Close"
           >

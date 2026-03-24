@@ -1,19 +1,21 @@
 const express = require("express");
 const router = express.Router();
 const {
-  registerPartner,
-  authPartner,
-  updatePartnerProfile,
-  getAllPartners,
-  approvePartner,
-  rejectPartner,
-  checkEmailExists,
-  requestPasswordReset,
-  verifyOTPAndResetPassword,
-  getPartnerProfile, 
-  sendPartnerVerificationCode,
-  verifyPartnerOTP,
-  updatePartnerPlan, 
+  registerPartner,
+  authPartner,
+  updatePartnerProfile,
+  getAllPartners,
+  approvePartner,
+  rejectPartner,
+  checkEmailExists,
+  requestPasswordReset,
+  verifyOTPAndResetPassword,
+  getPartnerProfile,
+  sendPartnerVerificationCode,
+  verifyPartnerOTP,
+  updatePartnerPlan,
+  googleAuthPartner, // 🔥 NEW
+  completePartnerProfile // 🔥 NEW
 } = require("../../controllers/partnerController");
 const Partnerwebapp = require("../../models/webapp-models/partnerModel");
 const { authenticate } = require("../../middlewares/authMiddleware");
@@ -22,28 +24,28 @@ const { imageUploader } = require("../../utils/multer");
 
 // Middleware to set req.isPartner for all partner routes
 router.use((req, res, next) => {
-  req.isPartner = true; // Mark as partner
-  next();
+  req.isPartner = true; // Mark as partner
+  next();
 });
 
 router.post("/register", profilePicUpload.single('profileImage'), registerPartner);
-router.post("/login", authPartner); 
+router.post("/login", authPartner);
 
 // 🎯 CRITICAL FIX: The updatePartnerProfile controller function must be here.
 router.put(
-    "/profile", 
-    authenticate, 
-    profilePicUpload.single('profileImage'), 
-    updatePartnerProfile // <-- The missing function that saves the file path
-); 
+  "/profile",
+  authenticate,
+  profilePicUpload.single('profileImage'),
+  updatePartnerProfile // <-- The missing function that saves the file path
+);
 
-router.get("/partners", getAllPartners); 
-router.patch("/approve/:partnerId", approvePartner); 
+router.get("/partners", getAllPartners);
+router.patch("/approve/:partnerId", approvePartner);
 router.patch("/reject/:partnerId", rejectPartner);
 router.post("/check-email", checkEmailExists);
 
-router.post('/request-password-reset', requestPasswordReset); 
-router.post('/verify-otp-reset-password', verifyOTPAndResetPassword); 
+router.post('/request-password-reset', requestPasswordReset);
+router.post('/verify-otp-reset-password', verifyOTPAndResetPassword);
 router.get("/profile", authenticate, getPartnerProfile);
 
 router.post("/send-verification-code", sendPartnerVerificationCode);
@@ -92,5 +94,8 @@ router.post(
     }
   }
 );
+
+router.post("/google-auth", googleAuthPartner);                                                      // 🔥 ADD
+router.post("/complete-profile", authenticate, profilePicUpload.single("profileImage"), completePartnerProfile); // 🔥 ADD
 
 module.exports = router;

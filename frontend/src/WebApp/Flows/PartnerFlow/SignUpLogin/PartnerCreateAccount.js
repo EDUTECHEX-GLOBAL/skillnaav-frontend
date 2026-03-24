@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate, useLocation, Link } from "react-router-dom"; // 🔥 add useLocation
 import { Formik, Form, Field, ErrorMessage } from "formik";
 import * as Yup from "yup";
-import { useNavigate, Link } from "react-router-dom";
 import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/solid";
 import axios from "axios";
-// Assuming partner2Image is available, or you can remove/replace it
 import partner2Image from "../../../../assets-webapp/partner2_img.jpg";
+import { GoogleLogin } from "@react-oauth/google"; // 🔥 NEW
 
 // --- VALIDATION SCHEMAS ---
 
@@ -25,7 +25,7 @@ const step1ValidationSchema = Yup.object({
     .required("Confirm Password is Required"),
 });
 
-// Step 2 (Now the Final Step): Institutional Info & Profile Picture
+// Step 2 (Final Step): Institutional Info & Profile Picture
 const step2ValidationSchema = Yup.object({
   universityName: Yup.string().required("University/Company Name is Required"),
   institutionId: Yup.string().required("Institutional ID is Required"),
@@ -34,29 +34,30 @@ const step2ValidationSchema = Yup.object({
 
 const PartnerSignUpFlow = () => {
   const navigate = useNavigate();
-  // Step count adjusted: 1, 1.5 (OTP), 2 (Final Step)
   const [step, setStep] = useState(1);
   const [errorMessage, setErrorMessage] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  // 🔥 NEW: Track whether the partner came via Google signup
+  const [isGoogleSignup, setIsGoogleSignup] = useState(false);
+
   // Timer state for Resend OTP button
   const [resendTimer, setResendTimer] = useState(0);
 
-  // Consolidated form data state (REMOVED: dob, educationLevel, fieldOfStudy)
+  // Consolidated form data state
   const [formData, setFormData] = useState({
-    // Step 1 data
     name: "",
     email: "",
     password: "",
     confirmPassword: "",
-    otp: "", // For verification
-
-    // Step 2 data (Now Final Step Data)
+    otp: "",
     universityName: "",
     institutionId: "",
     profileImageFile: null,
     profileImageUrl: null,
+    // 🔥 NEW: Store token from Google signup to authenticate the complete-profile call
+    token: null,
   });
 
   // --- TIMER EFFECT ---
@@ -72,14 +73,28 @@ const PartnerSignUpFlow = () => {
 
   const startResendTimer = () => {
     setResendTimer(60);
-  }
+  };
 
+  const location = useLocation();
+
+  useEffect(() => {
+    const state = location.state;
+    if (state?.googleSignup) {
+      setIsGoogleSignup(true);
+      setFormData(prev => ({
+        ...prev,
+        name: state.name,
+        email: state.email,
+        token: state.token,
+      }));
+      setStep(2);
+    }
+  }, []);
   // --- STEP 1: ACCOUNT & OTP LOGIC ---
 
   const handleStep1Submit = async (values, { setSubmitting }) => {
     setErrorMessage("");
     try {
-      // 1. Check if partner is already registered
       const check = await axios.post("/api/partners/check-email", {
         email: values.email.trim(),
       });
@@ -90,18 +105,16 @@ const PartnerSignUpFlow = () => {
         return;
       }
 
-      // 2. Send verification code
       await axios.post("/api/partners/send-verification-code", {
         email: values.email.trim(),
       });
 
-      // 3. Update form data, move to OTP sub-step, and start timer
       setFormData(prev => ({
         ...prev,
         ...values,
         otp: ""
       }));
-      setStep(1.5); // Move to OTP verification sub-step
+      setStep(1.5);
       startResendTimer();
 
     } catch (error) {
@@ -127,8 +140,7 @@ const PartnerSignUpFlow = () => {
     }
   };
 
-
-  // VERIFY OTP (Now proceeds directly to Step 2/Final Step)
+  // VERIFY OTP
   const verifyOtpAndProceed = async (values, { setSubmitting }) => {
     setErrorMessage("");
     try {
@@ -139,12 +151,64 @@ const PartnerSignUpFlow = () => {
 
       if (verify.data.success) {
         setFormData(prev => ({ ...prev, otp: values.otp }));
-        setStep(2); // MOVED DIRECTLY TO THE FINAL STEP (STEP 2)
+        setStep(2);
       }
     } catch (error) {
       setErrorMessage("Invalid or expired OTP.");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // 🔥 NEW: Google Sign-Up handler
+  // On success: creates partner account via Google, then skips OTP and goes straight to Step 2
+  const handleGoogleSignup = async (credentialResponse) => {
+    setErrorMessage("");
+    try {
+      const idToken = credentialResponse.credential;
+
+      const res = await axios.post("/api/partners/google-auth", { idToken });
+
+      // Pre-fill name and email from Google, save token for the complete-profile call
+      setFormData(prev => ({
+        ...prev,
+        name: res.data.name,
+        email: res.data.email,
+        token: res.data.token,
+      }));
+
+      setIsGoogleSignup(true);
+
+      // If profile is already complete (returning Google partner), go to main page
+      if (!res.data.needsProfileCompletion) {
+        localStorage.setItem("token", res.data.token);
+        localStorage.setItem("adminApproved", res.data.adminApproved);
+        localStorage.setItem("partnerId", res.data._id);
+        localStorage.setItem("userInfo", JSON.stringify({
+          _id: res.data._id,
+          name: res.data.name,
+          email: res.data.email,
+          profileImage: res.data.profileImage,
+          isGoogleUser: res.data.isGoogleUser,
+          universityName: res.data.universityName,
+          institutionId: res.data.institutionId,
+          isPremium: res.data.isPremium ?? false,
+          planType: res.data.planType ?? "Freemium",
+          premiumExpiration: res.data.premiumExpiration ?? null,
+          adminApproved: res.data.adminApproved,
+          status: res.data.status,
+        }));
+        localStorage.setItem("loginTime", Date.now().toString());
+        navigate("/partner-main-page");
+        return;
+      }
+
+      // 🔥 New Google partner — skip OTP (email already verified by Google), go to Step 2
+      setStep(2);
+
+    } catch (err) {
+      console.error(err);
+      setErrorMessage("Google sign-up failed. Please try again.");
     }
   };
 
@@ -164,18 +228,7 @@ const PartnerSignUpFlow = () => {
   const handleStep2Submit = async (values, { setSubmitting }) => {
     setErrorMessage("");
 
-    // Collect ALL data from the state (Step 1) and merge with the current step's values (Step 2/Final)
-    const finalData = {
-      name: formData.name,
-      email: formData.email,
-      password: formData.password,
-      // Removed: dob, educationLevel, fieldOfStudy
-      universityName: values.universityName,
-      institutionId: values.institutionId,
-      profileImageFile: formData.profileImageFile
-    };
-
-    if (!finalData.profileImageFile) {
+    if (!formData.profileImageFile) {
       setErrorMessage("Profile picture is required.");
       setSubmitting(false);
       return;
@@ -183,25 +236,63 @@ const PartnerSignUpFlow = () => {
 
     try {
       const finalFormData = new FormData();
+      finalFormData.append("universityName", values.universityName);
+      finalFormData.append("institutionId", values.institutionId);
+      finalFormData.append("profileImage", formData.profileImageFile);
 
-      finalFormData.append("name", finalData.name);
-      finalFormData.append("email", finalData.email);
-      finalFormData.append("password", finalData.password);
-      finalFormData.append("confirmPassword", finalData.password);
-      finalFormData.append("universityName", finalData.universityName);
-      finalFormData.append("institutionId", finalData.institutionId);
-      finalFormData.append("profileImage", finalData.profileImageFile);
+      if (isGoogleSignup) {
+        // 🔥 Google signup path — call complete-profile endpoint with Bearer token
+        const response = await axios.post(
+          "/api/partners/complete-profile",
+          finalFormData,
+          {
+            headers: {
+              "Content-Type": "multipart/form-data",
+              Authorization: `Bearer ${formData.token}`,
+            },
+          }
+        );
 
-      // Submit the data to your backend/database
-      const response = await axios.post(
-        "/api/partners/register",
-        finalFormData,
-        { headers: { 'Content-Type': 'multipart/form-data' } }
-      );
+        // Save everything to localStorage after profile is complete
+        localStorage.setItem("token", response.data.token);
+        localStorage.setItem("adminApproved", response.data.adminApproved);
+        localStorage.setItem("partnerId", response.data._id);
+        localStorage.setItem("userInfo", JSON.stringify({
+          _id: response.data._id,
+          name: response.data.name,
+          email: response.data.email,
+          profileImage: response.data.profileImage,
+          isGoogleUser: response.data.isGoogleUser,
+          universityName: response.data.universityName,
+          institutionId: response.data.institutionId,
+          isPremium: response.data.isPremium ?? false,
+          planType: response.data.planType ?? "Freemium",
+          premiumExpiration: response.data.premiumExpiration ?? null,
+          adminApproved: response.data.adminApproved,
+          status: response.data.status,
+        }));
+        localStorage.setItem("loginTime", Date.now().toString());
 
-      if (response.status === 201) {
         alert("Registration successful! Redirecting to login.");
         navigate("/partner/login");
+
+      } else {
+        // Normal signup path — call register endpoint with all fields
+        finalFormData.append("name", formData.name);
+        finalFormData.append("email", formData.email);
+        finalFormData.append("password", formData.password);
+        finalFormData.append("confirmPassword", formData.password);
+
+        const response = await axios.post(
+          "/api/partners/register",
+          finalFormData,
+          { headers: { "Content-Type": "multipart/form-data" } }
+        );
+
+        if (response.status === 201) {
+          alert("Registration successful! Redirecting to login.");
+          navigate("/partner/login");
+        }
       }
     } catch (error) {
       console.error("Error submitting form:", error);
@@ -273,6 +364,20 @@ const PartnerSignUpFlow = () => {
                 >
                   Send Verification Code
                 </button>
+
+                {/* 🔥 NEW: Google Sign-Up — shown only on Step 1 */}
+                <div className="flex items-center my-2">
+                  <hr className="w-full border-gray-300" />
+                  <span className="px-3 text-gray-500 text-sm whitespace-nowrap">OR sign up with</span>
+                  <hr className="w-full border-gray-300" />
+                </div>
+
+                <div className="flex justify-center">
+                  <GoogleLogin
+                    onSuccess={handleGoogleSignup}
+                    onError={() => setErrorMessage("Google sign-up failed")}
+                  />
+                </div>
               </Form>
             )}
           </Formik>
@@ -334,7 +439,7 @@ const PartnerSignUpFlow = () => {
           // STEP 2 (FINAL): Institutional Info & Profile Picture
           <Formik
             initialValues={{ universityName: formData.universityName, institutionId: formData.institutionId }}
-            validationSchema={step2ValidationSchema} // Renamed from step3ValidationSchema
+            validationSchema={step2ValidationSchema}
             onSubmit={handleStep2Submit}
           >
             {({ isSubmitting, values }) => (
@@ -348,7 +453,6 @@ const PartnerSignUpFlow = () => {
                   <label className="block text-sm font-medium text-gray-700"> Name </label>
                   <p className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-50">{formData.name}</p>
                 </div>
-
 
                 {/* University or Company Name */}
                 <div>
@@ -387,8 +491,8 @@ const PartnerSignUpFlow = () => {
                   <button
                     type="submit"
                     className={`w-full py-3 rounded-md font-semibold text-center text-white transition duration-200 disabled:bg-purple-300 ${(values.universityName && values.institutionId && formData.profileImageFile)
-                        ? "bg-purple-400 hover:bg-purple-700"
-                        : "bg-purple-100 cursor-not-allowed"
+                      ? "bg-purple-400 hover:bg-purple-700"
+                      : "bg-purple-100 cursor-not-allowed"
                       }`}
                     disabled={isSubmitting || !formData.profileImageFile}
                   >
@@ -411,7 +515,6 @@ const PartnerSignUpFlow = () => {
       {/* Image Side */}
       <div className="hidden md:flex md:w-full lg:w-1/2 items-center justify-center">
         <img src={partner2Image} alt="Create Account" className="w-full h-full object-contain max-w-[830px] max-h-[900px] p-6 ml-6 shadow-lg" />
-        {/* <div className="text-gray-500 text-lg">Partner Sign Up Steps Visual (Replace with Image)</div> */}
       </div>
 
       {/* Form Side */}
@@ -428,7 +531,7 @@ const PartnerSignUpFlow = () => {
             </div>
           )}
 
-          {/* Step Progress Indicator (Adjusted for 2 main steps) */}
+          {/* Step Progress Indicator */}
           <div className="flex justify-between mb-6 w-1/2 mx-auto">
             <div className={`p-2 rounded-full ${step >= 1 ? 'bg-teal-500 text-white' : 'bg-gray-200 text-gray-500'}`}>1</div>
             <div className={`p-2 rounded-full ${step >= 2 ? 'bg-teal-500 text-white' : 'bg-gray-200 text-gray-500'}`}>2</div>
@@ -437,29 +540,29 @@ const PartnerSignUpFlow = () => {
           {/* Render Current Step Content */}
           {renderStepContent()}
 
-          {/* Back Button for multi-step flow */}
+          {/* Back Buttons */}
           {step === 1.5 && (
             <button
               type="button"
-              onClick={() => setStep(1)} // Back from OTP step to Step 1 (Account Creation)
+              onClick={() => setStep(1)}
               className="mt-4 p-2 text-center text-teal-500 hover:underline"
             >
               &larr; Back to Account Details
             </button>
           )}
-          {step === 2 && (
+          {/* 🔥 On Google signup, Step 2 back button is hidden (no OTP step was shown) */}
+          {step === 2 && !isGoogleSignup && (
             <button
               type="button"
-              onClick={() => setStep(1.5)} // Back from Final Step to Step 1.5 (OTP)
+              onClick={() => setStep(1.5)}
               className="mt-4 p-2 text-center text-teal-500 hover:underline"
             >
               &larr; Back to OTP Verification
             </button>
           )}
 
-
-          {/* Login Link - Only show on the first or final step for clarity */}
-          {(step === 1 || step === 2) && (
+          {/* Login Link — only on Step 1 */}
+          {step === 1 && (
             <>
               <div className="flex items-center my-4">
                 <hr className="w-full border-t border-gray-300" />
