@@ -612,3 +612,4 @@ function ChartCard({ title, icon, type, color }) {
     </div>
   );
 }
+// changes
