@@ -12,18 +12,22 @@ function FeaturesPage() {
   const { skillnaavData } = useSelector((state) => state.root);
 
   useEffect(() => {
-    if (!skillnaavData || !skillnaavData.features) {
-      const fetchData = async () => {
-        try {
-          const response = await axios.get("/api/skillnaav/get-skillnaav-data");
-          dispatch(SetSkillNaavData(response.data));
-        } catch (error) {
-          console.error("Failed to fetch skillnaav data:", error);
-        }
-      };
-      fetchData();
-    }
-  }, [dispatch, skillnaavData]);
+  if (!skillnaavData || !skillnaavData.visionhead) {
+    const fetchData = async () => {
+      try {
+        const response = await axios.get(
+          `${process.env.REACT_APP_API_BASE}/api/skillnaav/get-skillnaav-data`
+        );
+
+        dispatch(SetSkillNaavData(response.data));
+      } catch (error) {
+        console.error("Failed to fetch skillnaav data:", error);
+      }
+    };
+
+    fetchData();
+  }
+}, [dispatch, skillnaavData]);
 
   return (
     <>
