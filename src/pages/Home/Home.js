@@ -20,23 +20,23 @@ function Home() {
   const dispatch = useDispatch();
 
   // ✅ API CALL ONLY FOR HOME PAGE
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const response = await axios.get("/api/skillnaav/get-skillnaav-data");
-        dispatch(SetSkillNaavData(response.data));
-        dispatch(HideLoading());
-      } catch (error) {
-        console.error("Error fetching SkillNaav data:", error);
-        dispatch(HideLoading());
-      }
-    };
-
-    if (!skillnaavData) {
-      fetchData();
-    }
-  }, [skillnaavData, dispatch]);
-
+   useEffect(() => {
+   if (!skillnaavData || !skillnaavData.visionhead) {
+     const fetchData = async () => {
+       try {
+         const response = await axios.get(
+           `${process.env.REACT_APP_API_BASE}/api/skillnaav/get-skillnaav-data`
+         );
+ 
+         dispatch(SetSkillNaavData(response.data));
+       } catch (error) {
+         console.error("Failed to fetch skillnaav data:", error);
+       }
+     };
+ 
+     fetchData();
+   }
+ }, [dispatch, skillnaavData]);
   return (
     <div className="font-inter">
       <Navbar />
