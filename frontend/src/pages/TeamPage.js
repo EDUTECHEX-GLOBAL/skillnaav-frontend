@@ -1,10 +1,30 @@
-import React from "react";
+import React, { useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import axios from "axios";
+import { SetSkillNaavData } from "../redux/rootSlice";
 import Navbar from "../components/Navbar";
 import Team from "../components/Team/Team";
 import Footer from "../components/Footer";
 import { Helmet } from "react-helmet";
 
 function TeamPage() {
+  const dispatch = useDispatch();
+  const { skillnaavData } = useSelector((state) => state.root);
+
+  useEffect(() => {
+    if (!skillnaavData || !skillnaavData.team) {
+      const fetchData = async () => {
+        try {
+          const response = await axios.get("/api/skillnaav/get-skillnaav-data");
+          dispatch(SetSkillNaavData(response.data));
+        } catch (error) {
+          console.error("Failed to fetch skillnaav data:", error);
+        }
+      };
+      fetchData();
+    }
+  }, [dispatch, skillnaavData]);
+
   return (
     <>
       <Helmet>
