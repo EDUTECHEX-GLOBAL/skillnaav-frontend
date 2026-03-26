@@ -1,0 +1,269 @@
+import React, { useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+
+const SchoolAdminProfileForm = () => {
+  const location = useLocation();
+  const initialRegisterData = location.state || {};
+  const navigate = useNavigate();
+
+  const [formData, setFormData] = useState({
+    schoolName: "",
+    schoolType: "",
+    schoolNumber: "",
+    address: "",
+    affiliation: "",
+    city: "Toronto",
+    province: "Ontario",
+    postalCode: "",
+    country: "Canada",
+    website: "",
+    contactPerson: "",
+    contactEmail: "",
+    contactPhone: "",
+    languageOfInstruction: "",
+    verificationDoc: null,
+  });
+
+  const handleChange = (e) => {
+    const { name, value, files } = e.target;
+    if (name === "verificationDoc") {
+      setFormData({ ...formData, [name]: files[0] });
+    } else {
+      setFormData({ ...formData, [name]: value });
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    const combinedData = {
+      ...initialRegisterData,
+      ...formData,
+    };
+
+    try {
+      const response = await fetch("/api/school-admin/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(combinedData),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        alert("Registration submitted successfully!");
+        navigate("/schooladmin/login");
+      } else {
+        alert(data.message || "Registration failed.");
+      }
+    } catch (error) {
+      console.error("Error submitting profile:", error);
+      alert("An error occurred.");
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-100 flex items-center justify-center px-4 font-poppins">
+      <form
+        onSubmit={handleSubmit}
+        className="bg-white shadow-xl rounded-xl w-full max-w-3xl p-8"
+      >
+        <h2 className="text-3xl font-bold text-blue-700 mb-8 text-center">
+          School Profile Details (Canada)
+        </h2>
+
+        {/* Institution Details */}
+        <div>
+          <h3 className="text-lg font-semibold text-gray-700 mb-4">Institution Details</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <input
+              type="text"
+              name="schoolName"
+              placeholder="School Name"
+              value={formData.schoolName}
+              onChange={handleChange}
+              className="p-3 border border-gray-300 rounded-md"
+              required
+            />
+
+            <select
+              name="schoolType"
+              value={formData.schoolType}
+              onChange={handleChange}
+              className="p-3 border border-gray-300 rounded-md"
+              required
+            >
+              <option value="">Select School Type</option>
+              <option value="Public">Public</option>
+              <option value="Catholic">Catholic</option>
+              <option value="Private">Private</option>
+              <option value="Charter">Charter</option>
+            </select>
+
+            <input
+              type="text"
+              name="schoolNumber"
+              placeholder="School Number (if applicable)"
+              value={formData.schoolNumber}
+              onChange={handleChange}
+              className="p-3 border border-gray-300 rounded-md"
+            />
+
+            <input
+              type="text"
+              name="affiliation"
+              placeholder="Affiliation (e.g., TDSB)"
+              value={formData.affiliation}
+              onChange={handleChange}
+              className="p-3 border border-gray-300 rounded-md"
+            />
+
+            <input
+              type="text"
+              name="city"
+              placeholder="City"
+              value={formData.city}
+              onChange={handleChange}
+              className="p-3 border border-gray-300 rounded-md"
+              required
+            />
+
+            <input
+              type="text"
+              name="province"
+              placeholder="Province (e.g., Ontario)"
+              value={formData.province}
+              onChange={handleChange}
+              className="p-3 border border-gray-300 rounded-md"
+              required
+            />
+
+            <input
+              type="text"
+              name="postalCode"
+              placeholder="Postal Code (e.g., M5V 2T6)"
+              value={formData.postalCode}
+              onChange={handleChange}
+              pattern="[A-Za-z]\d[A-Za-z][ -]?\d[A-Za-z]\d"
+              title="Format: A1A 1A1"
+              className="p-3 border border-gray-300 rounded-md"
+              required
+            />
+
+            <select
+              name="country"
+              value={formData.country}
+              onChange={handleChange}
+              className="p-3 border border-gray-300 rounded-md"
+              required
+            >
+              <option value="">Select Country</option>
+              <option value="Canada">Canada</option>
+              <option value="USA">USA</option>
+              <option value="India">India</option>
+            </select>
+
+            <input
+              type="url"
+              name="website"
+              placeholder="Website (optional)"
+              value={formData.website}
+              onChange={handleChange}
+              className="p-3 border border-gray-300 rounded-md md:col-span-2"
+            />
+          </div>
+        </div>
+
+        {/* Full Address */}
+        <div className="mt-6">
+          <h3 className="text-lg font-semibold text-gray-700 mb-2">Full Address</h3>
+          <textarea
+            name="address"
+            placeholder="Street, Area, Landmark"
+            value={formData.address}
+            onChange={handleChange}
+            className="w-full p-3 border border-gray-300 rounded-md"
+            rows={3}
+            required
+          />
+        </div>
+
+        {/* Language of Instruction */}
+        <div className="mt-6">
+          <h3 className="text-lg font-semibold text-gray-700 mb-2">Language of Instruction</h3>
+          <select
+            name="languageOfInstruction"
+            value={formData.languageOfInstruction}
+            onChange={handleChange}
+            className="p-3 border border-gray-300 rounded-md w-full"
+            required
+          >
+            <option value="">Select Language</option>
+            <option value="English">English</option>
+            <option value="French">French</option>
+            <option value="Bilingual">Bilingual (English/French)</option>
+          </select>
+        </div>
+
+        {/* Contact Info */}
+        <div className="mt-6">
+          <h3 className="text-lg font-semibold text-gray-700 mb-4">Contact Details</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <input
+              type="text"
+              name="contactPerson"
+              placeholder="Contact Person Name"
+              value={formData.contactPerson}
+              onChange={handleChange}
+              className="p-3 border border-gray-300 rounded-md"
+              required
+            />
+            <input
+              type="email"
+              name="contactEmail"
+              placeholder="Contact Email"
+              value={formData.contactEmail}
+              onChange={handleChange}
+              className="p-3 border border-gray-300 rounded-md"
+              required
+            />
+            <input
+              type="text"
+              name="contactPhone"
+              placeholder="Contact Phone"
+              value={formData.contactPhone}
+              onChange={handleChange}
+              className="p-3 border border-gray-300 rounded-md"
+              required
+            />
+          </div>
+        </div>
+
+        {/* Upload Verification Doc */}
+        <div className="mt-6">
+          <h3 className="text-lg font-semibold text-gray-700 mb-2">
+            Upload Verification Document (optional)
+          </h3>
+          <input
+            type="file"
+            name="verificationDoc"
+            onChange={handleChange}
+            className="p-2 border border-gray-300 rounded-md w-full"
+          />
+        </div>
+
+        {/* Submit */}
+        <button
+          type="submit"
+          className="mt-8 w-full bg-blue-600 hover:bg-blue-700 text-white py-3 text-lg rounded-md font-semibold transition"
+        >
+          Submit Profile
+        </button>
+      </form>
+    </div>
+  );
+};
+
+export default SchoolAdminProfileForm;

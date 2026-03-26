@@ -1,0 +1,227 @@
+import React, { useState, useEffect, useRef } from "react";
+import { Skeleton, Modal } from "antd";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import Navbar from "./Navbar";
+import Sidebar from "./Sidebar";
+import BodyContent from "./BodyContent";
+import { TabProvider, useTabContext } from "./UserHomePageContext/HomePageContext";
+import axios from "axios";
+import PremiumPage from "./PremiumPage";
+import Chatbot from "../../../../components/Chatbot";
+import chatBotImage from "../../../../assets-webapp/chat-bot.png";
+import UserAgeGateConsent from "../SignUpLogin/UserProfileBuilding/UserAgeGateConsent";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faChevronLeft, faChevronRight } from "@fortawesome/free-solid-svg-icons";
+
+const UserMainPageContent = () => {
+  const { handleSelectTab, selectedTab } = useTabContext();
+
+  const [userInfo, setUserInfo] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [isApproved, setIsApproved] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);           // mobile
+  const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState(true); // desktop
+  const [showUpgradePopup, setShowUpgradePopup] = useState(false);
+  const [showPricingModal, setShowPricingModal] = useState(false);
+  const [showChatbot, setShowChatbot] = useState(false);
+  const [assistDockOpen, setAssistDockOpen] = useState(false);
+  const [showReverifyModal, setShowReverifyModal] = useState(false);
+  const [reverifySaving, setReverifySaving] = useState(false);
+  const [popupDismissed, setPopupDismissed] = useState(false);
+  const popupTimerRef = useRef(null);
+
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (mobile) setIsSidebarOpen(false);
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  useEffect(() => {
+    const fetchUserInfo = async () => {
+      try {
+        let token = localStorage.getItem("userToken");
+        if (!token) {
+          token = sessionStorage.getItem("userToken");
+          if (token) localStorage.setItem("userToken", token);
+          if (!token) {
+            navigate("/user/login");
+            return;
+          }
+        }
+
+        const [profileRes, consentRes] = await Promise.all([
+          axios.get("/api/users/profile", {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          axios.get("/api/user-age-gate-consent", {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+        ]);
+
+        setUserInfo(profileRes.data);
+
+        const reverifyRequested = !!consentRes.data?.data?.reverificationRequested;
+        setIsApproved(reverifyRequested ? false : profileRes.data.adminApproved);
+
+        if (reverifyRequested) setShowReverifyModal(true);
+
+        const openTab = searchParams.get("openTab");
+        if (openTab) handleSelectTab(openTab);
+      } catch (error) {
+        console.error("Failed to fetch user info:", error);
+        localStorage.clear();
+        navigate("/user/login");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchUserInfo();
+  }, [searchParams, navigate, handleSelectTab]);
+
+  useEffect(() => {
+    if (!userInfo || userInfo.isPremium || popupDismissed) return;
+    const initialDelay = setTimeout(() => {
+      setShowUpgradePopup(true);
+      popupTimerRef.current = setTimeout(() => setShowUpgradePopup(false), 10000);
+    }, 60000);
+    return () => {
+      clearTimeout(initialDelay);
+      clearTimeout(popupTimerRef.current);
+    };
+  }, [userInfo, popupDismissed]);
+
+  const handleDismissPopup = () => {
+    setShowUpgradePopup(false);
+    setPopupDismissed(true);
+    clearTimeout(popupTimerRef.current);
+  };
+
+  const handleToggleSidebar = () => setIsSidebarOpen((prev) => !prev);
+  const handleCloseSidebar = () => setIsSidebarOpen(false);
+
+  const handleReverifyComplete = async (payload) => {
+    try {
+      let token = localStorage.getItem("userToken") || sessionStorage.getItem("userToken");
+      if (!token) { navigate("/user/login"); return; }
+      setReverifySaving(true);
+      const fd = new FormData();
+      fd.append("ageCategory", "OVER_18");
+      fd.append("ageGateCompleted", "true");
+      fd.append("ageVerificationPhoto", payload.ageVerificationPhoto);
+      await axios.post("/api/user-age-gate-consent", fd, {
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" },
+      });
+      setShowReverifyModal(false);
+      setIsApproved(false);
+    } catch (err) {
+      console.error("Reverification upload failed:", err);
+    } finally {
+      setReverifySaving(false);
+    }
+  };
+
+  if (loading) {
+    return <div className="p-6"><Skeleton active /></div>;
+  }
+
+  return (
+    <>
+      <div className="flex flex-col h-screen font-poppins bg-gray-50">
+        {/* Navbar */}
+        <Navbar onToggleSidebar={handleToggleSidebar} />
+
+        {/* Layout: Sidebar + Content */}
+        <div className="flex flex-1 overflow-hidden relative">
+
+          {/* Sidebar */}
+          <Sidebar
+            isOpen={isSidebarOpen}
+            isMobile={isMobile}   
+            onClose={handleCloseSidebar}
+            isDesktopOpen={isDesktopSidebarOpen}
+          />
+
+          {/* Desktop chevron toggle button at sidebar boundary */}
+          <button
+  onClick={() => setIsDesktopSidebarOpen((prev) => !prev)}
+  className="hidden md:flex items-center justify-center absolute top-4 z-50
+    w-6 h-6 rounded-full bg-white border border-gray-300 shadow-md
+    hover:bg-purple-50 hover:border-purple-400 transition-all duration-200"
+  style={{ left: isDesktopSidebarOpen ? "248px" : "48px" }}
+>
+  <FontAwesomeIcon
+    icon={isDesktopSidebarOpen ? faChevronLeft : faChevronRight}
+    className="text-purple-600 text-xs"
+  />
+</button>
+
+          {/* Main content */}
+          <main className="flex-1 overflow-y-auto p-4">
+            {!isApproved && (
+              <div className="bg-yellow-100 text-yellow-800 text-sm px-4 py-2 text-center rounded mb-3">
+                Your account is not approved by an admin yet. Some features may be restricted.
+              </div>
+            )}
+            <BodyContent />
+          </main>
+        </div>
+      </div>
+
+      {/* Upgrade popup */}
+      {showUpgradePopup && (
+        <div className="fixed bottom-6 right-6 z-50 bg-white border border-purple-300 shadow-xl rounded-xl p-4 max-w-xs">
+          <button
+            onClick={handleDismissPopup}
+            className="absolute top-2 right-3 text-gray-400 hover:text-gray-600 text-lg font-bold"
+          >
+            ×
+          </button>
+          <p className="text-sm text-gray-700 font-medium">
+            Upgrade to Premium to apply for unlimited jobs, get priority listings, and exclusive opportunities.
+          </p>
+          <button
+            onClick={() => { setShowPricingModal(true); handleDismissPopup(); }}
+            className="mt-3 w-full bg-purple-600 hover:bg-purple-700 text-white text-sm py-2 rounded-lg"
+          >
+            Upgrade Now
+          </button>
+        </div>
+      )}
+
+      {/* Pricing Modal */}
+      <Modal open={showPricingModal} onCancel={() => setShowPricingModal(false)} footer={null} width={900} centered>
+        <PremiumPage />
+      </Modal>
+
+      {/* Reverify Modal */}
+      <Modal open={showReverifyModal} footer={null} closable={false} centered>
+        <UserAgeGateConsent onComplete={handleReverifyComplete} saving={reverifySaving} />
+      </Modal>
+
+      {/* Chatbot */}
+      {showChatbot && <Chatbot onClose={() => setShowChatbot(false)} />}
+      <div
+        className="fixed bottom-4 right-4 z-50 cursor-pointer"
+        onClick={() => setShowChatbot((prev) => !prev)}
+      >
+        <img src={chatBotImage} alt="Chatbot" className="w-14 h-14 rounded-full shadow-lg" />
+      </div>
+    </>
+  );
+};
+
+const UserMainPage = () => (
+  <TabProvider>
+    <UserMainPageContent />
+  </TabProvider>
+);
+
+export default UserMainPage;
