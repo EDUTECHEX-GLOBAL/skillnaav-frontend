@@ -5,6 +5,9 @@ import "@fontsource/inter/600.css";
 import "@fontsource/inter/700.css";
 import PageLoader from "./components/PageLoader";
 
+// ---------- CONTEXT ----------
+import FeedbackProvider from "./context/FeedbackContext";
+import FeedbackModal from "./components/FeedbackModal/FeedbackModal";
 
 
 // ---------- LAZY IMPORTS ----------
@@ -52,9 +55,7 @@ const SchoolAdminFlow = lazy(() => import("./WebApp/Flows/SchoolAdminFlow/School
 const SchoolAdminResetPassword = lazy(() => import("./WebApp/Flows/SchoolAdminFlow/SignUpLogin/SchoolAdminResetPassword"));
 const SchoolAdminForgotPassword = lazy(() => import("./WebApp/Flows/SchoolAdminFlow/SignUpLogin/SchoolAdminForgotPassword"));
 
-// ---------- CONTEXT ----------
-import FeedbackProvider from "./context/FeedbackContext";
-import FeedbackModal from "./components/FeedbackModal/FeedbackModal";
+
 
 function App() {
   return (
