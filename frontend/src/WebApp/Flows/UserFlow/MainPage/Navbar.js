@@ -155,9 +155,9 @@ const Navbar = ({ onToggleSidebar }) => {
     <div className="bg-white font-poppins border-b border-gray-200 sticky top-0 z-50 w-full">
       <div className="flex items-center justify-between px-4 sm:px-6 py-4">
         <div className="flex items-center space-x-4">
-          <button onClick={onToggleSidebar} className="text-gray-700 md:hidden">
-            <FontAwesomeIcon icon={faBars} className="text-xl" />
-          </button>
+        <button onClick={onToggleSidebar} className="text-gray-700 md:hidden">
+  <FontAwesomeIcon icon={faBars} className="text-xl" />
+</button>
           <img src={logo} alt="Skillnaav Logo" className="h-12" />
         </div>
 

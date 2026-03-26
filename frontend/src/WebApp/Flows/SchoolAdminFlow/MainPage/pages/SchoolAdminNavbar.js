@@ -95,36 +95,33 @@ const SchoolAdminNavbar = React.memo(({ onLogout, onToggleSidebar }) => {
   }, [performLogout, openFeedback]);
 
   return (
-    <header className="bg-white shadow px-4 py-4 flex items-center justify-between border-b font-poppins">
-      <div className="flex items-center">
-        <button
+  <nav className="w-full bg-white shadow-sm px-4 py-3 flex items-center justify-between z-50">
+    
+    {/* Left: Hamburger (visible on ALL screens) + Logo */}
+    <div className="flex items-center gap-3">
+      {/* ✅ No md:hidden — visible on desktop too */}
+    <button
           onClick={onToggleSidebar}
           className="text-gray-600 md:hidden mr-4"
           aria-label="Toggle sidebar"
         >
           <FaBars className="text-xl" />
         </button>
-        {/* ✅ Fixed dimensions prevent layout shift */}
-        <img
-          src={logo}
-          alt="SkillNaav Logo"
-          className="h-10 w-auto"
-          width="120"
-          height="40"
-        />
-      </div>
 
-      <button
-        onClick={handleLogoutClick}
-        type="button"
-        disabled={isPending}
-        className="flex items-center px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm disabled:opacity-70 transition-opacity"
-      >
-        <FaSignOutAlt className="mr-2" />
-        {isPending ? "Logging out..." : "Logout"}
-      </button>
-    </header>
-  );
+      <img src={logo} alt="SkillNaav" className="h-8 w-auto" />
+    </div>
+
+    {/* Right: Logout button — keep your existing logout button here */}
+    <button
+      onClick={handleLogoutClick}
+      disabled={isPending}
+      className="flex items-center gap-2 px-3 py-2 text-sm text-red-500 hover:bg-red-50 rounded-lg transition"
+    >
+      <FaSignOutAlt />
+      <span className="hidden sm:inline">Logout</span>
+    </button>
+  </nav>
+);
 });
 
 export default SchoolAdminNavbar;

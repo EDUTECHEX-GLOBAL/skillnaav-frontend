@@ -1,46 +1,53 @@
 import React from "react";
 import {
-  FaHome,
-  FaUserGraduate,
-  FaBriefcase,
-  FaCreditCard,
-  FaSignOutAlt,
-  FaIdCard,
-  FaBook,
+  FaHome, FaUserGraduate, FaBriefcase, FaCreditCard,
+  FaSignOutAlt, FaIdCard, FaBook,
 } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-
-// Feedback Context (same paths used in your Navbar)
 import { useFeedback } from "../../../../../context/FeedbackContext";
 import { schoolAdminFlowQuestions } from "../../../../../components/FeedbackModal/questionSets";
 
-const SchoolAdminSidebar = ({ selectedTab, setSelectedTab, isOpen, onClose }) => {
+const SchoolAdminSidebar = ({
+  selectedTab,
+  setSelectedTab,
+  isOpen,
+  onClose,
+  isDesktopOpen = true,
+}) => {
   const navigate = useNavigate();
   const { openFeedback } = useFeedback();
 
-  // performLogout declared first (avoid TDZ)
+  const menuItems = [
+    { id: "dashboard",     label: "Dashboard",     icon: <FaHome /> },
+    { id: "students",      label: "Students",       icon: <FaUserGraduate /> },
+    { id: "upload",        label: "Upload Students",icon: <FaBook /> },
+    { id: "internships",   label: "Internships",    icon: <FaBriefcase /> },
+    { id: "subscriptions", label: "Subscriptions",  icon: <FaCreditCard /> },
+    { id: "profile",       label: "Profile",        icon: <FaIdCard /> },
+  ];
+
+  /* ---- performLogout declared first to avoid TDZ ---- */
   const performLogout = async () => {
     try {
-      // try server logout if you keep sessionId/token by other flows (non-blocking)
       const sessionId = localStorage.getItem("sessionId");
-      const token = localStorage.getItem("userToken") || localStorage.getItem("schoolAdminToken");
+      const token =
+        localStorage.getItem("userToken") ||
+        localStorage.getItem("schoolAdminToken");
       if (sessionId && token) {
         try {
           await axios.post(
             "/api/sessions/logout",
             { sessionId },
-            { headers: { Authorization: token ? `Bearer ${JSON.parse(token)}` : "" } }
+            { headers: { Authorization: `Bearer ${JSON.parse(token)}` } }
           );
         } catch (err) {
-          // don't block client-side logout
           console.warn("Session logout request failed:", err?.message || err);
         }
       }
     } catch (err) {
       // noop
     } finally {
-      // clear relevant keys (keep other app-wide keys intact)
       try {
         localStorage.removeItem("sessionId");
         localStorage.removeItem("userToken");
@@ -48,219 +55,176 @@ const SchoolAdminSidebar = ({ selectedTab, setSelectedTab, isOpen, onClose }) =>
         localStorage.removeItem("schoolAdminToken");
         localStorage.removeItem("schoolAdminId");
         localStorage.removeItem("schoolAdminProfile");
-        // Optionally remove loginTime if you want:
         localStorage.removeItem("loginTime");
       } catch (e) {
         console.warn("LocalStorage cleanup error:", e);
       }
-      // navigate to schooladmin login
       navigate("/schooladmin/login");
     }
   };
 
   const handleLogoutTrigger = async () => {
-    // parse loginTime from either localStorage or sessionStorage
     const parseLoginValue = (v) => {
       if (v === null || v === undefined) return NaN;
       const n = Number(String(v));
       return Number.isFinite(n) ? n : NaN;
     };
 
-    const rawLocal = localStorage.getItem("loginTime");
-    const rawSession = sessionStorage.getItem("loginTime");
-    const loginTimeLocal = parseLoginValue(rawLocal);
-    const loginTimeSession = parseLoginValue(rawSession);
-    const loginTime = !Number.isNaN(loginTimeLocal) ? loginTimeLocal : loginTimeSession;
-    const oneMinutePassed = !Number.isNaN(loginTime) && (Date.now() - loginTime >= 60000);
+    const loginTime =
+      parseLoginValue(localStorage.getItem("loginTime")) ||
+      parseLoginValue(sessionStorage.getItem("loginTime"));
+    const oneMinutePassed =
+      !Number.isNaN(loginTime) && Date.now() - loginTime >= 60000;
 
-    // Immediate logout if less than 1 minute (or missing)
-    if (!oneMinutePassed) {
-      return performLogout();
-    }
+    if (!oneMinutePassed) return performLogout();
 
-    // Resolve admin identity from multiple sources
-    const rawUserInfo = localStorage.getItem("userInfo");
-    const parsedUserInfo = rawUserInfo ? JSON.parse(rawUserInfo) : null;
-
-    const rawSchoolProfile = localStorage.getItem("schoolAdminProfile");
-    const parsedSchoolProfile = rawSchoolProfile ? JSON.parse(rawSchoolProfile) : null;
-
-    const schoolAdminIdKey = localStorage.getItem("schoolAdminId");
+    const parsedUserInfo = (() => {
+      try { return JSON.parse(localStorage.getItem("userInfo")); } catch { return null; }
+    })();
+    const parsedSchoolProfile = (() => {
+      try { return JSON.parse(localStorage.getItem("schoolAdminProfile")); } catch { return null; }
+    })();
 
     const adminId =
-      (parsedUserInfo && (parsedUserInfo._id || parsedUserInfo.id || parsedUserInfo.userId)) ||
-      (parsedSchoolProfile && (parsedSchoolProfile._id || parsedSchoolProfile.id)) ||
-      schoolAdminIdKey ||
-      null;
+      parsedUserInfo?._id || parsedUserInfo?.id ||
+      parsedSchoolProfile?._id || parsedSchoolProfile?.id ||
+      localStorage.getItem("schoolAdminId") || null;
 
-    const adminName =
-      (parsedUserInfo && (parsedUserInfo.name || parsedUserInfo.schoolName || parsedUserInfo.displayName)) ||
-      (parsedSchoolProfile && (parsedSchoolProfile.schoolName || parsedSchoolProfile.name)) ||
-      null;
+    const snapshot = {
+      _id: adminId,
+      name: parsedUserInfo?.name || parsedSchoolProfile?.schoolName || null,
+      email: parsedUserInfo?.email || parsedSchoolProfile?.email || null,
+    };
 
-    const adminEmail =
-      (parsedUserInfo && (parsedUserInfo.email || parsedUserInfo.schoolEmail || parsedUserInfo.contactEmail)) ||
-      (parsedSchoolProfile && (parsedSchoolProfile.email || parsedSchoolProfile.contactEmail)) ||
-      null;
-
-    const snapshot = { _id: adminId, name: adminName, email: adminEmail };
-
-    // If no id -> open modal and always logout when modal closes/submits
     if (!adminId) {
       openFeedback({
         flow: "schoolAdmin",
         questions: schoolAdminFlowQuestions,
         triggerInfo: { type: "logout", page: window.location.pathname },
         user: snapshot,
-        userId: null,
-        userName: adminName,
-        userEmail: adminEmail,
-        // UNCONDITIONAL logout when modal closes or is submitted
         postSubmitCallback: () => performLogout(),
       });
       return;
     }
 
-    // If we have an ID, check backend if already submitted
     try {
       const resp = await axios.get("/api/feedback/check", {
         params: { userId: adminId, flow: "schoolAdmin" },
       });
-      if (resp.data?.alreadySubmitted) {
-        // already submitted — logout immediately
-        return performLogout();
-      }
+      if (resp.data?.alreadySubmitted) { performLogout(); return; }
     } catch (err) {
-      // Fail-open: open modal anyway
       console.warn("Feedback check failed; opening modal anyway:", err?.message || err);
     }
 
-    // Open modal and always logout when it closes/submits
     openFeedback({
       flow: "schoolAdmin",
       questions: schoolAdminFlowQuestions,
       triggerInfo: { type: "logout", page: window.location.pathname },
       user: snapshot,
-      userId: adminId,
-      userName: adminName,
-      userEmail: adminEmail,
       postSubmitCallback: () => performLogout(),
     });
   };
 
+  const handleTabClick = async (tab) => {
+    if (tab === "logout") {
+      await handleLogoutTrigger();
+    } else {
+      setSelectedTab(tab);
+      if (onClose) onClose(); // close on mobile after tap
+    }
+  };
+
+  const SidebarItem = ({ id, label, icon }) => {
+    const isActive = selectedTab === id;
+    return (
+      <button
+        onClick={() => handleTabClick(id)}
+        className={`flex items-center w-full p-3 rounded-lg font-medium transition-colors
+          ${isActive ? "bg-teal-100 text-teal-700" : "text-gray-600 hover:bg-gray-100"}
+          ${!isDesktopOpen ? "justify-center" : ""}
+        `}
+        title={!isDesktopOpen ? label : ""}
+      >
+        <span className={`text-lg flex-shrink-0 ${isActive ? "text-teal-600" : "text-gray-500"} ${isDesktopOpen ? "mr-3" : ""}`}>
+          {icon}
+        </span>
+        {isDesktopOpen && <span className="whitespace-nowrap">{label}</span>}
+      </button>
+    );
+  };
+
   return (
     <>
-      {/* Overlay for mobile */}
+      {/* Mobile backdrop */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
+          onClick={onClose}
+        />
+      )}
+
+      {/* Sidebar panel */}
       <div
-        className={`fixed inset-0 bg-black bg-opacity-50 z-40 transition-opacity md:hidden ${isOpen ? "block" : "hidden"}`}
-        onClick={onClose}
-      ></div>
-
-      {/* Sidebar */}
-      <aside
         className={`
-          fixed z-50 inset-y-0 left-0 w-64 bg-white shadow-md border-r transform
-          transition-transform duration-300 ease-in-out
+          fixed md:relative z-50 md:z-auto
+          top-0 left-0
+          bg-white shadow-lg font-poppins
+          transition-all duration-300 ease-in-out
+          flex flex-col overflow-hidden
           ${isOpen ? "translate-x-0" : "-translate-x-full"}
-          md:relative md:translate-x-0 md:flex
+          md:translate-x-0
+          ${!isDesktopOpen ? "md:w-14" : "md:w-64"}
+          w-64
         `}
+        style={{ height: "calc(100vh - 64px)" }}
       >
-        <div className="flex flex-col justify-between h-full">
-          {/* Top Section */}
-          <div className="p-6">
-            <nav className="flex flex-col gap-2">
-              <SidebarItem
-                label="Dashboard"
-                icon={<FaHome />}
-                active={selectedTab === "dashboard"}
-                onClick={() => {
-                  setSelectedTab("dashboard");
-                  onClose?.();
-                }}
-              />
-              <SidebarItem
-                label="Students"
-                icon={<FaUserGraduate />}
-                active={selectedTab === "students"}
-                onClick={() => {
-                  setSelectedTab("students");
-                  onClose?.();
-                }}
-              />
-              <SidebarItem
-                label="Upload Students"
-                icon={<FaUserGraduate />}
-                active={selectedTab === "upload-students"}
-                onClick={() => {
-                  setSelectedTab("upload-students");
-                  onClose?.();
-                }}
-              />
-              <SidebarItem
-                label="Internship & Applications"
-                icon={<FaBriefcase />}
-                active={selectedTab === "internships"}
-                onClick={() => {
-                  setSelectedTab("internships");
-                  onClose?.();
-                }}
-              />
-              <SidebarItem
-                label="Subscriptions"
-                icon={<FaCreditCard />}
-                active={selectedTab === "subscriptions"}
-                onClick={() => {
-                  setSelectedTab("subscriptions");
-                  onClose?.();
-                }}
-              />
-              <SidebarItem
-                label="Profile"
-                icon={<FaIdCard />}
-                active={selectedTab === "profile"}
-                onClick={() => {
-                  setSelectedTab("profile");
-                  onClose?.();
-                }}
-              />
-              {/* <SidebarItem
-                label="Curriculum"
-                icon={<FaBook />}
-                active={selectedTab === "curriculum"}
-                onClick={() => setSelectedTab("curriculum")}
-              /> */}
-            </nav>
+        {/* Inner content — w-full so it respects clipped parent */}
+        <div className="w-full h-full flex flex-col">
+
+          {/* Scrollable nav */}
+          <div className={`flex-1 overflow-y-auto pt-4 pb-6 hide-scrollbar ${isDesktopOpen ? "px-3" : "px-1"}`}>
+            <ul className="space-y-1">
+              {menuItems.map((item) => (
+                <li key={item.id}>
+                  <SidebarItem {...item} />
+                </li>
+              ))}
+
+              {/* Logout */}
+              <li>
+                <button
+                  onClick={() => handleTabClick("logout")}
+                  className={`flex items-center w-full p-3 rounded-lg font-medium text-red-500 hover:bg-red-50 transition-colors
+                    ${!isDesktopOpen ? "justify-center" : ""}
+                  `}
+                  title={!isDesktopOpen ? "Logout" : ""}
+                >
+                  <FaSignOutAlt className={`text-lg flex-shrink-0 ${isDesktopOpen ? "mr-3" : ""}`} />
+                  {isDesktopOpen && <span>Logout</span>}
+                </button>
+              </li>
+            </ul>
           </div>
 
-          {/* Bottom Section */}
-          <div className="p-4 border-t text-sm">
-            {/* Premium + Logout */}
-            <button
-              onClick={() => {
-                handleLogoutTrigger();
-                if (onClose) onClose();
-              }}
-              className="flex items-center justify-center text-red-600 font-medium mt-4 hover:underline w-full"
-            >
-              <FaSignOutAlt className="mr-2" />
-              Logout
-            </button>
-          </div>
+          {/* Upgrade box — only when expanded */}
+          {isDesktopOpen && (
+            <div className="p-4 bg-teal-50 rounded-lg m-3">
+              <h3 className="text-teal-700 text-sm font-semibold">UPGRADE PLAN</h3>
+              <p className="text-xs text-teal-600 mt-1">
+                Unlock more student seats and premium features.
+              </p>
+              <button
+                onClick={() => handleTabClick("subscriptions")}
+                className="mt-3 w-full bg-teal-600 text-white py-2 px-4 rounded-lg hover:bg-teal-700 transition text-sm"
+              >
+                Upgrade Now
+              </button>
+            </div>
+          )}
         </div>
-      </aside>
+      </div>
     </>
   );
 };
-
-const SidebarItem = ({ label, icon, active, onClick }) => (
-  <button
-    onClick={onClick}
-    className={`flex items-start w-full px-4 py-2 rounded-md text-sm font-bold transition-all duration-150 ${active ? "bg-blue-100 text-blue-600" : "text-gray-700 hover:bg-blue-50"
-      }`}
-  >
-    <span className="mt-0 mr-4 text-base">{icon}</span>
-    <span className="leading-snug text-left break-words whitespace-normal">{label}</span>
-  </button>
-);
 
 export default SchoolAdminSidebar;

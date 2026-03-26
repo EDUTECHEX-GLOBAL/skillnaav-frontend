@@ -1,367 +1,357 @@
-import React, { useState, useEffect, useRef } from "react";
+// ─── Message.js ───────────────────────────────────────────────────────────────
+// Root orchestrator. Owns all state and data-fetching; renders either:
+//   • A "no session" error screen
+//   • <InternshipListView> (when no chat is open)
+//   • <ChatView>           (when a chat is open)
+//
+// No JSX markup for list items or messages lives here — those are fully
+// encapsulated inside their respective view components.
+
+import React, {
+  useState, useEffect, useRef,
+  useCallback, useReducer,
+} from "react";
 import axios from "axios";
 
-// Enhanced Internship Card with modern design
-const InternshipCard = ({ internshipId, jobTitle, onClick, hasUnread = false }) => (
-  <div
-    className="group relative p-5 mb-4 bg-white shadow-lg rounded-2xl cursor-pointer hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border border-gray-100 hover:border-blue-200"
-    onClick={() => onClick(internshipId, jobTitle)}
-  >
-    <div className="flex items-center justify-between">
-      <div className="flex-1">
-        <h3 className="text-lg font-semibold text-gray-800 group-hover:text-blue-600 transition-colors">
-          {jobTitle}
-        </h3>
-        <p className="text-sm text-gray-500 mt-1">ID: {internshipId}</p>
-      </div>
-      {hasUnread && (
-        <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
-      )}
-      <div className="ml-4 text-gray-400 group-hover:text-blue-500 transition-colors">
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
-      </div>
-    </div>
-  </div>
-);
+import InternshipListView from "./Internshiplistview";
+import  ChatView     from "./Chatview";
+import {
+  resolvePartnerId, useDebounce,
+  intInitial, intReducer,
+  msgInitial, msgReducer,
+  INTERNSHIPS_PER_PAGE, MESSAGES_PER_PAGE,
+  S, globalCss, IconNoSession,
+} from "./Chatconstants";
 
-// Enhanced Message Bubble Component with improved styling
-const MessageBubble = ({ message, isOwn, timestamp }) => (
-  <div className={`flex mb-4 ${isOwn ? 'justify-end' : 'justify-start'}`}>
-    <div className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-sm ${isOwn
-      ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-br-md'
-      : 'bg-white text-gray-800 border border-gray-200 rounded-bl-md'
-      }`}>
-      <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{message.message}</p>
-      <p className={`text-xs mt-2 ${isOwn ? 'text-blue-100' : 'text-gray-500'}`}>
-        {new Date(message.timestamp || message.createdAt).toLocaleTimeString([], {
-          hour: '2-digit',
-          minute: '2-digit'
-        })}
-      </p>
-    </div>
-  </div>
-);
-
-// Typing Indicator Component
-const TypingIndicator = () => (
-  <div className="flex justify-start mb-4">
-    <div className="bg-gray-200 rounded-2xl px-4 py-3 rounded-bl-md">
-      <div className="flex space-x-1">
-        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-      </div>
-    </div>
-  </div>
-);
-
-// Main Enhanced Chat Interface
+// ─── ChatInterface (root) ─────────────────────────────────────────────────────
 const ChatInterface = () => {
-  const [internships, setInternships] = useState([]);
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [sending, setSending] = useState(false);
-  const [partnerId, setPartnerId] = useState(null);
-  // Removed adminId state
-  const [selectedInternshipId, setSelectedInternshipId] = useState(null);
-  const [selectedInternshipTitle, setSelectedInternshipTitle] = useState("");
+
+  // ── Auth ──────────────────────────────────────────────────────────────────
+  // resolvePartnerId is passed as a lazy initialiser — runs exactly once
+  const [partnerId] = useState(resolvePartnerId);
+
+  // ── Internship list ───────────────────────────────────────────────────────
+  const [intState, intDispatch] = useReducer(intReducer, intInitial);
+  const {
+    list: internships,
+    loading: intLoading, searching: intSearching,
+    currentPage: intCurrentPage, totalPages: intTotalPages, totalCount: intTotalCount,
+    searchDraft, committedQuery,
+  } = intState;
+
+  // ── Chat / selected internship ─────────────────────────────────────────────
   const [showChat, setShowChat] = useState(false);
+  const [selected, setSelected] = useState({
+    id: null, title: "", company: "",
+    imgUrl: "", intType: "", intMode: "", location: "",
+  });
+
+  // ── Detail panel ──────────────────────────────────────────────────────────
+  const [showDetailPanel, setShowDetailPanel]       = useState(false);
+  const [selectedInternship, setSelectedInternship] = useState(null);
+  const [detailLoading, setDetailLoading]           = useState(false);
+
+  // ── Messages ──────────────────────────────────────────────────────────────
+  const [msgState, msgDispatch] = useReducer(msgReducer, msgInitial);
+  const {
+    list: messages,
+    loading: msgLoading, paging: msgPaging,
+    currentPage: msgCurrentPage, totalPages: msgTotalPages, totalCount: msgTotalCount,
+  } = msgState;
+
+  // ── Input / send ──────────────────────────────────────────────────────────
+  const [input, setInput]       = useState("");
+  const [sending, setSending]   = useState(false);
   const [isTyping, setIsTyping] = useState(false);
 
-  const messagesEndRef = useRef(null);
-  const inputRef = useRef(null);
+  // ── Refs ──────────────────────────────────────────────────────────────────
+  const messagesEndRef   = useRef(null);
+  const inputRef         = useRef(null);
+  const isIntInitialRef  = useRef(true);   // skip page-change effect on first render
+  const isMsgInitialRef  = useRef(true);   // skip msg-page-change effect on first render
+  const currentInternRef = useRef(null);   // keeps internship id for paged message fetches
 
-  // Smooth scroll to bottom
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+  // ── Debounced search ──────────────────────────────────────────────────────
+  const debouncedSearch = useDebounce(searchDraft, 400);
 
-  useEffect(scrollToBottom, [messages]);
-
-  // Auto-focus input when chat opens
+  // Log missing session once on mount
   useEffect(() => {
-    if (showChat && inputRef.current) {
-      inputRef.current.focus();
+    if (!partnerId)
+      console.warn("[ChatInterface] No partnerId in localStorage. Keys:", Object.keys(localStorage));
+  }, []); // eslint-disable-line
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // Internship fetching
+  // ══════════════════════════════════════════════════════════════════════════
+  const fetchInternships = useCallback(async (page, query, isFirst = false) => {
+    if (!partnerId) return;
+    intDispatch({ type: "FETCH_START", isFirst });
+    try {
+      const res = await axios.get(`/api/interns/partner/${partnerId}`, {
+        params: { page, limit: INTERNSHIPS_PER_PAGE, search: query },
+      });
+      intDispatch({
+        type: "FETCH_SUCCESS",
+        data:       res.data.data       || [],
+        totalPages: res.data.totalPages || 1,
+        totalCount: res.data.total      || 0,
+        query,
+      });
+    } catch (err) {
+      console.error("fetchInternships:", err);
+      intDispatch({ type: "FETCH_ERROR" });
     }
-  }, [showChat]);
+  }, [partnerId]);
 
-  // Load only partnerId from localStorage
+  // Initial load
   useEffect(() => {
-    const storedPartnerId = localStorage.getItem("partnerId");
-    // Removed adminInfo parsing/adminId setting
-    if (storedPartnerId) setPartnerId(storedPartnerId);
+    if (!partnerId) return;
+    fetchInternships(1, "", true);
+    isIntInitialRef.current = false;
+  }, [partnerId]); // eslint-disable-line
+
+  // Page navigation
+  useEffect(() => {
+    if (isIntInitialRef.current) return;
+    fetchInternships(intCurrentPage, committedQuery);
+  }, [intCurrentPage]); // eslint-disable-line
+
+  // Debounced auto-search
+  useEffect(() => {
+    if (isIntInitialRef.current) return;
+    intDispatch({ type: "SET_PAGE", page: 1 });
+    fetchInternships(1, debouncedSearch);
+  }, [debouncedSearch]); // eslint-disable-line
+
+  const handleSearchSubmit = useCallback(() => {
+    intDispatch({ type: "SET_PAGE", page: 1 });
+    fetchInternships(1, searchDraft);
+  }, [searchDraft, fetchInternships]);
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // Internship detail panel
+  // ══════════════════════════════════════════════════════════════════════════
+  const fetchInternshipDetail = useCallback(async (internshipId) => {
+    setDetailLoading(true);
+    try {
+      const res = await axios.get(`/api/interns/${internshipId}`);
+      setSelectedInternship(res.data?.data || res.data || null);
+    } catch (err) {
+      console.error("fetchInternshipDetail:", err);
+      setSelectedInternship(null);
+    } finally {
+      setDetailLoading(false);
+    }
   }, []);
 
-  // Fetch internships with loading state
-useEffect(() => {
-  const fetchInternships = async () => {
-    if (!partnerId) return;
+  const handleToggleDetailPanel = useCallback(() => {
+    if (!showDetailPanel && selected.id) fetchInternshipDetail(selected.id);
+    setShowDetailPanel((prev) => !prev);
+  }, [showDetailPanel, selected.id, fetchInternshipDetail]);
 
-    setLoading(true);
-    try {
-      const response = await axios.get(`/api/interns/partner/${partnerId}`);
+  const handleCloseDetailPanel = useCallback(() => {
+    setShowDetailPanel(false);
+    setSelectedInternship(null);
+  }, []);
 
-      // ✅ FIX: extract array correctly
-      setInternships(response.data.data || []);
-    } catch (err) {
-      console.error("Error fetching internships:", err);
-      setInternships([]); // safety fallback
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  fetchInternships();
-}, [partnerId]);
-
-
-  // Enhanced message fetching with better UX
-  const fetchMessages = async (internshipId) => {
+  // ══════════════════════════════════════════════════════════════════════════
+  // Message fetching
+  // ══════════════════════════════════════════════════════════════════════════
+  const fetchMessages = useCallback(async (page, internshipId, isFirst = false) => {
     if (!partnerId || !internshipId) return;
-
-    setLoading(true);
+    msgDispatch({ type: "FETCH_START", isFirst });
     try {
-      const response = await axios.get(`/api/chats/partner/${partnerId}/internship/${internshipId}`);
-      setMessages(response.data || []);
+      const res = await axios.get(
+        `/api/chats/partner/${partnerId}/internship/${internshipId}`,
+        { params: { page, limit: MESSAGES_PER_PAGE } }
+      );
+      const payload = res.data;
+      if (Array.isArray(payload)) {
+        msgDispatch({ type: "FETCH_SUCCESS", data: payload, totalPages: 1, totalCount: payload.length });
+      } else {
+        msgDispatch({
+          type: "FETCH_SUCCESS",
+          data:       payload.data       || [],
+          totalPages: payload.totalPages || 1,
+          totalCount: payload.total      || 0,
+        });
+      }
     } catch (err) {
-      console.error("Error fetching messages:", err);
-    } finally {
-      setLoading(false);
+      console.error("fetchMessages:", err);
+      msgDispatch({ type: "FETCH_ERROR" });
     }
-  };
+  }, [partnerId]);
 
-  // Handle internship selection with smooth transition
-  const handleInternshipClick = (id, jobTitle) => {
-    setSelectedInternshipId(id);
-    setSelectedInternshipTitle(jobTitle);
+  // Open chat -> load first page
+  useEffect(() => {
+    if (!showChat || !selected.id) return;
+    currentInternRef.current = selected.id;
+    isMsgInitialRef.current  = false;
+    fetchMessages(1, selected.id, true);
+  }, [showChat, selected.id]); // eslint-disable-line
+
+  // Message page change
+  useEffect(() => {
+    if (isMsgInitialRef.current) return;
+    fetchMessages(msgCurrentPage, currentInternRef.current);
+  }, [msgCurrentPage]); // eslint-disable-line
+
+  // Scroll to bottom on new messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // Focus input when chat opens
+  useEffect(() => {
+    if (showChat) inputRef.current?.focus();
+  }, [showChat]);
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // Event handlers
+  // ══════════════════════════════════════════════════════════════════════════
+  const handleInternshipClick = useCallback((id, title, extra = {}) => {
+    setSelected({
+      id,
+      title,
+      company:  extra.companyName    || "",
+      imgUrl:   extra.imgUrl         || "",
+      intType:  extra.internshipType || "",
+      intMode:  extra.internshipMode || "",
+      location: extra.location       || "",
+    });
+    msgDispatch({ type: "RESET" });
+    isMsgInitialRef.current = true;
+    setShowDetailPanel(false);
+    setSelectedInternship(null);
     setShowChat(true);
-    fetchMessages(id);
-  };
+  }, []);
 
-  // Enhanced message sending with optimistic UI and better UX feedback
-  const handleSend = async () => {
-    // 🛑 CRITICAL CHANGE: Only check for required data the client must send
-    if (!input.trim() || !partnerId || !selectedInternshipId || sending) return;
+  const handleBackToList = useCallback(() => {
+    setShowChat(false);
+    msgDispatch({ type: "RESET" });
+    isMsgInitialRef.current = true;
+    setShowDetailPanel(false);
+    setSelectedInternship(null);
+  }, []);
 
-    const messageText = input.trim();
+  const handleMsgPageChange = useCallback((page) =>
+    msgDispatch({ type: "SET_PAGE", page }), []);
+
+  const handleSend = useCallback(async () => {
+    if (!input.trim() || !partnerId || !selected.id || sending) return;
+    const text = input.trim();
     setInput("");
     setSending(true);
     setIsTyping(true);
 
-    // Optimistic UI update
-    const optimisticMessage = {
-      message: messageText,
-      sender: partnerId,
+    const optimistic = {
+      message: text, sender: partnerId,
       timestamp: new Date().toISOString(),
-      _id: Date.now() // temporary ID
+      _id: `opt-${Date.now()}`,
     };
-
-    setMessages(prev => [...prev, optimisticMessage]);
+    msgDispatch({ type: "APPEND", msg: optimistic });
 
     try {
-      const newMessage = {
-        internshipId: selectedInternshipId,
-        senderId: partnerId,
-        // Removed receiverId: The backend will resolve the Admin ID using the environment variable.
-        message: messageText,
-      };
-
-      const response = await axios.post("/api/chats/send", newMessage, {
-        headers: { "Content-Type": "application/json" },
-      });
-
-      if (response.status === 201) {
-        // Replace optimistic message with server response
-        setMessages(prev => [
-          ...prev.slice(0, -1),
-          response.data
-        ]);
+      const res = await axios.post(
+        "/api/chats/send",
+        { internshipId: selected.id, senderId: partnerId, message: text },
+        { headers: { "Content-Type": "application/json" } }
+      );
+      if (res.status === 201) {
+        msgDispatch({ type: "REPLACE_LAST", msg: res.data });
       }
     } catch (err) {
-      console.error("Error sending message:", err);
-      // Remove optimistic message on error
-      setMessages(prev => prev.slice(0, -1));
-      setInput(messageText); // Restore input
+      console.error("handleSend:", err);
+      msgDispatch({ type: "REMOVE", id: optimistic._id });
+      setInput(text); // restore on failure
     } finally {
       setSending(false);
       setIsTyping(false);
       inputRef.current?.focus();
     }
-  };
+  }, [input, partnerId, selected.id, sending]);
 
-  // Handle Enter key press and auto-resize textarea
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
+  const handleKeyDown = useCallback((e) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
+  }, [handleSend]);
 
-  // Auto-resize textarea
-  const handleTextareaChange = (e) => {
+  const handleTextareaChange = useCallback((e) => {
     setInput(e.target.value);
-    const textarea = e.target;
-    textarea.style.height = 'auto';
-    textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
-  };
+    e.target.style.height = "auto";
+    e.target.style.height = Math.min(e.target.scrollHeight, 110) + "px";
+  }, []);
 
-  // Internship List View with FIXED header and scrollable content
-  if (!showChat) {
+  // ══════════════════════════════════════════════════════════════════════════
+  // Render
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // ── No session ────────────────────────────────────────────────────────────
+  if (!partnerId) {
     return (
-      <div className="h-screen flex flex-col bg-gradient-to-br from-gray-50 to-blue-50">
-        {/* FIXED Header */}
-        <div className="bg-white shadow-sm border-b border-gray-200 flex-shrink-0">
-          <div className="max-w-4xl mx-auto px-6 py-6">
-            <h1 className="text-2xl font-bold text-gray-800">Messages</h1>
-            <p className="text-gray-600 mt-1">Select an internship to start chatting</p>
+      <>
+        <style>{globalCss}</style>
+        <div style={S.noSession}>
+          <div style={{ textAlign: "center", padding: 32 }}>
+            <div style={S.noSessionIcon}>{IconNoSession}</div>
+            <p style={{ margin: 0, fontWeight: 600, fontSize: 15, color: "#1A1D2E", fontFamily: "'Sora', sans-serif" }}>
+              Session not found
+            </p>
+            <p style={{ margin: "6px 0 0", fontSize: 13, color: "#8B91A7", maxWidth: 260 }}>
+              Please log in again. Your partner session could not be found.
+            </p>
           </div>
         </div>
-
-        {/* SCROLLABLE Content */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="max-w-4xl mx-auto px-6 py-8">
-            {loading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-                <p className="ml-4 text-gray-600">Loading internships...</p>
-              </div>
-            ) : internships.length === 0 ? (
-              <div className="text-center py-16">
-                <div className="w-24 h-24 bg-gray-100 rounded-full mx-auto mb-4 flex items-center justify-center">
-                  <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-medium text-gray-800 mb-2">No internships found</h3>
-                <p className="text-gray-500">You don't have any internships to message about yet.</p>
-              </div>
-            ) : (
-              <div className="grid gap-4">
-                {internships.map(({ _id, jobTitle }) => (
-                  <InternshipCard
-                    key={_id}
-                    internshipId={_id}
-                    jobTitle={jobTitle}
-                    onClick={handleInternshipClick}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+      </>
     );
   }
 
-  // Enhanced Chat UI with modern design
+  // ── List View ─────────────────────────────────────────────────────────────
+  if (!showChat) {
+    return (
+      <InternshipListView
+        internships={internships}
+        intLoading={intLoading}
+        intSearching={intSearching}
+        intCurrentPage={intCurrentPage}
+        intTotalPages={intTotalPages}
+        intTotalCount={intTotalCount}
+        searchDraft={searchDraft}
+        committedQuery={committedQuery}
+        onCardClick={handleInternshipClick}
+        onSearchChange={(val) => intDispatch({ type: "SET_DRAFT", value: val })}
+        onSearchSubmit={handleSearchSubmit}
+        onPageChange={(p) => intDispatch({ type: "SET_PAGE", page: p })}
+      />
+    );
+  }
+
+  // ── Chat View ─────────────────────────────────────────────────────────────
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
-      {/* Enhanced Header with gradient */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg flex-shrink-0">
-        <div className="flex items-center justify-between px-6 py-4">
-          <div className="flex items-center">
-            <button
-              className="mr-4 p-2 hover:bg-blue-700 rounded-full transition-all duration-200"
-              onClick={() => setShowChat(false)}
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-            <div>
-              <h2 className="text-xl font-bold">{selectedInternshipTitle}</h2>
-              <p className="text-blue-100 text-sm">ID: {selectedInternshipId}</p>
-            </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-            <span className="text-sm text-blue-100">Online</span>
-          </div>
-        </div>
-      </div>
-
-      {/* SCROLLABLE Messages Area with enhanced styling */}
-      <div className="flex-1 overflow-y-auto px-6 py-4 bg-gray-50">
-        {loading ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-            <p className="ml-3 text-gray-600">Loading messages...</p>
-          </div>
-        ) : messages.length === 0 ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-blue-100 rounded-full mx-auto mb-4 flex items-center justify-center">
-                <svg className="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-medium text-gray-800 mb-2">Start the conversation</h3>
-              <p className="text-gray-500">Send a message to begin chatting about this internship.</p>
-            </div>
-          </div>
-        ) : (
-          <>
-            {messages.map((msg, idx) => (
-              <MessageBubble
-                key={msg._id || idx}
-                message={msg}
-                isOwn={msg.sender === partnerId} // Correct display logic for P2P chat
-                timestamp={msg.timestamp || msg.createdAt}
-              />
-            ))}
-            {isTyping && <TypingIndicator />}
-            <div ref={messagesEndRef} />
-          </>
-        )}
-      </div>
-
-      {/* Enhanced Input Area */}
-      <div className="bg-white border-t border-gray-200 px-6 py-4 flex-shrink-0 shadow-lg">
-        <div className="flex items-end space-x-3">
-          <div className="flex-1 relative">
-            <textarea
-              ref={inputRef}
-              className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none transition-all duration-200 min-h-[48px] max-h-[120px]"
-              placeholder="Type your message..."
-              value={input}
-              onChange={handleTextareaChange}
-              onKeyDown={handleKeyPress}
-              rows={1}
-              disabled={sending}
-            />
-            <div className="absolute right-3 bottom-3">
-              <button className="p-1 text-gray-400 hover:text-gray-600 transition-colors">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                </svg>
-              </button>
-            </div>
-          </div>
-          <button
-            className={`p-3 rounded-2xl transition-all duration-200 ${input.trim() && !sending
-              ? 'bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:shadow-xl'
-              : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-              }`}
-            onClick={handleSend}
-            disabled={!input.trim() || sending}
-          >
-            {sending ? (
-              <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full"></div>
-            ) : (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-              </svg>
-            )}
-          </button>
-        </div>
-        <div className="mt-2 text-xs text-gray-500 text-center">
-          Press Enter to send • Shift + Enter for new line
-        </div>
-      </div>
-    </div>
+    <ChatView
+      selected={selected}
+      partnerId={partnerId}
+      messages={messages}
+      msgLoading={msgLoading}
+      msgPaging={msgPaging}
+      msgCurrentPage={msgCurrentPage}
+      msgTotalPages={msgTotalPages}
+      msgTotalCount={msgTotalCount}
+      isTyping={isTyping}
+      sending={sending}
+      input={input}
+      inputRef={inputRef}
+      messagesEndRef={messagesEndRef}
+      showDetailPanel={showDetailPanel}
+      detailLoading={detailLoading}
+      selectedInternship={selectedInternship}
+      onBack={handleBackToList}
+      onMsgPageChange={handleMsgPageChange}
+      onSend={handleSend}
+      onKeyDown={handleKeyDown}
+      onInputChange={handleTextareaChange}
+      onToggleDetail={handleToggleDetailPanel}
+      onCloseDetail={handleCloseDetailPanel}
+    />
   );
 };
 
