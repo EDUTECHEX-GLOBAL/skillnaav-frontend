@@ -9,6 +9,7 @@ import { faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
 import partner2Image from "../../../../assets-webapp/partner2_img.jpg";
 import ForgotPasswordModal from "../SignUpLogin/PartnerforgotPassword";
 import { GoogleLogin } from "@react-oauth/google"; // 🔥 NEW
+import { API_BASE } from "../../../../config";
 
 const validationSchema = Yup.object({
   email: Yup.string().email("Invalid email address").required("Required"),
@@ -31,7 +32,7 @@ const PartnerLogin = () => {
           "Content-type": "application/json",
         },
       };
-      const { data } = await axios.post("/api/partners/login", values, config);
+      const { data } = await axios.post(`${API_BASE}/api/partners/login`, values, config);
   
       // Save token and adminApproved status to localStorage
       localStorage.setItem("token", data.token);

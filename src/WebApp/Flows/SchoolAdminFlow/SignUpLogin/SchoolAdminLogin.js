@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { FiEye, FiEyeOff } from "react-icons/fi";
 import classroomImg from "../../../../assets-webapp/school-dashboard.png";
 import SchoolAdminForgotPassword from "./SchoolAdminForgotPassword";
+import { API_BASE } from "../../../../config";
 
 const SchoolAdminLogin = () => {
   const [credentials, setCredentials] = useState({ email: "", password: "" });
@@ -28,7 +29,7 @@ const handleLogin = async (e) => {
   try {
     setLoading(true);
 
-    const response = await fetch("/api/school-admin/login", {
+    const response = await fetch(`${API_BASE}/api/school-admin/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(credentials),

@@ -12,6 +12,7 @@ import { FcGoogle } from "react-icons/fc";
 import ForgotPasswordModal from "../SignUpLogin/UserforgotPassword";
 import { GoogleLogin } from "@react-oauth/google";
 import axios from "axios";
+import { API_BASE } from "../../../../config";
 
 const validationSchema = Yup.object({
   email: Yup.string().email("Invalid email address").required("Required"),
@@ -35,7 +36,7 @@ const UserLogin = () => {
         },
       };
 
-      const { data } = await axios.post("/api/users/login", values, config);
+      const { data } = await axios.post(`${API_BASE}/api/users/login`, values, config);
 
       if (!data || !data.token) {
         throw new Error("Invalid response from server");
@@ -61,15 +62,11 @@ const UserLogin = () => {
         localStorage.setItem("schoolAdminId", data.schoolAdminId);
       }
 
-      const sessionRes = await axios.post(
-        "/api/sessions/login",
-        {},
-        {
-          headers: {
-            Authorization: `Bearer ${data.token}`,
-          },
-        }
-      );
+      const sessionRes = await axios.post(`${API_BASE}/api/sessions/login`, {}, {
+  headers: {
+    Authorization: `Bearer ${data.token}`,
+  },
+});
 
       if (sessionRes?.data?.sessionId) {
         localStorage.setItem("sessionId", sessionRes.data.sessionId);
@@ -195,7 +192,7 @@ const UserLogin = () => {
               try {
                 const idToken = credentialResponse.credential;
 
-                const res = await axios.post("/api/users/google-auth", { idToken });
+                const res = await axios.post(`${API_BASE}/api/users/google-auth`, { idToken });
 
                 localStorage.setItem("userToken", res.data.token);
 
