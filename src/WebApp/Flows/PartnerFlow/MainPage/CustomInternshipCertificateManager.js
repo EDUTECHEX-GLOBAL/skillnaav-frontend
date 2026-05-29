@@ -21,7 +21,9 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
+  Palette,
 } from "lucide-react";
+import CertificateTemplate from "../../UserFlow/MainPage/CertificateTemplate";
 
 /* ─── animation helpers ─── */
 const fadeUp = {
@@ -65,10 +67,20 @@ const CustomInternshipCertificateManager = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [activeTab, setActiveTab] = useState("upload"); // "upload" | "gallery"
-  const [lightboxImage, setLightboxImage] = useState(null);
+  const [lightboxData, setLightboxData] = useState(null);
   const [pendingDeleteItem, setPendingDeleteItem] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [galleryPage, setGalleryPage] = useState(1);
+  const [textColor, setTextColor] = useState("#1f2937");
+
+  const colorOptions = [
+    { label: "Dark Gray", value: "#1f2937" },
+    { label: "Navy Blue", value: "#1e3a8a" },
+    { label: "Forest Green", value: "#166534" },
+    { label: "Maroon", value: "#7f1d1d" },
+    { label: "Deep Purple", value: "#4c1d95" },
+    { label: "Gold", value: "#b45309" },
+  ];
 
   useEffect(() => {
     if (legacyStorageKey) localStorage.removeItem(legacyStorageKey);
@@ -135,6 +147,7 @@ const CustomInternshipCertificateManager = () => {
     setSelectedFile(null);
     setSelectedImagePreview("");
     setSelectedFileName("");
+    setTextColor("#1f2937");
     const input = document.getElementById("customCertificateImageInput");
     if (input) input.value = "";
   };
@@ -156,6 +169,7 @@ const CustomInternshipCertificateManager = () => {
       name: capturedName,
       fileName: capturedFile.name,
       imageUrl: optimisticBlobUrl,
+      textColor: textColor,
       createdAt: new Date().toISOString(),
     };
 
@@ -169,6 +183,7 @@ const CustomInternshipCertificateManager = () => {
       formData.append("partnerId", partnerId);
       formData.append("name", capturedName);
       formData.append("image", capturedFile);
+      formData.append("textColor", textColor);
 
       const response = await axios.post(
         "/api/custom-internship-certificates",
@@ -331,33 +346,45 @@ const CustomInternshipCertificateManager = () => {
     <div className="w-full min-h-screen bg-[#fafbfc] font-sans pb-20">
       {/* ── Image Lightbox ── */}
       <AnimatePresence>
-        {lightboxImage && (
+        {lightboxData && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-6"
-            onClick={() => setLightboxImage(null)}
+            onClick={() => setLightboxData(null)}
           >
             <motion.div
               initial={{ scale: 0.85, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.85, opacity: 0 }}
               transition={{ type: "spring", duration: 0.5 }}
-              className="relative max-w-4xl w-full max-h-[85vh]"
+              className="relative max-w-[1120px] w-full"
+              style={{ aspectRatio: "1120 / 792" }}
               onClick={(e) => e.stopPropagation()}
             >
               <button
-                onClick={() => setLightboxImage(null)}
+                onClick={() => setLightboxData(null)}
                 className="absolute -top-4 -right-4 w-10 h-10 rounded-full bg-white shadow-xl flex items-center justify-center text-slate-700 hover:bg-slate-100 z-10 transition-colors"
               >
                 <X size={20} strokeWidth={2.5} />
               </button>
-              <img
-                src={lightboxImage}
-                alt="Preview"
-                className="w-full h-full object-contain rounded-2xl shadow-2xl"
-              />
+              
+              <div className="w-full h-full relative overflow-hidden rounded-2xl shadow-2xl bg-white flex items-center justify-center">
+                <svg viewBox="0 0 1120 792" style={{ width: "100%", height: "auto" }}>
+                  <foreignObject width="1120" height="792">
+                    <CertificateTemplate 
+                      studentName="John Doe"
+                      internshipTitle="Frontend Developer Intern"
+                      companyName="Acme Corp"
+                      backgroundImageUrl={lightboxData.imageUrl}
+                      textColor={lightboxData.textColor}
+                      width={1120}
+                      height={792}
+                    />
+                  </foreignObject>
+                </svg>
+              </div>
             </motion.div>
           </motion.div>
         )}
@@ -554,6 +581,49 @@ const CustomInternshipCertificateManager = () => {
                         </label>
                       </div>
 
+                      {/* Text Color Picker */}
+                      <div>
+                        <label className="block text-[13px] font-bold text-slate-700 mb-3 flex items-center gap-1.5">
+                          <Palette size={16} className="text-indigo-500" />
+                          Certificate Text Color
+                        </label>
+                        <div className="flex flex-wrap gap-3 items-center">
+                          {colorOptions.map((color) => (
+                            <button
+                              key={color.value}
+                              type="button"
+                              onClick={() => setTextColor(color.value)}
+                              className={`relative w-10 h-10 rounded-full cursor-pointer transition-all ${
+                                textColor === color.value
+                                  ? "ring-2 ring-offset-2 ring-indigo-500 scale-110 shadow-md"
+                                  : "border border-slate-200 hover:scale-105"
+                              }`}
+                              style={{ backgroundColor: color.value }}
+                              title={color.label}
+                            >
+                              {textColor === color.value && (
+                                <CheckCircle2
+                                  size={16}
+                                  className="absolute inset-0 m-auto text-white drop-shadow-sm"
+                                />
+                              )}
+                            </button>
+                          ))}
+                          <div className="flex items-center gap-2 ml-2 pl-3 border-l border-slate-200">
+                            <span className="text-xs font-semibold text-slate-500">Custom:</span>
+                            <div className="relative">
+                              <input
+                                type="color"
+                                value={textColor}
+                                onChange={(e) => setTextColor(e.target.value)}
+                                className="w-10 h-10 p-1 bg-white border border-slate-200 rounded-lg cursor-pointer"
+                                title="Choose custom color"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
                       {/* Message */}
                       <AnimatePresence>
                         {message && (
@@ -608,15 +678,36 @@ const CustomInternshipCertificateManager = () => {
                     </div>
                     <div className="p-4 min-h-[240px] flex items-center justify-center bg-[#f8f9fb]">
                       {selectedImagePreview ? (
-                        <motion.img
-                          key={selectedImagePreview}
-                          initial={{ opacity: 0, scale: 0.95 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          src={selectedImagePreview}
-                          alt="Certificate Preview"
-                          className="max-w-full max-h-[280px] object-contain rounded-xl border border-slate-200 shadow-sm cursor-pointer"
-                          onClick={() => setLightboxImage(selectedImagePreview)}
-                        />
+                        <div 
+                          className="w-full relative shadow-lg rounded-xl overflow-hidden cursor-pointer hover:shadow-xl hover:ring-2 hover:ring-indigo-500/30 transition-all"
+                          style={{
+                            /* Aspect ratio of 1120/792 ~ 1.41 */
+                            aspectRatio: '1120 / 792',
+                            maxWidth: '100%',
+                          }}
+                          onClick={() => setLightboxData({ imageUrl: selectedImagePreview, textColor: textColor })}
+                        >
+                          {/* Use SVG foreignObject to responsively scale the original 1120x792 template into the container */}
+                          <svg viewBox="0 0 1120 792" style={{ width: "100%", height: "auto", display: "block" }}>
+                            <foreignObject width="1120" height="792">
+                              <CertificateTemplate 
+                                studentName="John Doe"
+                                internshipTitle="Frontend Developer Intern"
+                                companyName="Acme Corp"
+                                backgroundImageUrl={selectedImagePreview}
+                                textColor={textColor}
+                                width={1120}
+                                height={792}
+                              />
+                            </foreignObject>
+                          </svg>
+                          
+                          <div className="absolute inset-0 bg-black/0 hover:bg-black/5 transition-colors flex items-center justify-center opacity-0 hover:opacity-100 z-10">
+                            <span className="bg-white/90 backdrop-blur-sm text-slate-800 text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-sm">
+                              <Eye size={14} /> Enlarge Preview
+                            </span>
+                          </div>
+                        </div>
                       ) : (
                         <div className="text-center py-8">
                           <ImageIcon
@@ -786,7 +877,7 @@ const CustomInternshipCertificateManager = () => {
                         {/* Image */}
                         <div
                           className="h-48 bg-slate-50 overflow-hidden relative cursor-pointer"
-                          onClick={() => setLightboxImage(item.imageUrl)}
+                          onClick={() => setLightboxData({ imageUrl: item.imageUrl, textColor: item.textColor || "#1f2937" })}
                         >
                           <img
                             src={item.imageUrl}

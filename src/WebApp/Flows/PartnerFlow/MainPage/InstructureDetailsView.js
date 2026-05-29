@@ -15,7 +15,25 @@ import {
   faExclamationTriangle,
   faTrash,
   faExternalLinkAlt,
+  faCalendarAlt,
 } from "@fortawesome/free-solid-svg-icons";
+
+import FullCalendar from "@fullcalendar/react";
+import dayGridPlugin from "@fullcalendar/daygrid";
+import timeGridPlugin from "@fullcalendar/timegrid";
+import interactionPlugin from "@fullcalendar/interaction";
+
+const parseTimeFrontend = (timeStr) => {
+    if (!timeStr) return { h: 0, m: 0 };
+    const isPM = timeStr.toLowerCase().includes('pm');
+    const isAM = timeStr.toLowerCase().includes('am');
+    const cleanStr = timeStr.replace(/[^\d:]/g, '').trim();
+    let [h, m] = cleanStr.split(':').map(n => parseInt(n, 10) || 0);
+    
+    if (isPM && h !== 12) h += 12;
+    if (isAM && h === 12) h = 0;
+    return { h, m };
+};
 
 const getPartnerToken = () => {
   const direct =
@@ -84,7 +102,7 @@ const sectionThemes = {
       "text-xs font-bold text-amber-700 uppercase tracking-widest flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-gradient-to-r after:from-amber-300 after:via-orange-200 after:to-transparent",
     icon: "text-amber-500 text-[10px]",
   },
-  Assignment: {
+  "Instructor Timetable": {
     wrap:
       "rounded-3xl border border-slate-200/80 bg-gradient-to-br from-white via-rose-50/20 to-pink-50/30 p-5 shadow-sm shadow-slate-200/60",
     title:
@@ -187,8 +205,29 @@ export default function InstructureDetailsView({
 }) {
   const [confirmStage, setConfirmStage] = useState(0);
   const [deleting, setDeleting] = useState(false);
+  const [assignments, setAssignments] = useState([]);
+  const [loadingAssignments, setLoadingAssignments] = useState(false);
 
   const [portalTarget, setPortalTarget] = useState(null);
+
+  useEffect(() => {
+    if (open && item && (item._id || item.id)) {
+      const fetchAssignments = async () => {
+        try {
+          setLoadingAssignments(true);
+          const { data } = await axios.get(`/api/instructors/${item._id || item.id}/assignments`, { headers: authHeaders() });
+          setAssignments(data);
+        } catch (err) {
+          console.error("Failed to fetch assignments:", err);
+        } finally {
+          setLoadingAssignments(false);
+        }
+      };
+      fetchAssignments();
+    } else {
+      setAssignments([]);
+    }
+  }, [open, item]);
 
   useEffect(() => {
     if (open && (autoDeletePrompt || confirmOnly)) setConfirmStage(1);
@@ -488,9 +527,91 @@ export default function InstructureDetailsView({
                 />
               </FormSection>
 
-              {/* ── Assignment ── */}
-              <FormSection title="Assignment" icon={faClipboardList}>
-                <DetailField label="Assigned Internship" value={item.assignInternship} />
+              {/* ── Instructor Timetable ── */}
+              <FormSection title="Instructor Timetable" icon={faCalendarAlt}>
+                <div className="md:col-span-3 space-y-6">
+                  <label className={labelCls}>Assigned Schedule</label>
+                  {loadingAssignments ? (
+                    <div className="text-sm text-slate-500">Loading assignments...</div>
+                  ) : assignments.length > 0 ? (
+                    <>
+                      <div className="overflow-x-auto rounded-xl border border-slate-200">
+                      <table className="min-w-full text-sm text-left text-slate-600">
+                        <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
+                          <tr>
+                            <th className="px-4 py-3">Internship</th>
+                            <th className="px-4 py-3">Date</th>
+                            <th className="px-4 py-3">Time</th>
+                            <th className="px-4 py-3">Batch</th>
+                            <th className="px-4 py-3">Summary</th>
+                            <th className="px-4 py-3">Link</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200 bg-white/95">
+                          {assignments.map((a, i) => (
+                            <tr key={i} className="hover:bg-slate-50">
+                              <td className="px-4 py-3 whitespace-nowrap">{a.jobTitle || "—"}</td>
+                              <td className="px-4 py-3 whitespace-nowrap">{new Date(a.date).toLocaleDateString()}</td>
+                              <td className="px-4 py-3 whitespace-nowrap">{a.startTime} - {a.endTime}</td>
+                              <td className="px-4 py-3 whitespace-nowrap">{a.batch ? <span className="inline-flex items-center px-2 py-1 rounded-md text-[10px] font-semibold bg-indigo-50 text-indigo-600 border border-indigo-100">{a.batch}</span> : <span className="text-slate-400">Default</span>}</td>
+                              <td className="px-4 py-3">{a.sectionSummary || "-"}</td>
+                              <td className="px-4 py-3 whitespace-nowrap">{a.eventLink ? <StyledLink href={a.eventLink} external>Join</StyledLink> : "TBA"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    
+                    <div className="mt-8 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm p-4">
+                      <style>{`
+                        .fc-theme-standard .fc-scrollgrid { border-color: #e2e8f0; }
+                        .fc-theme-standard th { border-color: #e2e8f0; padding: 8px 0; background-color: #f8fafc; font-weight: 600; color: #334155; }
+                        .fc-theme-standard td { border-color: #e2e8f0; }
+                        .fc-event { cursor: pointer; border-radius: 4px; padding: 2px 4px; border: none; background-color: #4f46e5; color: white; font-size: 11px; }
+                        .fc-event:hover { background-color: #4338ca; }
+                        .fc .fc-toolbar-title { font-size: 1.1rem; font-weight: 700; color: #1e293b; }
+                        .fc .fc-button-primary { background-color: #fff; color: #475569; border-color: #cbd5e1; text-transform: capitalize; }
+                        .fc .fc-button-primary:hover { background-color: #f1f5f9; color: #0f172a; border-color: #94a3b8; }
+                        .fc .fc-button-primary:not(:disabled).fc-button-active, .fc .fc-button-primary:not(:disabled):active { background-color: #f1f5f9; color: #0f172a; border-color: #94a3b8; }
+                        .fc .fc-today-button { background-color: #f8fafc; }
+                      `}</style>
+                      <FullCalendar
+                        plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+                        initialView="dayGridMonth"
+                        headerToolbar={{
+                          left: 'prev,next today',
+                          center: 'title',
+                          right: 'dayGridMonth,timeGridWeek,timeGridDay'
+                        }}
+                        height="auto"
+                        contentHeight={500}
+                        events={assignments.map(a => {
+                          const startT = parseTimeFrontend(a.startTime);
+                          const endT = parseTimeFrontend(a.endTime);
+                          const startDate = new Date(a.date);
+                          startDate.setHours(startT.h, startT.m, 0, 0);
+                          const endDate = new Date(a.date);
+                          endDate.setHours(endT.h, endT.m, 0, 0);
+                          return {
+                            title: `${a.batch ? `[${a.batch}] ` : ''}${a.sectionSummary || 'Session'}`,
+                            start: startDate,
+                            end: endDate,
+                            url: a.eventLink || undefined
+                          };
+                        })}
+                        eventClick={(info) => {
+                          if (info.event.url) {
+                            info.jsEvent.preventDefault();
+                            window.open(info.event.url, "_blank");
+                          }
+                        }}
+                      />
+                    </div>
+                  </>
+                  ) : (
+                    <div className="text-sm text-slate-500 italic">No assigned sessions currently.</div>
+                  )}
+                </div>
                 <DetailField label="Notes" value={item.notes} span={3} />
               </FormSection>
             </div>

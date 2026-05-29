@@ -26,9 +26,29 @@ export default function InternshipScheduleViewer({
 
     const [selectedLocation, setSelectedLocation] = useState(null);
     const [selectedSummary, setSelectedSummary] = useState(null);
+    const [activeBatchTab, setActiveBatchTab] = useState('');
 
     const scrollContainerRef = useRef(null);
     const rowRefs = useRef({});
+
+    // Set active tab when schedule loads
+    useEffect(() => {
+        if (schedule?.batches?.length > 0 && !activeBatchTab) {
+            setActiveBatchTab(schedule.batches[0].timeSlot);
+        }
+    }, [schedule, activeBatchTab]);
+
+    const displayTimetable = React.useMemo(() => {
+        if (!schedule) return [];
+        if (Array.isArray(schedule.batches) && schedule.batches.length > 0) {
+            const batch = schedule.batches.find(b => b.timeSlot === activeBatchTab);
+            return batch ? batch.timetable : (schedule.batches[0]?.timetable || []);
+        }
+        if (Array.isArray(schedule.timetable)) {
+            return schedule.timetable;
+        }
+        return [];
+    }, [schedule, activeBatchTab]);
 
     // Fetch schedule when opened
     useEffect(() => {
@@ -77,9 +97,9 @@ export default function InternshipScheduleViewer({
 
     // Scroll to today's session
     useEffect(() => {
-        if (!isOpen || !schedule?.timetable?.length) return;
+        if (!isOpen || displayTimetable.length === 0) return;
 
-        const today = schedule.timetable.find((s) => {
+        const today = displayTimetable.find((s) => {
             const d = parseISO(s.date);
             return isValid(d) && isToday(d);
         });
@@ -117,7 +137,7 @@ export default function InternshipScheduleViewer({
                 {/* Summary cards */}
                 <div className="mt-2">
                     <div className="sticky top-0 z-10 bg-white pt-2 pb-4">
-                        {Array.isArray(schedule?.timetable) && schedule.timetable.length > 0 &&
+                        {displayTimetable.length > 0 &&
                             schedule?.startDate && schedule?.endDate && schedule?.workHours && (
                                 <div className="grid grid-cols-3 gap-4 text-center">
                                     <div className="bg-gray-50 border border-gray-200 rounded-md p-3 flex flex-col items-center justify-center">
@@ -164,10 +184,29 @@ export default function InternshipScheduleViewer({
 
                 {/* Table */}
                 {!loading && !error && (
-                    <div
-                        ref={scrollContainerRef}
-                        className="mt-4 max-h-[65vh] overflow-auto relative"
-                    >
+                    <div className="mt-4">
+                        {Array.isArray(schedule?.batches) && schedule.batches.length > 0 && (
+                            <div className="flex overflow-x-auto gap-2 mb-2 pb-2 border-b border-gray-200">
+                                {schedule.batches.map(batch => (
+                                    <button
+                                        key={batch.timeSlot}
+                                        type="button"
+                                        onClick={() => setActiveBatchTab(batch.timeSlot)}
+                                        className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors whitespace-nowrap ${
+                                            activeBatchTab === batch.timeSlot
+                                                ? 'bg-indigo-100 text-indigo-700 border-b-2 border-indigo-600'
+                                                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                                        }`}
+                                    >
+                                        Batch: {batch.timeSlot}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                        <div
+                            ref={scrollContainerRef}
+                            className="max-h-[65vh] overflow-auto relative"
+                        >
                         <table className="min-w-full bg-white rounded-lg">
                             <thead className="bg-indigo-50 border-b border-indigo-200 sticky top-0 z-10">
                                 <tr>
@@ -192,9 +231,8 @@ export default function InternshipScheduleViewer({
                                 </tr>
                             </thead>
                             <tbody>
-                                {Array.isArray(schedule?.timetable) &&
-                                    schedule.timetable.length > 0 ? (
-                                    schedule.timetable.map((session, idx) => {
+                                {displayTimetable.length > 0 ? (
+                                    displayTimetable.map((session, idx) => {
                                         const sessionDate = parseISO(session.date);
                                         const isTodayRow =
                                             isValid(sessionDate) && isToday(sessionDate);
@@ -332,6 +370,7 @@ export default function InternshipScheduleViewer({
                                 )}
                             </tbody>
                         </table>
+                        </div>
                     </div>
                 )}
 

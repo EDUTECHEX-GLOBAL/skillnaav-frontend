@@ -100,7 +100,7 @@ const PartnerSignUpFlow = () => {
       });
 
       if (check.data.exists) {
-        setErrorMessage("Partner already registered.");
+        setErrorMessage(check.data.message || "Partner already registered.");
         setSubmitting(false);
         return;
       }

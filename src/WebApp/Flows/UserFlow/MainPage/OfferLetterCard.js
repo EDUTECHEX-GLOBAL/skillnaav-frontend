@@ -5,9 +5,6 @@ import React, { useCallback, useEffect, useState, useRef } from "react";
 import axios from "../../../../api/axiosInstance";
 import { toast } from "react-toastify";
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
-import CertificateTemplate from "./CertificateTemplate";
 // env-backed bases (correct relative path)
 import { API_BASE, GOOGLE_AUTH_URL } from "../../../../config";
 import CalendarSyncStatus from "./calendarsyncstatus";
@@ -604,10 +601,17 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
 
 
   useEffect(() => {
-    if (showScheduleModal && schedule?.timetable?.length > 0) {
-      const todaySession = schedule.timetable.find((session) =>
-        isToday(parseISO(session.date))
-      );
+    if (showScheduleModal) {
+      let displayTimetable = schedule?.timetable || [];
+      if (job?.internshipType === "PAID" && Array.isArray(schedule?.batches) && schedule.batches.length > 0) {
+          const matchedBatch = schedule.batches.find(b => b.timeSlot === preferredSlotLocal);
+          if (matchedBatch) displayTimetable = matchedBatch.timetable || [];
+      }
+      
+      if (displayTimetable.length > 0) {
+        const todaySession = displayTimetable.find((session) =>
+          isToday(parseISO(session.date))
+        );
 
       if (todaySession) {
         const refKey = `${todaySession.date}-${todaySession.startTime}`;
@@ -620,7 +624,8 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
         }
       }
     }
-  }, [showScheduleModal, schedule]);
+  }
+  }, [showScheduleModal, schedule, job, preferredSlotLocal]);
 
   // 3. UPDATE handleRespond logic
   // OfferLetterCard.jsx (Inside handleRespond function)
@@ -633,21 +638,17 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
       return;
     }
 
-    // ✅ PAID internship → keep existing paid flow (payment → confirmation → time-slot)
+    // ✅ PAID internship → show payment modal if not paid
     if (job?.internshipType === "PAID") {
       if (!paymentStatus?.paid) {
         setShowPaymentModal(true);
         return;
       }
-
-      // Paid & already paid → show confirmation modal → then time slot modal
-      setResponseType(type);
-      setShowModal(true);
-      return;
     }
 
-    // ✅ FREE + STIPEND → Accept should directly open schedule (no confirmation/time-slot)
-    acceptAndOpenSchedule();
+    // For PAID (if already paid), FREE, and STIPEND -> show confirmation modal!
+    setResponseType(type);
+    setShowModal(true);
   };
 
   const normalizeUrl = (url) => {
@@ -737,7 +738,13 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
         return;
       }
 
-      // ✅ FREE/STIPEND fallback (shouldn't normally hit now, but safe)
+      // ✅ For STIPEND internships, show Stipend Details modal if not yet submitted
+      if (job?.internshipType === "STIPEND" && !stipendDetailsSubmitted) {
+        setShowStipendModal(true);
+        return;
+      }
+
+      // ✅ FREE fallback (and STIPEND if details already submitted)
       acceptAndOpenSchedule();
       return;
     }
@@ -857,7 +864,12 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
     setSyncSummary({ created: 0, updated: 0, deleted: 0 });
     setSyncPhase('starting');
     setSyncModalOpen(true);
-    setSyncTotal(Array.isArray(schedule?.timetable) ? schedule.timetable.length : 0);
+    let syncTimetable = schedule?.timetable || [];
+    if (job?.internshipType === "PAID" && Array.isArray(schedule?.batches) && schedule.batches.length > 0) {
+        const matchedBatch = schedule.batches.find(b => b.timeSlot === preferredSlotLocal);
+        if (matchedBatch) syncTimetable = matchedBatch.timetable || [];
+    }
+    setSyncTotal(Array.isArray(syncTimetable) ? syncTimetable.length : 0);
 
     setLoading(true); // keep existing loading toggles (won't change button label below)
     try {
@@ -925,101 +937,6 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
     }
   };
 
-  const handleDownloadCertificate = async () => {
-    let container = null;
-    let reactDom = null;
-    try {
-      let latestSchedule = schedule;
-
-      if (resolvePartnerId() && offer?.internshipId) {
-        setLoading(true);
-        try {
-          latestSchedule = await fetchInternshipSchedule();
-        } finally {
-          setLoading(false);
-        }
-      }
-
-      // 🔒 Gate: partner must close the schedule first
-      if (!latestSchedule?.isClosed) {
-        setShowCompleteNotice(true);
-        return;
-      }
-
-      let backgroundImageUrl = latestSchedule?.selectedCertificateTemplate?.imageUrl || "";
-      let certificateSize = DEFAULT_CERTIFICATE_SIZE;
-
-      if (backgroundImageUrl) {
-        try {
-          const dimensions = await loadImageDimensions(backgroundImageUrl);
-          certificateSize = getCertificateRenderSize(dimensions);
-        } catch (imageError) {
-          console.error("Failed to load certificate template image:", imageError);
-          backgroundImageUrl = "";
-        }
-      }
-
-      // Create hidden container for rendering certificate
-      container = document.createElement("div");
-      container.style.position = "fixed";
-      container.style.left = "-10000px";
-      container.style.top = "0";
-      container.style.zIndex = "-1";
-      document.body.appendChild(container);
-
-      // Render the CertificateTemplate inside container
-      const element = (
-        <CertificateTemplate
-          studentName={userInfo?.name || "Student"}
-          backgroundImageUrl={backgroundImageUrl}
-          width={certificateSize.width}
-          height={certificateSize.height}
-        />
-      );
-
-      // Dynamically import ReactDOM and render → capture → PDF
-      const reactDomModule = await import("react-dom");
-      reactDom = reactDomModule.default || reactDomModule;
-
-      await new Promise((resolve) => {
-        reactDom.render(element, container, resolve);
-      });
-
-      await waitForCertificateImages(container);
-
-      const certificateNode = container.querySelector("#certificate-content");
-      if (!certificateNode) {
-        throw new Error("Certificate content not found");
-      }
-
-      const canvas = await html2canvas(certificateNode, {
-        useCORS: true,
-        scale: 2,
-        backgroundColor: "#ffffff",
-      });
-      const imgData = canvas.toDataURL("image/png");
-
-      const pdf = new jsPDF({
-        orientation: canvas.width >= canvas.height ? "landscape" : "portrait",
-        unit: "pt",
-        format: [certificateSize.width, certificateSize.height],
-      });
-
-      pdf.addImage(imgData, "PNG", 0, 0, certificateSize.width, certificateSize.height);
-      pdf.save("Internship_Certificate.pdf");
-    } catch (err) {
-      console.error("Certificate generation failed:", err);
-      toast.error("Failed to generate certificate.");
-    } finally {
-      setLoading(false);
-      if (reactDom && container) {
-        reactDom.unmountComponentAtNode(container);
-      }
-      if (container?.parentNode) {
-        container.parentNode.removeChild(container);
-      }
-    }
-  };
 
   // ─── 3) Render the schedule with table + per‐row Google Calendar links ─
   const renderSchedule = () => {
@@ -1080,19 +997,27 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
                 </tr>
               </thead>
               <tbody>
-                {Array.isArray(schedule?.timetable) && schedule.timetable.length > 0 ? (
-                  schedule.timetable.map((session, idx) => {
-                    const sessionDate = parseISO(session.date);
-                    const isTodaySession = isValid(sessionDate) && isToday(sessionDate);
-                    const rowRefKey = `${session.date}-${session.startTime}`;
+                {(() => {
+                  let displayTimetable = Array.isArray(schedule?.timetable) ? schedule.timetable : [];
+                  
+                  // Use batch-specific timetable for PAID internships if available
+                  if (job?.internshipType === "PAID" && Array.isArray(schedule?.batches) && schedule.batches.length > 0) {
+                      const savedPreferredSlot = preferredSlotLocal;
+                      if (savedPreferredSlot) {
+                          const matchedBatch = schedule.batches.find(b => b.timeSlot === savedPreferredSlot);
+                          if (matchedBatch && Array.isArray(matchedBatch.timetable)) {
+                              displayTimetable = matchedBatch.timetable;
+                          }
+                      }
+                  }
 
-                    // ✅ For PAID internships, show student's preferred time slot immediately (local state)
-                    const savedPreferredSlot = preferredSlotLocal;
+                  return displayTimetable.length > 0 ? (
+                    displayTimetable.map((session, idx) => {
+                      const sessionDate = parseISO(session.date);
+                      const isTodaySession = isValid(sessionDate) && isToday(sessionDate);
+                      const rowRefKey = `${session.date}-${session.startTime}`;
 
-                    const displayTime =
-                      job?.internshipType === "PAID" && savedPreferredSlot
-                        ? savedPreferredSlot
-                        : `${session.startTime} - ${session.endTime}`;
+                      const displayTime = `${session.startTime} - ${session.endTime}`;
 
                     if (isTodaySession) {
                       rowRefs.current[rowRefKey] = React.createRef();
@@ -1210,7 +1135,8 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
                       Internship schedule coming soon.
                     </td>
                   </tr>
-                )}
+                );
+                })()}
               </tbody>
             </table>
           </div>
@@ -1871,18 +1797,7 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
                 </button>
               </div>
 
-              <div className="flex justify-center">
-                <button
-                  onClick={handleDownloadCertificate}
-                  className={`flex items-center text-sm font-medium ${schedule?.isClosed
-                    ? "text-cyan-600 hover:text-cyan-700"
-                    : "text-gray-500 hover:text-gray-600"
-                    }`}
-                >
-                  <FontAwesomeIcon icon={faDownload} className="mr-2" />
-                  Download Certificate
-                </button>
-              </div>
+
             </div>
           ) : (
             <div className="bg-yellow-100 text-yellow-800 px-4 py-2 rounded-lg text-sm font-medium">

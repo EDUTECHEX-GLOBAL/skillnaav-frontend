@@ -114,6 +114,11 @@ const InternshipList = () => {
   const [selectedInternshipForView, setSelectedInternshipForView] = useState(null);
   const [timeSlotsModal, setTimeSlotsModal] = useState({ open: false, internshipId: null });
 
+  // ─── Filter state ────────────────────────────────────────────────────────────
+  const [filterType, setFilterType] = useState("All Types");
+  const [filterMode, setFilterMode] = useState("All Modes");
+  const [filterLevel, setFilterLevel] = useState("All Levels");
+
   // ─── Fetch internships ───────────────────────────────────────────────────────
   const fetchInternships = useCallback(async (pid, pageNum = 1, query = "", isInitialLoad = false) => {
     if (!pid) return;
@@ -253,6 +258,21 @@ const InternshipList = () => {
   };
 
   const toggleApplicationOpen = async (internshipId, newStatus) => {
+    const internship = internships.find((i) => i._id === internshipId);
+    if (internship && internship.isScheduleClosed && newStatus === true) {
+      setCloseScheduleModal({
+        ...getDefaultCloseScheduleModalState(),
+        open: true,
+        internshipId: null,
+        title: "Schedule Is Closed",
+        message: "Cannot open applications because the internship schedule is already closed.",
+        confirmLabel: "Yes",
+        cancelLabel: "OK",
+        hideConfirm: true,
+      });
+      return;
+    }
+
     try {
       setInternships((prev) =>
         prev.map((i) => i._id === internshipId ? { ...i, applicationOpen: newStatus } : i)
@@ -457,6 +477,19 @@ const InternshipList = () => {
     });
   };
 
+  const openCloseApplicationsRequiredPopup = () => {
+    setCloseScheduleModal({
+      ...getDefaultCloseScheduleModalState(),
+      open: true,
+      internshipId: null,
+      title: "Applications Are Still Open",
+      message: "Please close the applications (toggle set to Closed) before you can close the schedule.",
+      confirmLabel: "Yes",
+      cancelLabel: "OK",
+      hideConfirm: true,
+    });
+  };
+
   const handleCloseScheduleModalCancel = () => {
     resetCloseScheduleModal();
   };
@@ -533,6 +566,12 @@ const InternshipList = () => {
       return;
     }
 
+    const internship = internships.find((i) => i._id === internshipId);
+    if (internship && internship.applicationOpen) {
+      openCloseApplicationsRequiredPopup();
+      return;
+    }
+
     try {
       const response = await axios.get('/api/schedule/get-schedule', {
         params: { internshipId, partnerId },
@@ -545,7 +584,8 @@ const InternshipList = () => {
       }
 
       const hasCreatedSchedule =
-        Array.isArray(response.data?.timetable) && response.data.timetable.length > 0;
+        (Array.isArray(response.data?.timetable) && response.data.timetable.length > 0) ||
+        (Array.isArray(response.data?.batches) && response.data.batches.length > 0);
 
       if (!hasCreatedSchedule) {
         openCreateScheduleRequiredPopup();
@@ -865,6 +905,20 @@ const InternshipList = () => {
     </div>
   );
 
+  // ─── Filtered internships (client-side: Type, Mode, Level) ──────────────────
+  const filteredInternships = internships.filter((internship) => {
+    const matchType =
+      filterType === "All Types" ||
+      (internship.internshipType || "").toUpperCase() === filterType.toUpperCase();
+    const matchMode =
+      filterMode === "All Modes" ||
+      (internship.internshipMode || "").toLowerCase() === filterMode.toLowerCase();
+    const matchLevel =
+      filterLevel === "All Levels" ||
+      (internship.classification || "").toLowerCase() === filterLevel.toLowerCase();
+    return matchType && matchMode && matchLevel;
+  });
+
   // ─── Loading / error ─────────────────────────────────────────────────────────
   if (loading)
     return (
@@ -963,8 +1017,51 @@ const InternshipList = () => {
         </div>
       </div>
 
+      {/* ── Filters: Type / Mode / Level ── */}
+      <div className="grid grid-cols-3 gap-3 mb-5">
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-gray-500">Type</label>
+          <select
+            value={filterType}
+            onChange={(e) => setFilterType(e.target.value)}
+            className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition cursor-pointer"
+          >
+            <option>All Types</option>
+            <option>Free</option>
+            <option>Stipend</option>
+            <option>Paid</option>
+          </select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-gray-500">Mode</label>
+          <select
+            value={filterMode}
+            onChange={(e) => setFilterMode(e.target.value)}
+            className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition cursor-pointer"
+          >
+            <option>All Modes</option>
+            <option>Online</option>
+            <option>Offline</option>
+            <option>Hybrid</option>
+          </select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-gray-500">Level</label>
+          <select
+            value={filterLevel}
+            onChange={(e) => setFilterLevel(e.target.value)}
+            className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition cursor-pointer"
+          >
+            <option>All Levels</option>
+            <option>Basic</option>
+            <option>Intermediate</option>
+            <option>Advanced</option>
+          </select>
+        </div>
+      </div>
+
       {/* ── Cards ── */}
-      {internships.length === 0 ? (
+      {filteredInternships.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-gray-400 gap-3">
           <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center">
             <FontAwesomeIcon icon={faBriefcase} className="text-2xl text-gray-300" />
@@ -974,7 +1071,7 @@ const InternshipList = () => {
         </div>
       ) : (
         <div className="space-y-4">
-          {internships.map((internship) => {
+          {filteredInternships.map((internship) => {
             const compensationText =
               internship.internshipType === "STIPEND"
                 ? `${internship.compensationDetails?.amount} ${internship.compensationDetails?.currency} / ${internship.compensationDetails?.frequency?.toLowerCase()}`

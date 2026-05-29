@@ -311,7 +311,7 @@ const UnifiedUserRegistration = () => {
       // Check email existence
       const checkRes = await axios.get(`/api/users/check-email?email=${formData.email}`);
       if (checkRes.data.exists) {
-        setErrorMessage("Email already registered.");
+        setErrorMessage(checkRes.data.message || "Email already registered.");
         return;
       }
 
@@ -323,7 +323,7 @@ const UnifiedUserRegistration = () => {
       setResendTimer(30);
       setCanResend(false);
     } catch (error) {
-      setErrorMessage("Failed to send OTP. Try again.");
+      setErrorMessage(error.response?.data?.message || "Failed to send OTP. Try again.");
     }
   };
 
@@ -1054,6 +1054,7 @@ const UnifiedUserRegistration = () => {
             open={showAgeGateModal}
             saving={savingConsent}
             onComplete={handleAgeGateComplete}
+            userEmail={formData.email}
           />
 
           {(currentStep === 1 || currentStep === 1.5) && (
@@ -1085,7 +1086,7 @@ const UnifiedUserRegistration = () => {
 
                   } catch (error) {
                     console.error(error);
-                    setErrorMessage("Google Sign-In failed.");
+                    setErrorMessage(error.response?.data?.message || "Google Sign-In failed.");
                   }
                 }}
               />

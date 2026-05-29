@@ -21,7 +21,6 @@ const Navbar = ({ onToggleSidebar }) => {
 
   const { openFeedback } = useFeedback();
 
-  // ─── Helper: read userInfo from localStorage into state ───
   const syncUserInfoFromStorage = () => {
     const rawUserInfo = localStorage.getItem("userInfo");
     if (!rawUserInfo) return;
@@ -43,18 +42,14 @@ const Navbar = ({ onToggleSidebar }) => {
   useEffect(() => {
     syncUserInfoFromStorage();
 
-    // ✅ Listen for both custom event (premium upgrade) and native storage event (profile update)
     window.addEventListener("userInfoUpdated", syncUserInfoFromStorage);
-    window.addEventListener("storage", syncUserInfoFromStorage);  // ✅ FIX: was missing — ProfileForm dispatches "storage" but Navbar only listened for "userInfoUpdated"
+    window.addEventListener("storage", syncUserInfoFromStorage);
     return () => {
       window.removeEventListener("userInfoUpdated", syncUserInfoFromStorage);
       window.removeEventListener("storage", syncUserInfoFromStorage);
     };
   }, []);
 
-  // ✅ FIX: Separated userId into its own variable to stabilise the dependency
-  //    Previously `userInfo._id` could be undefined on first render, causing the
-  //    effect to silently skip and never re-run even after userInfo loaded.
   const userId = userInfo?._id;
 
   useEffect(() => {
@@ -73,7 +68,7 @@ const Navbar = ({ onToggleSidebar }) => {
     };
 
     fetchNotifications();
-  }, [userId]); // ✅ FIX: was [userInfo._id] which throws if userInfo is {} on mount
+  }, [userId]);
 
   const handleUserClick = () => setIsDropdownOpen((prev) => !prev);
 
@@ -89,7 +84,6 @@ const Navbar = ({ onToggleSidebar }) => {
 
     if (!oneMinutePassed) return performLogout();
 
-    // ✅ FIX: Guard against stale/corrupt JSON in localStorage
     let sessionUser = null;
     try {
       sessionUser = JSON.parse(localStorage.getItem("userInfo")) || null;
@@ -153,25 +147,40 @@ const Navbar = ({ onToggleSidebar }) => {
     <div className="bg-white font-poppins border-b border-gray-200 sticky top-0 z-50 w-full">
       <div className="flex items-center justify-between px-4 sm:px-6 py-4">
         <div className="flex items-center space-x-4">
-        <button onClick={onToggleSidebar} className="text-gray-700 md:hidden">
-  <FontAwesomeIcon icon={faBars} className="text-xl" />
-</button>
+          <button onClick={onToggleSidebar} className="text-gray-700 md:hidden">
+            <FontAwesomeIcon icon={faBars} className="text-xl" />
+          </button>
           <img src={logo} alt="Skillnaav Logo" className="h-10" />
         </div>
 
         <div className="relative flex items-center space-x-5">
-          <div
-            className="relative cursor-pointer group"
-            onClick={() => handleSelectTab("notifications")}
-          >
-            <FontAwesomeIcon icon={faBell} className="w-5 h-5 text-gray-700 hover:text-purple-600" />
-            {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded-full">
-                {unreadCount}
-              </span>
-            )}
+
+          {/* 1st — Bell */}
+          <div className="relative">
+            <button
+              onClick={() => handleSelectTab("notifications")}
+              className="relative focus:outline-none w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 border border-gray-200 transition"
+              aria-label="Open notifications"
+            >
+              <FontAwesomeIcon icon={faBell} className="w-4 h-4 text-gray-600" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 rounded-full bg-red-600 text-white text-[11px] font-bold flex items-center justify-center border-2 border-white">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
+            </button>
           </div>
 
+          {/* 2nd — Name + Plan */}
+          <div className="hidden sm:flex flex-col items-start">
+            <span className="text-gray-800 text-sm font-semibold">{userInfo.name}</span>
+            <span className={`text-xs font-semibold rounded-full px-2 py-0.5 mt-1 flex items-center gap-1 ${planStyles[planType] || planStyles["Free"]}`}>
+              <FontAwesomeIcon icon={faCrown} className="text-[10px]" />
+              {planType}
+            </span>
+          </div>
+
+          {/* 3rd — Profile Image */}
           <div className="relative" onClick={handleUserClick}>
             {userInfo.profileImage ? (
               <img
@@ -182,14 +191,6 @@ const Navbar = ({ onToggleSidebar }) => {
             ) : (
               <FontAwesomeIcon icon={faUser} className="w-8 h-8 text-gray-800 cursor-pointer" />
             )}
-          </div>
-
-          <div className="hidden sm:flex flex-col items-start">
-            <span className="text-gray-800 text-sm font-semibold">{userInfo.name}</span>
-            <span className={`text-xs font-semibold rounded-full px-2 py-0.5 mt-1 flex items-center gap-1 ${planStyles[planType] || planStyles["Free"]}`}>
-              <FontAwesomeIcon icon={faCrown} className="text-[10px]" />
-              {planType}
-            </span>
           </div>
 
           {isDropdownOpen && (
@@ -217,6 +218,7 @@ const Navbar = ({ onToggleSidebar }) => {
               </button>
             </div>
           )}
+
         </div>
       </div>
     </div>

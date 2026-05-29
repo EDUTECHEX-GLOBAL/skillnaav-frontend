@@ -43,9 +43,27 @@ const SchoolAdminProfileForm = () => {
     };
 
     try {
-      await axios.post("/api/school-admin/register", combinedData);
-      alert("Registration submitted successfully!");
-      navigate("/schooladmin/login");
+      if (initialRegisterData.isGoogleUser) {
+        const token = localStorage.getItem("schoolAdminToken");
+        const { data } = await axios.put("/api/school-admin/update-profile", combinedData, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+        
+        if (!data.admin.isApproved) {
+          alert("Profile completed successfully! Your account is pending administrator approval.");
+          localStorage.clear();
+          navigate("/schooladmin/login");
+        } else {
+          alert("Profile completed successfully!");
+          navigate("/schooladmin/dashboard");
+        }
+      } else {
+        await axios.post("/api/school-admin/register", combinedData);
+        alert("Registration submitted successfully!");
+        navigate("/schooladmin/login");
+      }
     } catch (error) {
       const message = error.response?.data?.message || "Registration failed.";
       console.error("Error submitting profile:", error);
@@ -258,11 +276,17 @@ const SchoolAdminProfileForm = () => {
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">Contact Phone</label>
               <input
-                type="text"
+                type="tel"
                 name="contactPhone"
                 placeholder="Contact Phone"
                 value={formData.contactPhone}
-                onChange={handleChange}
+                onChange={(e) => {
+                  const numericOnly = e.target.value.replace(/\D/g, "");
+                  setFormData({ ...formData, contactPhone: numericOnly });
+                }}
+                inputMode="numeric"
+                pattern="[0-9]*"
+                title="Please enter numbers only"
                 className="w-full p-3 border border-gray-300 rounded-md"
                 required
               />

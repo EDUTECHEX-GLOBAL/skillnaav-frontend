@@ -1,8 +1,10 @@
 // frontend/src/WebApp/Flows/PartnerFlow/MainPage/Navbar.jsx
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faUser, faSignOutAlt, faBars } from "@fortawesome/free-solid-svg-icons";
+import { faSignOutAlt, faBars, faBell } from "@fortawesome/free-solid-svg-icons";
 import logo from "../../../../assets-webapp/Skillnaav-logo.png";
+import defaultCompanyLogo from "../../../../assets/default-company-logo.png";
+
 import { useTabContext } from "./UserHomePageContext/HomePageContext";
 import { useNavigate } from "react-router-dom";
 import axios from "../../../../api/axiosInstance";
@@ -13,13 +15,46 @@ import { useFeedback } from "../../../../context/FeedbackContext";
 import { partnerFlowQuestions } from "../../../../components/FeedbackModal/questionSets";
 
 const Navbar = ({ onToggleSidebar }) => {
-  useTabContext();
+  const { handleSelectTab } = useTabContext();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [unreadSummary, setUnreadSummary] = useState({ totalUnread: 0, conversations: [] });
   const [userInfo, setUserInfo] = useState({ name: "", email: "", planType: "", profileImage: "" });
   const dropdownRef = useRef(null);
+  const notificationsRef = useRef(null);
   const navigate = useNavigate();
 
   const { openFeedback } = useFeedback();
+
+  const getPartnerId = useCallback(() => {
+    const direct = localStorage.getItem("partnerId") || localStorage.getItem("partner_id");
+    if (direct) return direct;
+
+    for (const key of ["userInfo", "partnerInfo", "partner", "user"]) {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(key) || "null");
+        const id = parsed?._id || parsed?.id || parsed?.partnerId;
+        if (id) return id;
+      } catch (_) {}
+    }
+
+    return null;
+  }, []);
+
+  const fetchUnreadSummary = useCallback(async () => {
+    const partnerId = getPartnerId();
+    if (!partnerId) return;
+
+    try {
+      const { data } = await axios.get(`/api/chats/unread/partner/${partnerId}`);
+      setUnreadSummary({
+        totalUnread: data?.totalUnread || 0,
+        conversations: data?.conversations || [],
+      });
+    } catch (err) {
+      console.error("fetchPartnerUnreadSummary:", err);
+    }
+  }, [getPartnerId]);
 
   // Read from localStorage on mount
   useEffect(() => {
@@ -36,7 +71,7 @@ const Navbar = ({ onToggleSidebar }) => {
   // Fetch premium status from backend and sync localStorage & state
   const fetchPremiumStatus = useCallback(async () => {
     try {
-      // ✅ FIX 1: Login saves the token under the key "token" (plain string, no JSON).
+      // Login saves the token under the key "token" (plain string, no JSON).
       // The previous code used JSON.parse(localStorage.getItem("userToken")) which
       // (a) read the wrong key "userToken" and (b) unnecessarily JSON-parsed a plain string.
       const token = localStorage.getItem("token");
@@ -73,8 +108,12 @@ const Navbar = ({ onToggleSidebar }) => {
   // Sync on mount, on tab focus, on localStorage change, and on custom partnerUpdated events
   useEffect(() => {
     fetchPremiumStatus();
+    fetchUnreadSummary();
 
-    const onFocus = () => fetchPremiumStatus();
+    const onFocus = () => {
+      fetchPremiumStatus();
+      fetchUnreadSummary();
+    };
     window.addEventListener("focus", onFocus);
 
     const onStorage = (e) => {
@@ -101,14 +140,11 @@ const Navbar = ({ onToggleSidebar }) => {
       window.removeEventListener("storage", onStorage);
       window.removeEventListener("partnerUpdated", onPartnerUpdatedEvent);
     };
-  }, [fetchPremiumStatus]);
+  }, [fetchPremiumStatus, fetchUnreadSummary]);
 
-  // ─── Real-time partner update listener (Socket.IO) ────────────────────────
+  // Real-time partner update listener (Socket.IO)
   useEffect(() => {
-    const stored = (() => {
-      try { return JSON.parse(localStorage.getItem("userInfo")); } catch { return null; }
-    })();
-    const partnerId = stored?._id;
+    const partnerId = getPartnerId();
     if (!partnerId) return;
 
     const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || "http://localhost:5000";
@@ -140,22 +176,52 @@ const Navbar = ({ onToggleSidebar }) => {
       }
     };
 
+    const onUnreadUpdated = (payload) => {
+      setUnreadSummary({
+        totalUnread: payload?.totalUnread || 0,
+        conversations: payload?.conversations || [],
+      });
+    };
+
     socket.on("connect", handleConnect);
     socket.on("partner:updated", onPartnerUpdated);
+    socket.on("chatUnreadUpdated", onUnreadUpdated);
 
     return () => {
       socket.off("connect", handleConnect);
       socket.off("partner:updated", onPartnerUpdated);
+      socket.off("chatUnreadUpdated", onUnreadUpdated);
       socket.disconnect();
     };
-  }, []);
+  }, [getPartnerId]);
+
+  const openMessageChat = (conversation) => {
+    const internshipId = conversation?.internshipId || conversation?.internship?._id;
+    if (!internshipId) return;
+
+    sessionStorage.setItem("partnerOpenChatInternshipId", internshipId);
+    setNotificationsOpen(false);
+    handleSelectTab("messages");
+    navigate("/partner-main-page/messages");
+    window.dispatchEvent(new CustomEvent("partnerOpenInternshipChat", { detail: { internshipId } }));
+  };
+
+  const formatNotificationTime = (value) => {
+    if (!value) return "";
+    return new Date(value).toLocaleString([], {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
 
   const handleUserClick = () => setIsDropdownOpen((prev) => !prev);
 
-  // Actual logout — clears session and navigates away
+  // Actual logout clears session and navigates away
   const performLogout = async () => {
     const sessionId = localStorage.getItem("sessionId");
-    // ✅ FIX 2: Read token from the correct key "token" (plain string)
+    // Read token from the correct key "token" (plain string)
     const token = localStorage.getItem("token");
 
     if (sessionId && token) {
@@ -172,7 +238,7 @@ const Navbar = ({ onToggleSidebar }) => {
     }
 
     try {
-      // ✅ FIX 3: Remove "token" (the key Login actually writes), not the non-existent "userToken"
+      // Remove "token" (the key Login actually writes), not the non-existent "userToken"
       localStorage.removeItem("token");
       localStorage.removeItem("sessionId");
       localStorage.removeItem("userInfo");
@@ -239,6 +305,9 @@ const Navbar = ({ onToggleSidebar }) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setIsDropdownOpen(false);
       }
+      if (notificationsRef.current && !notificationsRef.current.contains(event.target)) {
+        setNotificationsOpen(false);
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -255,9 +324,9 @@ const Navbar = ({ onToggleSidebar }) => {
       </div>
 
       {/* Right: User info + dropdown */}
-      <div className="relative flex items-center ml-auto">
+      <div className="relative flex items-center gap-2 ml-auto">
         {userInfo.name && (
-          <div className="flex flex-col items-end mr-3 min-w-[90px] min-h-[40px] justify-center">
+          <div className="order-2 flex flex-col items-end min-w-[90px] min-h-[40px] justify-center">
             <span className="text-gray-800 text-sm">{userInfo.name}</span>
             <span
               className={`mt-1 px-2 py-0.5 text-xs font-medium rounded-full transition-opacity duration-200
@@ -274,15 +343,81 @@ const Navbar = ({ onToggleSidebar }) => {
           </div>
         )}
 
-        {/* Profile image / fallback icon */}
-        <button onClick={handleUserClick} className="focus:outline-none ml-2 w-10 h-10 flex items-center justify-center flex-shrink-0">
-          {userInfo.profileImage ? (
-            <img src={userInfo.profileImage} alt="Profile" className="w-10 h-10 rounded-full object-cover border border-gray-300" />
-          ) : (
-            <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center border border-gray-200">
-              <FontAwesomeIcon icon={faUser} className="w-4 h-4 text-gray-500" />
+        {/* Unread message notifications */}
+        <div className="relative order-1" ref={notificationsRef}>
+          <button
+            onClick={() => setNotificationsOpen((prev) => !prev)}
+            className="relative focus:outline-none w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 border border-gray-200 transition"
+            aria-label="Open unread message notifications"
+          >
+            <FontAwesomeIcon icon={faBell} className="w-4 h-4 text-gray-600" />
+            {unreadSummary.totalUnread > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 rounded-full bg-red-600 text-white text-[11px] font-bold flex items-center justify-center border-2 border-white">
+                {unreadSummary.totalUnread > 99 ? "99+" : unreadSummary.totalUnread}
+              </span>
+            )}
+          </button>
+
+          {notificationsOpen && (
+            <div className="absolute right-0 top-10 mt-2 bg-white shadow-xl rounded-xl border border-gray-200 z-50 w-80 max-w-[92vw] overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-100">
+                <p className="text-sm font-bold text-gray-900">Unread Messages</p>
+                <p className="text-xs text-gray-500">{unreadSummary.totalUnread} unread message{unreadSummary.totalUnread === 1 ? "" : "s"}</p>
+              </div>
+
+              <div className="max-h-80 overflow-y-auto">
+                {unreadSummary.conversations.length === 0 ? (
+                  <div className="px-4 py-8 text-center text-sm text-gray-500">
+                    No unread messages.
+                  </div>
+                ) : (
+                  unreadSummary.conversations.map((item) => (
+                    <button
+                      key={item.internshipId}
+                      onClick={() => openMessageChat(item)}
+                      className="w-full text-left px-4 py-3 hover:bg-indigo-50 transition border-b border-gray-100 last:border-b-0"
+                    >
+                      <div className="flex items-start gap-3">
+                        <img
+                          src={item.internship?.imgUrl || logo}
+                          alt={item.internship?.companyName || "Internship"}
+                          className="w-10 h-10 rounded-xl object-cover border border-gray-200"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="text-sm font-semibold text-gray-900 truncate">
+                              {item.internship?.jobTitle || "Internship Chat"}
+                            </p>
+                            <span className="shrink-0 rounded-full bg-red-100 text-red-700 text-[11px] font-bold px-2 py-0.5">
+                              {item.unreadCount}
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-500 truncate">
+                            {item.internship?.companyName || "Admin"}
+                          </p>
+                          <p className="mt-1 text-xs text-gray-700 truncate">
+                            {item.latestMessage?.message || item.latestMessage?.fileName || "New attachment"}
+                          </p>
+                          <p className="mt-1 text-[11px] text-gray-400">
+                            {formatNotificationTime(item.latestAt)}
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
             </div>
           )}
+        </div>
+
+        {/* Profile image / fallback icon */}
+        <button onClick={handleUserClick} className="order-3 focus:outline-none w-10 h-10 flex items-center justify-center flex-shrink-0">
+          <img
+            src={userInfo.profileImage || defaultCompanyLogo}
+            alt="Profile"
+            className="w-10 h-10 rounded-full object-cover border border-gray-300"
+          />
         </button>
 
         {/* Dropdown */}
@@ -292,11 +427,11 @@ const Navbar = ({ onToggleSidebar }) => {
             <div className="px-4 py-3 border-b rounded-t-xl bg-white">
               <div className="flex items-center gap-3 text-black">
                 <div className="h-12 w-12 rounded-full overflow-hidden border border-gray-300">
-                  {userInfo.profileImage ? (
-                    <img src={userInfo.profileImage} alt="User" className="h-full w-full object-cover" />
-                  ) : (
-                    <FontAwesomeIcon icon={faUser} className="text-gray-600 w-full h-full p-3" />
-                  )}
+                  <img
+                    src={userInfo.profileImage || defaultCompanyLogo}
+                    alt="User"
+                    className="h-full w-full object-cover"
+                  />
                 </div>
                 <span className="block text-sm font-medium whitespace-nowrap" title={userInfo.email}>
                   {userInfo.email}

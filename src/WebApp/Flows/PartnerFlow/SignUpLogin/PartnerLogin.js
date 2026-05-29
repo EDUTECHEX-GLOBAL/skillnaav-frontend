@@ -94,7 +94,7 @@ const PartnerLogin = () => {
 }
     } catch (err) {
       console.error(err);
-      setError("Google login failed. Please try again.");
+      setError(err.response?.data?.message || "Google login failed. Please try again.");
     }
   };
   

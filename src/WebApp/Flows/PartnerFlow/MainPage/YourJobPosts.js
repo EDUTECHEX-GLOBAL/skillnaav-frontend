@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import axios from "../../../../api/axiosInstance";
 import Modal from "react-modal";
+import defaultCompanyLogo from "../../../../assets/default-company-logo.png";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faXmark,
-  faBuilding,
   faLocationDot,
   faBriefcase,
   faMagnifyingGlass,
@@ -232,21 +232,15 @@ const ViewModalBody = ({ internship: i, onEdit, onClose }) => (
       </button>
 
       <div className="flex items-start gap-4 pr-10">
-        {i.imgUrl ? (
-          <img
-            src={i.imgUrl}
-            alt={i.companyName}
-            width="56"
-            height="56"
-            loading="eager"
-            fetchpriority="high"
-            className="w-14 h-14 rounded-xl object-contain bg-white p-1 shadow"
-          />
-        ) : (
-          <div className="w-14 h-14 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0 shadow">
-            <FontAwesomeIcon icon={faBuilding} className="text-2xl text-white/80" />
-          </div>
-        )}
+        <img
+          src={i.imgUrl || defaultCompanyLogo}
+          alt={i.companyName}
+          width="56"
+          height="56"
+          loading="eager"
+          fetchPriority="high"
+          className="w-14 h-14 rounded-xl object-contain bg-white p-1 shadow"
+        />
         <div className="min-w-0">
           <h2
             className="text-xl font-bold text-white leading-tight"
@@ -460,21 +454,57 @@ const ViewModalBody = ({ internship: i, onEdit, onClose }) => (
 // ═══════════════════════════════════════════════════════════════════════════════
 // EDIT MODAL BODY
 // ═══════════════════════════════════════════════════════════════════════════════
-const EditModalBody = ({ internship: si, updateField, onSave, onBack, onClose }) => (
+const EditModalBody = ({ internship: si, updateField, onSave, onBack, onClose }) => {
+  const logoInputRef = useRef(null);
+
+  const handleLogoChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => updateField("imgUrl", ev.target.result);
+    reader.readAsDataURL(file);
+  };
+
+  return (
   <>
     {/* Sticky header */}
     <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b rounded-t-2xl bg-white">
-      <div>
-        <h2
-          className="text-base font-semibold text-gray-800 flex items-center gap-2"
-          style={{ fontFamily: "'Poppins', sans-serif" }}
+      <div className="flex items-center gap-3">
+        {/* Clickable logo / profile pic with edit overlay */}
+        <div
+          className="relative w-12 h-12 flex-shrink-0 cursor-pointer group"
+          onClick={() => logoInputRef.current && logoInputRef.current.click()}
+          title="Change company logo"
         >
-          <FontAwesomeIcon icon={faPenToSquare} className="text-indigo-400" />
-          Edit Internship
-        </h2>
-        <p className="text-xs text-gray-400 mt-0.5" style={{ fontFamily: "'Poppins', sans-serif" }}>
-          {si.jobTitle} · {si.companyName}
-        </p>
+          <img
+            src={si.imgUrl || defaultCompanyLogo}
+            alt="Company Logo"
+            className="w-12 h-12 rounded-xl object-contain bg-gray-50 border border-gray-200 p-1 shadow-sm"
+          />
+          {/* Hover overlay */}
+          <div className="absolute inset-0 rounded-xl bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+            <FontAwesomeIcon icon={faPenToSquare} className="text-white text-sm" />
+          </div>
+        </div>
+        <input
+          ref={logoInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleLogoChange}
+        />
+
+        <div>
+          <h2
+            className="text-base font-semibold text-gray-800 flex items-center gap-2"
+            style={{ fontFamily: "'Poppins', sans-serif" }}
+          >
+            Edit Internship
+          </h2>
+          <p className="text-xs text-gray-400 mt-0.5" style={{ fontFamily: "'Poppins', sans-serif" }}>
+            {si.jobTitle} · {si.companyName}
+          </p>
+        </div>
       </div>
       <button
         onClick={onClose}
@@ -728,7 +758,8 @@ const EditModalBody = ({ internship: si, updateField, onSave, onBack, onClose })
       </div>
     </div>
   </>
-);
+  );
+};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
@@ -778,6 +809,53 @@ const YourJobPosts = () => {
     },
     [partnerId]
   );
+
+  useEffect(() => {
+  if (!selectedInternship?.startDate || !selectedInternship?.endDateOrDuration) {
+    return;
+  }
+
+  const start = new Date(selectedInternship.startDate + "T00:00:00");
+  const end = new Date(selectedInternship.endDateOrDuration + "T00:00:00");
+
+  if (
+    isNaN(start.getTime()) ||
+    isNaN(end.getTime())
+  ) {
+    updateField("duration", "");
+    return;
+  }
+
+  if (end < start) {
+    updateField("duration", "Invalid duration");
+    return;
+  }
+
+  const totalDays = Math.floor(
+    (end - start) / (1000 * 60 * 60 * 24)
+  );
+
+  const months = Math.floor(totalDays / 30);
+  const days = totalDays % 30;
+
+  let duration = "";
+
+  if (months > 0) {
+    duration = `${months} month${months > 1 ? "s" : ""}`;
+
+    if (days > 0) {
+      duration += ` and ${days} day${days > 1 ? "s" : ""}`;
+    }
+  } else {
+    duration = `${totalDays} day${totalDays > 1 ? "s" : ""}`;
+  }
+
+  updateField("duration", duration);
+
+}, [
+  selectedInternship?.startDate,
+  selectedInternship?.endDateOrDuration
+]);
 
   useEffect(() => {
     fetchInternships(1, "", sortCriteria, sortDirection, true);
@@ -977,22 +1055,16 @@ const YourJobPosts = () => {
               style={{ fontFamily: "'Poppins', sans-serif" }}
             >
               {/* Logo / Image */}
-              {internship.imgUrl ? (
-                <div className="mb-4 w-full h-32 flex items-center justify-center bg-gray-50 rounded-lg border border-gray-100 overflow-hidden">
-                  <img
-                    src={internship.imgUrl}
-                    alt={internship.jobTitle}
-                    className="max-h-28 max-w-full object-contain p-2"
-                    width="200"
-                    height="112"
-                    loading="lazy"
-                  />
-                </div>
-              ) : (
-                <div className="mb-4 w-full h-32 flex items-center justify-center bg-gradient-to-br from-indigo-50 to-purple-50 rounded-lg border border-indigo-100">
-                  <FontAwesomeIcon icon={faBuilding} className="text-4xl text-indigo-200" />
-                </div>
-              )}
+              <div className="mb-4 w-full h-32 flex items-center justify-center bg-gray-50 rounded-lg border border-gray-100 overflow-hidden">
+                <img
+                  src={internship.imgUrl || defaultCompanyLogo}
+                  alt={internship.jobTitle}
+                  className="max-h-28 max-w-full object-contain p-2"
+                  width="200"
+                  height="112"
+                  loading="lazy"
+                />
+              </div>
 
               {/* Title + Company */}
               <h3 className="text-[15px] font-bold text-gray-900 leading-snug mb-0.5">

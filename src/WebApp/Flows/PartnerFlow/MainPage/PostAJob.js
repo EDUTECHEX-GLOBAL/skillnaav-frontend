@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import axios from "../../../../api/axiosInstance";
+import defaultCompanyLogo from "../../../../assets/default-company-logo.png";
 
 import { useTabContext } from "./UserHomePageContext/HomePageContext";
 
@@ -80,7 +81,9 @@ const PostAJob = () => {
   useEffect(() => {
     try {
       const ui = JSON.parse(localStorage.getItem("userInfo"));
-      if (ui) setUserType(ui.planType);
+      if (ui) {
+        setUserType(ui.planType);
+      }
     } catch (err) {
       console.error("PostAJob: failed reading localStorage", err);
     }
@@ -180,29 +183,44 @@ const PostAJob = () => {
 
   // Duration calc — uses total day diff (avoids negative-day bug)
   const calculateDuration = useCallback((startDate, endDateOrDuration) => {
-    if (!startDate || !endDateOrDuration) {
-      setFormData((prev) => ({ ...prev, duration: "" }));
-      return;
-    }
-    const start = new Date(startDate);
-    const end = new Date(endDateOrDuration);
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-      setFormData((prev) => ({ ...prev, duration: "" }));
-      return;
-    }
-    if (end <= start) {
-      setFormData((prev) => ({ ...prev, duration: "Invalid duration" }));
-      return;
-    }
-    const totalDays = Math.floor((end - start) / (1000 * 60 * 60 * 24));
-    const months = Math.floor(totalDays / 30);
-    const days = totalDays % 30;
-    const durationText =
-      months > 0
-        ? `${months} month${months > 1 ? "s" : ""}${days > 0 ? ` and ${days} day${days > 1 ? "s" : ""}` : ""}`
-        : `${totalDays} day${totalDays > 1 ? "s" : ""}`;
-    setFormData((prev) => ({ ...prev, duration: durationText }));
-  }, []);
+  if (!startDate || !endDateOrDuration) {
+    setFormData((prev) => ({ ...prev, duration: "" }));
+    return;
+  }
+
+  // Prevent timezone issues
+  const start = new Date(startDate + "T00:00:00");
+  const end = new Date(endDateOrDuration + "T00:00:00");
+
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+    setFormData((prev) => ({ ...prev, duration: "" }));
+    return;
+  }
+
+  if (end < start) {
+    setFormData((prev) => ({ ...prev, duration: "Invalid duration" }));
+    return;
+  }
+
+  const totalDays = Math.floor(
+    (end - start) / (1000 * 60 * 60 * 24)
+  );
+
+  const months = Math.floor(totalDays / 30);
+  const days = totalDays % 30;
+
+  const durationText =
+    months > 0
+      ? `${months} month${months > 1 ? "s" : ""}${
+          days > 0 ? ` and ${days} day${days > 1 ? "s" : ""}` : ""
+        }`
+      : `${totalDays} day${totalDays > 1 ? "s" : ""}`;
+
+  setFormData((prev) => ({
+    ...prev,
+    duration: durationText,
+  }));
+}, []);
 
   useEffect(() => {
     calculateDuration(formData.startDate, formData.endDateOrDuration);
@@ -249,6 +267,7 @@ const PostAJob = () => {
 
     const payload = {
       ...formData,
+      imgUrl: formData.imgUrl || defaultCompanyLogo,
       internshipMode: (formData.mode || "ONLINE").toUpperCase(), // ONLINE | OFFLINE | HYBRID
       location: formData.state
         ? `${formData.city}, ${formData.state}, ${formData.country}`
@@ -445,7 +464,11 @@ const PostAJob = () => {
           <label className="block text-gray-700 font-medium mb-2">Upload Image</label>
           <input type="file" accept="image/*" onChange={handleFileUpload} className={inputCls} />
           {uploading && <p className="text-sm text-gray-500 mt-1">Uploading image...</p>}
-          {previewUrl && <img src={previewUrl} alt="Preview" className="mt-2 max-h-40 rounded-lg" />}
+          <img
+            src={previewUrl || formData.imgUrl || defaultCompanyLogo}
+            alt="Internship preview"
+            className="mt-2 h-24 w-24 rounded-lg object-cover border border-gray-200"
+          />
         </div>
 
         {/* Internship Type — value matches backend enum: FREE | STIPEND | PAID */}

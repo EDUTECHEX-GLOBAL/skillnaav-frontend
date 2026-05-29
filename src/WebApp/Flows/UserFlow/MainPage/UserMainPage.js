@@ -69,6 +69,12 @@ const UserMainPageContent = () => {
 
         setUserInfo(profileRes.data);
 
+        // Keep localStorage synced so Navbar (and other components) see fresh data like planType
+        const existingUserInfo = JSON.parse(localStorage.getItem("userInfo") || "{}");
+        const updatedUserInfo = { ...existingUserInfo, ...profileRes.data };
+        localStorage.setItem("userInfo", JSON.stringify(updatedUserInfo));
+        window.dispatchEvent(new Event("userInfoUpdated"));
+
         const reverifyRequested = !!consentRes.data?.data?.reverificationRequested;
         setIsApproved(reverifyRequested ? false : profileRes.data.adminApproved);
 

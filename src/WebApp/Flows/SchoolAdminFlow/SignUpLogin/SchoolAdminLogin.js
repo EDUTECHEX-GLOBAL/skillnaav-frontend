@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { FiEye, FiEyeOff, FiX } from "react-icons/fi";
 import classroomImg from "../../../../assets-webapp/school-dashboard.png";
 import SchoolAdminForgotPassword from "./SchoolAdminForgotPassword";
+import { GoogleLogin } from "@react-oauth/google";
 import axios from "../../../../api/axiosInstance";
 
 const SchoolAdminLogin = () => {
@@ -124,8 +125,52 @@ const SchoolAdminLogin = () => {
             {loading ? "Logging in..." : "Login"}
           </button>
 
+          <div className="flex items-center my-6">
+            <hr className="w-full border-gray-300" />
+            <span className="px-3 text-gray-500">OR</span>
+            <hr className="w-full border-gray-300" />
+          </div>
+
+          <div className="flex justify-center mb-4">
+            <GoogleLogin
+              width="400"
+              size="large"
+              onSuccess={async (credentialResponse) => {
+                try {
+                  const idToken = credentialResponse.credential;
+                  const { data } = await axios.post("/api/school-admin/google-auth", { idToken });
+
+                  // ✅ Added: check approval for Google login too, but allow profile completion
+                  if (!data.isApproved && !data.needsProfileCompletion) {
+                    setErrorMessage(
+                      "Your account is not yet approved by the platform administrator."
+                    );
+                    return;
+                  }
+
+                  localStorage.setItem("schoolAdminToken", data.token);
+                  localStorage.setItem("schoolAdminId", data._id);
+                  localStorage.setItem("schoolAdminProfile", JSON.stringify(data));
+                  localStorage.setItem("loginTime", Date.now());
+
+                  if (data.needsProfileCompletion) {
+                    navigate("/schooladmin/profile", { state: { isGoogleUser: true } });
+                  } else {
+                    navigate("/schooladmin/dashboard");
+                  }
+                } catch (error) {
+                  console.error("Google login error:", error.response || error.message);
+                  setErrorMessage(
+                    error.response?.data?.message || "Google login failed."
+                  );
+                }
+              }}
+              onError={() => setErrorMessage("Google login failed.")}
+            />
+          </div>
+
           <div className="text-center mt-4 text-sm text-gray-600">
-            Don’t have an account?
+            Don't have an account?
             <button
               type="button"
               onClick={() => navigate("/schooladmin/register")}

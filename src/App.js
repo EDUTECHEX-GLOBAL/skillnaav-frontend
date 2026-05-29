@@ -20,6 +20,7 @@ const TeamPage = lazy(() => import("./pages/TeamPage"));
 const FaqPage = lazy(() => import("./pages/FaqPage"));
 const ContactPage = lazy(() => import("./pages/ContactPage"));
 const VisionPage = lazy(() => import("./pages/VisionPage"));
+const VerifyCertificate = lazy(() => import("./WebApp/MainPage/VerifyCertificate"));
 
 const UserCreateAccount = lazy(() => import("./WebApp/Flows/UserFlow/SignUpLogin/UserCreateAccount"));
 const UserLogin = lazy(() => import("./WebApp/Flows/UserFlow/SignUpLogin/UserLogin"));
@@ -69,6 +70,7 @@ function App() {
             <Route path="/faqs" element={<FaqPage />} />
             <Route path="/contact" element={<ContactPage />} />
             <Route path="/vision" element={<VisionPage />} />
+            <Route path="/verify/:certificateId" element={<VerifyCertificate />} />
 
             {/* User */}
             <Route path="/user" element={<UserFlow />} />

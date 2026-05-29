@@ -12,6 +12,7 @@ import React, {
   useCallback,
 } from "react";
 import Modal from "react-modal";
+import { io as ioClient } from "socket.io-client";
 import axios from "../../../../api/axiosInstance"; // ← adjust if needed
 import {
   FaCommentDots,
@@ -263,13 +264,32 @@ const AdminChatModal = ({ isOpen, internship, onClose, onReviewedUpdate }) => {
 
         if (!silent) setChatError(data.length === 0 ? "No messages yet. Be the first to say something!" : null);
         setMessages(data);
+        if (isOpen && adminId) {
+          axios.patch("/api/chats/read", {
+            internshipId: internship._id,
+            readerId: adminId,
+          }).catch((err) => console.error("markAdminConversationRead:", err));
+        }
       } catch (err) {
         if (!silent) setChatError("Failed to load messages.");
         console.error("fetchMessages:", err);
       }
     },
-    [internship?._id]
+    [internship?._id, isOpen, adminId]
   );
+
+  const markConversationRead = useCallback(async () => {
+    if (!internship?._id || !adminId) return;
+
+    try {
+      await axios.patch("/api/chats/read", {
+        internshipId: internship._id,
+        readerId: adminId,
+      });
+    } catch (err) {
+      console.error("markAdminConversationRead:", err);
+    }
+  }, [internship?._id, adminId]);
 
   // ── Load older messages (pagination) ──────────────────────────────────────
   const loadOlderMessages = async () => {
@@ -302,11 +322,12 @@ const AdminChatModal = ({ isOpen, internship, onClose, onReviewedUpdate }) => {
     setUploadedMeta(null);
     setPage(1);
     fetchMessages(false);
+    markConversationRead();
 
     // Polling
     pollerRef.current = setInterval(() => fetchMessages(true), POLL_INTERVAL_MS);
     return () => clearInterval(pollerRef.current);
-  }, [isOpen, internship?._id, fetchMessages]);
+  }, [isOpen, internship?._id, fetchMessages, markConversationRead]);
 
   useEffect(() => {
     if (isOpen) {
@@ -314,6 +335,56 @@ const AdminChatModal = ({ isOpen, internship, onClose, onReviewedUpdate }) => {
       setTimeout(() => inputRef.current?.focus(), 100);
     }
   }, [isOpen, messages, scrollToBottom]);
+
+  useEffect(() => {
+    if (!isOpen || !internship?._id || !adminId) return;
+
+    const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || "http://localhost:5000";
+    const socket = ioClient(SOCKET_URL, { withCredentials: true });
+
+    const joinRooms = () => {
+      socket.emit("joinAdminRoom");
+      socket.emit("joinChatRoom", { internshipId: internship._id });
+    };
+
+    const handleNewMessage = (message) => {
+      if (String(message?.internship) !== String(internship._id)) return;
+      if (String(message?.sender) === String(adminId)) return;
+
+      setMessages((prev) =>
+        prev.some((item) => String(item._id) === String(message._id))
+          ? prev
+          : [...prev, message]
+      );
+
+      axios.patch("/api/chats/read", {
+        internshipId: internship._id,
+        readerId: adminId,
+      }).catch((err) => console.error("markAdminConversationRead:", err));
+    };
+
+    const handleMessageDeleted = ({ messageId }) => {
+      setMessages((prev) =>
+        prev.map((item) =>
+          String(item._id) === String(messageId)
+            ? { ...item, isDeleted: true, deletedAt: new Date().toISOString() }
+            : item
+        )
+      );
+    };
+
+    socket.on("connect", joinRooms);
+    socket.on("newMessage", handleNewMessage);
+    socket.on("messageDeleted", handleMessageDeleted);
+
+    return () => {
+      socket.emit("leaveChatRoom", { internshipId: internship._id });
+      socket.off("connect", joinRooms);
+      socket.off("newMessage", handleNewMessage);
+      socket.off("messageDeleted", handleMessageDeleted);
+      socket.disconnect();
+    };
+  }, [isOpen, internship?._id, adminId]);
 
   // ── Group messages by date ─────────────────────────────────────────────────
   const groupedMessages = (() => {

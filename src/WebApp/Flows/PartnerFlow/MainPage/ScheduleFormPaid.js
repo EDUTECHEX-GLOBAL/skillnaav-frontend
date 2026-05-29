@@ -130,7 +130,8 @@ const ScheduleFormPaid = ({ internshipId, onClose, initialInternshipMode = '' })
   });
 
   const [error, setError] = useState(null);
-  const [timetable, setTimetable] = useState([]);
+  const [batchTimetables, setBatchTimetables] = useState({});
+  const [activeBatchTab, setActiveBatchTab] = useState('');
   const [previewed, setPreviewed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [excelData, setExcelData] = useState({});
@@ -332,22 +333,41 @@ const ScheduleFormPaid = ({ internshipId, onClose, initialInternshipMode = '' })
           };
         });
 
-        setTimetable(
-          (data.timetable || []).map(entry => ({
-            date: entry.date.slice(0, 10),
-            day: entry.day,
-            selected: true,
-            startTime: entry.startTime,
-            endTime: entry.endTime,
-            eventLink: entry.eventLink || '',
-            type: entry.type || 'online',
-            location: entry.location || { name: '', address: '', mapLink: '' },
-            sectionSummary: entry.sectionSummary || '',
-            instructor: entry.instructor || '',
-            assignment: entry.assignment || null,
-            events: entry.events || []
-          }))
-        );
+        const formatTimetable = (tt) => (tt || []).map(entry => ({
+          date: entry.date.slice(0, 10),
+          day: entry.day,
+          selected: true,
+          startTime: entry.startTime,
+          endTime: entry.endTime,
+          eventLink: entry.eventLink || '',
+          type: entry.type || 'online',
+          location: entry.location || { name: '', address: '', mapLink: '' },
+          sectionSummary: entry.sectionSummary || '',
+          instructor: entry.instructor || '',
+          assignment: entry.assignment || null,
+          events: entry.events || []
+        }));
+
+        if (data.batches && data.batches.length > 0) {
+          const loadedBatches = {};
+          data.batches.forEach(b => {
+            loadedBatches[b.timeSlot] = formatTimetable(b.timetable);
+          });
+          setBatchTimetables(loadedBatches);
+          setActiveBatchTab(data.batches[0].timeSlot);
+        } else if (data.timetable && data.timetable.length > 0) {
+          // Fallback for legacy paid schedules
+          let fallbackSlot = 'Default Slot';
+          if (data.timeSlots) {
+            const effectiveType = data.defaultType || data.timetable[0]?.type || 'online';
+            const slots = data.timeSlots[effectiveType];
+            if (slots && slots.length > 0) {
+              fallbackSlot = `${slots[0].startTime} - ${slots[0].endTime}`;
+            }
+          }
+          setBatchTimetables({ [fallbackSlot]: formatTimetable(data.timetable) });
+          setActiveBatchTab(fallbackSlot);
+        }
 
         // ✅ Always go straight to preview if schedule exists
         setPreviewed(true);
@@ -388,61 +408,7 @@ const ScheduleFormPaid = ({ internshipId, onClose, initialInternshipMode = '' })
       return { ...f, selectedDays: Array.from(sel) };
     });
 
-  const applyAiSectionSummaries = async (days) => {
-    // If schedule mode is manual, do nothing
-    if (form.scheduleMode !== 'automated') return days;
 
-    // If schedule is persisted, only generate for TODAY + future (past days must remain unchanged)
-    const dayNumberByDate = {};
-    days.forEach((d, idx) => { dayNumberByDate[d.date] = idx + 1; });
-
-    const targetDays = isPersisted
-      ? days.filter(d => isFutureDate(d.date))   // today + future
-      : days;
-
-    // If nothing to generate, return as-is
-    if (!targetDays.length) return days;
-
-    setAiGenerating(true);
-    try {
-      const { data } = await axios.post(
-        '/api/schedule/ai-section-summaries',
-        {
-          internshipId,
-          totalDays: days.length, // ✅ count how many scheduled days
-          days: targetDays.map(d => ({
-            date: d.date,
-            dayNumber: dayNumberByDate[d.date],
-            type: d.type || form.defaultType
-          }))
-        },
-        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
-      );
-
-      // Expected: data.summaries = [{ date:"YYYY-MM-DD", sectionSummary:"..." }, ...]
-      const summaryMap = {};
-      (data?.summaries || []).forEach(s => {
-        if (s?.date) summaryMap[s.date] = s.sectionSummary || '';
-      });
-
-      // Merge: keep Excel/manual summary if already present, otherwise fill with AI
-      return days.map(d => {
-        const aiText = summaryMap[d.date];
-        if (!aiText) return d;
-
-        // If already has summary (Excel/user), keep it
-        if (d.sectionSummary && d.sectionSummary.trim() !== '') return d;
-
-        return { ...d, sectionSummary: aiText };
-      });
-    } catch (err) {
-      console.error('AI Section Summary generation failed:', err);
-      setError(err.response?.data?.error || 'AI generation failed. You can still edit manually.');
-      return days; // fallback safely
-    } finally {
-      setAiGenerating(false);
-    }
-  };
 
   const generatePreview = async () => {
     const {
@@ -480,13 +446,10 @@ const ScheduleFormPaid = ({ internshipId, onClose, initialInternshipMode = '' })
       return setError('Fill work hours before generating schedule');
     }
 
-    // ✅ Use ONLY Work Hours to generate schedule times (Slots are ignored)
+    // Validating Work Hours
     const { startTime: finalStartTime, endTime: finalEndTime } = parseWorkHoursRange(workHours);
-
-    // Validate Work Hours format and order
     const whStart = timeToMinutes(finalStartTime);
     const whEnd = timeToMinutes(finalEndTime);
-
     if (!finalStartTime || !finalEndTime || !Number.isFinite(whStart) || !Number.isFinite(whEnd)) {
       return setError('Work Hours must be in format like: 09:00 - 17:00');
     }
@@ -494,7 +457,7 @@ const ScheduleFormPaid = ({ internshipId, onClose, initialInternshipMode = '' })
       return setError('Work Hours: End Time must be after Start Time.');
     }
 
-    // Slots are optional; validate only if user added slots
+    // Slots are mandatory
     const slotErr = validateSlotsForType(defaultType);
     if (slotErr) return setError(slotErr);
 
@@ -502,70 +465,133 @@ const ScheduleFormPaid = ({ internshipId, onClose, initialInternshipMode = '' })
       return setError('Select at least one day');
     }
 
-    // If the schedule is already saved, keep a quick lookup to preserve past days
-    const existingByDate = isPersisted
-      ? Object.fromEntries(timetable.map(d => [d.date, d]))
-      : {};
+    const activeSlots = form.timeSlots[defaultType] || [];
+    const newBatchTimetables = {};
+    let firstSlot = "";
 
-    const days = [];
-    let dayCounter = 1;
-
-    for (let d = new Date(startDate); d <= new Date(endDate); d.setDate(d.getDate() + 1)) {
-      const dayName = d.toLocaleString('en-us', { weekday: 'long' });
-
-      if (selectedDays.includes(dayName)) {
-        const key = `Day - ${dayCounter}`;
-        const isoDateKey = d.toISOString().split('T')[0];
-
-        // ⛔ After first save: do NOT let Excel overwrite past dates
-        if (isPersisted) {
-          const existing = existingByDate[isoDateKey];
-          if (existing && isPastDate(isoDateKey)) {
-            days.push({ ...existing });
-            dayCounter++;
-            continue; // skip any Excel/default overrides for this past day
-          }
+    // ✅ PRE-FETCH AI SUMMARIES ONCE FOR ALL BATCHES
+    let sharedAiSummaryMap = {};
+    if (form.scheduleMode === 'automated') {
+      const repDays = [];
+      let dayCounter = 1;
+      for (let d = new Date(startDate); d <= new Date(endDate); d.setDate(d.getDate() + 1)) {
+        const dayName = d.toLocaleString('en-us', { weekday: 'long' });
+        if (selectedDays.includes(dayName)) {
+          repDays.push({
+            date: d.toISOString().split('T')[0],
+            dayNumber: dayCounter,
+            type: defaultType
+          });
+          dayCounter++;
         }
+      }
 
-        const excelEntry = excelData[key] || excelData[isoDateKey] || {};
-        const useExcelData = Object.keys(excelEntry).length > 0;
-        const entryType = excelEntry.type || defaultType;
+      const targetDays = isPersisted ? repDays.filter(d => isFutureDate(d.date)) : repDays;
 
-        const resolvedType =
-          defaultType === 'hybrid'
-            ? (entryType === 'online' || entryType === 'offline' ? entryType : 'online')
-            : defaultType;
-
-        days.push({
-          date: d.toISOString().split('T')[0],
-          day: dayName,
-          selected: true,
-          startTime: finalStartTime,
-          endTime: finalEndTime,
-          sectionSummary: useExcelData ? excelEntry.summary || '' : '',
-          instructor: useExcelData ? excelEntry.instructor || '' : '',
-          assignment: null,
-          type: resolvedType,
-          eventLink: resolvedType === 'online'
-            ? (useExcelData ? excelEntry.link || eventLink : eventLink)
-            : '',
-          location: resolvedType === 'offline'
-            ? {
-              name: useExcelData ? (excelEntry.locationName || location.name) : location.name,
-              address: useExcelData ? (excelEntry.address || location.address) : location.address,
-              mapLink: useExcelData ? (excelEntry.mapLink || location.mapLink) : location.mapLink
-            }
-            : { name: '', address: '', mapLink: '' },
-          events: []
-        });
-
-        dayCounter++;
+      if (targetDays.length > 0) {
+        setAiGenerating(true);
+        try {
+          const { data } = await axios.post(
+            '/api/schedule/ai-section-summaries',
+            {
+              internshipId,
+              totalDays: repDays.length,
+              batchTimeSlot: null, // Don't bind to a specific batch to get identical results
+              days: targetDays
+            },
+            { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+          );
+          (data?.summaries || []).forEach(s => {
+            if (s?.date) sharedAiSummaryMap[s.date] = s.sectionSummary || '';
+          });
+        } catch (err) {
+          console.error('AI Section Summary generation failed:', err);
+          setError(err.response?.data?.error || 'AI generation failed. You can still edit manually.');
+        } finally {
+          setAiGenerating(false);
+        }
       }
     }
 
-    const finalDays = await applyAiSectionSummaries(days);
+    for (let sIdx = 0; sIdx < activeSlots.length; sIdx++) {
+      const slot = activeSlots[sIdx];
+      const slotName = `${slot.startTime} - ${slot.endTime}`;
+      if (sIdx === 0) firstSlot = slotName;
 
-    setTimetable(finalDays);
+      // If the schedule is already saved, keep a quick lookup to preserve past days for this batch
+      const existingByDate = (isPersisted && batchTimetables[slotName])
+        ? Object.fromEntries(batchTimetables[slotName].map(d => [d.date, d]))
+        : {};
+
+      const days = [];
+      let dayCounter = 1;
+
+      for (let d = new Date(startDate); d <= new Date(endDate); d.setDate(d.getDate() + 1)) {
+        const dayName = d.toLocaleString('en-us', { weekday: 'long' });
+
+        if (selectedDays.includes(dayName)) {
+          const key = `Day - ${dayCounter}`;
+          const isoDateKey = d.toISOString().split('T')[0];
+
+          // ⛔ After first save: do NOT let Excel overwrite past dates
+          if (isPersisted) {
+            const existing = existingByDate[isoDateKey];
+            if (existing && isPastDate(isoDateKey)) {
+              days.push({ ...existing });
+              dayCounter++;
+              continue; // skip any Excel/default overrides for this past day
+            }
+          }
+
+          const excelEntry = excelData[key] || excelData[isoDateKey] || {};
+          const useExcelData = Object.keys(excelEntry).length > 0;
+          const entryType = excelEntry.type || defaultType;
+
+          const resolvedType =
+            defaultType === 'hybrid'
+              ? (entryType === 'online' || entryType === 'offline' ? entryType : 'online')
+              : defaultType;
+
+          days.push({
+            date: d.toISOString().split('T')[0],
+            day: dayName,
+            selected: true,
+            startTime: slot.startTime, // ✅ Use batch's start time
+            endTime: slot.endTime,     // ✅ Use batch's end time
+            sectionSummary: useExcelData ? excelEntry.summary || '' : '',
+            instructor: useExcelData ? excelEntry.instructor || '' : '',
+            assignment: null,
+            type: resolvedType,
+            eventLink: resolvedType === 'online'
+              ? (useExcelData ? excelEntry.link || eventLink : eventLink)
+              : '',
+            location: resolvedType === 'offline'
+              ? {
+                name: useExcelData ? (excelEntry.locationName || location.name) : location.name,
+                address: useExcelData ? (excelEntry.address || location.address) : location.address,
+                mapLink: useExcelData ? (excelEntry.mapLink || location.mapLink) : location.mapLink
+              }
+              : { name: '', address: '', mapLink: '' },
+            events: []
+          });
+
+          dayCounter++;
+        }
+      }
+
+      // Apply the pre-fetched shared AI summaries
+      const finalDays = days.map(d => {
+        const aiText = sharedAiSummaryMap[d.date];
+        if (!aiText) return d;
+        // If already has summary (Excel/user), keep it
+        if (d.sectionSummary && d.sectionSummary.trim() !== '') return d;
+        return { ...d, sectionSummary: aiText };
+      });
+      newBatchTimetables[slotName] = finalDays;
+    }
+
+    setBatchTimetables(newBatchTimetables);
+    setActiveBatchTab(firstSlot);
     setPreviewed(true);
     setError(null);
   };
@@ -599,14 +625,18 @@ const ScheduleFormPaid = ({ internshipId, onClose, initialInternshipMode = '' })
   }, [previewed]);
 
   const toggleDay = idx =>
-    setTimetable(tt => {
+    setBatchTimetables(prev => {
+      if (!activeBatchTab) return prev;
+      const tt = prev[activeBatchTab] || [];
       const copy = [...tt];
       copy[idx].selected = !copy[idx].selected;
-      return copy;
+      return { ...prev, [activeBatchTab]: copy };
     });
 
   const changeField = (idx, field, val) =>
-    setTimetable(tt => {
+    setBatchTimetables(prev => {
+      if (!activeBatchTab) return prev;
+      const tt = prev[activeBatchTab] || [];
       const copy = [...tt];
       copy[idx][field] = val;
 
@@ -623,17 +653,19 @@ const ScheduleFormPaid = ({ internshipId, onClose, initialInternshipMode = '' })
         }
       }
 
-      return copy;
+      return { ...prev, [activeBatchTab]: copy };
     });
 
   const changeLocationField = (idx, field, val) =>
-    setTimetable(tt => {
+    setBatchTimetables(prev => {
+      if (!activeBatchTab) return prev;
+      const tt = prev[activeBatchTab] || [];
       const copy = [...tt];
       copy[idx].location = {
         ...copy[idx].location,
         [field]: val
       };
-      return copy;
+      return { ...prev, [activeBatchTab]: copy };
     });
 
   const addNewDay = () => {
@@ -694,8 +726,8 @@ const ScheduleFormPaid = ({ internshipId, onClose, initialInternshipMode = '' })
       date: newDate,
       day: name,
       selected: true,
-      startTime: finalStartTime || '',
-      endTime: finalEndTime || '',
+      startTime: activeBatchTab ? activeBatchTab.split(' - ')[0] : (finalStartTime || ''),
+      endTime: activeBatchTab ? activeBatchTab.split(' - ')[1] : (finalEndTime || ''),
       type: initialType,
       eventLink: initialType === 'online' ? (defaultEventLink || '') : '',
       location: initialType === 'offline'
@@ -707,7 +739,11 @@ const ScheduleFormPaid = ({ internshipId, onClose, initialInternshipMode = '' })
       events: []
     };
 
-    setTimetable(prev => [...prev, newDayEntry]);
+    setBatchTimetables(prev => {
+      if (!activeBatchTab) return prev;
+      const tt = prev[activeBatchTab] || [];
+      return { ...prev, [activeBatchTab]: [...tt, newDayEntry] };
+    });
     setForm(f => ({ ...f, newDate: '' }));
     setError(null);
   };
@@ -765,13 +801,17 @@ const ScheduleFormPaid = ({ internshipId, onClose, initialInternshipMode = '' })
           [form.defaultType]: form.timeSlots?.[form.defaultType] || []
         },
         selectedDays: form.selectedDays,
-        timetable: timetable
-          .filter(d => d.selected)
-          .map(day => ({
-            ...day,
-            location: day.type === 'online' ? null : day.location,
-            assignment: day.assignment?.name || null
-          }))
+        batches: Object.keys(batchTimetables).map(timeSlot => ({
+          timeSlot,
+          timetable: (batchTimetables[timeSlot] || [])
+            .filter(d => d.selected)
+            .map(day => ({
+              ...day,
+              location: day.type === 'online' ? null : day.location,
+              assignment: day.assignment?.name || null
+            }))
+        })),
+        timetable: [] // legacy field left empty since we use batches now
       };
 
       await axios.post('/api/schedule/create', payload, {
@@ -1384,12 +1424,35 @@ const ScheduleFormPaid = ({ internshipId, onClose, initialInternshipMode = '' })
             <div className="space-y-8">
               {/* Schedule Preview */}
               <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">Schedule Preview</h3>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-semibold text-gray-800">Schedule Preview</h3>
+                </div>
+                
+                {/* Batch Tabs */}
+                {Object.keys(batchTimetables).length > 0 && (
+                  <div className="flex overflow-x-auto gap-2 mb-4 pb-2 border-b border-gray-200">
+                    {Object.keys(batchTimetables).map(tab => (
+                      <button
+                        key={tab}
+                        type="button"
+                        onClick={() => setActiveBatchTab(tab)}
+                        className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors whitespace-nowrap ${
+                          activeBatchTab === tab
+                            ? 'bg-indigo-100 text-indigo-700 border-b-2 border-indigo-600'
+                            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                        }`}
+                      >
+                        Batch: {tab}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                
                 <div
                   ref={previewScrollRef}
                   className="space-y-3 max-h-96 overflow-y-auto pr-2"
                 >
-                  {timetable.map((day, idx) => {
+                  {(batchTimetables[activeBatchTab] || []).map((day, idx) => {
                     const isPast = isPastDate(day.date);
                     const isFuture = isFutureDate(day.date);
 

@@ -225,7 +225,7 @@ const UserLogin = () => {
 
               } catch (err) {
                 console.error(err);
-                setError("Google login failed. Try again.");
+                setError(err.response?.data?.message || "Google login failed. Try again.");
               }
             }}
             onError={() => setError("Google login failed")}

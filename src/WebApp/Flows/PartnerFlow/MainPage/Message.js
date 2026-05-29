@@ -5,6 +5,7 @@
 // • Desktop : same as tablet; list sidebar stays visible while chatting
 import React, { useState, useEffect, useRef, useCallback, useReducer } from "react";
 import axios from "../../../../api/axiosInstance";
+import { io as ioClient } from "socket.io-client";
 
 import InternshipListView from "./Internshiplistview";
 import ChatView from "./Chatview";
@@ -144,6 +145,10 @@ const ChatInterface = () => {
       } else {
         msgDispatch({ type: "FETCH_SUCCESS", data: payload.data || [], totalPages: payload.totalPages || 1, totalCount: payload.total || 0 });
       }
+      await axios.patch("/api/chats/read", {
+        internshipId,
+        readerId: partnerId,
+      });
     } catch (err) {
       console.error("fetchMessages:", err);
       msgDispatch({ type: "FETCH_ERROR" });
@@ -173,6 +178,85 @@ const ChatInterface = () => {
     setPendingFiles([]);
     setShowChat(true);
   }, []);
+
+  const openInternshipFromNotification = useCallback(async (internshipId) => {
+    if (!internshipId) return;
+
+    let target = internships.find((item) => String(item._id || item.id) === String(internshipId));
+
+    if (!target) {
+      try {
+        const res = await axios.get(`/api/interns/${internshipId}`);
+        target = res.data?.data || res.data || null;
+      } catch (err) {
+        console.error("openInternshipFromNotification:", err);
+      }
+    }
+
+    if (!target) return;
+
+    handleInternshipClick(target._id || target.id, target.jobTitle || target.title || "Internship", {
+      companyName: target.companyName || target.company || "",
+      imgUrl: target.imgUrl || target.image || target.companyLogo || "",
+      internshipType: target.internshipType || target.intType || "",
+      internshipMode: target.internshipMode || target.intMode || "",
+      location: target.location || "",
+    });
+
+    sessionStorage.removeItem("partnerOpenChatInternshipId");
+  }, [internships, handleInternshipClick]);
+
+  useEffect(() => {
+    openInternshipFromNotification(sessionStorage.getItem("partnerOpenChatInternshipId"));
+
+    const handleOpenChatEvent = (event) => {
+      openInternshipFromNotification(event?.detail?.internshipId);
+    };
+
+    window.addEventListener("partnerOpenInternshipChat", handleOpenChatEvent);
+    return () => window.removeEventListener("partnerOpenInternshipChat", handleOpenChatEvent);
+  }, [openInternshipFromNotification]);
+
+  useEffect(() => {
+    if (!partnerId || !showChat || !selected.id) return;
+
+    const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || "http://localhost:5000";
+    const socket = ioClient(SOCKET_URL, { withCredentials: true });
+
+    const joinRooms = () => {
+      socket.emit("joinPartnerRoom", { partnerId });
+      socket.emit("joinChatRoom", { internshipId: selected.id });
+    };
+
+    const handleNewMessage = async (message) => {
+      if (String(message?.internship) !== String(selected.id)) return;
+      if (String(message?.sender) === String(partnerId)) return;
+
+      msgDispatch({ type: "APPEND", msg: message });
+      try {
+        await axios.patch("/api/chats/read", {
+          internshipId: selected.id,
+          readerId: partnerId,
+        });
+      } catch (err) {
+        console.error("markPartnerConversationRead:", err);
+      }
+    };
+
+    const handleMessageDeleted = () => fetchMessages(1, selected.id, true);
+
+    socket.on("connect", joinRooms);
+    socket.on("newMessage", handleNewMessage);
+    socket.on("messageDeleted", handleMessageDeleted);
+
+    return () => {
+      socket.emit("leaveChatRoom", { internshipId: selected.id });
+      socket.off("connect", joinRooms);
+      socket.off("newMessage", handleNewMessage);
+      socket.off("messageDeleted", handleMessageDeleted);
+      socket.disconnect();
+    };
+  }, [partnerId, showChat, selected.id, fetchMessages]);
 
   const handleBackToList = useCallback(() => {
     setShowChat(false);

@@ -247,18 +247,33 @@ const Notifications = ({ onNavigate }) => {
     }
   }, []);
 
-  // ── Label helpers ──────────────────────────────────────────────────────────
-  const linkLabel = (type) =>
-    type === "offer" ? "📄 View Offer Letter" : "📄 View Recommendation";
+  const linkLabel = (type) => {
+    if (type === "offer") return "📄 View Offer Letter";
+    if (type === "recommendation") return "📄 View Recommendation";
+    if (type === "schedule") return "📅 View Schedule";
+    return "🔗 View Details";
+  };
 
-  const menuOpenLabel = (type) =>
-    type === "offer" ? "Open Offer Letter" : "Open Recommendation";
+  const menuOpenLabel = (type) => {
+    if (type === "offer") return "Open Offer Letter";
+    if (type === "recommendation") return "Open Recommendation";
+    if (type === "schedule") return "Open Schedule";
+    return "Open Details";
+  };
 
-  const menuDownloadLabel = (type) =>
-    type === "offer" ? "Download Offer Letter" : "Download Recommendation";
+  const menuDownloadLabel = (type) => {
+    if (type === "offer") return "Download Offer Letter";
+    if (type === "recommendation") return "Download Recommendation";
+    if (type === "schedule") return "Download Schedule";
+    return "Download Attachment";
+  };
 
-  const downloadFilename = (type) =>
-    type === "offer" ? "offer-letter.pdf" : "recommendation.pdf";
+  const downloadFilename = (type) => {
+    if (type === "offer") return "offer-letter.pdf";
+    if (type === "recommendation") return "recommendation.pdf";
+    if (type === "schedule") return "schedule.pdf";
+    return "document.pdf";
+  };
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -326,10 +341,15 @@ const Notifications = ({ onNavigate }) => {
 
               {/* Body */}
               <div className="flex-1 min-w-0 pr-8">
+                {notification.title && (
+                  <p className={`text-base font-semibold ${notification.isRead ? "text-gray-800" : "text-gray-900"}`}>
+                    {notification.title}
+                  </p>
+                )}
                 <p
                   className={`text-sm ${
                     notification.isRead ? "text-gray-700" : "text-blue-900 font-medium"
-                  }`}
+                  } ${notification.title ? "mt-1" : ""}`}
                 >
                   {notification.message}
                 </p>

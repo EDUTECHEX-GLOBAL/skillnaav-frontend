@@ -211,6 +211,31 @@ const PartnerManagement = () => {
     load();
   }, []);
 
+  useEffect(() => {
+    const openTargetChat = (targetId) => {
+      if (!targetId || internships.length === 0) return;
+
+      const target = internships.find((item) => String(item._id) === String(targetId));
+      if (!target) return;
+
+      setStatusFilter("ALL");
+      setSearchQuery("");
+      setCurrentPage(Math.max(1, Math.ceil((internships.indexOf(target) + 1) / ITEMS_PER_PAGE)));
+      setChatInternship(target);
+      setIsChatOpen(true);
+      sessionStorage.removeItem("adminOpenChatInternshipId");
+    };
+
+    openTargetChat(sessionStorage.getItem("adminOpenChatInternshipId"));
+
+    const handleOpenChatEvent = (event) => {
+      openTargetChat(event?.detail?.internshipId);
+    };
+
+    window.addEventListener("adminOpenInternshipChat", handleOpenChatEvent);
+    return () => window.removeEventListener("adminOpenInternshipChat", handleOpenChatEvent);
+  }, [internships]);
+
   // ── Helpers ──────────────────────────────────────────────────────────────
   const calculatePostedTime = (date) => {
     const diff = Math.floor((Date.now() - new Date(date)) / 86_400_000);

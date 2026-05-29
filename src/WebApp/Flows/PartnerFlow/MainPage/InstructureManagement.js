@@ -278,6 +278,7 @@ const InstructureManagement = () => {
   const [prefSlots, setPrefSlots] = useState([]);
   const [openMenuId, setOpenMenuId] = useState(null);
   const [portalTarget, setPortalTarget] = useState(null);
+  const [isAssigning, setIsAssigning] = useState(false);
 
   const [assignPopup, setAssignPopup] = useState({
     open: false,
@@ -583,12 +584,15 @@ const InstructureManagement = () => {
 
   const handleAssignInstructor = async () => {
     try {
+      setIsAssigning(true);
       const partnerId = localStorage.getItem("partnerId") || undefined;
       const { data } = await axios.post(
-        "/api/ai/assign-instructors",
-        { partnerId },
-        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+        "/api/instructors/auto-assign",
+        {},
+        { headers: authHeaders() }
       );
+
+      setIsAssigning(false);
 
       setAssignPopup({
         open: true,
@@ -599,6 +603,7 @@ const InstructureManagement = () => {
       });
     } catch (err) {
       console.error("Assign Instructor failed:", err);
+      setIsAssigning(false);
 
       setAssignPopup({
         open: true,
@@ -683,10 +688,11 @@ const InstructureManagement = () => {
           <button
             type="button"
             onClick={handleAssignInstructor}
-            className="w-full min-w-0 justify-center inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs sm:text-sm font-semibold whitespace-nowrap shadow-lg shadow-amber-200/70 hover:from-amber-600 hover:to-orange-600 active:scale-[0.98] transition-all duration-150"
+            disabled={isAssigning}
+            className="w-full min-w-0 justify-center inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs sm:text-sm font-semibold whitespace-nowrap shadow-lg shadow-amber-200/70 hover:from-amber-600 hover:to-orange-600 active:scale-[0.98] transition-all duration-150 disabled:opacity-70 disabled:cursor-wait"
           >
             <FontAwesomeIcon icon={faUserCheck} className="text-xs" />
-            Auto-Assign
+            {isAssigning ? "Assigning..." : "Auto-Assign"}
           </button>
         </div>
       </div>
@@ -752,15 +758,15 @@ const InstructureManagement = () => {
 
                     return (
                       <div
-                        key={`${row.internshipId || "internship"}-${idx}`}
+                        key={`${row.instructorId || "inst"}-${idx}`}
                         className="rounded-2xl border border-slate-200 bg-gradient-to-r from-white to-slate-50 p-4"
                       >
                         <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                          Internship ID
+                          Instructor Name
                         </div>
 
                         <div className="text-sm font-semibold text-slate-800 break-all mt-1">
-                          {row.internshipId || "—"}
+                          {row.instructorName || "—"}
                         </div>
 
                         <div className="mt-3 inline-flex max-w-full items-center px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-600 border border-indigo-100">
@@ -1637,15 +1643,15 @@ const InstructureManagement = () => {
                           const updatedCount = Number(row.sessionsUpdated || 0);
                           return (
                             <div
-                              key={`${row.internshipId || "internship"}-${idx}`}
+                              key={`${row.instructorId || "inst"}-${idx}`}
                               className="rounded-2xl border border-slate-200 bg-gradient-to-r from-white to-slate-50 p-4"
                             >
                               <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                                Internship ID
+                                Instructor Name
                               </div>
 
                               <div className="text-sm font-semibold text-slate-800 break-all mt-1">
-                                {row.internshipId || "—"}
+                                {row.instructorName || "—"}
                               </div>
 
                               <div className="mt-3">
