@@ -96,13 +96,35 @@ const MessageBubble = ({ message, isOwn, onDelete, adminId }) => {
             <>
               {/* File attachment */}
               {hasFile && (
-                <div className={`mb-2 rounded-xl overflow-hidden border ${isOwn ? "border-white/30" : "border-gray-200"}`}>
+                <div className={`mb-2 rounded-xl overflow-hidden border relative group/img ${isOwn ? "border-white/30" : "border-gray-200"}`}>
                   {isImage ? (
-                    <img
-                      src={message.fileUrl}
-                      alt={message.fileName || "attachment"}
-                      className="max-w-full max-h-52 object-cover rounded-xl"
-                    />
+                    <>
+                      {/* Clicking the image opens/downloads it */}
+                      <a
+                        href={message.fileUrl}
+                        download={message.fileName || "image"}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ display: "block" }}
+                      >
+                        <img
+                          src={message.fileUrl}
+                          alt={message.fileName || "attachment"}
+                          className="max-w-full max-h-52 object-cover rounded-xl cursor-pointer"
+                        />
+                      </a>
+                      {/* Download badge — appears on hover */}
+                      <a
+                        href={message.fileUrl}
+                        download={message.fileName || "image"}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="absolute bottom-2 right-2 p-1.5 rounded-full bg-black/50 text-white opacity-0 group-hover/img:opacity-100 transition-opacity"
+                        title="Download image"
+                      >
+                        <FaDownload className="w-3 h-3" />
+                      </a>
+                    </>
                   ) : (
                     <div className={`flex items-center gap-3 px-3 py-2 ${isOwn ? "bg-white/15" : "bg-gray-50"}`}>
                       <FileIcon type={message.fileType} />
@@ -280,7 +302,6 @@ const AdminChatModal = ({ isOpen, internship, onClose, onReviewedUpdate }) => {
 
   const markConversationRead = useCallback(async () => {
     if (!internship?._id || !adminId) return;
-
     try {
       await axios.patch("/api/chats/read", {
         internshipId: internship._id,

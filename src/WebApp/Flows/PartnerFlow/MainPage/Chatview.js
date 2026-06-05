@@ -164,38 +164,62 @@ const FileBubble = React.memo(({ file, isOwn }) => {
 });
 
 // ─── Message bubble ───────────────────────────────────────────
-const MessageBubble = React.memo(({ message, isOwn, showDate }) => (
-  <>
-    {showDate && (
-      <div style={{ display: "flex", justifyContent: "center", margin: "12px 0 14px" }}>
-        <div style={{ padding: "4px 11px", borderRadius: 999, background: "#E2E8F0", color: "#475569", fontSize: 10.5, fontWeight: 600 }}>
-          {fmtDate(message.timestamp || message.createdAt)}
+const MessageBubble = React.memo(({ message, isOwn, showDate }) => {
+  // Normalise both formats:
+  //   • Partner-sent: message.files = [{ url, originalName, mimeType, size }]
+  //   • Admin-sent  : message.fileUrl / message.fileName / message.fileType / message.fileSize (flat)
+  const normalizedFiles = (() => {
+    if (message.files?.length) return message.files;
+    if (message.fileUrl) {
+      return [{
+        url: message.fileUrl,
+        originalName: message.fileName || "attachment",
+        mimeType: message.fileType || "",
+        size: message.fileSize || 0,
+      }];
+    }
+    return [];
+  })();
+
+  // Hide the auto-generated "Sent a file: ..." text when a real file bubble is shown
+  const displayText =
+    normalizedFiles.length > 0 && message.message?.startsWith("Sent a file:")
+      ? ""
+      : message.message;
+
+  return (
+    <>
+      {showDate && (
+        <div style={{ display: "flex", justifyContent: "center", margin: "12px 0 14px" }}>
+          <div style={{ padding: "4px 11px", borderRadius: 999, background: "#E2E8F0", color: "#475569", fontSize: 10.5, fontWeight: 600 }}>
+            {fmtDate(message.timestamp || message.createdAt)}
+          </div>
+        </div>
+      )}
+      <div style={{ display: "flex", justifyContent: isOwn ? "flex-end" : "flex-start", marginBottom: 8, animation: "msgIn 0.18s ease both" }}>
+        <div style={{
+          maxWidth: "72%",
+          padding: "9px 12px",
+          borderRadius: isOwn ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
+          background: isOwn ? "linear-gradient(135deg,#4A6CF7,#3154E8)" : "#FFFFFF",
+          color: isOwn ? "#fff" : "#0F172A",
+          border: isOwn ? "none" : "1px solid #E9EDF5",
+          boxShadow: isOwn ? "0 5px 16px rgba(74,108,247,0.18)" : "0 2px 10px rgba(15,23,42,0.05)",
+        }}>
+          {normalizedFiles.map((file, idx) => <FileBubble key={idx} file={file} isOwn={isOwn} />)}
+          {displayText && (
+            <p style={{ margin: normalizedFiles.length ? "7px 0 0" : 0, fontSize: 13.5, lineHeight: 1.65, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+              {displayText}
+            </p>
+          )}
+          <p style={{ margin: "5px 0 0", fontSize: 10, textAlign: "right", color: isOwn ? "rgba(255,255,255,0.6)" : "#94A3B8" }}>
+            {fmtTime(message.timestamp || message.createdAt)}
+          </p>
         </div>
       </div>
-    )}
-    <div style={{ display: "flex", justifyContent: isOwn ? "flex-end" : "flex-start", marginBottom: 8, animation: "msgIn 0.18s ease both" }}>
-      <div style={{
-        maxWidth: "72%",
-        padding: "9px 12px",
-        borderRadius: isOwn ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
-        background: isOwn ? "linear-gradient(135deg,#4A6CF7,#3154E8)" : "#FFFFFF",
-        color: isOwn ? "#fff" : "#0F172A",
-        border: isOwn ? "none" : "1px solid #E9EDF5",
-        boxShadow: isOwn ? "0 5px 16px rgba(74,108,247,0.18)" : "0 2px 10px rgba(15,23,42,0.05)",
-      }}>
-        {message.files?.map((file, idx) => <FileBubble key={idx} file={file} isOwn={isOwn} />)}
-        {message.message && (
-          <p style={{ margin: message.files?.length ? "7px 0 0" : 0, fontSize: 13.5, lineHeight: 1.65, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-            {message.message}
-          </p>
-        )}
-        <p style={{ margin: "5px 0 0", fontSize: 10, textAlign: "right", color: isOwn ? "rgba(255,255,255,0.6)" : "#94A3B8" }}>
-          {fmtTime(message.timestamp || message.createdAt)}
-        </p>
-      </div>
-    </div>
-  </>
-));
+    </>
+  );
+});
 
 // ─── Pager ────────────────────────────────────────────────────
 const MessagesPager = React.memo(({ currentPage, totalPages, onGoTo, totalCount, isLoading }) => {

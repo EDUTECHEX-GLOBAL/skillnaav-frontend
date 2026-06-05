@@ -26,10 +26,7 @@ const UserCreateAccount = lazy(() => import("./WebApp/Flows/UserFlow/SignUpLogin
 const UserLogin = lazy(() => import("./WebApp/Flows/UserFlow/SignUpLogin/UserLogin"));
 const UserFlow = lazy(() => import("./WebApp/Flows/UserFlow/UserFlow"));
 const UserMainPage = lazy(() => import("./WebApp/Flows/UserFlow/MainPage/UserMainPage"));
-const UserProfileForm = lazy(() => import("./WebApp/Flows/UserFlow/SignUpLogin/UserProfileBuilding/UserProfileForm"));
-const UserProfilePicture = lazy(() => import("./WebApp/Flows/UserFlow/SignUpLogin/UserProfileBuilding/UserProfilePicture"));
 const UserforgotPassword = lazy(() => import("./WebApp/Flows/UserFlow/SignUpLogin/UserforgotPassword"));
-const GoogleUserProfileForm = lazy(() => import("./WebApp/Flows/UserFlow/SignUpLogin/UserProfileBuilding/GoogleUserProfileForm"));
 
 const SkillnaavAnalysis = lazy(() => import("./WebApp/Flows/UserFlow/MainPage/SkillnaavAnalysis"));
 
@@ -76,11 +73,10 @@ function App() {
             <Route path="/user" element={<UserFlow />} />
             <Route path="/user-create-account" element={<UserCreateAccount />} />
             <Route path="/user/login" element={<UserLogin />} />
-            <Route path="/user-profile-form" element={<UserProfileForm />} />
-            <Route path="/user-profile-picture" element={<UserProfilePicture />} />
+
             <Route path="/user-main-page/*" element={<UserMainPage />} />
             <Route path="/user-forgot-password" element={<UserforgotPassword />} />
-            <Route path="/google-user-profileform" element={<GoogleUserProfileForm />} />
+           
 
             <Route path="/skillnaav-analysis" element={<SkillnaavAnalysis />} />
 

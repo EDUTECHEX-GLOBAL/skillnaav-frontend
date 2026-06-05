@@ -220,7 +220,7 @@ const UserLogin = () => {
                 localStorage.setItem("loginTime", Date.now());
 
                 if (res.data.needsProfileCompletion) {
-                  navigate("/user/complete-profile");
+                  navigate("/user-create-account");
                 } else {
                   navigate("/user-main-page");
                 }

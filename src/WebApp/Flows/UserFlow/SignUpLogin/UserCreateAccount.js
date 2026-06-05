@@ -563,11 +563,9 @@ const UnifiedUserRegistration = () => {
 
       // ✅ Registration fully complete — wipe session so a refresh never re-triggers this flow
       clearRegistrationSession();
-      localStorage.removeItem("userToken");
+      // localStorage.removeItem("userToken"); // Removed to allow access to user-main-page
 
-      navigate("/registration-pending", {
-        state: { message: "Registration successful! Your account is pending admin approval. You will be notified by email once approved." }
-      });
+      navigate("/user-main-page");
 
     } catch (err) {
       console.error(err);
