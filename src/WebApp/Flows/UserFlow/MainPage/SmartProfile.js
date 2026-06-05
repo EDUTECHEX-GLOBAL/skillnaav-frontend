@@ -198,8 +198,8 @@ const SmartProfile = () => {
   const [bulkLoading, setBulkLoading] = useState(null);
   const [toast, setToast] = useState(null);
 
-  const userInfo = JSON.parse(localStorage.getItem("userInfo") || "{}");
-  const userId = userInfo?._id;
+  const studentInfo = JSON.parse(localStorage.getItem("studentInfo") || "{}");
+  const userId = studentInfo?._id;
 
   const showToast = (msg, type = "success") => {
     setToast({ msg, type });

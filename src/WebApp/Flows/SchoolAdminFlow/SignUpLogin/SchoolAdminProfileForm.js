@@ -53,7 +53,9 @@ const SchoolAdminProfileForm = () => {
         
         if (!data.admin.isApproved) {
           alert("Profile completed successfully! Your account is pending administrator approval.");
-          localStorage.clear();
+          localStorage.removeItem("schoolAdminToken");
+          localStorage.removeItem("schoolAdminInfo");
+          localStorage.removeItem("userInfo");
           navigate("/schooladmin/login");
         } else {
           alert("Profile completed successfully!");

@@ -59,7 +59,7 @@ const Navbar = ({ onToggleSidebar }) => {
   // Read from localStorage on mount
   useEffect(() => {
     try {
-      const storedUserInfo = JSON.parse(localStorage.getItem("userInfo"));
+      const storedUserInfo = (JSON.parse(localStorage.getItem("partnerInfo")) || JSON.parse(localStorage.getItem("userInfo")));
       if (storedUserInfo) {
         setUserInfo(storedUserInfo);
       }
@@ -98,7 +98,7 @@ const Navbar = ({ onToggleSidebar }) => {
       // Remove undefined keys so they don't accidentally overwrite existing values
       Object.keys(updatedUser).forEach((k) => updatedUser[k] === undefined && delete updatedUser[k]);
 
-      localStorage.setItem("userInfo", JSON.stringify(updatedUser));
+      localStorage.setItem("partnerInfo", JSON.stringify(updatedUser));
       setUserInfo((prev) => ({ ...prev, ...updatedUser }));
     } catch (error) {
       console.error("Failed to fetch premium status:", error);
@@ -159,7 +159,7 @@ const Navbar = ({ onToggleSidebar }) => {
         if (!payload || payload.partnerId !== partnerId) return;
 
         const existing = (() => {
-          try { return JSON.parse(localStorage.getItem("userInfo")) || {}; } catch { return {}; }
+          try { return (JSON.parse(localStorage.getItem("partnerInfo")) || JSON.parse(localStorage.getItem("userInfo"))) || {}; } catch { return {}; }
         })();
         const updated = {
           ...existing,
@@ -168,7 +168,7 @@ const Navbar = ({ onToggleSidebar }) => {
           premiumExpiration: payload.premiumExpiration,
         };
 
-        localStorage.setItem("userInfo", JSON.stringify(updated));
+        localStorage.setItem("partnerInfo", JSON.stringify(updated));
         setUserInfo(updated);
         window.dispatchEvent(new CustomEvent("partnerUpdated", { detail: updated }));
       } catch (err) {
@@ -263,7 +263,7 @@ const Navbar = ({ onToggleSidebar }) => {
     }
 
     const sessionUser = (() => {
-      try { return JSON.parse(localStorage.getItem("userInfo")); } catch { return null; }
+      try { return (JSON.parse(localStorage.getItem("partnerInfo")) || JSON.parse(localStorage.getItem("userInfo"))); } catch { return null; }
     })();
     const userId = sessionUser?._id;
 

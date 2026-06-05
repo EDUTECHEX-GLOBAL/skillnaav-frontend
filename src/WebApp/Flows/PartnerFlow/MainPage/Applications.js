@@ -120,7 +120,7 @@ const InternshipList = () => {
   const [filterLevel, setFilterLevel] = useState("All Levels");
 
   // ─── Fetch internships ───────────────────────────────────────────────────────
-  const fetchInternships = useCallback(async (pid, pageNum = 1, query = "", isInitialLoad = false) => {
+  const fetchInternships = useCallback(async (pid, pageNum = 1, query = "", isInitialLoad = false, type = "All Types", mode = "All Modes", level = "All Levels") => {
     if (!pid) return;
     if (isInitialLoad) setLoading(true);
     else setIsSearching(true);
@@ -130,6 +130,9 @@ const InternshipList = () => {
     try {
       const params = { page: pageNum, limit: 6 };
       if (query.trim()) params.search = query.trim();
+      if (type !== "All Types") params.internshipType = type.toUpperCase();
+      if (mode !== "All Modes") params.internshipMode = mode.toUpperCase();
+      if (level !== "All Levels") params.classification = level;
 
       const response = await axios.get(`/api/interns/partner/${pid}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
@@ -245,7 +248,7 @@ const InternshipList = () => {
     const partnerId = partnerData?._id || localStorage.getItem("partnerId");
     if (!partnerId) return;
 
-    fetchCloseScheduleTemplates(partnerId).catch(() => {});
+    fetchCloseScheduleTemplates(partnerId).catch(() => { });
   }, [partnerData, fetchCloseScheduleTemplates]);
 
   const handleSearchChange = (e) => {
@@ -592,7 +595,7 @@ const InternshipList = () => {
         return;
       }
 
-      fetchCloseScheduleTemplates(partnerId).catch(() => {});
+      fetchCloseScheduleTemplates(partnerId).catch(() => { });
       openCloseScheduleConfirmation(internshipId);
     } catch (err) {
       if (err.response?.status === 404) {
@@ -773,11 +776,10 @@ const InternshipList = () => {
                         selectedTemplateId: item._id,
                       }))
                     }
-                    className={`overflow-hidden rounded-2xl border bg-white text-left shadow-sm transition ${
-                      isSelected
-                        ? "border-blue-500 ring-2 ring-blue-100"
-                        : "border-gray-200 hover:border-blue-300 hover:shadow-md"
-                    }`}
+                    className={`overflow-hidden rounded-2xl border bg-white text-left shadow-sm transition ${isSelected
+                      ? "border-blue-500 ring-2 ring-blue-100"
+                      : "border-gray-200 hover:border-blue-300 hover:shadow-md"
+                      }`}
                     style={{
                       contain: "layout paint",
                       contentVisibility: "auto",
@@ -852,11 +854,10 @@ const InternshipList = () => {
                           templatePage: pageNumber,
                         }))
                       }
-                      className={`min-w-10 rounded-xl border px-3 py-2 text-sm font-semibold transition ${
-                        activeTemplatePage === pageNumber
-                          ? "border-blue-500 bg-blue-600 text-white"
-                          : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
-                      }`}
+                      className={`min-w-10 rounded-xl border px-3 py-2 text-sm font-semibold transition ${activeTemplatePage === pageNumber
+                        ? "border-blue-500 bg-blue-600 text-white"
+                        : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                        }`}
                     >
                       {pageNumber}
                     </button>
@@ -904,20 +905,6 @@ const InternshipList = () => {
       </div>
     </div>
   );
-
-  // ─── Filtered internships (client-side: Type, Mode, Level) ──────────────────
-  const filteredInternships = internships.filter((internship) => {
-    const matchType =
-      filterType === "All Types" ||
-      (internship.internshipType || "").toUpperCase() === filterType.toUpperCase();
-    const matchMode =
-      filterMode === "All Modes" ||
-      (internship.internshipMode || "").toLowerCase() === filterMode.toLowerCase();
-    const matchLevel =
-      filterLevel === "All Levels" ||
-      (internship.classification || "").toLowerCase() === filterLevel.toLowerCase();
-    return matchType && matchMode && matchLevel;
-  });
 
   // ─── Loading / error ─────────────────────────────────────────────────────────
   if (loading)
@@ -1023,7 +1010,10 @@ const InternshipList = () => {
           <label className="text-xs font-medium text-gray-500">Type</label>
           <select
             value={filterType}
-            onChange={(e) => setFilterType(e.target.value)}
+            onChange={(e) => {
+              setFilterType(e.target.value);
+              if (partnerIdRef.current) fetchInternships(partnerIdRef.current, 1, debouncedQuery, false, e.target.value, filterMode, filterLevel);
+            }}
             className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition cursor-pointer"
           >
             <option>All Types</option>
@@ -1036,7 +1026,10 @@ const InternshipList = () => {
           <label className="text-xs font-medium text-gray-500">Mode</label>
           <select
             value={filterMode}
-            onChange={(e) => setFilterMode(e.target.value)}
+            onChange={(e) => {
+              setFilterMode(e.target.value);
+              if (partnerIdRef.current) fetchInternships(partnerIdRef.current, 1, debouncedQuery, false, filterType, e.target.value, filterLevel);
+            }}
             className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition cursor-pointer"
           >
             <option>All Modes</option>
@@ -1049,7 +1042,10 @@ const InternshipList = () => {
           <label className="text-xs font-medium text-gray-500">Level</label>
           <select
             value={filterLevel}
-            onChange={(e) => setFilterLevel(e.target.value)}
+            onChange={(e) => {
+              setFilterLevel(e.target.value);
+              if (partnerIdRef.current) fetchInternships(partnerIdRef.current, 1, debouncedQuery, false, filterType, filterMode, e.target.value);
+            }}
             className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition cursor-pointer"
           >
             <option>All Levels</option>
@@ -1061,7 +1057,7 @@ const InternshipList = () => {
       </div>
 
       {/* ── Cards ── */}
-      {filteredInternships.length === 0 ? (
+      {internships.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-gray-400 gap-3">
           <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center">
             <FontAwesomeIcon icon={faBriefcase} className="text-2xl text-gray-300" />
@@ -1071,7 +1067,7 @@ const InternshipList = () => {
         </div>
       ) : (
         <div className="space-y-4">
-          {filteredInternships.map((internship) => {
+          {internships.map((internship) => {
             const compensationText =
               internship.internshipType === "STIPEND"
                 ? `${internship.compensationDetails?.amount} ${internship.compensationDetails?.currency} / ${internship.compensationDetails?.frequency?.toLowerCase()}`
@@ -1291,7 +1287,7 @@ const InternshipList = () => {
 
                       <button
                         onClick={() => handleCloseScheduleClick(internship._id)}
-                        className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-red-500 to-pink-600 text-white font-semibold rounded-lg shadow-lg hover:from-red-600 hover:to-pink-700 transform hover:scale-105 transition duration-200"
+                        className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-rose-400 to-pink-400 text-white text-xs font-semibold rounded-lg shadow hover:from-rose-500 hover:to-pink-500 transition active:scale-95"
                       >
                         <FontAwesomeIcon icon={faTimes} /> Close Schedule
                       </button>

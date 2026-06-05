@@ -8,6 +8,16 @@ import {
   PAID_PILL, FREE_PILL, MODE_PILL, ACTIVE_DOT, ACTIVE_WRAP,
 } from "./Chatconstants";
 
+// ─── Download icon ────────────────────────────────────────────
+const IconDownload = (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+    <polyline points="7 10 12 15 17 10"/>
+    <line x1="12" y1="15" x2="12" y2="3"/>
+  </svg>
+);
+
 // ─── Avatar ───────────────────────────────────────────────────
 const Avatar = React.memo(({ title, size = 38 }) => (
   <div style={{
@@ -62,13 +72,15 @@ const FileAttachmentPreview = React.memo(({ files, onRemove }) => {
           <div key={idx} style={{ position: "relative", borderRadius: 9, border: "1.5px solid #E2E8F0", background: "#F8FAFC", overflow: "hidden", display: "flex", alignItems: "center", gap: 6, padding: isImg ? 0 : "6px 9px", maxWidth: isImg ? 70 : 190 }}>
             {isImg
               ? <img src={url} alt={f.name} style={{ width: 70, height: 70, objectFit: "cover", display: "block" }} />
-              : <>
+              : (
+                <>
                   <span style={{ fontSize: 17 }}>{fileIcon(f.type)}</span>
                   <div style={{ minWidth: 0 }}>
                     <p style={{ margin: 0, fontSize: 11.5, fontWeight: 600, color: "#0F172A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 120 }}>{f.name}</p>
                     <p style={{ margin: 0, fontSize: 10, color: "#94A3B8" }}>{formatBytes(f.size)}</p>
                   </div>
                 </>
+              )
             }
             <button onClick={() => onRemove(idx)} style={{ position: "absolute", top: 3, right: 3, width: 16, height: 16, borderRadius: "50%", border: "none", background: "rgba(15,23,42,0.5)", color: "#fff", fontSize: 10, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
           </div>
@@ -80,22 +92,73 @@ const FileAttachmentPreview = React.memo(({ files, onRemove }) => {
 
 // ─── File bubble inside a message ────────────────────────────
 const FileBubble = React.memo(({ file, isOwn }) => {
-  const isImg = file?.mimeType?.startsWith("image/") || /\.(png|jpg|jpeg|gif|webp)$/i.test(file?.originalName || "");
+  const isImg =
+    file?.mimeType?.startsWith("image/") ||
+    /\.(png|jpg|jpeg|gif|webp)$/i.test(file?.originalName || "");
+
   if (isImg && file?.url) {
     return (
-      <a href={file.url} target="_blank" rel="noreferrer">
-        <img src={file.url} alt={file.originalName} style={{ maxWidth: 200, maxHeight: 200, borderRadius: 9, display: "block", border: isOwn ? "none" : "1px solid #E2E8F0", marginTop: 4 }} />
+      <a
+        href={file.url}
+        download={file.originalName || "image"}
+        target="_blank"
+        rel="noreferrer"
+        style={{ textDecoration: "none", display: "block" }}
+      >
+        <img
+          src={file.url}
+          alt={file.originalName}
+          style={{
+            maxWidth: 200, maxHeight: 200, borderRadius: 9,
+            display: "block",
+            border: isOwn ? "none" : "1px solid #E2E8F0",
+            marginTop: 4,
+            cursor: "pointer",
+          }}
+        />
+        <span style={{
+          display: "flex", alignItems: "center", gap: 4, marginTop: 4,
+          fontSize: 10.5,
+          color: isOwn ? "rgba(255,255,255,0.7)" : "#64748B",
+        }}>
+          {IconDownload}
+          {file.originalName || "Download image"}
+        </span>
       </a>
     );
   }
+
   return (
-    <a href={file?.url} target="_blank" rel="noreferrer"
-      style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 10, background: isOwn ? "rgba(255,255,255,0.15)" : "#F1F5F9", border: isOwn ? "1px solid rgba(255,255,255,0.2)" : "1px solid #E2E8F0", textDecoration: "none", marginTop: 4, maxWidth: 220 }}>
-      <span style={{ fontSize: 18 }}>{fileIcon(file?.mimeType)}</span>
-      <div style={{ minWidth: 0 }}>
-        <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: isOwn ? "#fff" : "#0F172A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 140 }}>{file?.originalName || "Attachment"}</p>
-        {file?.size && <p style={{ margin: 0, fontSize: 10, color: isOwn ? "rgba(255,255,255,0.6)" : "#94A3B8" }}>{formatBytes(file.size)}</p>}
+    <a
+      href={file?.url || "#"}
+      download={file?.originalName || "attachment"}
+      target="_blank"
+      rel="noreferrer"
+      style={{
+        display: "inline-flex", alignItems: "center", gap: 8,
+        padding: "9px 13px", borderRadius: 10, marginTop: 4, maxWidth: 240,
+        background: isOwn ? "rgba(255,255,255,0.15)" : "#F1F5F9",
+        border: isOwn ? "1px solid rgba(255,255,255,0.25)" : "1px solid #E2E8F0",
+        textDecoration: "none",
+        transition: "background 0.15s",
+      }}
+    >
+      <span style={{ fontSize: 20 }}>{fileIcon(file?.mimeType)}</span>
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <p style={{
+          margin: 0, fontSize: 12, fontWeight: 600,
+          color: isOwn ? "#fff" : "#0F172A",
+          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 140,
+        }}>
+          {file?.originalName || "Attachment"}
+        </p>
+        <p style={{ margin: "2px 0 0", fontSize: 10, color: isOwn ? "rgba(255,255,255,0.6)" : "#94A3B8" }}>
+          {file?.size ? formatBytes(file.size) : "Tap to download"}
+        </p>
       </div>
+      <span style={{ color: isOwn ? "rgba(255,255,255,0.8)" : "#4A6CF7", flexShrink: 0 }}>
+        {IconDownload}
+      </span>
     </a>
   );
 });
@@ -284,7 +347,7 @@ const ChatView = ({
               </button>
             </div>
             <p style={S.hintText}>
-              <strong>Enter</strong> to send · <strong>Shift+Enter</strong> new line · 📎 attach
+              <strong>Enter</strong> to send · <strong>Shift+Enter</strong> new line · attach
             </p>
           </div>
 

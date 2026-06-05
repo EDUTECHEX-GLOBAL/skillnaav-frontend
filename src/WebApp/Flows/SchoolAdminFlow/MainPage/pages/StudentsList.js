@@ -4,6 +4,22 @@ import StudentStatusModal from './StudentStatusModal';
 import ConfirmationModal from './ConfirmationModal';
 import { Search, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 
+// ─── Windowed page number builder ────────────────────────────────────────────
+const getPageNumbers = (current, total) => {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages = new Set([1, total]);
+  for (let i = Math.max(2, current - 2); i <= Math.min(total - 1, current + 2); i++) pages.add(i);
+  const sorted = [...pages].sort((a, b) => a - b);
+  const result = [];
+  let prev = 0;
+  for (const p of sorted) {
+    if (p - prev > 1) result.push("...");
+    result.push(p);
+    prev = p;
+  }
+  return result;
+};
+
 const STUDENTS_PER_PAGE = 40;
 
 const StudentsList = () => {
@@ -174,60 +190,48 @@ const StudentsList = () => {
       </div>
 
       {/* Pagination Controls */}
-      {!isLoadingStudents && filteredStudents.length > 0 && (
-        <div className="flex justify-between items-center mt-4 text-sm text-gray-600">
-          <span>
-            Showing {((currentPage - 1) * STUDENTS_PER_PAGE) + 1}–{Math.min(currentPage * STUDENTS_PER_PAGE, filteredStudents.length)} of {filteredStudents.length} students
-          </span>
-          <div className="flex items-center gap-2">
+      {!isLoadingStudents && totalPages > 1 && (
+        <div className="flex justify-center px-4 py-8 bg-gray-50/50 rounded-b-lg">
+          <div className="flex items-center gap-1.5 bg-white p-1.5 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-gray-100/50">
+            {/* Prev */}
             <button
               onClick={handlePrevPage}
               disabled={currentPage === 1}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-md border border-gray-300 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-slate-50 text-slate-500 hover:bg-slate-100 disabled:text-slate-400 disabled:bg-slate-50/50"
             >
-              <ChevronLeft size={16} />
-              Prev
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+              Previous
             </button>
 
-            {/* Page number buttons */}
-            {Array.from({ length: totalPages }, (_, i) => i + 1)
-              .filter(page =>
-                page === 1 ||
-                page === totalPages ||
-                Math.abs(page - currentPage) <= 1
+            {/* Windowed page numbers */}
+            {getPageNumbers(currentPage, totalPages).map((p, i) =>
+              p === "..." ? (
+                <div key={`ellipsis-${i}`} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-50 text-slate-400 text-sm font-semibold select-none">
+                  ...
+                </div>
+              ) : (
+                <button
+                  key={p}
+                  onClick={() => setCurrentPage(p)}
+                  className={`w-10 h-10 flex items-center justify-center rounded-xl text-sm font-semibold transition-all ${
+                    currentPage === p
+                      ? "bg-[#2563EB] text-white shadow-lg shadow-blue-500/30"
+                      : "text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  {p}
+                </button>
               )
-              .reduce((acc, page, i, arr) => {
-                if (i > 0 && page - arr[i - 1] > 1) {
-                  acc.push('...');
-                }
-                acc.push(page);
-                return acc;
-              }, [])
-              .map((item, i) =>
-                item === '...' ? (
-                  <span key={`ellipsis-${i}`} className="px-2 text-gray-400">…</span>
-                ) : (
-                  <button
-                    key={item}
-                    onClick={() => setCurrentPage(item)}
-                    className={`w-8 h-8 rounded-md border text-sm font-medium transition ${
-                      currentPage === item
-                        ? 'bg-blue-500 text-white border-blue-500'
-                        : 'border-gray-300 hover:bg-gray-100 text-gray-700'
-                    }`}
-                  >
-                    {item}
-                  </button>
-                )
-              )}
+            )}
 
+            {/* Next */}
             <button
               onClick={handleNextPage}
               disabled={currentPage === totalPages}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-md border border-gray-300 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-slate-50 text-slate-700 hover:bg-slate-100 disabled:text-slate-400 disabled:bg-slate-50/50"
             >
               Next
-              <ChevronRight size={16} />
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
             </button>
           </div>
         </div>

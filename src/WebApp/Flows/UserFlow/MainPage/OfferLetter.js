@@ -14,7 +14,7 @@ const OfferLetters = () => {
   const [certificates, setCertificates] = useState([]);
   const [loadingCertificates, setLoadingCertificates] = useState(true);
 
-  const userInfo = JSON.parse(localStorage.getItem("userInfo"));
+  const userInfo = (JSON.parse(localStorage.getItem("studentInfo")) || JSON.parse(localStorage.getItem("userInfo")));
   // Ensure correct id field
   const studentId = userInfo?.studentId || userInfo?._id;
 

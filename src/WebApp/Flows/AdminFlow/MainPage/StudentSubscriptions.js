@@ -78,6 +78,23 @@ const SkeletonRow = () => (
   </tr>
 );
 
+// ─── Windowed page number builder ────────────────────────────────────────────
+
+const getPageNumbers = (current, total) => {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages = new Set([1, total]);
+  for (let i = Math.max(2, current - 2); i <= Math.min(total - 1, current + 2); i++) pages.add(i);
+  const sorted = [...pages].sort((a, b) => a - b);
+  const result = [];
+  let prev = 0;
+  for (const p of sorted) {
+    if (p - prev > 1) result.push("...");
+    result.push(p);
+    prev = p;
+  }
+  return result;
+};
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 const StudentSubscriptions = () => {
@@ -91,7 +108,7 @@ const StudentSubscriptions = () => {
   const [sortBy, setSortBy] = useState("joinedAt");
   const [sortDir, setSortDir] = useState("desc");
   const [page, setPage] = useState(1);
-  const PAGE_SIZE = 15;
+  const PAGE_SIZE = 20;
 
   const fetchStudents = useCallback(async () => {
     setLoading(true);
@@ -329,26 +346,47 @@ const StudentSubscriptions = () => {
 
         {/* Pagination */}
         {!loading && totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-gray-50">
-            <p className="text-xs text-gray-400">
-              Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, sorted.length)} of {sorted.length}
-            </p>
-            <div className="flex gap-1">
-              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
-                className="px-2.5 py-1 rounded-lg text-xs border border-gray-200 text-gray-600 disabled:opacity-40 hover:border-teal-300 transition-colors">
-                ← Prev
+          <div className="flex justify-center px-4 py-8 bg-gray-50/50">
+            <div className="flex items-center gap-1.5 bg-white p-1.5 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-gray-100/50">
+              {/* Prev */}
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-slate-50 text-slate-500 hover:bg-slate-100 disabled:text-slate-400 disabled:bg-slate-50/50"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+                Previous
               </button>
-              {[...Array(totalPages)].map((_, i) => (
-                <button key={i} onClick={() => setPage(i + 1)}
-                  className={`px-2.5 py-1 rounded-lg text-xs border transition-colors ${
-                    page === i + 1 ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600 hover:border-teal-300"
-                  }`}>
-                  {i + 1}
-                </button>
-              ))}
-              <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-                className="px-2.5 py-1 rounded-lg text-xs border border-gray-200 text-gray-600 disabled:opacity-40 hover:border-teal-300 transition-colors">
-                Next →
+
+              {/* Windowed page numbers */}
+              {getPageNumbers(page, totalPages).map((p, i) =>
+                p === "..." ? (
+                  <div key={`ellipsis-${i}`} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-50 text-slate-400 text-sm font-semibold select-none">
+                    ...
+                  </div>
+                ) : (
+                  <button
+                    key={p}
+                    onClick={() => setPage(p)}
+                    className={`w-10 h-10 flex items-center justify-center rounded-xl text-sm font-semibold transition-all ${
+                      page === p
+                        ? "bg-[#2563EB] text-white shadow-lg shadow-blue-500/30"
+                        : "text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    {p}
+                  </button>
+                )
+              )}
+
+              {/* Next */}
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-slate-50 text-slate-700 hover:bg-slate-100 disabled:text-slate-400 disabled:bg-slate-50/50"
+              >
+                Next
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
               </button>
             </div>
           </div>

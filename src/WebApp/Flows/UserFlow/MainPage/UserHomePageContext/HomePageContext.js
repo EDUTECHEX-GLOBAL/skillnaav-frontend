@@ -92,7 +92,7 @@ export const TabProvider = ({ children }) => {
   const [error, setError] = useState(null);
   const [isLoadingSavedJobs, setIsLoadingSavedJobs] = useState(true);
 
-  const userInfo = JSON.parse(localStorage.getItem("userInfo"));
+  const userInfo = (JSON.parse(localStorage.getItem("studentInfo")) || JSON.parse(localStorage.getItem("userInfo")));
   const userId = userInfo?._id;
 
   const getSavedJobs = useCallback(async () => {

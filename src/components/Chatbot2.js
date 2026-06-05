@@ -106,24 +106,105 @@ const ensureInstructorFeature = (featureIndex) => {
   return [...list, INSTRUCTOR_FEATURE];
 };
 
+/* ═══════════════════════════════════════════════════════════════
+   ALL hooks are inside the component — this is the only valid place
+   ═══════════════════════════════════════════════════════════════ */
 const Chatbot2 = ({ featureIndex = [] }) => {
+  // ── Chat state ──
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [newMsgIdx, setNewMsgIdx] = useState(null);
 
+  // ── Drag state ──
+  const [position, setPosition] = useState({ x: 24, y: 24 });
+  const [dragging, setDragging] = useState(false);
+  const dragStart = useRef(null);
+  const didDrag = useRef(false); // distinguish click vs drag
+
+  // ── Other refs ──
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const fabRef = useRef(null);
 
+  // ── Scroll to bottom on new message ──
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
+  // ── Focus input when chat opens ──
   useEffect(() => {
     if (isOpen) setTimeout(() => inputRef.current?.focus(), 100);
   }, [isOpen]);
 
+  // ── Drag: attach / detach window listeners ──
+  useEffect(() => {
+    const onMove = (e) => {
+      if (!dragStart.current) return;
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      const dx = dragStart.current.mouseX - clientX;
+      const dy = dragStart.current.mouseY - clientY;
+
+      // Only mark as real drag after 4px movement to preserve click behaviour
+      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) didDrag.current = true;
+
+      const newX = Math.max(8, Math.min(window.innerWidth - 64, dragStart.current.startX + dx));
+      const newY = Math.max(8, Math.min(window.innerHeight - 64, dragStart.current.startY + dy));
+      setPosition({ x: newX, y: newY });
+    };
+
+    const onUp = () => {
+      setDragging(false);
+      dragStart.current = null;
+    };
+
+    if (dragging) {
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
+      window.addEventListener("touchmove", onMove, { passive: true });
+      window.addEventListener("touchend", onUp);
+    }
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("touchmove", onMove);
+      window.removeEventListener("touchend", onUp);
+    };
+  }, [dragging]);
+
+  const handleMouseDown = (e) => {
+    // Only trigger drag from the FAB wrapper, not from the button's internal SVGs
+    didDrag.current = false;
+    dragStart.current = {
+      mouseX: e.clientX,
+      mouseY: e.clientY,
+      startX: position.x,
+      startY: position.y,
+    };
+    setDragging(true);
+  };
+
+  const handleTouchStart = (e) => {
+    const touch = e.touches[0];
+    didDrag.current = false;
+    dragStart.current = {
+      mouseX: touch.clientX,
+      mouseY: touch.clientY,
+      startX: position.x,
+      startY: position.y,
+    };
+    setDragging(true);
+  };
+
+  // ── Toggle open only if the user didn't actually drag ──
+  const handleFabClick = () => {
+    if (didDrag.current) return; // was a drag, not a tap
+    setIsOpen((prev) => !prev);
+  };
+
+  // ── Send message ──
   const sendMessage = async (text) => {
     const msg = (text || input).trim();
     if (!msg) return;
@@ -175,19 +256,15 @@ const Chatbot2 = ({ featureIndex = [] }) => {
         .scrollbar-thin::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 99px; }
       `}</style>
 
-      {/* ── Chat panel ──
-          ✅ KEY FIX: This is its own fixed element sized to the panel only.
-          When closed, pointerEvents="none" so it CANNOT block any clicks beneath it.
-          Previously this was a flex column wrapper that covered the whole bottom-right
-          area of the screen even when the chat was invisible. */}
+      {/* ── Chat panel ── */}
       <div
         style={{
           position: "fixed",
-          bottom: "96px",      /* 24px (bottom-6) + 56px (FAB height) + 16px gap */
-          right: "24px",
+          bottom: `${position.y + 72}px`,
+          right: `${position.x}px`,
           zIndex: 50,
-          pointerEvents: isOpen ? "auto" : "none",   /* ✅ never blocks when closed */
-          transition: "opacity 0.3s ease, transform 0.3s ease",
+          pointerEvents: isOpen ? "auto" : "none",
+          transition: dragging ? "none" : "opacity 0.3s ease, transform 0.3s ease",
           opacity: isOpen ? 1 : 0,
           transform: isOpen ? "scale(1) translateY(0)" : "scale(0.95) translateY(16px)",
           transformOrigin: "bottom right",
@@ -313,24 +390,37 @@ const Chatbot2 = ({ featureIndex = [] }) => {
         </div>
       </div>
 
-      {/* ── FAB button ──
-          ✅ KEY FIX: Its own fixed element, exactly 56×56px.
-          No wrapper div with flex/gap/column that expands the hit area beyond the button. */}
+      {/* ── FAB button (draggable wrapper) ── */}
       <div
+        ref={fabRef}
         style={{
           position: "fixed",
-          bottom: "24px",
-          right: "24px",
+          bottom: `${position.y}px`,
+          right: `${position.x}px`,
           zIndex: 50,
           width: "56px",
           height: "56px",
+          cursor: dragging ? "grabbing" : "grab",
+          userSelect: "none",
         }}
+        onMouseDown={handleMouseDown}
+        onTouchStart={handleTouchStart}
       >
+        {/* Drag hint tooltip */}
+        {!isOpen && !dragging && (
+          <div
+            className="absolute -top-8 right-0 whitespace-nowrap text-[10px] bg-gray-800 text-white px-2 py-1 rounded-lg pointer-events-none opacity-0 group-hover:opacity-100"
+            style={{ transition: "opacity 0.2s" }}
+          >
+            Drag to move
+          </div>
+        )}
+
         <button
-          onClick={() => setIsOpen((prev) => !prev)}
+          onClick={handleFabClick}
           aria-label={isOpen ? "Close chat" : "Open chat"}
           className={`
-            relative w-14 h-14 rounded-2xl shadow-lg flex items-center justify-center
+            group relative w-14 h-14 rounded-2xl shadow-lg flex items-center justify-center
             transition-all duration-300 active:scale-95
             bg-gradient-to-br from-blue-500 to-indigo-600
             ${!isOpen ? "hover:shadow-blue-300 hover:shadow-xl hover:-translate-y-0.5" : ""}

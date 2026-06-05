@@ -74,8 +74,12 @@ const UserManagement = () => {
       try {
         const { data } = await axios.get("/api/users/users");
         console.log("Fetched users:", data);
-        setUsers(data);
-        setFilteredUsers(data);
+        const processedUsers = data.map(u => ({
+          ...u,
+          status: (u.schoolAdmin && (!u.status || u.status === "Pending")) ? "Approved" : (u.status || "Pending")
+        }));
+        setUsers(processedUsers);
+        setFilteredUsers(processedUsers);
       } catch (err) {
         setError(err.response?.data?.message || err.message);
       } finally {
@@ -514,7 +518,7 @@ const UserManagement = () => {
                         }`}
                       >
                         <AiOutlineCheck size={14} />
-                        {user.status === "Approved" ? "Approved ✓" : "Approve"}
+                        {user.status === "Approved" ? "Approved" : "Approve"}
                       </button>
 
                       {/* Reject Button — Grid View */}
@@ -528,7 +532,7 @@ const UserManagement = () => {
                         }`}
                       >
                         <AiOutlineCloseCircle size={14} />
-                        {user.status === "Rejected" ? "Rejected ✗" : "Reject"}
+                        {user.status === "Rejected" ? "Rejected" : "Reject"}
                       </button>
                     </div>
                   </div>
@@ -618,32 +622,32 @@ const UserManagement = () => {
 
                     <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                       {/* Approve Button — List View */}
-<button
-  onClick={() => handleApprove(user._id)}
-  disabled={user.status === 'Approved'}
-  className={`w-full flex-1 px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-1 transition ${
-    user.status === 'Approved'
-      ? 'bg-green-600 text-white cursor-not-allowed opacity-70'
-      : 'bg-green-500 text-white hover:bg-green-600'
-  }`}
->
-  <AiOutlineCheck size={14} />
-  {user.status === 'Approved' ? 'Approved ✓' : 'Approve'}
-</button>
-
-{/* Reject Button — List View */}
-<button
-  onClick={() => handleReject(user._id)}
-  disabled={user.status === 'Rejected'}
-  className={`w-full flex-1 px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-1 transition ${
-    user.status === 'Rejected'
-      ? 'bg-red-600 text-white cursor-not-allowed opacity-70'
-      : 'bg-red-500 text-white hover:bg-red-600'
-  }`}
->
-  <AiOutlineCloseCircle size={14} />
-  {user.status === 'Rejected' ? 'Rejected ✗' : 'Reject'}
-</button>
+                      <button
+                        onClick={() => handleApprove(user._id)}
+                        disabled={user.status === 'Approved'}
+                        className={`w-full flex-1 px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-1 transition ${
+                          user.status === 'Approved'
+                            ? 'bg-green-600 text-white cursor-not-allowed opacity-70'
+                            : 'bg-green-500 text-white hover:bg-green-600'
+                        }`}
+                      >
+                        <AiOutlineCheck size={14} />
+                        {user.status === 'Approved' ? 'Approved' : 'Approve'}
+                      </button>
+                      
+                      {/* Reject Button — List View */}
+                      <button
+                        onClick={() => handleReject(user._id)}
+                        disabled={user.status === 'Rejected'}
+                        className={`w-full flex-1 px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-1 transition ${
+                          user.status === 'Rejected'
+                            ? 'bg-red-600 text-white cursor-not-allowed opacity-70'
+                            : 'bg-red-500 text-white hover:bg-red-600'
+                        }`}
+                      >
+                        <AiOutlineCloseCircle size={14} />
+                        {user.status === 'Rejected' ? 'Rejected' : 'Reject'}
+                      </button>
                     </div>
                   </div>
                 </div>

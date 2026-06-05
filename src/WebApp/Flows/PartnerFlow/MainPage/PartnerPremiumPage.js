@@ -96,7 +96,7 @@ export default function PartnerPremiumPage() {
 
   // ✅ FIX 1: partner MUST be declared before any usage — moved to top of component body
   const reduxPartner = useSelector((s) => s.auth?.partnerInfo);
-  const stored  = JSON.parse(localStorage.getItem("userInfo") || "{}");
+  const stored  = (JSON.parse(localStorage.getItem("partnerInfo")) || JSON.parse(localStorage.getItem("userInfo") || "{}"));
   const partner = reduxPartner || stored;
 
   // ✅ FIX 2: Token is saved as "token" by PartnerLogin — read the correct key.
@@ -226,7 +226,7 @@ export default function PartnerPremiumPage() {
                 planType:          verify.partner.planType,
                 premiumExpiration: verify.partner.premiumExpiration,
               };
-              localStorage.setItem("userInfo", JSON.stringify(updated));
+              localStorage.setItem("partnerInfo", JSON.stringify(updated));
               // Notify Navbar and any other listener (socket handler also dispatches this)
               window.dispatchEvent(new CustomEvent("partnerUpdated", { detail: updated }));
 

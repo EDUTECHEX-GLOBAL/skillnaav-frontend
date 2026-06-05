@@ -350,9 +350,9 @@ const ProfileForm = () => {
       //    lacks isPremium/planType fields that Navbar reads). Merge with existing stored
       //    premium fields so they are never wiped on a profile save.
       const existingStored = (() => {
-        try { return JSON.parse(localStorage.getItem("userInfo")) || {}; } catch { return {}; }
+        try { return (JSON.parse(localStorage.getItem("studentInfo")) || JSON.parse(localStorage.getItem("userInfo"))) || {}; } catch { return {}; }
       })();
-      localStorage.setItem("userInfo", JSON.stringify({
+      localStorage.setItem("studentInfo", JSON.stringify({
         ...existingStored,
         ...updatedUser,
         // Never overwrite premium fields from a profile-update response

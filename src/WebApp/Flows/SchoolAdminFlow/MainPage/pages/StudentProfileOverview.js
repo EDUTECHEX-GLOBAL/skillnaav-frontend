@@ -90,6 +90,22 @@ function CompletionBadge({ pct }) {
   );
 }
 
+// ─── Windowed page number builder ────────────────────────────────────────────
+const getPageNumbers = (current, total) => {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages = new Set([1, total]);
+  for (let i = Math.max(2, current - 2); i <= Math.min(total - 1, current + 2); i++) pages.add(i);
+  const sorted = [...pages].sort((a, b) => a - b);
+  const result = [];
+  let prev = 0;
+  for (const p of sorted) {
+    if (p - prev > 1) result.push("...");
+    result.push(p);
+    prev = p;
+  }
+  return result;
+};
+
 // ─── Main component ───────────────────────────────────────────────────────────
 const StudentProfileOverview = () => {
   const [students, setStudents]               = useState([]);
@@ -99,6 +115,15 @@ const StudentProfileOverview = () => {
   const [sortKey, setSortKey]                 = useState('completion');
   const [sortAsc, setSortAsc]                 = useState(true);
   const [selectedStudent, setSelectedStudent] = useState(null);
+  
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
+
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [search, filter, sortKey, sortAsc]);
 
   const fetchOverview = useCallback(async () => {
     const token = localStorage.getItem('schoolAdminToken');
@@ -138,6 +163,9 @@ const StudentProfileOverview = () => {
       if (av > bv) return sortAsc ? 1  : -1;
       return 0;
     });
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const handleSort = (key) => {
     if (sortKey === key) setSortAsc(prev => !prev);
@@ -246,7 +274,7 @@ const StudentProfileOverview = () => {
                 </td>
               </tr>
             ) : (
-              filtered.map((student) => (
+              paginated.map((student) => (
                 <tr key={student._id} className="bg-white border-t border-blue-100 hover:bg-blue-50 transition-colors">
 
                   {/* Name + avatar */}
@@ -285,6 +313,54 @@ const StudentProfileOverview = () => {
           </tbody>
         </table>
       </div>
+
+      {/* Pagination */}
+      {!loading && totalPages > 1 && (
+        <div className="flex justify-center px-4 py-8 bg-gray-50/50 rounded-b-lg">
+          <div className="flex items-center gap-1.5 bg-white p-1.5 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-gray-100/50">
+            {/* Prev */}
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-slate-50 text-slate-500 hover:bg-slate-100 disabled:text-slate-400 disabled:bg-slate-50/50"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+              Previous
+            </button>
+
+            {/* Windowed page numbers */}
+            {getPageNumbers(page, totalPages).map((p, i) =>
+              p === "..." ? (
+                <div key={`ellipsis-${i}`} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-50 text-slate-400 text-sm font-semibold select-none">
+                  ...
+                </div>
+              ) : (
+                <button
+                  key={p}
+                  onClick={() => setPage(p)}
+                  className={`w-10 h-10 flex items-center justify-center rounded-xl text-sm font-semibold transition-all ${
+                    page === p
+                      ? "bg-[#2563EB] text-white shadow-lg shadow-blue-500/30"
+                      : "text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  {p}
+                </button>
+              )
+            )}
+
+            {/* Next */}
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-slate-50 text-slate-700 hover:bg-slate-100 disabled:text-slate-400 disabled:bg-slate-50/50"
+            >
+              Next
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Detail modal ── */}
       {selectedStudent && (

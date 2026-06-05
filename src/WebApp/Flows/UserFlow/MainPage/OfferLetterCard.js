@@ -155,7 +155,7 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
   const rowRefs = useRef({});
   const qualificationRowRef = useRef(null);
   const qualificationMeasureRef = useRef(null);
-  const userInfo = JSON.parse(localStorage.getItem('userInfo'));
+  const userInfo = (JSON.parse(localStorage.getItem('studentInfo')) || JSON.parse(localStorage.getItem('userInfo')));
   const userPlan = userInfo?.planType;
   const [showCompleteNotice, setShowCompleteNotice] = useState(false);
   const [showTimeModal, setShowTimeModal] = useState(false);

@@ -19,7 +19,7 @@ const Notifications = ({ onNavigate }) => {
     const fetchNotifications = async () => {
       try {
         setLoading(true);
-        const userInfo = JSON.parse(localStorage.getItem("userInfo"));
+        const userInfo = (JSON.parse(localStorage.getItem("studentInfo")) || JSON.parse(localStorage.getItem("userInfo")));
         const studentId = userInfo?._id;
         if (!studentId) {
           setError("Unable to identify user");
@@ -186,7 +186,7 @@ const Notifications = ({ onNavigate }) => {
   const markAllRead = async () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
     try {
-      const userInfo = JSON.parse(localStorage.getItem("userInfo"));
+      const userInfo = (JSON.parse(localStorage.getItem("studentInfo")) || JSON.parse(localStorage.getItem("userInfo")));
       const studentId = userInfo?._id;
       await axios.put(`/api/notifications/read-all`, { studentId });
     } catch (err) {

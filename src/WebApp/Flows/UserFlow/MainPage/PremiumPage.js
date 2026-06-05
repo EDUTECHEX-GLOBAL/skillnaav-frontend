@@ -41,12 +41,12 @@ function PremiumPage() {
 
         if (data.success && data.user) {
           const updatedUser = {
-            ...(JSON.parse(localStorage.getItem("userInfo")) || {}),
+            ...((JSON.parse(localStorage.getItem("studentInfo")) || JSON.parse(localStorage.getItem("userInfo"))) || {}),
             isPremium: data.user.isPremium,
             planType: data.user.planType,
             premiumExpiration: data.user.premiumExpiration,
           };
-          localStorage.setItem("userInfo", JSON.stringify(updatedUser));
+          localStorage.setItem("studentInfo", JSON.stringify(updatedUser));
           setIsPremium(data.user.isPremium);
           setPlanType(data.user.planType || "Free");
           setPremiumExpiration(data.user.premiumExpiration || null);
@@ -136,14 +136,14 @@ function PremiumPage() {
               setPaymentHistory([]);
               setShowHistory(false);
 
-              const userInfo = JSON.parse(localStorage.getItem("userInfo")) || {};
+              const userInfo = (JSON.parse(localStorage.getItem("studentInfo")) || JSON.parse(localStorage.getItem("userInfo"))) || {};
               const updatedUser = {
                 ...userInfo,
                 isPremium: true,
                 planType: verifyRes.data.user.planType,
                 premiumExpiration: verifyRes.data.user.premiumExpiration,
               };
-              localStorage.setItem("userInfo", JSON.stringify(updatedUser));
+              localStorage.setItem("studentInfo", JSON.stringify(updatedUser));
 
               setIsPremium(true);
               setPlanType(updatedUser.planType);
@@ -206,7 +206,7 @@ function PremiumPage() {
       showAlert("PayPal is still loading. Try again shortly.", "error");
       return;
     }
-    const userInfo = JSON.parse(localStorage.getItem("userInfo"));
+    const userInfo = (JSON.parse(localStorage.getItem("studentInfo")) || JSON.parse(localStorage.getItem("userInfo")));
     if (!userInfo?._id) {
       showAlert("User session not found. Please log in again.", "error");
       return;

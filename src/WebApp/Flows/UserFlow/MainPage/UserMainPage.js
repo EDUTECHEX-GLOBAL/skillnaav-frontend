@@ -70,9 +70,9 @@ const UserMainPageContent = () => {
         setUserInfo(profileRes.data);
 
         // Keep localStorage synced so Navbar (and other components) see fresh data like planType
-        const existingUserInfo = JSON.parse(localStorage.getItem("userInfo") || "{}");
+        const existingUserInfo = JSON.parse(localStorage.getItem("studentInfo") || localStorage.getItem("userInfo") || "{}");
         const updatedUserInfo = { ...existingUserInfo, ...profileRes.data };
-        localStorage.setItem("userInfo", JSON.stringify(updatedUserInfo));
+        localStorage.setItem("studentInfo", JSON.stringify(updatedUserInfo));
         window.dispatchEvent(new Event("userInfoUpdated"));
 
         const reverifyRequested = !!consentRes.data?.data?.reverificationRequested;
@@ -84,7 +84,10 @@ const UserMainPageContent = () => {
         if (openTab) handleSelectTab(openTab);
       } catch (error) {
         console.error("Failed to fetch user info:", error);
-        localStorage.clear();
+        localStorage.removeItem("userToken");
+        localStorage.removeItem("studentInfo");
+        localStorage.removeItem("userInfo");
+        localStorage.removeItem("sessionId");
         navigate("/user/login");
       } finally {
         setLoading(false);

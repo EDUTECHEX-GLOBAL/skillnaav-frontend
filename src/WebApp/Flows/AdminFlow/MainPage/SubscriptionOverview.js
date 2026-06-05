@@ -77,11 +77,53 @@ const SubscriptionOverview = () => {
   useEffect(() => {
     const fetchOverview = async () => {
       try {
-        const res = await fetch("api/admin/subscriptions/overview");
+        const API_BASE = process.env.REACT_APP_API_BASE || "http://localhost:5000";
+        const [res, schoolRes] = await Promise.all([
+          fetch(`${API_BASE}/api/admin/subscriptions/overview`),
+          fetch(`${API_BASE}/api/school-admin/schooladmins`).catch(() => ({ ok: false, json: () => [] }))
+        ]);
+        
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const result = await res.json();
-        if (result.success) setData(result.data);
-        else throw new Error("API returned success: false");
+        
+        let schoolAdmins = [];
+        if (schoolRes.ok) {
+           schoolAdmins = await schoolRes.json();
+        }
+
+        if (result.success) {
+           const overviewData = result.data;
+           
+           // Calculate stats for school admins
+           const schoolList = Array.isArray(schoolAdmins) ? schoolAdmins : [];
+           const totalSchools = schoolList.length;
+           const activeCount = schoolList.filter((s) => s.subscriptionStatus === "active").length;
+           const inactiveCount = totalSchools - activeCount;
+           const totalCreditsBought = schoolList.reduce((sum, s) => sum + (s.creditsTotalReceived ?? s.creditsAvailable ?? 0), 0);
+           const totalCreditsRemaining = schoolList.reduce((sum, s) => sum + (s.creditsAvailable ?? 0), 0);
+           
+           const planMap = {};
+           schoolList.forEach((s) => {
+             const p = s.plan || "Free Plan";
+             planMap[p] = (planMap[p] || 0) + 1;
+           });
+           const planBreakdown = Object.entries(planMap).map(([plan, count]) => ({
+             plan,
+             count,
+             pct: totalSchools ? Math.round((count / totalSchools) * 100) : 0,
+           }));
+           
+           overviewData.schoolAdmins = {
+             total: totalSchools,
+             active: activeCount,
+             inactive: inactiveCount,
+             creditsBought: totalCreditsBought,
+             creditsRemaining: totalCreditsRemaining,
+             planBreakdown
+           };
+           
+           setData(overviewData);
+        } else throw new Error("API returned success: false");
       } catch (err) {
         console.error("Overview fetch failed:", err);
         setError("Failed to load subscription data.");
@@ -118,6 +160,15 @@ const SubscriptionOverview = () => {
           sub: "Within 7 days",
         },
         { label: "Expired", value: data.partners.expired, colorClass: "text-red-500" },
+      ]
+    : [];
+
+  const schoolAdminStats = data && data.schoolAdmins
+    ? [
+        { label: "Total Schools", value: data.schoolAdmins.total, colorClass: "text-gray-800" },
+        { label: "Active Sub.", value: data.schoolAdmins.active, colorClass: "text-emerald-600" },
+        { label: "Credits Bought", value: data.schoolAdmins.creditsBought, colorClass: "text-teal-600" },
+        { label: "Credits Remaining", value: data.schoolAdmins.creditsRemaining, colorClass: "text-blue-600" },
       ]
     : [];
 
@@ -191,6 +242,15 @@ const SubscriptionOverview = () => {
         stats={partnerStats}
         planBreakdown={data?.partners.planBreakdown}
         onViewAll={() => handleSelectTab("partner-subscriptions")}
+        loading={loading}
+      />
+
+      {/* School Admin panel */}
+      <SectionPanel
+        title="School Admin Subscriptions"
+        stats={schoolAdminStats}
+        planBreakdown={data?.schoolAdmins?.planBreakdown}
+        onViewAll={() => handleSelectTab("school-admin-subscriptions")}
         loading={loading}
       />
     </div>

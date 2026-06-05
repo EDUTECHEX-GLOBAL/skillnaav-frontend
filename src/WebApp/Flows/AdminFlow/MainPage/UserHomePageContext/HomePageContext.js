@@ -23,6 +23,7 @@ const VALID_TABS = new Set([
   "subscription-overview",
   "student-subscriptions",
   "partner-subscriptions",
+  "school-admin-subscriptions",
 ]);
 
 const TAB_ROUTE_SEGMENTS = {
@@ -43,6 +44,7 @@ const TAB_ROUTE_SEGMENTS = {
   "subscription-overview": "subscriptions",
   "student-subscriptions": "subscriptions/students",
   "partner-subscriptions": "subscriptions/partners",
+  "school-admin-subscriptions": "subscriptions/schools",
 };
 
 const normalizePath = (path = "") => {

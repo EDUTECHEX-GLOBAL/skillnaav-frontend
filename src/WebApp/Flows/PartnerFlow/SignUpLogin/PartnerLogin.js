@@ -37,7 +37,7 @@ const PartnerLogin = () => {
       localStorage.setItem("token", data.token);
       localStorage.setItem("adminApproved", data.adminApproved);
       localStorage.setItem("partnerId", data._id);
-      localStorage.setItem("userInfo", JSON.stringify(data));
+      localStorage.setItem("partnerInfo", JSON.stringify(data));
       localStorage.setItem("loginTime", Date.now().toString());
       
       setLoading(false);
@@ -63,7 +63,7 @@ const PartnerLogin = () => {
       localStorage.setItem("token", res.data.token);
       localStorage.setItem("adminApproved", res.data.adminApproved);
       localStorage.setItem("partnerId", res.data._id);
-      localStorage.setItem("userInfo", JSON.stringify({
+      localStorage.setItem("partnerInfo", JSON.stringify({
         _id: res.data._id,
         name: res.data.name,
         email: res.data.email,

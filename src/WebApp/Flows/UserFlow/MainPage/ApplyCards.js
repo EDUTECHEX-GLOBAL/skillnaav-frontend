@@ -6,6 +6,7 @@ import { faClock } from "@fortawesome/free-solid-svg-icons";
 import { format } from "date-fns";
 import SkillAnalysis from "./SkillnaavAnalysis";
 import ProctoredAssessment from "./AssessmentModal";
+import { FaTrash, FaChevronDown } from "react-icons/fa";
 
 // 🟡 Limit definitions per plan
 const MAX_LIMITS = {
@@ -29,11 +30,13 @@ const ApplyCards = ({ job, onBack }) => {
   const [showAssessmentModal, setShowAssessmentModal] = useState(false);
   const [existingResumes, setExistingResumes] = useState([]);
   const [selectedResumeUrl, setSelectedResumeUrl] = useState(null);
+  const [showResumeDropdown, setShowResumeDropdown] = useState(false);
+  
 
   // ✅ Fetch application data
   useEffect(() => {
     const fetchApplicationData = async () => {
-      const userInfo = JSON.parse(localStorage.getItem("userInfo"));
+      const userInfo = (JSON.parse(localStorage.getItem("studentInfo")) || JSON.parse(localStorage.getItem("userInfo")));
       const studentId = userInfo?._id;
       const schoolAdminIdFromStorage = userInfo?.schoolAdminId || null;
       const plan = userInfo?.planType || "Free";
@@ -61,7 +64,7 @@ const ApplyCards = ({ job, onBack }) => {
   }, [job._id]);
   useEffect(() => {
     const fetchResumes = async () => {
-      const userInfo = JSON.parse(localStorage.getItem("userInfo"));
+      const userInfo = (JSON.parse(localStorage.getItem("studentInfo")) || JSON.parse(localStorage.getItem("userInfo")));
       const studentId = userInfo?._id;
       if (!studentId) return;
 
@@ -80,7 +83,7 @@ const ApplyCards = ({ job, onBack }) => {
   // ✅ Fetch existing assessment if any
   useEffect(() => {
     const fetchAssessment = async () => {
-      const userInfo = JSON.parse(localStorage.getItem("userInfo"));
+      const userInfo = (JSON.parse(localStorage.getItem("studentInfo")) || JSON.parse(localStorage.getItem("userInfo")));
       const studentId = userInfo?._id;
       if (!studentId) return;
 
@@ -98,25 +101,35 @@ const ApplyCards = ({ job, onBack }) => {
   // ✅ File upload handler
   const handleFileChange = (event) => {
     const file = event.target.files[0];
+
+    if (!file) return;
+
     const allowedTypes = [
       "application/pdf",
       "application/msword",
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     ];
 
-    if (!file) return;
-    if (!allowedTypes.includes(file.type)) return alert("Only PDF, DOC, and DOCX files are allowed.");
-    if (file.size > 5 * 1024 * 1024) return alert("File size should not exceed 5MB.");
+    if (!allowedTypes.includes(file.type)) {
+      return alert("Only PDF, DOC and DOCX files are allowed.");
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      return alert("File size should not exceed 5MB.");
+    }
 
     setResume(file);
-    setSelectedResumeUrl(null); // keep only one source active
+    
+
+    // disable dropdown
+    setSelectedResumeUrl(null);
   };
 
   // ✅ Apply to internship
   const handleApply = async () => {
     if (isApplied) return;
 
-    const userInfo = JSON.parse(localStorage.getItem("userInfo"));
+    const userInfo = (JSON.parse(localStorage.getItem("studentInfo")) || JSON.parse(localStorage.getItem("userInfo")));
     const studentId = userInfo?._id;
     const token = localStorage.getItem("userToken");
 
@@ -241,7 +254,7 @@ const ApplyCards = ({ job, onBack }) => {
 
   // ✅ Generate AI assessment
   const handleGenerateAssessment = async () => {
-    const userInfo = JSON.parse(localStorage.getItem("userInfo"));
+    const userInfo = (JSON.parse(localStorage.getItem("studentInfo")) || JSON.parse(localStorage.getItem("userInfo")));
     const studentId = userInfo?._id;
     if (!studentId) return alert("Please log in first.");
 
@@ -265,6 +278,43 @@ const ApplyCards = ({ job, onBack }) => {
       setLoadingAssessment(false);
     }
   };
+
+  const handleDeleteResume = async (resumeId) => {
+  const confirmDelete = window.confirm(
+    "Are you sure you want to delete this resume?"
+  );
+
+  if (!confirmDelete) return;
+
+  try {
+    await axios.delete(`/api/resumes/${resumeId}`);
+if (
+  selectedResumeUrl ===
+  existingResumes.find((r) => r._id === resumeId)?.fileUrl
+) {
+  setSelectedResumeUrl(null);
+}
+    setExistingResumes((prev) =>
+      prev.filter((resume) => resume._id !== resumeId)
+    );
+
+    if (
+      selectedResumeUrl &&
+      existingResumes.find(
+        (resume) =>
+          resume._id === resumeId &&
+          resume.fileUrl === selectedResumeUrl
+      )
+    ) {
+      setSelectedResumeUrl(null);
+    }
+
+    alert("Resume deleted successfully");
+  } catch (error) {
+    console.error(error);
+    alert("Failed to delete resume");
+  }
+};
 
   const maxAppsDisplay = MAX_LIMITS[planType]?.applications || 5;
 
@@ -311,41 +361,153 @@ const ApplyCards = ({ job, onBack }) => {
             </div>
 
             <div className="mt-4">
-              {/* Existing Resumes */}
-              {existingResumes.length > 0 && (
-                <div className="mb-3">
-                  <p className="text-sm font-semibold text-gray-700 mb-1">
-                    Select Existing Resume
-                  </p>
-                  <select
-                    value={selectedResumeUrl || ""}
-                    className="border rounded-md p-2 w-full"
-                    onChange={(e) => {
-                      setSelectedResumeUrl(e.target.value);
-                      setResume(null);
-                    }}
-                  >
-                    <option value="">-- Choose Resume --</option>
-                    {existingResumes.map((res) => (
-                      <option key={res._id} value={res.fileUrl}>
-                        {res.fileName || "Resume"}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
 
-              {/* Upload New Resume */}
-              <input
-                type="file"
-                accept=".pdf,.doc,.docx"
-                onChange={(e) => {
-                  handleFileChange(e);
-                  setSelectedResumeUrl(null); // clear existing if uploading new
-                }}
-                className="block w-full text-sm text-gray-500"
-              />
-            </div>
+  {/* Existing Resumes */}
+  {existingResumes.length > 0 && (
+    <div className="mb-3">
+      <p className="text-sm font-semibold text-gray-700 mb-1">
+        Select Existing Resume
+      </p>
+
+<div className="relative w-full">
+  <button
+    type="button"
+    disabled={isApplied}
+    onClick={() => setShowResumeDropdown(!showResumeDropdown)}
+    className={`w-full border rounded-md px-4 py-2 flex justify-between items-center bg-white ${
+      isApplied ? "cursor-not-allowed bg-gray-100" : ""
+    }`}
+  >
+    <span>
+      {selectedResumeUrl
+        ? existingResumes.find(
+            (r) => r.fileUrl === selectedResumeUrl
+          )?.fileName
+        : "-- Choose Resume --"}
+    </span>
+
+    <FaChevronDown />
+  </button>
+
+  {showResumeDropdown && !isApplied && (
+    <div className="absolute z-50 w-full bg-white border rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto">
+      {existingResumes.length === 0 ? (
+        <div className="px-4 py-2 text-gray-500">
+          No resumes found
+        </div>
+      ) : (
+        existingResumes.map((res) => (
+          <div
+            key={res._id}
+            className="flex items-center justify-between px-4 py-2 hover:bg-gray-100 cursor-pointer"
+          >
+            <span
+              className="flex-1 truncate"
+              onClick={() => {
+                setSelectedResumeUrl(res.fileUrl);
+                setResume(null);
+                setShowResumeDropdown(false);
+              }}
+            >
+              {res.fileName}
+            </span>
+
+            <button
+              type="button"
+              className="text-red-500 hover:text-red-700 ml-3"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDeleteResume(res._id);
+              }}
+            >
+              <FaTrash />
+            </button>
+          </div>
+        ))
+      )}
+    </div>
+  )}
+</div>
+
+
+
+    {selectedResumeUrl && (
+  <div className="mt-2">
+    <button
+      type="button"
+      onClick={() => setSelectedResumeUrl(null)}
+      className="text-red-500 text-sm hover:underline"
+    >
+      Clear selected resume
+    </button>
+  </div>
+)}
+    </div>
+  )}
+
+  {/* Resume Count */}
+  <p className="text-sm text-gray-500 mt-1">
+    {existingResumes.length}/5 resumes used
+  </p>
+
+  {existingResumes.length >= 5 && (
+    <p className="text-red-500 text-sm mt-1">
+      Maximum 5 resumes allowed. Delete one to upload another.
+    </p>
+  )}
+
+  {/* Upload New Resume */}
+  <div className="mt-3">
+  <input
+  type="file"
+  accept=".pdf,.doc,.docx"
+  disabled={isApplied}
+  onChange={(e) => {
+    handleFileChange(e);
+    setSelectedResumeUrl(null);
+  }}
+  className={`block w-full text-sm ${
+    isApplied
+      ? "text-gray-400 cursor-not-allowed"
+      : "text-gray-500"
+  }`}
+/>
+
+    {resume && (
+  <div className="mt-2">
+    <button
+      type="button"
+      onClick={() => setResume(null)}
+      className="text-red-500 text-sm hover:underline"
+    >
+      Remove uploaded resume
+    </button>
+  </div>
+)}
+
+    {selectedResumeUrl && (
+      <p className="text-gray-500 text-sm mt-2">
+        File upload disabled because a saved resume is selected.
+      </p>
+    )}
+  </div>
+
+  {/* Resume Preview */}
+  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4">
+    <p className="text-sm font-semibold text-gray-700">
+      Resume that will be submitted
+    </p>
+
+    <p className="text-blue-700 mt-1 font-medium">
+      {resume?.name ||
+        existingResumes.find(
+          (r) => r.fileUrl === selectedResumeUrl
+        )?.fileName ||
+        "No resume selected"}
+    </p>
+  </div>
+
+</div>
 
             <div className="flex gap-4 mt-4">
               {job.applicationOpen ? (
@@ -472,7 +634,7 @@ const ApplyCards = ({ job, onBack }) => {
       {showAssessmentModal && assessment && (
         <ProctoredAssessment
           assessment={assessment}
-          studentId={JSON.parse(localStorage.getItem("userInfo"))._id}
+          studentId={(JSON.parse(localStorage.getItem("studentInfo")) || JSON.parse(localStorage.getItem("userInfo")))._id}
           onClose={() => setShowAssessmentModal(false)}
         />
       )}

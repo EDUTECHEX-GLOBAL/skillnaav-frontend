@@ -59,7 +59,12 @@ const Sidebar = ({ isMobile, isOpen, onClose, isDesktopOpen = true }) => {
         console.error("Logout session error:", error?.response?.data || error?.message);
       }
     }
-    try { localStorage.clear(); } catch (err) { console.warn("LocalStorage clear failed:", err); }
+    try { 
+      localStorage.removeItem("userToken");
+      localStorage.removeItem("studentInfo");
+      localStorage.removeItem("userInfo");
+      localStorage.removeItem("sessionId"); 
+    } catch (err) { console.warn("LocalStorage clear failed:", err); }
     navigate("/user/login");
   };
 
@@ -68,7 +73,7 @@ const Sidebar = ({ isMobile, isOpen, onClose, isDesktopOpen = true }) => {
     const oneMinutePassed = !isNaN(loginTime) && (Date.now() - loginTime >= 60000);
     if (!oneMinutePassed) return performLogout();
 
-    const sessionUser = JSON.parse(localStorage.getItem("userInfo")) || null;
+    const sessionUser = JSON.parse(localStorage.getItem("studentInfo")) || JSON.parse(localStorage.getItem("userInfo")) || null;
     const userId = sessionUser?._1d || sessionUser?._id;
 
     if (!userId) {

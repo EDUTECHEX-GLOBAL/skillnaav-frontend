@@ -77,10 +77,11 @@ const PostAJob = () => {
   // Derived list/labels for State/Province based on selected country
   const stateList = formData.country === "Canada" ? CA_PROVINCES : US_STATES;
   const stateLabel = formData.country === "Canada" ? "Province / Territory" : "State";
+  const [qualInput, setQualInput] = useState("");
 
   useEffect(() => {
     try {
-      const ui = JSON.parse(localStorage.getItem("userInfo"));
+      const ui = (JSON.parse(localStorage.getItem("partnerInfo")) || JSON.parse(localStorage.getItem("userInfo")));
       if (ui) {
         setUserType(ui.planType);
       }
@@ -149,13 +150,6 @@ const PostAJob = () => {
     });
   };
 
-  const handleQualificationsChange = (e) => {
-    setFormData((p) => ({
-      ...p,
-      qualifications: e.target.value.split(",").map((q) => q.trim()).filter(Boolean),
-    }));
-  };
-
   const handleFileUpload = async (event) => {
     const file = event.target.files && event.target.files[0];
     if (!file) return;
@@ -222,6 +216,25 @@ const PostAJob = () => {
   }));
 }, []);
 
+{/* Qualifications — tag input */}
+
+
+const addQualification = () => {
+  const val = qualInput.trim();
+  if (!val) return;
+  setFormData((prev) => ({
+    ...prev,
+    qualifications: [...prev.qualifications, val],
+  }));
+  setQualInput("");
+};
+
+const removeQualification = (index) => {
+  setFormData((prev) => ({
+    ...prev,
+    qualifications: prev.qualifications.filter((_, i) => i !== index),
+  }));
+};
   useEffect(() => {
     calculateDuration(formData.startDate, formData.endDateOrDuration);
   }, [formData.startDate, formData.endDateOrDuration, calculateDuration]);
@@ -273,6 +286,9 @@ const PostAJob = () => {
         ? `${formData.city}, ${formData.state}, ${formData.country}`
         : `${formData.city}, ${formData.country}`,
       partnerId: pid,
+      qualifications: typeof formData.qualifications === 'string' 
+        ? formData.qualifications.split(",").map(q => q.trim()).filter(Boolean)
+        : formData.qualifications,
     };
 
     try {
@@ -439,12 +455,46 @@ const PostAJob = () => {
 
         {/* Qualifications */}
         <div>
-          <label className="block text-gray-700 font-medium mb-2">Qualifications</label>
-          <input type="text" name="qualifications"
-            value={formData.qualifications.join(", ")}
-            onChange={handleQualificationsChange} required className={inputCls}
-            placeholder="Enter required qualifications, separated by commas" />
-        </div>
+  <label className="block text-gray-700 font-medium mb-2">Qualifications</label>
+  <div
+    className="flex flex-wrap gap-2 items-center min-h-[48px] p-2 border border-gray-300 rounded-lg bg-white focus-within:ring focus-within:ring-teal-500 cursor-text"
+    onClick={() => document.getElementById("qualInput").focus()}
+  >
+    {formData.qualifications.map((q, i) => (
+      <span
+        key={i}
+        className="inline-flex items-center gap-1 bg-teal-50 text-teal-700 text-sm px-3 py-1 rounded-full border border-teal-200"
+      >
+        {q}
+        <button
+          type="button"
+          onClick={() => removeQualification(i)}
+          className="ml-1 text-teal-500 hover:text-red-500 leading-none"
+          aria-label={`Remove ${q}`}
+        >
+          ×
+        </button>
+      </span>
+    ))}
+    <input
+      id="qualInput"
+      type="text"
+      value={qualInput}
+      onChange={(e) => setQualInput(e.target.value)}
+      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addQualification(); } }}
+      placeholder={formData.qualifications.length === 0 ? "Type a skill and press Enter or Add..." : "Add another..."}
+      className="flex-1 min-w-[160px] outline-none bg-transparent text-sm py-1 px-1"
+    />
+    <button
+      type="button"
+      onClick={addQualification}
+      className="text-sm px-3 py-1 border border-gray-300 rounded-md text-gray-600 hover:bg-teal-50 hover:text-teal-700 hover:border-teal-300"
+    >
+      + Add
+    </button>
+  </div>
+  <p className="text-xs text-gray-400 mt-1">Press Enter or click Add. Click × to remove a skill.</p>
+</div>
 
         {/* Contact Information */}
         <div>

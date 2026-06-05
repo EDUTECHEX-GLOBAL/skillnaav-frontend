@@ -70,18 +70,18 @@ const StatusPill = ({ adminStatus, adminReviewed, adminApproved, className = "" 
   // Derive display state from adminStatus (new field) with fallback to legacy booleans
   const status = adminStatus || (
     adminApproved ? "approved" :
-    adminReviewed ? "in_review" :
-    "pending"
+      adminReviewed ? "in_review" :
+        "pending"
   );
 
   const cfg =
     status === "approved"
-      ? { bg: "bg-green-100 text-green-800 border border-green-200",   icon: faCircleCheck,  label: "Approved"   }
-    : status === "rejected"
-      ? { bg: "bg-red-100 text-red-700 border border-red-200",         icon: faCircleXmark,  label: "Rejected"   }
-    : status === "in_review"
-      ? { bg: "bg-yellow-100 text-yellow-800 border border-yellow-200", icon: faMagnifyingGlass, label: "In Review" }
-    : { bg: "bg-gray-100 text-gray-500 border border-gray-200",        icon: faCircle,       label: "Pending"    };
+      ? { bg: "bg-green-100 text-green-800 border border-green-200", icon: faCircleCheck, label: "Approved" }
+      : status === "rejected"
+        ? { bg: "bg-red-100 text-red-700 border border-red-200", icon: faCircleXmark, label: "Rejected" }
+        : status === "in_review"
+          ? { bg: "bg-yellow-100 text-yellow-800 border border-yellow-200", icon: faMagnifyingGlass, label: "In Review" }
+          : { bg: "bg-gray-100 text-gray-500 border border-gray-200", icon: faCircle, label: "Pending" };
 
   return (
     <span
@@ -215,6 +215,75 @@ const DateInput = ({ label, value, onChange }) => {
   );
 };
 
+const QualTagInput = ({ qualifications, onChange }) => {
+  const [inputVal, setInputVal] = useState("");
+
+  const addTag = () => {
+    const val = inputVal.trim();
+    if (!val || qualifications.includes(val)) return;
+    onChange([...qualifications, val]);
+    setInputVal("");
+  };
+
+  const removeTag = (idx) => {
+    onChange(qualifications.filter((_, i) => i !== idx));
+  };
+
+  return (
+    <div>
+      {/* Tag chips */}
+      {qualifications.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {qualifications.map((q, idx) => (
+            <span
+              key={idx}
+              className="inline-flex items-center gap-1 px-3 py-1 bg-indigo-50 border border-indigo-100 text-indigo-700 text-xs rounded-full font-medium"
+              style={{ fontFamily: "'Poppins', sans-serif" }}
+            >
+              <FontAwesomeIcon icon={faCheck} className="text-[9px] text-indigo-400" />
+              {q}
+              <button
+                type="button"
+                onClick={() => removeTag(idx)}
+                className="ml-0.5 text-indigo-300 hover:text-red-400 transition-colors leading-none"
+                aria-label={`Remove ${q}`}
+              >
+                <FontAwesomeIcon icon={faXmark} className="text-[10px]" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Input row */}
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={inputVal}
+          onChange={(e) => setInputVal(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") { e.preventDefault(); addTag(); }
+          }}
+          placeholder={qualifications.length === 0 ? "Type a skill and press Enter or Add..." : "Add another skill..."}
+          className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+          style={{ fontFamily: "'Poppins', sans-serif" }}
+        />
+        <button
+          type="button"
+          onClick={addTag}
+          className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-xs text-gray-600 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition font-medium flex-shrink-0"
+          style={{ fontFamily: "'Poppins', sans-serif" }}
+        >
+          <FontAwesomeIcon icon={faCheck} className="text-[10px]" />
+          Add
+        </button>
+      </div>
+      <p className="text-xs text-gray-400 mt-1" style={{ fontFamily: "'Poppins', sans-serif" }}>
+        Press Enter or click Add. Click × on a tag to remove it.
+      </p>
+    </div>
+  );
+};
 // ═══════════════════════════════════════════════════════════════════════════════
 // VIEW MODAL BODY
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -272,8 +341,8 @@ const ViewModalBody = ({ internship: i, onEdit, onClose }) => (
         {/* Open / Closed */}
         <span
           className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold shadow-sm border ${i.applicationOpen
-              ? "bg-teal-50 text-teal-700 border-teal-200"
-              : "bg-gray-100 text-gray-500 border-gray-200"
+            ? "bg-teal-50 text-teal-700 border-teal-200"
+            : "bg-gray-100 text-gray-500 border-gray-200"
             }`}
           style={{ fontFamily: "'Poppins', sans-serif" }}
         >
@@ -466,298 +535,292 @@ const EditModalBody = ({ internship: si, updateField, onSave, onBack, onClose })
   };
 
   return (
-  <>
-    {/* Sticky header */}
-    <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b rounded-t-2xl bg-white">
-      <div className="flex items-center gap-3">
-        {/* Clickable logo / profile pic with edit overlay */}
-        <div
-          className="relative w-12 h-12 flex-shrink-0 cursor-pointer group"
-          onClick={() => logoInputRef.current && logoInputRef.current.click()}
-          title="Change company logo"
-        >
-          <img
-            src={si.imgUrl || defaultCompanyLogo}
-            alt="Company Logo"
-            className="w-12 h-12 rounded-xl object-contain bg-gray-50 border border-gray-200 p-1 shadow-sm"
+    <>
+      {/* Sticky header */}
+      <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b rounded-t-2xl bg-white">
+        <div className="flex items-center gap-3">
+          {/* Clickable logo / profile pic with edit overlay */}
+          <div
+            className="relative w-12 h-12 flex-shrink-0 cursor-pointer group"
+            onClick={() => logoInputRef.current && logoInputRef.current.click()}
+            title="Change company logo"
+          >
+            <img
+              src={si.imgUrl || defaultCompanyLogo}
+              alt="Company Logo"
+              className="w-12 h-12 rounded-xl object-contain bg-gray-50 border border-gray-200 p-1 shadow-sm"
+            />
+            {/* Hover overlay */}
+            <div className="absolute inset-0 rounded-xl bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+              <FontAwesomeIcon icon={faPenToSquare} className="text-white text-sm" />
+            </div>
+          </div>
+          <input
+            ref={logoInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleLogoChange}
           />
-          {/* Hover overlay */}
-          <div className="absolute inset-0 rounded-xl bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-            <FontAwesomeIcon icon={faPenToSquare} className="text-white text-sm" />
+
+          <div>
+            <h2
+              className="text-base font-semibold text-gray-800 flex items-center gap-2"
+              style={{ fontFamily: "'Poppins', sans-serif" }}
+            >
+              Edit Internship
+            </h2>
+            <p className="text-xs text-gray-400 mt-0.5" style={{ fontFamily: "'Poppins', sans-serif" }}>
+              {si.jobTitle} · {si.companyName}
+            </p>
           </div>
         </div>
-        <input
-          ref={logoInputRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={handleLogoChange}
-        />
-
-        <div>
-          <h2
-            className="text-base font-semibold text-gray-800 flex items-center gap-2"
-            style={{ fontFamily: "'Poppins', sans-serif" }}
-          >
-            Edit Internship
-          </h2>
-          <p className="text-xs text-gray-400 mt-0.5" style={{ fontFamily: "'Poppins', sans-serif" }}>
-            {si.jobTitle} · {si.companyName}
-          </p>
-        </div>
+        <button
+          onClick={onClose}
+          className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 transition"
+        >
+          <FontAwesomeIcon icon={faXmark} className="text-sm" />
+        </button>
       </div>
-      <button
-        onClick={onClose}
-        className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 transition"
-      >
-        <FontAwesomeIcon icon={faXmark} className="text-sm" />
-      </button>
-    </div>
 
-    {/* Scrollable form */}
-    <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-5">
+      {/* Scrollable form */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-5">
 
-      <FormSectionLabel icon={faCircleInfo}>Basic Info</FormSectionLabel>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {[
-          { label: "Job Title", field: "jobTitle", type: "text" },
-          { label: "Company Name", field: "companyName", type: "text" },
-          { label: "Location", field: "location", type: "text" },
-        ].map(({ label, field, type }) => (
-          <div key={field}>
+        <FormSectionLabel icon={faCircleInfo}>Basic Info</FormSectionLabel>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {[
+            { label: "Job Title", field: "jobTitle", type: "text" },
+            { label: "Company Name", field: "companyName", type: "text" },
+            { label: "Location", field: "location", type: "text" },
+          ].map(({ label, field, type }) => (
+            <div key={field}>
+              <label
+                className="block text-xs font-semibold text-gray-600 mb-1"
+                style={{ fontFamily: "'Poppins', sans-serif" }}
+              >
+                {label}
+              </label>
+
+              <input
+                type={type}
+                value={si[field] || ""}
+                onChange={(e) => updateField(field, e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                style={{ fontFamily: "'Poppins', sans-serif" }}
+              />
+            </div>
+          ))}
+
+          {/* Sector */}
+          <div>
             <label
               className="block text-xs font-semibold text-gray-600 mb-1"
               style={{ fontFamily: "'Poppins', sans-serif" }}
             >
-              {label}
+              Sector
             </label>
 
+            <select
+              value={si.sector || ""}
+              onChange={(e) => updateField("sector", e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              style={{ fontFamily: "'Poppins', sans-serif" }}
+            >
+              {Object.entries(SECTOR_LABELS).map(([val, label]) => (
+                <option key={val} value={val}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <FormSectionLabel icon={faCalendarDays}>Schedule</FormSectionLabel>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <DateInput
+            label="Start Date"
+            value={si.startDate ? String(si.startDate).slice(0, 10) : ""}
+            onChange={(val) => updateField("startDate", val)}
+          />
+          <DateInput
+            label="End Date"
+            value={
+              si.endDateOrDuration && /^\d{4}-\d{2}-\d{2}/.test(si.endDateOrDuration)
+                ? String(si.endDateOrDuration).slice(0, 10)
+                : ""
+            }
+            onChange={(val) => updateField("endDateOrDuration", val)}
+          />
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1" style={{ fontFamily: "'Poppins', sans-serif" }}>Duration (label)</label>
             <input
-              type={type}
-              value={si[field] || ""}
-              onChange={(e) => updateField(field, e.target.value)}
+              type="text"
+              value={si.duration || ""}
+              onChange={(e) => updateField("duration", e.target.value)}
+              placeholder="e.g. 3 months"
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
               style={{ fontFamily: "'Poppins', sans-serif" }}
             />
           </div>
-        ))}
-
-        {/* Sector */}
-        <div>
-          <label
-            className="block text-xs font-semibold text-gray-600 mb-1"
-            style={{ fontFamily: "'Poppins', sans-serif" }}
-          >
-            Sector
-          </label>
-
-          <select
-            value={si.sector || ""}
-            onChange={(e) => updateField("sector", e.target.value)}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-            style={{ fontFamily: "'Poppins', sans-serif" }}
-          >
-            {Object.entries(SECTOR_LABELS).map(([val, label]) => (
-              <option key={val} value={val}>
-                {label}
-              </option>
-            ))}
-          </select>
         </div>
-      </div>
 
-      <FormSectionLabel icon={faCalendarDays}>Schedule</FormSectionLabel>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <DateInput
-          label="Start Date"
-          value={si.startDate ? String(si.startDate).slice(0, 10) : ""}
-          onChange={(val) => updateField("startDate", val)}
-        />
-        <DateInput
-          label="End Date"
-          value={
-            si.endDateOrDuration && /^\d{4}-\d{2}-\d{2}/.test(si.endDateOrDuration)
-              ? String(si.endDateOrDuration).slice(0, 10)
-              : ""
-          }
-          onChange={(val) => updateField("endDateOrDuration", val)}
-        />
-        <div>
-          <label className="block text-xs font-semibold text-gray-600 mb-1" style={{ fontFamily: "'Poppins', sans-serif" }}>Duration (label)</label>
-          <input
-            type="text"
-            value={si.duration || ""}
-            onChange={(e) => updateField("duration", e.target.value)}
-            placeholder="e.g. 3 months"
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-            style={{ fontFamily: "'Poppins', sans-serif" }}
-          />
-        </div>
-      </div>
-
-      <FormSectionLabel icon={faSliders}>Format & Classification</FormSectionLabel>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div>
-          <label className="block text-xs font-semibold text-gray-600 mb-1" style={{ fontFamily: "'Poppins', sans-serif" }}>Mode</label>
-          <select
-            value={si.internshipMode || ""}
-            onChange={(e) => updateField("internshipMode", e.target.value)}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-            style={{ fontFamily: "'Poppins', sans-serif" }}
-          >
-            <option value="ONLINE">Online</option>
-            <option value="OFFLINE">Offline</option>
-            <option value="HYBRID">Hybrid</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs font-semibold text-gray-600 mb-1" style={{ fontFamily: "'Poppins', sans-serif" }}>Classification</label>
-          <select
-            value={si.classification || ""}
-            onChange={(e) => updateField("classification", e.target.value)}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-            style={{ fontFamily: "'Poppins', sans-serif" }}
-          >
-            <option value="">Select</option>
-            <option value="Basic">Basic</option>
-            <option value="Intermediate">Intermediate</option>
-            <option value="Advanced">Advanced</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs font-semibold text-gray-600 mb-1" style={{ fontFamily: "'Poppins', sans-serif" }}>Type (read-only)</label>
-          <input
-            type="text"
-            readOnly
-            value={si.internshipType === "PAID" ? "Paid" : si.internshipType === "STIPEND" ? "Stipend" : "Free"}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 mt-0 text-sm bg-gray-50 text-gray-400 cursor-not-allowed"
-            style={{ fontFamily: "'Poppins', sans-serif" }}
-          />
-        </div>
-      </div>
-
-      {si.internshipType !== "FREE" && (
-        <>
-          <FormSectionLabel icon={faCoins}>Compensation</FormSectionLabel>
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1" style={{ fontFamily: "'Poppins', sans-serif" }}>Amount</label>
-              <input
-                type="number"
-                placeholder="0"
-                value={si.compensationDetails?.amount || ""}
-                onChange={(e) => updateField("compensationDetails.amount", Number(e.target.value))}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 mt-0 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                style={{ fontFamily: "'Poppins', sans-serif" }}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1" style={{ fontFamily: "'Poppins', sans-serif" }}>Currency</label>
-              <select
-                value={si.compensationDetails?.currency || "USD"}
-                onChange={(e) => updateField("compensationDetails.currency", e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                style={{ fontFamily: "'Poppins', sans-serif" }}
-              >
-                {["USD", "CAD", "EUR", "INR", "GBP"].map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1" style={{ fontFamily: "'Poppins', sans-serif" }}>Frequency</label>
-              <select
-                value={si.compensationDetails?.frequency || "MONTHLY"}
-                onChange={(e) => updateField("compensationDetails.frequency", e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                style={{ fontFamily: "'Poppins', sans-serif" }}
-              >
-                <option value="MONTHLY">Monthly</option>
-                <option value="WEEKLY">Weekly</option>
-                <option value="ONE_TIME">One-time</option>
-              </select>
-            </div>
+        <FormSectionLabel icon={faSliders}>Format & Classification</FormSectionLabel>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1" style={{ fontFamily: "'Poppins', sans-serif" }}>Mode</label>
+            <select
+              value={si.internshipMode || ""}
+              onChange={(e) => updateField("internshipMode", e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              style={{ fontFamily: "'Poppins', sans-serif" }}
+            >
+              <option value="ONLINE">Online</option>
+              <option value="OFFLINE">Offline</option>
+              <option value="HYBRID">Hybrid</option>
+            </select>
           </div>
-        </>
-      )}
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1" style={{ fontFamily: "'Poppins', sans-serif" }}>Classification</label>
+            <select
+              value={si.classification || ""}
+              onChange={(e) => updateField("classification", e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              style={{ fontFamily: "'Poppins', sans-serif" }}
+            >
+              <option value="">Select</option>
+              <option value="Basic">Basic</option>
+              <option value="Intermediate">Intermediate</option>
+              <option value="Advanced">Advanced</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1" style={{ fontFamily: "'Poppins', sans-serif" }}>Type (read-only)</label>
+            <input
+              type="text"
+              readOnly
+              value={si.internshipType === "PAID" ? "Paid" : si.internshipType === "STIPEND" ? "Stipend" : "Free"}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 mt-0 text-sm bg-gray-50 text-gray-400 cursor-not-allowed"
+              style={{ fontFamily: "'Poppins', sans-serif" }}
+            />
+          </div>
+        </div>
 
-      <FormSectionLabel icon={faFileLines}>Description</FormSectionLabel>
-      <textarea
-        rows={4}
-        value={si.jobDescription || ""}
-        onChange={(e) => updateField("jobDescription", e.target.value)}
-        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-        style={{ fontFamily: "'Poppins', sans-serif" }}
-      />
+        {si.internshipType !== "FREE" && (
+          <>
+            <FormSectionLabel icon={faCoins}>Compensation</FormSectionLabel>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1" style={{ fontFamily: "'Poppins', sans-serif" }}>Amount</label>
+                <input
+                  type="number"
+                  placeholder="0"
+                  value={si.compensationDetails?.amount || ""}
+                  onChange={(e) => updateField("compensationDetails.amount", Number(e.target.value))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 mt-0 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  style={{ fontFamily: "'Poppins', sans-serif" }}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1" style={{ fontFamily: "'Poppins', sans-serif" }}>Currency</label>
+                <select
+                  value={si.compensationDetails?.currency || "USD"}
+                  onChange={(e) => updateField("compensationDetails.currency", e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  style={{ fontFamily: "'Poppins', sans-serif" }}
+                >
+                  {["USD", "CAD", "EUR", "INR", "GBP"].map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1" style={{ fontFamily: "'Poppins', sans-serif" }}>Frequency</label>
+                <select
+                  value={si.compensationDetails?.frequency || "MONTHLY"}
+                  onChange={(e) => updateField("compensationDetails.frequency", e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  style={{ fontFamily: "'Poppins', sans-serif" }}
+                >
+                  <option value="MONTHLY">Monthly</option>
+                  <option value="WEEKLY">Weekly</option>
+                  <option value="ONE_TIME">One-time</option>
+                </select>
+              </div>
+            </div>
+          </>
+        )}
 
-      <FormSectionLabel icon={faListCheck}>Qualifications</FormSectionLabel>
-      <div>
-        <p className="text-xs text-gray-400 mb-1" style={{ fontFamily: "'Poppins', sans-serif" }}>Comma-separated list</p>
+        <FormSectionLabel icon={faFileLines}>Description</FormSectionLabel>
         <textarea
-          rows={2}
-          value={Array.isArray(si.qualifications) ? si.qualifications.join(", ") : si.qualifications || ""}
-          onChange={(e) => updateField("qualifications", e.target.value.split(",").map((q) => q.trim()).filter(Boolean))}
+          rows={4}
+          value={si.jobDescription || ""}
+          onChange={(e) => updateField("jobDescription", e.target.value)}
           className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
           style={{ fontFamily: "'Poppins', sans-serif" }}
         />
+
+        <FormSectionLabel icon={faListCheck}>Qualifications</FormSectionLabel>
+        <QualTagInput
+          qualifications={Array.isArray(si.qualifications) ? si.qualifications : []}
+          onChange={(updated) => updateField("qualifications", updated)}
+        />
+
+        <FormSectionLabel icon={faAddressCard}>Contact</FormSectionLabel>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {[
+            { label: "Name", field: "contactInfo.name", type: "text" },
+            { label: "Email", field: "contactInfo.email", type: "email" },
+            { label: "Phone", field: "contactInfo.phone", type: "text" },
+          ].map(({ label, field, type }) => (
+            <div key={field}>
+              <label className="block text-xs font-semibold text-gray-600 mb-1" style={{ fontFamily: "'Poppins', sans-serif" }}>
+                {label}
+              </label>
+              <input
+                type={type}
+                value={si.contactInfo?.[field.split(".")[1]] || ""}
+                onChange={(e) => updateField(field, e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                style={{ fontFamily: "'Poppins', sans-serif" }}
+              />
+            </div>
+          ))}
+        </div>
+
+        <div className="h-2" />
       </div>
 
-      <FormSectionLabel icon={faAddressCard}>Contact</FormSectionLabel>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {[
-          { label: "Name", field: "contactInfo.name", type: "text" },
-          { label: "Email", field: "contactInfo.email", type: "email" },
-          { label: "Phone", field: "contactInfo.phone", type: "text" },
-        ].map(({ label, field, type }) => (
-          <div key={field}>
-            <label className="block text-xs font-semibold text-gray-600 mb-1" style={{ fontFamily: "'Poppins', sans-serif" }}>
-              {label}
-            </label>
-            <input
-              type={type}
-              value={si.contactInfo?.[field.split(".")[1]] || ""}
-              onChange={(e) => updateField(field, e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-              style={{ fontFamily: "'Poppins', sans-serif" }}
-            />
-          </div>
-        ))}
-      </div>
-
-      <div className="h-2" />
-    </div>
-
-    {/* Sticky footer */}
-    <div className="flex-shrink-0 flex justify-between items-center px-6 py-4 border-t bg-white rounded-b-2xl">
-      <button
-        type="button"
-        onClick={onBack}
-        className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition font-medium"
-        style={{ fontFamily: "'Poppins', sans-serif" }}
-      >
-        <FontAwesomeIcon icon={faArrowLeft} className="text-xs" />
-        Back
-      </button>
-      <div className="flex gap-2">
+      {/* Sticky footer */}
+      <div className="flex-shrink-0 flex justify-between items-center px-6 py-4 border-t bg-white rounded-b-2xl">
         <button
           type="button"
-          onClick={onClose}
+          onClick={onBack}
           className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition font-medium"
           style={{ fontFamily: "'Poppins', sans-serif" }}
         >
-          <FontAwesomeIcon icon={faXmark} className="text-xs" />
-          Cancel
+          <FontAwesomeIcon icon={faArrowLeft} className="text-xs" />
+          Back
         </button>
-        <button
-          type="button"
-          onClick={onSave}
-          className="flex items-center gap-2 px-5 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition font-semibold"
-          style={{ fontFamily: "'Poppins', sans-serif" }}
-        >
-          <FontAwesomeIcon icon={faFloppyDisk} />
-          Save Changes
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition font-medium"
+            style={{ fontFamily: "'Poppins', sans-serif" }}
+          >
+            <FontAwesomeIcon icon={faXmark} className="text-xs" />
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onSave}
+            className="flex items-center gap-2 px-5 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition font-semibold"
+            style={{ fontFamily: "'Poppins', sans-serif" }}
+          >
+            <FontAwesomeIcon icon={faFloppyDisk} />
+            Save Changes
+          </button>
+        </div>
       </div>
-    </div>
-  </>
+    </>
   );
 };
 
@@ -811,51 +874,51 @@ const YourJobPosts = () => {
   );
 
   useEffect(() => {
-  if (!selectedInternship?.startDate || !selectedInternship?.endDateOrDuration) {
-    return;
-  }
-
-  const start = new Date(selectedInternship.startDate + "T00:00:00");
-  const end = new Date(selectedInternship.endDateOrDuration + "T00:00:00");
-
-  if (
-    isNaN(start.getTime()) ||
-    isNaN(end.getTime())
-  ) {
-    updateField("duration", "");
-    return;
-  }
-
-  if (end < start) {
-    updateField("duration", "Invalid duration");
-    return;
-  }
-
-  const totalDays = Math.floor(
-    (end - start) / (1000 * 60 * 60 * 24)
-  );
-
-  const months = Math.floor(totalDays / 30);
-  const days = totalDays % 30;
-
-  let duration = "";
-
-  if (months > 0) {
-    duration = `${months} month${months > 1 ? "s" : ""}`;
-
-    if (days > 0) {
-      duration += ` and ${days} day${days > 1 ? "s" : ""}`;
+    if (!selectedInternship?.startDate || !selectedInternship?.endDateOrDuration) {
+      return;
     }
-  } else {
-    duration = `${totalDays} day${totalDays > 1 ? "s" : ""}`;
-  }
 
-  updateField("duration", duration);
+    const start = new Date(selectedInternship.startDate + "T00:00:00");
+    const end = new Date(selectedInternship.endDateOrDuration + "T00:00:00");
 
-}, [
-  selectedInternship?.startDate,
-  selectedInternship?.endDateOrDuration
-]);
+    if (
+      isNaN(start.getTime()) ||
+      isNaN(end.getTime())
+    ) {
+      updateField("duration", "");
+      return;
+    }
+
+    if (end < start) {
+      updateField("duration", "Invalid duration");
+      return;
+    }
+
+    const totalDays = Math.floor(
+      (end - start) / (1000 * 60 * 60 * 24)
+    );
+
+    const months = Math.floor(totalDays / 30);
+    const days = totalDays % 30;
+
+    let duration = "";
+
+    if (months > 0) {
+      duration = `${months} month${months > 1 ? "s" : ""}`;
+
+      if (days > 0) {
+        duration += ` and ${days} day${days > 1 ? "s" : ""}`;
+      }
+    } else {
+      duration = `${totalDays} day${totalDays > 1 ? "s" : ""}`;
+    }
+
+    updateField("duration", duration);
+
+  }, [
+    selectedInternship?.startDate,
+    selectedInternship?.endDateOrDuration
+  ]);
 
   useEffect(() => {
     fetchInternships(1, "", sortCriteria, sortDirection, true);

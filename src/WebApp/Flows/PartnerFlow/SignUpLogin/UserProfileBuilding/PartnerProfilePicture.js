@@ -18,7 +18,7 @@ const PartnerProfile = () => {
 
   // Retrieve user data from localStorage
   useEffect(() => {
-    const storedUserInfo = localStorage.getItem("userInfo");
+    const storedUserInfo = (localStorage.getItem("partnerInfo") || localStorage.getItem("userInfo"));
     if (storedUserInfo) {
       setUserData(JSON.parse(storedUserInfo));
     }

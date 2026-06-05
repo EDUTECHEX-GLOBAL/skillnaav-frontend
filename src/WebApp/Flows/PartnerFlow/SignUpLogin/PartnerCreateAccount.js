@@ -184,7 +184,7 @@ const PartnerSignUpFlow = () => {
         localStorage.setItem("token", res.data.token);
         localStorage.setItem("adminApproved", res.data.adminApproved);
         localStorage.setItem("partnerId", res.data._id);
-        localStorage.setItem("userInfo", JSON.stringify({
+        localStorage.setItem("partnerInfo", JSON.stringify({
           _id: res.data._id,
           name: res.data.name,
           email: res.data.email,
@@ -257,7 +257,7 @@ const PartnerSignUpFlow = () => {
         localStorage.setItem("token", response.data.token);
         localStorage.setItem("adminApproved", response.data.adminApproved);
         localStorage.setItem("partnerId", response.data._id);
-        localStorage.setItem("userInfo", JSON.stringify({
+        localStorage.setItem("partnerInfo", JSON.stringify({
           _id: response.data._id,
           name: response.data.name,
           email: response.data.email,

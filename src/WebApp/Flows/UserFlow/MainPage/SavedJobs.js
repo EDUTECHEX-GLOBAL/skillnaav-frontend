@@ -15,7 +15,7 @@ const SavedJobs = () => {
   const { savedJobs, removeJob, getSavedJobs } = useTabContext();
   const [selectedJob, setSelectedJob] = useState(null);
   const [removingId, setRemovingId] = useState(null);
-  const userInfo = JSON.parse(localStorage.getItem("userInfo")) || {};
+  const userInfo = (JSON.parse(localStorage.getItem("studentInfo")) || JSON.parse(localStorage.getItem("userInfo"))) || {};
   const userId = userInfo?._id;
 
   useEffect(() => {

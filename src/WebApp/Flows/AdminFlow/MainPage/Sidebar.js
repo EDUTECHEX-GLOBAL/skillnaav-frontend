@@ -50,6 +50,7 @@ const subscriptionItems = [
   // { key: "subscription-overview", label: "Overview" },
   { key: "student-subscriptions", label: "Student Subscriptions" },
   { key: "partner-subscriptions", label: "Partner Subscriptions" },
+  { key: "school-admin-subscriptions", label: "School Subscriptions" },
 ];
 
 const PARTNER_MANAGEMENT_TABS = new Set(partnerManagementItems.map(({ key }) => key));
@@ -63,6 +64,7 @@ const SubBadge = ({ children, color = "green" }) => {
     green: "bg-emerald-50 text-emerald-700",
     amber: "bg-amber-50 text-amber-700",
     red: "bg-red-50 text-red-700",
+    blue: "bg-blue-50 text-blue-700",
   };
   return (
     <span
@@ -282,10 +284,6 @@ const Sidebar = ({ isOpen, isCompactLayout, onClose, isDesktopOpen = true }) => 
                   isExpanded={subscriptionOpen}
                   setExpanded={setSubscriptionOpen}
                   items={subscriptionItems}
-                  itemBadges={{
-                    "student-subscriptions": { color: "amber" },
-                    "partner-subscriptions": { color: "green" },
-                  }}
                 />
               </li>
 

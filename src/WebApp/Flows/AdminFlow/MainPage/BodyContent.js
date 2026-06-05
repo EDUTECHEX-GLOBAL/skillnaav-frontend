@@ -21,6 +21,7 @@ import SchoolFeedback from "./SchoolFeedback";
 import SubscriptionOverview from "./SubscriptionOverview";
 import StudentSubscriptions from "./StudentSubscriptions";
 import PartnerSubscriptions from "./PartnerSubscriptions";
+import SchoolAdminSubscriptions from "./SchoolAdminSubscriptions";
 
 const BodyContent = () => {
   const { selectedTab } = useTabContext();
@@ -78,6 +79,9 @@ const BodyContent = () => {
 
       case "partner-subscriptions":
         return <PartnerSubscriptions />;
+
+      case "school-admin-subscriptions":
+        return <SchoolAdminSubscriptions />;
 
       default:
         return (

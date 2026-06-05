@@ -22,7 +22,7 @@ const Navbar = ({ onToggleSidebar }) => {
   const { openFeedback } = useFeedback();
 
   const syncUserInfoFromStorage = () => {
-    const rawUserInfo = localStorage.getItem("userInfo");
+    const rawUserInfo = localStorage.getItem("studentInfo") || localStorage.getItem("userInfo");
     if (!rawUserInfo) return;
 
     let storedUserInfo;
@@ -73,7 +73,10 @@ const Navbar = ({ onToggleSidebar }) => {
   const handleUserClick = () => setIsDropdownOpen((prev) => !prev);
 
   const performLogout = () => {
-    localStorage.clear();
+    localStorage.removeItem("userToken");
+    localStorage.removeItem("studentInfo");
+    localStorage.removeItem("userInfo");
+    localStorage.removeItem("sessionId");
     sessionStorage.clear();
     navigate("/user/login");
   };
@@ -86,7 +89,7 @@ const Navbar = ({ onToggleSidebar }) => {
 
     let sessionUser = null;
     try {
-      sessionUser = JSON.parse(localStorage.getItem("userInfo")) || null;
+      sessionUser = JSON.parse(localStorage.getItem("studentInfo")) || JSON.parse(localStorage.getItem("userInfo")) || null;
     } catch {
       sessionUser = null;
     }

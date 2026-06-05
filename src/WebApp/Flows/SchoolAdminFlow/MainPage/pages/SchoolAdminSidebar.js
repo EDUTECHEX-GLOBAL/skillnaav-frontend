@@ -83,7 +83,7 @@ const SchoolAdminSidebar = ({
     if (!oneMinutePassed) return performLogout();
 
     const parsedUserInfo = (() => {
-      try { return JSON.parse(localStorage.getItem("userInfo")); } catch { return null; }
+      try { return (JSON.parse(localStorage.getItem("schoolAdminInfo")) || JSON.parse(localStorage.getItem("userInfo"))); } catch { return null; }
     })();
     const parsedSchoolProfile = (() => {
       try { return JSON.parse(localStorage.getItem("schoolAdminProfile")); } catch { return null; }

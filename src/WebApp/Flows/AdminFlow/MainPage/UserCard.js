@@ -900,46 +900,45 @@ const UserCard = ({ user, onClose, onApprove, onReject, onRequestReverify, class
             </button>
           )}
 
-          {/* Reject */}
-        {/* ✅ FIXED: Approve Button in UserCard footer */}
-<button
-  type="button"
-  disabled={user.status === 'Approved'}
-  onClick={() => {
-    if (user.status === 'Approved') return; // guard
-    onApprove?.(user.id);
-    onClose?.();
-  }}
-  className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold border shadow-sm
-    focus:outline-none focus:ring-2 focus:ring-offset-2 active:scale-[0.98] transition
-    ${user.status === 'Approved'
-      ? 'border-emerald-200 bg-emerald-50 text-emerald-700 opacity-60 cursor-not-allowed'
-      : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-300 focus:ring-emerald-300'
-    }`}
->
-  <AiOutlineCheck className="text-[16px]" />
-  {user.status === 'Approved' ? 'Approved' : 'Approve'}
-</button>
+          {/* Approve Button */}
+          <button
+            type="button"
+            disabled={user.status === 'Approved'}
+            onClick={() => {
+              if (user.status === 'Approved') return; // guard
+              onApprove?.(user.id);
+              onClose?.();
+            }}
+            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold border shadow-sm
+              focus:outline-none focus:ring-2 focus:ring-offset-2 active:scale-[0.98] transition
+              ${user.status === 'Approved'
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-700 opacity-60 cursor-not-allowed'
+                : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-300 focus:ring-emerald-300'
+              }`}
+          >
+            <AiOutlineCheck className="text-[16px]" />
+            {user.status === 'Approved' ? 'Approved' : 'Approve'}
+          </button>
 
-{/* ✅ FIXED: Reject Button in UserCard footer */}
-<button
-  type="button"
-  disabled={user.status === 'Rejected'}
-  onClick={() => {
-    if (user.status === 'Rejected') return; // guard
-    onReject?.(user.id);
-    onClose?.();
-  }}
-  className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold border shadow-sm
-    focus:outline-none focus:ring-2 focus:ring-offset-2 active:scale-[0.98] transition
-    ${user.status === 'Rejected'
-      ? 'border-red-200 bg-red-50 text-red-700 opacity-60 cursor-not-allowed'
-      : 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100 hover:border-red-300 focus:ring-red-300'
-    }`}
->
-  <AiOutlineCloseCircle className="text-[16px]" />
-  {user.status === 'Rejected' ? 'Rejected' : 'Reject'}
-</button>
+          {/* Reject Button */}
+          <button
+            type="button"
+            disabled={user.status === 'Rejected'}
+            onClick={() => {
+              if (user.status === 'Rejected') return; // guard
+              onReject?.(user.id);
+              onClose?.();
+            }}
+            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold border shadow-sm
+              focus:outline-none focus:ring-2 focus:ring-offset-2 active:scale-[0.98] transition
+              ${user.status === 'Rejected'
+                ? 'border-red-200 bg-red-50 text-red-700 opacity-60 cursor-not-allowed'
+                : 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100 hover:border-red-300 focus:ring-red-300'
+              }`}
+          >
+            <AiOutlineCloseCircle className="text-[16px]" />
+            {user.status === 'Rejected' ? 'Rejected' : 'Reject'}
+          </button>
         </div>
       </motion.div>
 

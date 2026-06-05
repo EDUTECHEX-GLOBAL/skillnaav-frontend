@@ -11,7 +11,7 @@
 
 //   useEffect(() => {
 //     const fetchData = async () => {
-//       const userInfo = JSON.parse(localStorage.getItem("userInfo"));
+//       const userInfo = (JSON.parse(localStorage.getItem("studentInfo")) || JSON.parse(localStorage.getItem("userInfo")));
 //       const token = JSON.parse(localStorage.getItem("userToken"));
 //       setIsPremium(userInfo?.isPremium);
 

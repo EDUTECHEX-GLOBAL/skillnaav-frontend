@@ -70,7 +70,7 @@ const Sidebar = ({ isOpen, onClose, isDesktopOpen = true }) => {
       return performLogout();
     }
 
-    const sessionUser = JSON.parse(localStorage.getItem("userInfo")) || null;
+    const sessionUser = (JSON.parse(localStorage.getItem("partnerInfo")) || JSON.parse(localStorage.getItem("userInfo"))) || null;
     const userId = sessionUser?._id;
 
     if (!userId) {

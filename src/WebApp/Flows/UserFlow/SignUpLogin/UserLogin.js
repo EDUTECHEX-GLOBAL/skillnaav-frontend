@@ -40,11 +40,13 @@ const UserLogin = () => {
         throw new Error("Invalid response from server");
       }
 
-      localStorage.clear();
-
+      localStorage.removeItem("userToken");
+      localStorage.removeItem("studentInfo");
+      localStorage.removeItem("userInfo");
+      localStorage.removeItem("sessionId");
       localStorage.setItem("userToken", data.token);
 
-      localStorage.setItem("userInfo", JSON.stringify({
+      localStorage.setItem("studentInfo", JSON.stringify({
         _id: data._id,
         name: data.name,
         email: data.email,
@@ -198,7 +200,7 @@ const UserLogin = () => {
 
                 localStorage.setItem("userToken", res.data.token);
 
-                localStorage.setItem("userInfo", JSON.stringify({
+                localStorage.setItem("studentInfo", JSON.stringify({
                   _id: res.data._id,
                   name: res.data.name,
                   email: res.data.email,

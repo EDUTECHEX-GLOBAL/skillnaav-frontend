@@ -141,7 +141,7 @@ const SearchBar = () => {
         setIsPremium(data.isPremium);
         setPlanType(data.planType || "Freemium");
 
-        const userInfo = JSON.parse(localStorage.getItem("userInfo")) || {};
+        const userInfo = (JSON.parse(localStorage.getItem("studentInfo")) || JSON.parse(localStorage.getItem("userInfo"))) || {};
         if (userInfo._id) {
           const { data: countData } = await axios.get(
             `/api/applications/count/${userInfo._id}`
@@ -179,7 +179,7 @@ const SearchBar = () => {
       sessionStorage.setItem("scrollPosition", window.scrollY.toString());
       sessionStorage.setItem("scrollTime", Date.now().toString());
 
-      const userInfo = JSON.parse(localStorage.getItem("userInfo"));
+      const userInfo = (JSON.parse(localStorage.getItem("studentInfo")) || JSON.parse(localStorage.getItem("userInfo")));
       if (!userInfo) return;
 
       const { data: countData } = await axios.get(
