@@ -217,7 +217,7 @@ const UserAgeGateConsent = ({ open, onComplete, saving = false, mode = "DEFAULT"
     if (!userOtp) return setUserOtpError("Please enter the OTP.");
     setVerifyingUserOtp(true);
     try {
-      const res = await axios.post("/api/users/verify-otp-only", {
+      const res = await axios.post("/api/users/verify-otp", {
         email: userEmail,
         otp: userOtp,
       });
@@ -253,7 +253,7 @@ const UserAgeGateConsent = ({ open, onComplete, saving = false, mode = "DEFAULT"
     if (!guardianOtp) return setGuardianOtpError("Please enter the OTP.");
     setVerifyingGuardianOtp(true);
     try {
-      const res = await axios.post("/api/users/verify-otp-only", {
+      const res = await axios.post("/api/users/verify-otp", {
         email: guardianEmail.trim(),
         otp: guardianOtp,
       });
