@@ -15,6 +15,7 @@ const Applications = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedJob, setSelectedJob] = useState(null);
+  const savedScrollRef = React.useRef(0);
 
   const userInfo = (JSON.parse(localStorage.getItem("studentInfo")) || JSON.parse(localStorage.getItem("userInfo")));
   const studentId = userInfo?._id || null;
@@ -65,15 +66,25 @@ const Applications = () => {
   ================================= */
   const resolveApplicationStatus = (pipeline, appStatus) => {
     if (!pipeline) return appStatus || "Applied";
+    
+    // L3 Status
+    if (pipeline.l3?.status === "passed") return "Interview Passed";
+    if (pipeline.l3?.status === "rejected") return "Interview Failed";
+    if (pipeline.l3?.status === "completed") return "Interview Completed";
     if (pipeline.l3?.status === "scheduled") return "Interview Scheduled";
     if (pipeline.l3?.status === "sent") return "Interview Invite Sent";
     if (pipeline.l3?.status === "created") return "Interview Pending";
+    
+    // L2 Status
     if (pipeline.l2?.status === "passed") return "Assessment Cleared";
     if (["generated", "sent", "started", "submitted"].includes(pipeline.l2?.status))
       return "Assessment In Progress";
     if (pipeline.l2?.status === "rejected") return "Assessment Failed";
+    
+    // L1 Status
     if (pipeline.l1?.status === "shortlisted") return "Shortlisted";
     if (pipeline.l1?.status === "rejected") return "Rejected";
+    
     if (appStatus && appStatus !== "Applied") return appStatus;
     return "Applied";
   };
@@ -91,6 +102,9 @@ const Applications = () => {
     "Interview Pending":     { bg: "#ffedd5", color: "#9a3412" },
     "Interview Scheduled":   { bg: "#dbeafe", color: "#1e40af" },
     "Interview Invite Sent": { bg: "#dcfce7", color: "#14532d" },
+    "Interview Completed":   { bg: "#fef9c3", color: "#854d0e" },
+    "Interview Passed":      { bg: "#dcfce7", color: "#166534" },
+    "Interview Failed":      { bg: "#fee2e2", color: "#991b1b" },
   };
 
   /* ================================
@@ -131,7 +145,20 @@ const Applications = () => {
   ================================= */
   const renderInterviewInfo = (pipeline) => {
     const l3 = pipeline?.l3;
-    if (!l3 || !["scheduled", "sent"].includes(l3.status)) return null;
+    if (!l3 || l3.status === "not_used") return null;
+
+    if (l3.status === "passed") {
+      return <div className="app-cta-info green">✅ Interview Passed — Awaiting Offer</div>;
+    }
+    if (l3.status === "rejected") {
+      return <div className="app-cta-info red">❌ Interview Failed</div>;
+    }
+    if (l3.status === "completed") {
+      return <div className="app-cta-info orange">⏳ Interview Completed — Awaiting Results</div>;
+    }
+
+    if (!["scheduled", "sent"].includes(l3.status)) return null;
+
     const interview = typeof l3.interviewId === "object" ? l3.interviewId : null;
     const scheduledAt = interview?.scheduledAt || l3?.scheduledAt;
 
@@ -161,6 +188,20 @@ const Applications = () => {
     if (!assessmentId) return;
     localStorage.setItem("activeAssessmentId", assessmentId);
     window.dispatchEvent(new CustomEvent("openTab", { detail: { tab: "assessment" } }));
+  };
+
+  const handleViewDetails = (job) => {
+    const container = document.getElementById("main-scroll-container");
+    if (container) savedScrollRef.current = container.scrollTop;
+    setSelectedJob(job);
+  };
+
+  const handleBack = () => {
+    setSelectedJob(null);
+    requestAnimationFrame(() => {
+      const container = document.getElementById("main-scroll-container");
+      if (container) container.scrollTop = savedScrollRef.current;
+    });
   };
 
   const getCompensationText = (job) => {
@@ -205,7 +246,7 @@ const Applications = () => {
   }
 
   if (selectedJob) {
-    return <ApplyCards job={selectedJob} onBack={() => setSelectedJob(null)} />;
+    return <ApplyCards job={selectedJob} onBack={handleBack} />;
   }
 
   /* ================================
@@ -306,7 +347,7 @@ const Applications = () => {
                     {renderInterviewInfo(app.pipeline)}
                     <button
                       className="app-view-btn"
-                      onClick={() => setSelectedJob(job)}
+                      onClick={() => handleViewDetails(job)}
                     >
                       View Details →
                     </button>

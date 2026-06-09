@@ -27,7 +27,6 @@ const BodyContent = () => {
     const handler = (e) => {
       const tab = e?.detail?.tab;
       if (!tab || typeof handleSelectTab !== "function") return;
-
       handleSelectTab(tab);
     };
 
@@ -113,4 +112,3 @@ const BodyContent = () => {
 };
 
 export default BodyContent;
-

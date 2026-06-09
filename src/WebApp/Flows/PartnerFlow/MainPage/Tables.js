@@ -720,6 +720,32 @@ export const ShortlistedTable = ({ candidates, internshipId }) => {
     setL3Items(await fetchPipelineByStage(internshipId, "L3"));
   };
 
+  // ── L3: Mark Result (Pass/Reject) ──────────────────────────────────────────
+  const handleInterviewResult = async (item, result) => {
+    try {
+      const interviewId = item?.l3?.interviewId?._id || item?.l3?.interviewId;
+      if (!interviewId) {
+        alert("Interview not scheduled yet.");
+        return;
+      }
+      
+      const confirmMsg = result === "passed" 
+        ? "Mark candidate as Passed? They will be moved to the Offer stage."
+        : "Mark candidate as Rejected?";
+        
+      if (!window.confirm(confirmMsg)) return;
+
+      setPipelineLoading(true);
+      await completeInterview({ interviewId, result, feedback: "" });
+      setL3Items(await fetchPipelineByStage(internshipId, "L3"));
+    } catch (err) {
+      console.error("❌ Failed to update interview result:", err);
+      alert("Failed to update status. Please try again.");
+    } finally {
+      setPipelineLoading(false);
+    }
+  };
+
   // ── Offer pill ──────────────────────────────────────────────────────────────
   const renderOfferStatusPill = (sid) => {
     const status = offerStatuses[sid] || "Not Sent";
@@ -1177,6 +1203,25 @@ export const ShortlistedTable = ({ candidates, internshipId }) => {
                           >
                             Schedule
                           </button>
+
+                          {/* New: Pass / Reject actions once interview is scheduled */}
+                          {["scheduled", "sent", "completed"].includes(l3Status) && (
+                            <>
+                              <button
+                                onClick={() => handleInterviewResult(item, "passed")}
+                                className="px-3 py-1.5 bg-green-600 text-white text-xs font-semibold rounded-lg hover:bg-green-700 transition active:scale-95"
+                              >
+                                ✅ Pass
+                              </button>
+                              <button
+                                onClick={() => handleInterviewResult(item, "rejected")}
+                                className="px-3 py-1.5 bg-red-600 text-white text-xs font-semibold rounded-lg hover:bg-red-700 transition active:scale-95"
+                              >
+                                ❌ Reject
+                              </button>
+                            </>
+                          )}
+
                           {offerStatus === "Not Sent" && (
                             <button
                               onClick={() => handleSendOfferClick(offerCandidate)}

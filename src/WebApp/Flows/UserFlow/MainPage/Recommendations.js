@@ -3,6 +3,14 @@ import axios from "../../../../api/axiosInstance";
 import { useLocation } from "react-router-dom";
 import JobCard from "./Card";
 import ApplyCards from "./ApplyCards";
+import { useTabContext } from "./UserHomePageContext/HomePageContext";
+
+const MAX_LIMITS = {
+  "Free": 5,
+  "Freemium": 5,
+  "Premium Basic": 25,
+  "Premium Plus": Infinity,
+};
 
 /* -----------------------------------
    HARD DEDUPE (GUARANTEED)
@@ -22,8 +30,67 @@ const Recommendations = () => {
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState(null);
   const [selectedJob, setSelectedJob] = useState(null);
+  const [showLimitPopup, setShowLimitPopup] = useState(false);
+  const [planType, setPlanType] = useState("Free");
 
-  const fetchedOnce = useRef(false);
+  const { handleSelectTab } = useTabContext();
+
+  const fetchedOnce    = useRef(false);
+  const savedScrollRef = useRef(0);
+
+  const handleViewDetails = async (job) => {
+    try {
+      const userInfo =
+        JSON.parse(localStorage.getItem("studentInfo")) ||
+        JSON.parse(localStorage.getItem("userInfo"));
+      if (!userInfo) return;
+
+      const { data: checkData } = await axios.get(
+        `/api/applications/check-applied/${userInfo._id}/${job._id}`
+      );
+
+      if (checkData.isApplied) {
+        const container = document.getElementById("main-scroll-container");
+        if (container) savedScrollRef.current = container.scrollTop;
+        setSelectedJob(job);
+        return;
+      }
+
+      const { data: countData } = await axios.get(
+        `/api/applications/count/${userInfo._id}`
+      );
+
+      const token = localStorage.getItem("userToken");
+      let currentPlanType = "Free";
+      if (token) {
+        const { data: profileData } = await axios.get("/api/users/profile", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        currentPlanType = profileData.planType || "Free";
+        setPlanType(currentPlanType);
+      }
+
+      const maxApps = MAX_LIMITS[currentPlanType] || 5;
+
+      if (countData.count >= maxApps) {
+        setShowLimitPopup(true);
+      } else {
+        const container = document.getElementById("main-scroll-container");
+        if (container) savedScrollRef.current = container.scrollTop;
+        setSelectedJob(job);
+      }
+    } catch (error) {
+      console.error("Error fetching updated application count:", error);
+    }
+  };
+
+  const handleBack = () => {
+    setSelectedJob(null);
+    requestAnimationFrame(() => {
+      const container = document.getElementById("main-scroll-container");
+      if (container) container.scrollTop = savedScrollRef.current;
+    });
+  };
 
   const location  = useLocation();
   const query     = useMemo(() => new URLSearchParams(location.search), [location]);
@@ -143,7 +210,7 @@ const Recommendations = () => {
   }
 
   if (selectedJob) {
-    return <ApplyCards job={selectedJob} onBack={() => setSelectedJob(null)} />;
+    return <ApplyCards job={selectedJob} onBack={handleBack} />;
   }
 
   // Check if Claude provided match reasons for any job
@@ -171,9 +238,39 @@ const Recommendations = () => {
 
       <JobCard
         jobs={jobs}
-        onViewDetails={job => setSelectedJob(job)}
+        onViewDetails={handleViewDetails}
         isRecommendation
       />
+
+      {/* Application limit popup */}
+      {showLimitPopup && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg max-w-sm text-center">
+            <h2 className="text-xl font-semibold text-gray-800">Application Limit Reached</h2>
+            <p className="text-gray-600 mt-2">
+              You have reached the maximum of {MAX_LIMITS[planType] || 5} applications allowed under your plan ({planType}).
+            </p>
+            <p className="text-gray-600 mt-1">Upgrade your account to apply for more jobs.</p>
+            <div className="flex justify-between mt-4">
+              <button
+                className="bg-gray-400 text-white px-4 py-2 rounded-md hover:bg-gray-500"
+                onClick={() => setShowLimitPopup(false)}
+              >
+                Close
+              </button>
+              <button
+                className="bg-purple-500 text-white px-4 py-2 rounded-md hover:bg-purple-600"
+                onClick={() => {
+                  setShowLimitPopup(false);
+                  if (handleSelectTab) handleSelectTab("premium");
+                }}
+              >
+                Upgrade Now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

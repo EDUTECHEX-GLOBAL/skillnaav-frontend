@@ -11,6 +11,7 @@ import { FaTrash, FaChevronDown } from "react-icons/fa";
 // 🟡 Limit definitions per plan
 const MAX_LIMITS = {
   "Free": { applications: 5, saves: 3 },
+  "Freemium": { applications: 5, saves: 3 },
   "Premium Basic": { applications: 25, saves: 25 },
   "Premium Plus": { applications: Infinity, saves: Infinity },
 };
@@ -39,13 +40,27 @@ const ApplyCards = ({ job, onBack }) => {
       const userInfo = (JSON.parse(localStorage.getItem("studentInfo")) || JSON.parse(localStorage.getItem("userInfo")));
       const studentId = userInfo?._id;
       const schoolAdminIdFromStorage = userInfo?.schoolAdminId || null;
-      const plan = userInfo?.planType || "Free";
-      setPlanType(plan);
       setSchoolAdminId(schoolAdminIdFromStorage);
 
       if (!studentId) return;
 
       try {
+        // Fetch fresh planType from server to avoid stale localStorage after re-subscription
+        const token = localStorage.getItem("userToken");
+        let freshPlan = userInfo?.planType || "Free";
+        if (token) {
+          try {
+            const { data: profileData } = await axios.get("/api/users/profile", {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            freshPlan = profileData.planType || freshPlan;
+            // Sync back to localStorage
+            const updatedInfo = { ...userInfo, planType: freshPlan };
+            localStorage.setItem("studentInfo", JSON.stringify(updatedInfo));
+          } catch (_) { /* fallback to localStorage value */ }
+        }
+        setPlanType(freshPlan);
+
         const { data: appliedData } = await axios.get(
           `/api/applications/check-applied/${studentId}/${job._id}`
         );

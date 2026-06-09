@@ -437,12 +437,14 @@ function PremiumPage() {
 
               <button
                 onClick={() => handlePayment(card.plantype, index)}
-                disabled={isCurrentActivePlan || isProcessing}
+                disabled={(isCurrentActivePlan && card.plantype === "Free") || isProcessing}
                 className={`mt-8 py-3 rounded-lg font-semibold transition-all ${theme.btn} ${
-                  isCurrentActivePlan ? "opacity-60 cursor-not-allowed" : ""
+                  (isCurrentActivePlan && card.plantype === "Free") ? "opacity-60 cursor-not-allowed" : ""
                 }`}
               >
-                {isCurrentActivePlan ? "✓ Subscribed" : card.pricebtn}
+                {isCurrentActivePlan 
+                  ? (card.plantype === "Free" ? "✓ Subscribed" : "Subscribe Again") 
+                  : card.pricebtn}
               </button>
 
               {selectedPlanIndex === index && (

@@ -15,7 +15,13 @@ import Skillnaavlogo from "../../../../assets-webapp/Skillnaavlogo.png";
 import { format } from "date-fns";
 
 const Homeimage = "/Home-Image.png";
-const MAX_FREE_APPLICATIONS = 5;
+
+const MAX_LIMITS = {
+  "Free": 5,
+  "Freemium": 5,
+  "Premium Basic": 25,
+  "Premium Plus": Infinity,
+};
 
 const getSavedLimitByPlan = (planType) => {
   switch (planType) {
@@ -31,6 +37,10 @@ const getSavedLimitByPlan = (planType) => {
 
 const Home = () => {
   const { savedJobs, saveJob, removeJob, handleSelectTab } = useTabContext();
+
+  // ─── selectedJob controls which view is shown ───────────────────────────
+  // Keeping this as local state means Home is never unmounted → jobData stays
+  // intact → scroll position can be restored cheaply.
   const [selectedJob, setSelectedJob] = useState(null);
   const [jobData, setJobData] = useState([]);
   const [, setApplicationCount] = useState(0);
@@ -42,13 +52,15 @@ const Home = () => {
   const [hasMore, setHasMore] = useState(true);
   const [loadingJobs, setLoadingJobs] = useState(false);
   const loadMoreRef = useRef(null);
-  const isRestoringScroll = useRef(false);
+
+  // Saved scroll position of <main id="main-scroll-container"> before entering detail view
+  const savedScrollRef = useRef(0);
 
   const navigate = useNavigate();
-
   const loadingRef = useRef(false);
   const hasMoreRef = useRef(true);
 
+  // ─── Data fetching ───────────────────────────────────────────────────────
   const fetchJobData = async (pageNumber = 1) => {
     try {
       if (loadingRef.current || !hasMoreRef.current) return;
@@ -56,7 +68,10 @@ const Home = () => {
       loadingRef.current = true;
       setLoadingJobs(true);
 
-      const userInfo = (JSON.parse(localStorage.getItem("studentInfo")) || JSON.parse(localStorage.getItem("userInfo"))) || {};
+      const userInfo =
+        JSON.parse(localStorage.getItem("studentInfo")) ||
+        JSON.parse(localStorage.getItem("userInfo")) ||
+        {};
       const isPremiumUser = userInfo.isPremium ? "true" : "false";
 
       const response = await axios.get(
@@ -65,10 +80,7 @@ const Home = () => {
 
       const { data, hasMore: more } = response.data;
 
-      setJobData(prev =>
-        pageNumber === 1 ? data : [...prev, ...data]
-      );
-
+      setJobData((prev) => (pageNumber === 1 ? data : [...prev, ...data]));
       hasMoreRef.current = more;
       setHasMore(more);
       setPage(pageNumber);
@@ -80,6 +92,7 @@ const Home = () => {
     }
   };
 
+  // ─── Effects ─────────────────────────────────────────────────────────────
   useEffect(() => {
     const link = document.createElement("link");
     link.rel = "preload";
@@ -91,18 +104,10 @@ const Home = () => {
   }, []);
 
   useEffect(() => {
-    const savedPosition = sessionStorage.getItem("scrollPosition");
-    if (savedPosition) {
-      window.scrollTo(0, parseInt(savedPosition, 10));
-    }
-
     const fetchUserProfile = async () => {
       try {
         const token = localStorage.getItem("userToken");
-        if (!token) {
-          console.error("No token found in localStorage");
-          return;
-        }
+        if (!token) return;
 
         const { data } = await axios.get("/api/users/profile", {
           headers: { Authorization: `Bearer ${token}` },
@@ -111,7 +116,10 @@ const Home = () => {
         setIsPremium(data.isPremium);
         setPlanType(data.planType || "Freemium");
 
-        const userInfo = (JSON.parse(localStorage.getItem("studentInfo")) || JSON.parse(localStorage.getItem("userInfo"))) || {};
+        const userInfo =
+          JSON.parse(localStorage.getItem("studentInfo")) ||
+          JSON.parse(localStorage.getItem("userInfo")) ||
+          {};
         if (userInfo._id) {
           const { data: countData } = await axios.get(
             `/api/applications/count/${userInfo._id}`
@@ -127,13 +135,18 @@ const Home = () => {
     fetchUserProfile();
   }, []);
 
+  // IntersectionObserver for infinite scroll — only active when list is visible
   useEffect(() => {
     if (!loadMoreRef.current) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
         const firstEntry = entries[0];
-        if (firstEntry.isIntersecting && hasMoreRef.current && !loadingRef.current) {
+        if (
+          firstEntry.isIntersecting &&
+          hasMoreRef.current &&
+          !loadingRef.current
+        ) {
           fetchJobData(page + 1);
         }
       },
@@ -141,24 +154,42 @@ const Home = () => {
     );
 
     observer.observe(loadMoreRef.current);
-
     return () => observer.disconnect();
-  }, [page, hasMore, loadingJobs]);
+  }, [page, hasMore, loadingJobs, selectedJob]);
 
+  // ─── Handlers ────────────────────────────────────────────────────────────
   const handleViewDetails = async (job) => {
     try {
-      sessionStorage.setItem("scrollPosition", window.scrollY.toString());
-      sessionStorage.setItem("scrollTime", Date.now().toString());
-
-      const userInfo = (JSON.parse(localStorage.getItem("studentInfo")) || JSON.parse(localStorage.getItem("userInfo")));
+      const userInfo =
+        JSON.parse(localStorage.getItem("studentInfo")) ||
+        JSON.parse(localStorage.getItem("userInfo"));
       if (!userInfo) return;
 
-      const { data: countData } = await axios.get(`/api/applications/count/${userInfo._id}`);
+      const { data: checkData } = await axios.get(
+        `/api/applications/check-applied/${userInfo._id}/${job._id}`
+      );
+
+      if (checkData.isApplied) {
+        // Allow them to view details of jobs they already applied to
+        const container = document.getElementById("main-scroll-container");
+        if (container) savedScrollRef.current = container.scrollTop;
+        setSelectedJob(job);
+        return;
+      }
+
+      const { data: countData } = await axios.get(
+        `/api/applications/count/${userInfo._id}`
+      );
       setApplicationCount(countData.count);
 
-      if (!isPremium && countData.count >= MAX_FREE_APPLICATIONS) {
+      const maxApps = MAX_LIMITS[planType] || 5;
+
+      if (countData.count >= maxApps) {
         setShowLimitPopup(true);
       } else {
+        // Save the scroll position of the main container BEFORE switching view
+        const container = document.getElementById("main-scroll-container");
+        if (container) savedScrollRef.current = container.scrollTop;
         setSelectedJob(job);
       }
     } catch (error) {
@@ -168,40 +199,27 @@ const Home = () => {
 
   const handleBack = () => {
     setSelectedJob(null);
-    isRestoringScroll.current = true;
+
+    // jobData is still in state (Home never unmounted) so cards render
+    // synchronously. requestAnimationFrame fires after paint — scroll is ready.
+    requestAnimationFrame(() => {
+      const container = document.getElementById("main-scroll-container");
+      if (container) container.scrollTop = savedScrollRef.current;
+    });
   };
-
-  useEffect(() => {
-    if (!selectedJob && isRestoringScroll.current) {
-      const savedPosition = sessionStorage.getItem("scrollPosition");
-      const savedTime = sessionStorage.getItem("scrollTime");
-
-      if (savedPosition && savedTime && (Date.now() - parseInt(savedTime)) < 10000) {
-        requestAnimationFrame(() => {
-          window.scrollTo(0, parseInt(savedPosition, 10));
-          sessionStorage.removeItem("scrollPosition");
-          sessionStorage.removeItem("scrollTime");
-          isRestoringScroll.current = false;
-        });
-      }
-    }
-  }, [selectedJob]);
 
   const toggleSaveJob = async (job) => {
     try {
-      if (isPremium && planType === "Freemium") {
-        console.log("⏳ Waiting for planType to load...");
-        return;
-      }
+      if (isPremium && planType === "Freemium") return;
 
       const savedLimit = getSavedLimitByPlan(planType);
-
       const jobExists = savedJobs.some((savedJob) => {
         const jobToCheck = savedJob.savedJob || savedJob;
-        return jobToCheck.jobId?._id === job._id || jobToCheck._id === job._id;
+        return (
+          jobToCheck.jobId?._id === job._id || jobToCheck._id === job._id
+        );
       });
 
-      // Only block NEW saves, not unsaves
       if (!jobExists && savedJobs.length >= savedLimit && savedLimit !== Infinity) {
         setShowSavedJobPopup(true);
         return;
@@ -220,21 +238,26 @@ const Home = () => {
   const calculatePostedTime = (date) => {
     const postedDate = new Date(date);
     const currentDate = new Date();
-    const differenceInTime = currentDate - postedDate;
-    const differenceInDays = Math.floor(differenceInTime / (1000 * 60 * 60 * 24));
-
+    const differenceInDays = Math.floor(
+      (currentDate - postedDate) / (1000 * 60 * 60 * 24)
+    );
     if (differenceInDays === 0) return "Today";
     if (differenceInDays === 1) return "Yesterday";
     return `${differenceInDays}d ago`;
   };
 
+  // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="font-poppins">
       {selectedJob ? (
+        // ── Detail view ──────────────────────────────────────────────────
+        // selectedJob is set → list is NOT rendered → IntersectionObserver
+        // does NOT fire → no background pagination requests.
         <ApplyCards job={selectedJob} onBack={handleBack} isPremium={isPremium} />
       ) : (
+        // ── List view ────────────────────────────────────────────────────
         <>
-          {/* Header Section */}
+          {/* Header */}
           <div className="relative w-full h-60">
             <img
               src={Homeimage}
@@ -246,13 +269,13 @@ const Home = () => {
             />
           </div>
 
-          {/* Jobs Listing */}
+          {/* Job cards */}
           <section className="py-10 px-6">
             <h2 className="text-3xl font-bold mb-2">Find your next role</h2>
             <p className="text-gray-600 mb-6">Recommendations based on your profile</p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
-              {jobData.map((job, index) => {
+              {jobData.map((job) => {
                 const saved = savedJobs.some(
                   (savedJob) =>
                     savedJob.jobId?._id === job._id ||
@@ -261,39 +284,36 @@ const Home = () => {
                 );
 
                 return (
-                  <div key={index} className="relative border rounded-lg p-6 shadow-sm">
-                    {/* Internship Type Badge */}
+                  <div key={job._id} className="relative border rounded-lg p-6 shadow-sm">
+                    {/* Badge */}
                     {job.internshipType && (
                       <span
-                        className={`absolute top-2 right-2 px-3 py-1 text-xs font-semibold uppercase rounded-full
-                          ${
-                            job.internshipType === "FREE"
-                              ? "bg-green-100 text-green-700"
-                              : job.internshipType === "STIPEND"
+                        className={`absolute top-2 right-2 px-3 py-1 text-xs font-semibold uppercase rounded-full ${job.internshipType === "FREE"
+                            ? "bg-green-100 text-green-700"
+                            : job.internshipType === "STIPEND"
                               ? "bg-blue-100 text-blue-700"
                               : job.internshipType === "PAID"
-                              ? "bg-red-100 text-red-700"
-                              : ""
+                                ? "bg-red-100 text-red-700"
+                                : ""
                           }`}
                       >
                         {job.internshipType}
                       </span>
                     )}
 
-                    {/* Save Button */}
+                    {/* Save button */}
                     <div className="absolute top-10 right-2">
                       <button
                         onClick={() => toggleSaveJob(job)}
-                        className={`transition ${
-                          saved ? "text-red-500" : "text-gray-500 hover:text-red-500"
-                        }`}
+                        className={`transition ${saved ? "text-red-500" : "text-gray-500 hover:text-red-500"
+                          }`}
                         aria-label={saved ? "Unsave job" : "Save job"}
                       >
                         <FontAwesomeIcon icon={faHeart} className="w-6 h-6" />
                       </button>
                     </div>
 
-                    {/* Job Details */}
+                    {/* Company + title */}
                     <div className="flex items-center mb-4">
                       <img
                         src={job.imgUrl}
@@ -315,52 +335,59 @@ const Home = () => {
                       </div>
                     </div>
 
+                    {/* Meta */}
                     <div className="text-gray-600 mb-4">
                       <p>
-                        <FontAwesomeIcon icon={faMapMarkerAlt} /> {job.location} {job.jobType}
+                        <FontAwesomeIcon icon={faMapMarkerAlt} /> {job.location}{" "}
+                        {job.jobType}
                       </p>
                       <p className="flex items-center">
                         <FontAwesomeIcon icon={faClock} className="mr-2" />
-                        {job.startDate ? format(new Date(job.startDate), "dd MMM yyyy") : "—"} –{" "}
+                        {job.startDate
+                          ? format(new Date(job.startDate), "dd MMM yyyy")
+                          : "—"}{" "}
+                        –{" "}
                         {job.endDateOrDuration
                           ? format(new Date(job.endDateOrDuration), "dd MMM yyyy")
                           : "—"}
                       </p>
-                      <div className="flex items-center gap-2 text-gray-600 text-sm md:text-base leading-none">
-                        <FontAwesomeIcon icon={faDollarSign} className="text-gray-600 w-4 h-4 flex-shrink-0" />
+                      <div className="flex items-center gap-2 text-sm md:text-base leading-none">
+                        <FontAwesomeIcon
+                          icon={faDollarSign}
+                          className="text-gray-600 w-4 h-4 flex-shrink-0"
+                        />
                         <span className="leading-none">
                           {job.internshipType === "STIPEND"
                             ? `${job.compensationDetails?.amount} ${job.compensationDetails?.currency} per ${job.compensationDetails?.frequency?.toLowerCase()}`
                             : job.internshipType === "FREE"
-                            ? "Unpaid / Free"
-                            : job.internshipType === "PAID"
-                            ? `Student Pays: ${job.compensationDetails?.amount} ${job.compensationDetails?.currency}`
-                            : "N/A"}
+                              ? "Unpaid / Free"
+                              : job.internshipType === "PAID"
+                                ? `Student Pays: ${job.compensationDetails?.amount} ${job.compensationDetails?.currency}`
+                                : "N/A"}
                         </span>
                       </div>
-
                       <p className="flex items-center mt-0">
                         <FontAwesomeIcon icon={faGlobe} className="mr-2 text-gray-600" />
                         <span className="font-medium text-gray-600">
                           {job.internshipMode === "ONLINE"
                             ? "Online"
                             : job.internshipMode === "OFFLINE"
-                            ? "Offline"
-                            : "Hybrid"}
+                              ? "Offline"
+                              : "Hybrid"}
                         </span>
                       </p>
                     </div>
 
-                    {/* Qualifications and View Details */}
+                    {/* Qualifications + View details */}
                     <div className="flex items-center justify-between">
                       <div className="flex flex-wrap gap-2">
                         {job.qualifications &&
-                          job.qualifications.slice(0, 2).map((qualification, index) => (
+                          job.qualifications.slice(0, 2).map((q, i) => (
                             <span
-                              key={index}
+                              key={i}
                               className="text-sm bg-gray-200 text-gray-800 py-1 px-3 rounded-full"
                             >
-                              {qualification}
+                              {q}
                             </span>
                           ))}
                         {job.qualifications && job.qualifications.length > 2 && (
@@ -369,7 +396,6 @@ const Home = () => {
                           </span>
                         )}
                       </div>
-
                       <button
                         className="text-purple-600 hover:underline"
                         onClick={() => handleViewDetails(job)}
@@ -381,16 +407,19 @@ const Home = () => {
                 );
               })}
             </div>
+
+            {/* Load-more sentinel — inside list branch so observer is disconnected
+                when the detail view is shown, preventing background fetches */}
+            <div ref={loadMoreRef} className="h-10 flex justify-center items-center mt-4">
+              {loadingJobs && (
+                <span className="text-gray-500 text-sm">Loading more internships…</span>
+              )}
+            </div>
           </section>
         </>
       )}
 
-      <div ref={loadMoreRef} className="h-10 flex justify-center items-center">
-        {loadingJobs && (
-          <span className="text-gray-500 text-sm">Loading more internships…</span>
-        )}
-      </div>
-
+      {/* Skillnaav analysis FAB */}
       <div className="fixed bottom-28 right-6 z-50">
         <button
           onClick={() => navigate("/skillnaav-analysis")}
@@ -400,20 +429,15 @@ const Home = () => {
         </button>
       </div>
 
-      {/* Application Limit Reached Popup */}
+      {/* Application limit popup */}
       {showLimitPopup && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
           <div className="bg-white p-6 rounded-lg shadow-lg max-w-sm text-center">
-            <h2 className="text-xl font-semibold text-gray-800">
-              Application Limit Reached
-            </h2>
+            <h2 className="text-xl font-semibold text-gray-800">Application Limit Reached</h2>
             <p className="text-gray-600 mt-2">
-              You have reached the maximum of {MAX_FREE_APPLICATIONS} free applications.
+              You have reached the maximum of {MAX_LIMITS[planType] || 5} applications allowed under your plan ({planType}).
             </p>
-            <p className="text-gray-600 mt-1">
-              Upgrade your account to apply for more jobs.
-            </p>
-
+            <p className="text-gray-600 mt-1">Upgrade your account to apply for more jobs.</p>
             <div className="flex justify-between mt-4">
               <button
                 className="bg-gray-400 text-white px-4 py-2 rounded-md hover:bg-gray-500"
@@ -435,13 +459,11 @@ const Home = () => {
         </div>
       )}
 
-      {/* Saved Jobs Limit Reached Popup */}
+      {/* Saved jobs limit popup */}
       {showSavedJobPopup && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
           <div className="bg-white p-6 rounded-lg shadow-lg max-w-sm text-center">
-            <h2 className="text-xl font-semibold text-gray-800">
-              Saved Jobs Limit Reached
-            </h2>
+            <h2 className="text-xl font-semibold text-gray-800">Saved Jobs Limit Reached</h2>
             <p className="text-gray-600 mt-2">
               You have reached the maximum of{" "}
               {getSavedLimitByPlan(planType) === Infinity
@@ -449,7 +471,6 @@ const Home = () => {
                 : getSavedLimitByPlan(planType)}{" "}
               saved jobs.
             </p>
-
             <div className="flex justify-between mt-4">
               <button
                 className="bg-gray-400 text-white px-4 py-2 rounded-md hover:bg-gray-500"

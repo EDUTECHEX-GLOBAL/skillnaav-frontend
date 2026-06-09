@@ -4,6 +4,22 @@ import React from "react";
 const defaultWidth = 1120;
 const defaultHeight = 792;
 
+/**
+ * Rewrites an S3 image URL to go through the Express image-proxy endpoint.
+ * This eliminates S3 CORS errors: the browser hits the same origin as the app
+ * (localhost:5000 or the production backend), which fetches from S3 server-side.
+ */
+const toProxiedUrl = (url) => {
+  if (!url) return url;
+  // Don't proxy blob: URLs (local preview before upload)
+  if (url.startsWith("blob:") || url.startsWith("data:")) return url;
+  // Already proxied
+  if (url.includes("/api/image-proxy")) return url;
+  const backendBase =
+    process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
+  return `${backendBase}/api/image-proxy?url=${encodeURIComponent(url)}`;
+};
+
 const CertificateTemplate = ({
   studentName,
   internshipTitle = "Frontend Developer Intern",
@@ -16,6 +32,8 @@ const CertificateTemplate = ({
   textColor = "#1f2937",
 }) => {
   const hasCustomBackground = Boolean(backgroundImageUrl);
+  // Use proxied URL so the browser never directly hits S3 (avoids CORS)
+  const proxiedBgUrl = toProxiedUrl(backgroundImageUrl);
 
   return (
     <>
@@ -40,7 +58,7 @@ const CertificateTemplate = ({
       >
         {hasCustomBackground && (
           <img
-            src={backgroundImageUrl}
+            src={proxiedBgUrl}
             alt=""
             crossOrigin="anonymous"
             style={{
@@ -53,6 +71,7 @@ const CertificateTemplate = ({
             }}
           />
         )}
+
 
         <div
           style={{

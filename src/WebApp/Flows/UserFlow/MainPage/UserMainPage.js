@@ -175,6 +175,7 @@ const UserMainPageContent = () => {
 
           {/* Main content */}
          <main
+  id="main-scroll-container"
   className={`flex-1 p-4 relative ${
     !isApproved ? 'overflow-hidden' : 'overflow-y-auto'
   }`}
