@@ -319,7 +319,9 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
         try {
           await fetchInternshipSchedule();
         } catch (err) {
-          console.error("Failed to fetch schedule after accept:", err);
+          if (err.response?.status !== 404) {
+            console.error("Failed to fetch schedule after accept:", err);
+          }
         } finally {
           setLoadingSchedule(false);
         }
@@ -449,7 +451,9 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
       try {
         await fetchInternshipSchedule();
       } catch (err) {
-        console.error("Failed to fetch schedule:", err);
+        if (err.response?.status !== 404) {
+          console.error("Failed to fetch schedule:", err);
+        }
       } finally {
         setLoadingSchedule(false);
       }
@@ -473,7 +477,9 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
         setLoadingSchedule(true);
         await fetchInternshipSchedule();
       } catch (err) {
-        console.error("Failed to fetch schedule for time slots:", err);
+        if (err.response?.status !== 404) {
+          console.error("Failed to fetch schedule for time slots:", err);
+        }
       } finally {
         setLoadingSchedule(false);
       }
