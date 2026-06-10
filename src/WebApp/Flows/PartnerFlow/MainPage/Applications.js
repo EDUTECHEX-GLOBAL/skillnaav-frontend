@@ -1364,6 +1364,7 @@ const InternshipList = () => {
             <ShortlistedTable
               candidates={shortlistedCandidates[modalData.internshipId]}
               internshipId={modalData.internshipId}
+              internshipTitle={internships.find(i => i._id === modalData.internshipId)?.jobTitle || "Internship"}
             />
           )
         )}

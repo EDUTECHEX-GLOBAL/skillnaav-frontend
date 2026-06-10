@@ -480,7 +480,7 @@ const TabBtn = ({ active, children, onClick }) => (
 // ─────────────────────────────────────────────────────────────────────────────
 // ShortlistedTable
 // ─────────────────────────────────────────────────────────────────────────────
-export const ShortlistedTable = ({ candidates, internshipId }) => {
+export const ShortlistedTable = ({ candidates, internshipId, internshipTitle = "Internship" }) => {
   const partnerId = useMemo(() => getPartnerId(), []);
 
   const [activeLevel, setActiveLevel] = useState("L1");
@@ -504,6 +504,7 @@ export const ShortlistedTable = ({ candidates, internshipId }) => {
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [scheduleTarget, setScheduleTarget] = useState(null);
   const [scheduleForm, setScheduleForm] = useState({ scheduledAt: "", durationMinutes: 30 });
+  const [isScheduling, setIsScheduling] = useState(false);
 
   // L1 filter + search
   const [l1Filter, setL1Filter] = useState("all");
@@ -702,22 +703,36 @@ export const ShortlistedTable = ({ candidates, internshipId }) => {
 
   // ── L3: Schedule Interview ──────────────────────────────────────────────────
   const handleScheduleInterview = async (item) => {
-    const sid = item?.studentId?._id || item?.studentId;
-    let interviewId = item?.l3?.interviewId?._id || item?.l3?.interviewId;
-    if (!interviewId) {
-      const res = await createInterview({ internshipId, studentId: sid, partnerId });
-      interviewId = res.interviewId;
+    if (!scheduleForm.scheduledAt) {
+      alert("Please select a valid date and time.");
+      return;
     }
-    await scheduleInterview({
-      interviewId,
-      scheduledAt: scheduleForm.scheduledAt,
-      durationMinutes: scheduleForm.durationMinutes,
-      studentEmail: item.studentId.email,
-      studentName: item.studentId.name,
-      internshipTitle: "Internship",
-    });
-    await sendInterviewInvite(interviewId);
-    setL3Items(await fetchPipelineByStage(internshipId, "L3"));
+    try {
+      setIsScheduling(true);
+      const sid = item?.studentId?._id || item?.studentId;
+      let interviewId = item?.l3?.interviewId?._id || item?.l3?.interviewId;
+      if (!interviewId) {
+        const res = await createInterview({ internshipId, studentId: sid, partnerId });
+        interviewId = res.interviewId;
+      }
+      await scheduleInterview({
+        interviewId,
+        scheduledAt: scheduleForm.scheduledAt,
+        durationMinutes: scheduleForm.durationMinutes,
+        studentEmail: item.studentId.email,
+        studentName: item.studentId.name,
+        internshipTitle: internshipTitle,
+      });
+      await sendInterviewInvite(interviewId);
+      setL3Items(await fetchPipelineByStage(internshipId, "L3"));
+      setShowScheduleModal(false);
+      setScheduleTarget(null);
+    } catch (err) {
+      console.error("❌ Schedule failed:", err);
+      alert("Failed to schedule interview. Please try again.");
+    } finally {
+      setIsScheduling(false);
+    }
   };
 
   // ── L3: Mark Result (Pass/Reject) ──────────────────────────────────────────
@@ -1189,35 +1204,58 @@ export const ShortlistedTable = ({ candidates, internshipId }) => {
                       </Td>
                       <Td className="text-gray-500">{email}</Td>
                       <Td>
-                        <StatusPill
-                          label={l3Status || "Scheduled"}
-                          cls="bg-blue-100 text-blue-700 border-blue-200"
-                        />
+                        <div className="flex flex-col gap-1.5">
+                          <StatusPill
+                            label={l3Status || "Scheduled"}
+                            cls="bg-blue-100 text-blue-700 border-blue-200 self-start"
+                          />
+                          {(item?.l3?.scheduledAt || item?.l3?.interviewId?.scheduledAt) && (
+                            <span className="text-[11px] text-gray-500 font-medium">
+                              {new Date(item?.l3?.scheduledAt || item?.l3?.interviewId?.scheduledAt).toLocaleString("en-GB", {
+                                day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit"
+                              })}
+                            </span>
+                          )}
+                          {item?.l3?.interviewId?.link && (
+                            <a href={item.l3.interviewId.link} target="_blank" rel="noopener noreferrer" className="text-[11px] text-blue-600 font-medium hover:underline flex items-center gap-1 w-fit">
+                              🎥 Meet Link
+                            </a>
+                          )}
+                        </div>
                       </Td>
                       <Td>{renderOfferStatusPill(sid)}</Td>
                       <Td>
-                        <div className="flex gap-2 flex-wrap">
-                          <button
-                            onClick={() => { setScheduleTarget(item); setShowScheduleModal(true); }}
-                            className="px-3 py-1.5 bg-orange-500 text-white text-xs font-semibold rounded-lg hover:bg-orange-600 transition active:scale-95"
-                          >
-                            Schedule
-                          </button>
+                        <div className="flex gap-2 flex-wrap items-center">
+                          {["scheduled", "sent", "completed"].includes(l3Status) ? (
+                            <button
+                              onClick={() => { setScheduleTarget(item); setShowScheduleModal(true); }}
+                              className="px-3 py-1.5 bg-white text-orange-600 border border-orange-200 text-xs font-semibold rounded-lg hover:bg-orange-50 transition active:scale-95 shadow-sm"
+                            >
+                              Reschedule
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => { setScheduleTarget(item); setShowScheduleModal(true); }}
+                              className="px-3 py-1.5 bg-orange-500 text-white text-xs font-semibold rounded-lg hover:bg-orange-600 transition active:scale-95 shadow-sm"
+                            >
+                              Schedule
+                            </button>
+                          )}
 
-                          {/* New: Pass / Reject actions once interview is scheduled */}
+                          {/* Pass / Reject actions once interview is scheduled */}
                           {["scheduled", "sent", "completed"].includes(l3Status) && (
                             <>
                               <button
                                 onClick={() => handleInterviewResult(item, "passed")}
-                                className="px-3 py-1.5 bg-green-600 text-white text-xs font-semibold rounded-lg hover:bg-green-700 transition active:scale-95"
+                                className="px-3 py-1.5 bg-emerald-500 text-white text-xs font-semibold rounded-lg hover:bg-emerald-600 transition active:scale-95 shadow-sm"
                               >
-                                ✅ Pass
+                                Pass
                               </button>
                               <button
                                 onClick={() => handleInterviewResult(item, "rejected")}
-                                className="px-3 py-1.5 bg-red-600 text-white text-xs font-semibold rounded-lg hover:bg-red-700 transition active:scale-95"
+                                className="px-3 py-1.5 bg-rose-500 text-white text-xs font-semibold rounded-lg hover:bg-rose-600 transition active:scale-95 shadow-sm"
                               >
-                                ❌ Reject
+                                Reject
                               </button>
                             </>
                           )}
@@ -1225,7 +1263,7 @@ export const ShortlistedTable = ({ candidates, internshipId }) => {
                           {offerStatus === "Not Sent" && (
                             <button
                               onClick={() => handleSendOfferClick(offerCandidate)}
-                              className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition active:scale-95"
+                              className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition active:scale-95 shadow-sm"
                             >
                               Send Offer
                             </button>
@@ -1416,9 +1454,20 @@ export const ShortlistedTable = ({ candidates, internshipId }) => {
           </div>
           <button
             onClick={() => handleScheduleInterview(scheduleTarget)}
-            className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2.5 rounded-xl transition active:scale-95"
+            disabled={isScheduling}
+            className={`w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2.5 rounded-xl transition active:scale-95 flex justify-center items-center gap-2 ${isScheduling ? "opacity-70 cursor-not-allowed" : ""}`}
           >
-            Confirm & Send Invite
+            {isScheduling ? (
+              <>
+                <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Scheduling...
+              </>
+            ) : (
+              "Confirm & Send Invite"
+            )}
           </button>
         </div>
       )}

@@ -134,6 +134,14 @@ const ProctoredAssessment = ({ assessment, studentId, onClose }) => {
     };
   }, []);
 
+  // ✨ Ensure video stream is attached when the video element mounts
+  useEffect(() => {
+    if (isReady && stream && videoRef.current) {
+      videoRef.current.srcObject = stream;
+      videoRef.current.play().catch(e => console.error("Error playing video:", e));
+    }
+  }, [isReady, stream, videoRef]);
+
   // ─── OPTION SELECT ────────────────────────────────────────────────
   const handleOptionSelect = (index, optionIndex) => {
     const newAnswers = [...answers];
