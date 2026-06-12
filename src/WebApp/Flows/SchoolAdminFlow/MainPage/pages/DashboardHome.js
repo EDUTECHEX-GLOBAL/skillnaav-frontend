@@ -4,26 +4,13 @@ import {
   LineChart, Line,
   PieChart, Pie, Cell
 } from "recharts";
-import { FiKey, FiClock, FiCheckCircle, FiBarChart2, FiUploadCloud } from "react-icons/fi";
+import { FiKey, FiClock, FiCheckCircle, FiBarChart2, FiUploadCloud, FiTrendingUp, FiTrendingDown } from "react-icons/fi";
 import { BsFileEarmarkCheck, BsClipboardData } from "react-icons/bs";
 import { motion } from "framer-motion";
 import axios from "../../../../../api/axiosInstance";
 import Papa from "papaparse";
 
-const chartData = [
-  { name: "Jan", value: 30 },
-  { name: "Feb", value: 40 },
-  { name: "Mar", value: 25 },
-  { name: "Apr", value: 35 },
-  { name: "May", value: 20 },
-];
-
-const pieData = [
-  { name: "Completed", value: 65 },
-  { name: "Pending", value: 35 },
-];
-
-const COLORS = ["#4F46E5", "#E5E7EB"];
+const COLORS = ["#10B981", "#F59E0B", "#EF4444", "#4F46E5", "#E5E7EB"];
 
 // ─── Full-Page Blur Overlay + Modal ──────────────────────────────────────────
 function UploadOverlay({ modal, onClose }) {
@@ -331,21 +318,32 @@ export default function Dashboard() {
     currentName: "",
   });
 
+  const [timeRange, setTimeRange] = useState("allTime");
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
+
   const [metrics, setMetrics] = useState({
     totalCredits: 0, generated: 0, remaining: 0,
     plan: "N/A", subscriptionStatus: "inactive",
+    generatedThisPeriod: 0, generatedTrend: null,
   });
 
   const token = localStorage.getItem("schoolAdminToken");
 
   useEffect(() => {
+    let query = `range=${timeRange}`;
+    if (timeRange === "custom") {
+      if (!customStart || !customEnd) return; // Wait until both are picked to avoid useless requests
+      query += `&startDate=${customStart}&endDate=${customEnd}`;
+    }
+
     axios
-      .get("/api/school-admin/dashboard-metrics", {
+      .get(`/api/school-admin/dashboard-metrics?${query}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       .then((r) => setMetrics(r.data))
       .catch((e) => console.error("Failed to fetch metrics:", e));
-  }, [token]);
+  }, [token, timeRange, customStart, customEnd]);
 
   const handleCSVChange = (e) => {
     setSelectedFile(e.target.files[0]);
@@ -474,6 +472,8 @@ export default function Dashboard() {
       icon:<FiKey size={32}/>,
       color:"from-green-400 to-green-200",
       textColor:"text-green-600",
+      trend: metrics.generatedTrend,
+      periodValue: metrics.generatedThisPeriod,
     },
     {
       label:"Remaining Credentials",
@@ -485,7 +485,7 @@ export default function Dashboard() {
     {
       label:"Upload Credentials CSV",
       type:"upload",
-      icon:<FiCheckCircle size={32}/>,
+      icon:<FiUploadCloud size={32}/>,
       color:"from-indigo-500 to-indigo-300",
       textColor:"text-indigo-700",
     },
@@ -496,6 +496,41 @@ export default function Dashboard() {
 
       {/* 🔒 Blur overlay */}
       <UploadOverlay modal={uploadModal} onClose={handleModalClose} />
+
+      {/* Header & Range Selector */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+        <h2 className="text-2xl font-bold text-gray-800">Overview</h2>
+        <div className="flex flex-wrap items-center gap-3">
+          {timeRange === "custom" && (
+            <div className="flex items-center gap-2 bg-white px-3 py-1.5 border border-gray-200 rounded-lg shadow-sm">
+              <input 
+                type="date" 
+                value={customStart} 
+                onChange={(e) => setCustomStart(e.target.value)} 
+                className="bg-transparent focus:outline-none text-gray-700 text-sm cursor-pointer" 
+              />
+              <span className="text-gray-400 text-sm">to</span>
+              <input 
+                type="date" 
+                value={customEnd} 
+                onChange={(e) => setCustomEnd(e.target.value)} 
+                className="bg-transparent focus:outline-none text-gray-700 text-sm cursor-pointer" 
+              />
+            </div>
+          )}
+          <select
+            value={timeRange}
+            onChange={(e) => setTimeRange(e.target.value)}
+            className="px-4 py-2 bg-white border border-gray-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-700 cursor-pointer font-medium"
+          >
+            <option value="last7">Last 7 Days</option>
+            <option value="last30">Last 30 Days</option>
+            <option value="thisYear">This Year</option>
+            <option value="allTime">All Time</option>
+            <option value="custom">Custom Date Range</option>
+          </select>
+        </div>
+      </div>
 
       {/* Stats cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
@@ -595,18 +630,34 @@ export default function Dashboard() {
                 )}
               </div>
             ) : (
-              <div className={`text-4xl font-bold ${stat.textColor}`}>{stat.value}</div>
+              <div>
+                <div className={`text-4xl font-bold ${stat.textColor}`}>{stat.value}</div>
+                {stat.trend !== undefined && stat.trend !== null && timeRange !== "allTime" && (
+                  <div className="mt-2 flex items-center gap-1.5 bg-white/30 rounded-full px-2.5 py-1 w-max">
+                    {stat.trend >= 0 ? (
+                      <FiTrendingUp className="text-emerald-700" size={14}/>
+                    ) : (
+                      <FiTrendingDown className="text-red-700" size={14}/>
+                    )}
+                    <span className={`text-xs font-bold ${stat.trend >= 0 ? "text-emerald-800" : "text-red-800"}`}>
+                      {stat.trend > 0 ? "+" : ""}{stat.trend}%
+                    </span>
+                    <span className="text-xs text-white opacity-90 font-medium ml-1">
+                      ({stat.periodValue} this period)
+                    </span>
+                  </div>
+                )}
+              </div>
             )}
           </motion.div>
         ))}
       </div>
 
       {/* Charts */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <ChartCard title="Internship Completions" icon={<BsClipboardData className="text-orange-500"/>} type="bar"  color="#f97316"/>
-        <ChartCard title="Selected Internships"   icon={<BsClipboardData className="text-green-500" />} type="line" color="#10B981"/>
-        <ChartCard title="Completed Internships"  icon={<BsFileEarmarkCheck className="text-pink-500"/>} type="pie"/>
-        <ChartCard title="Ongoing Internships"    icon={<BsClipboardData className="text-indigo-500"/>} type="bar"  color="#6366F1"/>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <ChartCard title="Applications (Last 6 Months)" icon={<BsClipboardData className="text-indigo-500"/>} type="bar" color="#6366F1" chartData={metrics.chartData || []} />
+        <ChartCard title="Application Trend" icon={<BsClipboardData className="text-green-500" />} type="line" color="#10B981" chartData={metrics.chartData || []} />
+        <ChartCard title="Application Status" icon={<BsFileEarmarkCheck className="text-pink-500"/>} type="pie" pieData={metrics.pieData || []} />
       </div>
     </div>
   );
@@ -616,7 +667,7 @@ export default function Dashboard() {
 function delay(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
 // ─── ChartCard ────────────────────────────────────────────────────────────────
-function ChartCard({ title, icon, type, color }) {
+function ChartCard({ title, icon, type, color, chartData = [], pieData = [] }) {
   return (
     <div className="bg-white p-6 rounded-2xl shadow-md font-poppins">
       <div className="flex items-center gap-3 text-gray-800 text-lg font-medium mb-4">
@@ -638,6 +689,7 @@ function ChartCard({ title, icon, type, color }) {
             <Pie data={pieData} dataKey="value" outerRadius={60} label>
               {pieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]}/>)}
             </Pie>
+            <Tooltip />
           </PieChart>
         )}
       </ResponsiveContainer>

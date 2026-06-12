@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSignOutAlt, faBars, faBell } from "@fortawesome/free-solid-svg-icons";
-import logo from "../../../../assets-webapp/Skillnaav-logo.png";
+import logo from "../../../../assets-webapp/skillnaav_final_logo.svg";
 import defaultCompanyLogo from "../../../../assets/default-company-logo.png";
 
 import { useTabContext } from "./UserHomePageContext/HomePageContext";
@@ -320,7 +320,7 @@ const Navbar = ({ onToggleSidebar }) => {
         <button onClick={onToggleSidebar} className="md:hidden text-gray-700 focus:outline-none">
           <FontAwesomeIcon icon={faBars} className="text-xl" />
         </button>
-        <img src={logo} alt="Skillnaav Logo" className="h-14 w-auto object-contain" width="120" height="56" />
+        <img src={logo} alt="Skillnaav Logo" className="h-10 w-auto object-contain" width="120" height="56" />
       </div>
 
       {/* Right: User info + dropdown */}

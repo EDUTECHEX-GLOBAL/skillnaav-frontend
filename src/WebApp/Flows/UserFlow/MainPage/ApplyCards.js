@@ -476,13 +476,13 @@ if (
   <input
   type="file"
   accept=".pdf,.doc,.docx"
-  disabled={isApplied}
+  disabled={isApplied || existingResumes.length >= 5}
   onChange={(e) => {
     handleFileChange(e);
     setSelectedResumeUrl(null);
   }}
   className={`block w-full text-sm ${
-    isApplied
+    isApplied || existingResumes.length >= 5
       ? "text-gray-400 cursor-not-allowed"
       : "text-gray-500"
   }`}

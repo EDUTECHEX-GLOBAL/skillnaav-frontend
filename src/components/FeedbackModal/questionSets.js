@@ -1,5 +1,5 @@
 export const userFlowQuestions = [
-  { id: "overall", type: "rating", label: "1) Overall, how would you rate your experience today?" },
+  { id: "overall", type: "rating", label: "1) Overall, how would you rate your experience today?", required: true },
   { id: "findEase", type: "scale", min: 1, max: 5, label: "2) How easy was it to find relevant internships/jobs? (1-5)", default: 4 },
   { id: "issueEncountered", type: "yesno", label: "3) Did you face any issues while applying or saving a job?" },
   { id: "issueDesc", type: "textarea", label: "If yes, briefly describe", rows: 2 },
@@ -14,7 +14,7 @@ export const userFlowQuestions = [
 ];
 
 export const partnerFlowQuestions = [
-  { id: "overall_partner", type: "rating", label: "1) Overall, how would you rate your partner dashboard experience?" },
+  { id: "overall_partner", type: "rating", label: "1) Overall, how would you rate your partner dashboard experience?", required: true },
   { id: "postEase", type: "scale", min: 1, max: 5, label: "2) How easy was it to post an internship/job?" },
   { id: "approvalClarity", type: "rating", label: "3) How clear was the approval/status process?" },
   { id: "toolsUsed", type: "select", label: "4) Which tool did you use most?", options: ["Post Job","Edit Job","Analytics","Profile"] },
@@ -27,7 +27,7 @@ export const partnerFlowQuestions = [
 ];
 
 export const schoolAdminFlowQuestions = [
-  { id: "overall_school", type: "rating", label: "1) Overall, how was the school admin experience?" },
+  { id: "overall_school", type: "rating", label: "1) Overall, how was the school admin experience?", required: true },
   { id: "reviewFlow", type: "rating", label: "2) How easy is it to review partner postings (1-5)?" },
   { id: "tools_school", type: "select", label: "3) Which action did you perform?", options: ["Approve","Reject","Edit","Communicate"] },
   { id: "issue_school", type: "yesno", label: "4) Did you face issues with the moderation tools?" },

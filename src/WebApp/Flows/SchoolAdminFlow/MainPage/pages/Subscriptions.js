@@ -74,6 +74,7 @@ const plans = [
 
 const SubscriptionPlans = () => {
   const [currentPlan, setCurrentPlan] = useState(null);
+  const [selectedPlanForPayment, setSelectedPlanForPayment] = useState(null);
 
   useEffect(() => {
     const fetchCurrentPlan = async () => {
@@ -226,59 +227,91 @@ const SubscriptionPlans = () => {
                       : plan.button}
                   </button>
                 ) : plan.title === "Standard Plan" ? (
-                  <PayPalButtons
-                    style={{
-                      layout: "vertical",
-                    }}
-                    createOrder={(data, actions) => {
-                      return actions.order.create({
-                        purchase_units: [
-                          {
-                            amount: {
-                              value: "10.00",
-                              currency_code: "USD",
+                  selectedPlanForPayment === "Standard Plan" ? (
+                    <PayPalButtons
+                      style={{
+                        layout: "vertical",
+                      }}
+                      createOrder={(data, actions) => {
+                        return actions.order.create({
+                          purchase_units: [
+                            {
+                              amount: {
+                                value: "10.00",
+                                currency_code: "USD",
+                              },
+                              description: "500 Student Credits",
                             },
-                            description: "500 Student Credits",
-                          },
-                        ],
-                      });
-                    }}
-                    onApprove={async (data, actions) => {
-                      const order = await actions.order.capture();
-                      await handlePaidPlanActivation("Standard Plan", order.id);
-                    }}
-                    onError={(err) => {
-                      console.error("PayPal error:", err);
-                      toast.error("❌ Payment failed. Please try again.");
-                    }}
-                  />
+                          ],
+                        });
+                      }}
+                      onApprove={async (data, actions) => {
+                        const order = await actions.order.capture();
+                        await handlePaidPlanActivation("Standard Plan", order.id);
+                      }}
+                      onError={(err) => {
+                        console.error("PayPal error:", err);
+                        toast.error("❌ Payment failed. Please try again.");
+                      }}
+                    />
+                  ) : (
+                    <button
+                      onClick={() => setSelectedPlanForPayment("Standard Plan")}
+                      disabled={currentPlan === "Standard Plan"}
+                      className={`w-full py-3 px-4 rounded-lg font-semibold transition-all ${plan.buttonColor} ${
+                        currentPlan === "Standard Plan"
+                          ? "opacity-60 cursor-not-allowed"
+                          : ""
+                      }`}
+                    >
+                      {currentPlan === "Standard Plan"
+                        ? "Current Plan"
+                        : plan.button}
+                    </button>
+                  )
                 ) : plan.title === "Premium Plan" ? (
-                  <PayPalButtons
-                    style={{
-                      layout: "vertical",
-                    }}
-                    createOrder={(data, actions) => {
-                      return actions.order.create({
-                        purchase_units: [
-                          {
-                            amount: {
-                              value: "25.00",
-                              currency_code: "USD",
+                  selectedPlanForPayment === "Premium Plan" ? (
+                    <PayPalButtons
+                      style={{
+                        layout: "vertical",
+                      }}
+                      createOrder={(data, actions) => {
+                        return actions.order.create({
+                          purchase_units: [
+                            {
+                              amount: {
+                                value: "25.00",
+                                currency_code: "USD",
+                              },
+                              description: "2000 Student Credits",
                             },
-                            description: "2000 Student Credits",
-                          },
-                        ],
-                      });
-                    }}
-                    onApprove={async (data, actions) => {
-                      const order = await actions.order.capture();
-                      await handlePaidPlanActivation("Premium Plan", order.id);
-                    }}
-                    onError={(err) => {
-                      console.error("PayPal error:", err);
-                      toast.error("❌ Payment failed. Please try again.");
-                    }}
-                  />
+                          ],
+                        });
+                      }}
+                      onApprove={async (data, actions) => {
+                        const order = await actions.order.capture();
+                        await handlePaidPlanActivation("Premium Plan", order.id);
+                      }}
+                      onError={(err) => {
+                        console.error("PayPal error:", err);
+                        toast.error("❌ Payment failed. Please try again.");
+                      }}
+                    />
+                  ) : (
+                    <button
+                      onClick={() => setSelectedPlanForPayment("Premium Plan")}
+                      disabled={currentPlan === "Premium Plan"}
+                      className={`w-full py-3 px-4 rounded-lg font-semibold transition-all ${plan.buttonColor} ${
+                        currentPlan === "Premium Plan"
+                          ? "opacity-60 cursor-not-allowed"
+                          : ""
+                      }`}
+                    >
+                      {currentPlan === "Premium Plan"
+                        ? "Current Plan"
+                        : plan.button}
+                    </button>
+                  )
                 ) : (
                   <button
                     onClick={handleContactSales}

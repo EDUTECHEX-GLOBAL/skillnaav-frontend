@@ -12,6 +12,7 @@ import SchoolAdminNavbar from "./pages/SchoolAdminNavbar";
 import SchoolAdminSidebar from "./pages/SchoolAdminSidebar";
 import UploadStudents from "./pages/UploadStudents";
 import StudentProfileOverview from "./pages/StudentProfileOverview"; // ✅ new
+import SavedJobsPage from "./pages/SavedJobsPage"; // ✅ new
 import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
 
 const DEFAULT_TAB = "dashboard";
@@ -22,6 +23,7 @@ const VALID_TABS = new Set([
   "students",
   "upload",
   "internships",
+  "saved-jobs", // ✅ new
   "subscription-status",
   "subscriptions",
   "profile",
@@ -34,6 +36,7 @@ const TAB_ROUTE_SEGMENTS = {
   students:              "students",
   upload:                "upload",
   internships:           "internships",
+  "saved-jobs":          "saved-jobs", // ✅ new
   "subscription-status": "subscription-status",
   subscriptions:         "subscriptions",
   profile:               "profile",
@@ -102,8 +105,8 @@ const SchoolAdminDashboard = () => {
   const handleLogout = useCallback(() => {
     localStorage.removeItem("schoolAdminToken");
     sessionStorage.removeItem(SCHOOL_ADMIN_SELECTED_TAB_KEY);
-    window.location.href = "/schooladmin/login";
-  }, []);
+    navigate("/schooladmin/login");
+  }, [navigate]);
 
   const handleToggleSidebar = useCallback(() => {
     setIsSidebarOpen((prev) => !prev);
@@ -132,6 +135,7 @@ const SchoolAdminDashboard = () => {
       case "students":           return <StudentsList />;
       case "upload":             return <UploadStudents />;
       case "internships":        return <Internships />;
+      case "saved-jobs":         return <SavedJobsPage />; // ✅ new
       case "subscription-status":return <SubscriptionStatus />;
       case "subscriptions":      return <Subscriptions />;
       case "profile":            return <SchoolAdminProfile />;

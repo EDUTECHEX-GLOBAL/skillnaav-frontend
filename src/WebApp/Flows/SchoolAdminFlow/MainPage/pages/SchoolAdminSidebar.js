@@ -3,7 +3,7 @@
 import React from "react";
 import {
   FaHome, FaUserGraduate, FaBriefcase, FaCreditCard,
-  FaSignOutAlt, FaIdCard, FaBook, FaChartPie,
+  FaSignOutAlt, FaIdCard, FaBook, FaChartPie, FaBookmark,
 } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import axios from "../../../../../api/axiosInstance";
@@ -26,6 +26,7 @@ const SchoolAdminSidebar = ({
     { id: "profile-completion", label: "Profile Completion",  icon: <FaChartPie /> }, // ✅ new
     { id: "upload",             label: "Upload Students",     icon: <FaBook /> },
     { id: "internships",        label: "Internships",         icon: <FaBriefcase /> },
+    { id: "saved-jobs",         label: "Saved Jobs",          icon: <FaBookmark /> }, // ✅ new
     { id: "subscription-status",label: "Subscriptions History", icon: <FaCreditCard /> },
     { id: "profile",            label: "Profile",             icon: <FaIdCard /> },
   ];

@@ -1,15 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { Form, Input, Button, message, Upload, Spin } from "antd";
-import { useDispatch, useSelector } from "react-redux";
+import { useDispatch } from "react-redux";
 import { ShowLoading, HideLoading } from "../../redux/rootSlice";
 import axios from "../../api/axiosInstance";
 import {
-  LoadingOutlined,
   UploadOutlined,
   DeleteOutlined,
 } from "@ant-design/icons";
-
-const antIcon = <LoadingOutlined style={{ fontSize: 24 }} spin />;
+import { FaSpinner } from "react-icons/fa";
 
 const AdminDiscover = () => {
   const [form] = Form.useForm();
@@ -17,7 +15,20 @@ const AdminDiscover = () => {
   const [compImageUrls, setCompImageUrls] = useState([]);
   const [, setUploading] = useState(false);
   const dispatch = useDispatch();
-  const { skillnaavData } = useSelector((state) => state.root);
+  const [skillnaavData, setSkillnaavData] = useState(null);
+
+  const fetchSkillnaavData = async () => {
+    try {
+      const response = await axios.get("/api/skillnaav/get-skillnaav-data");
+      setSkillnaavData(response.data);
+    } catch (error) {
+      console.error("Error fetching skillnaav data:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchSkillnaavData();
+  }, []);
 
   useEffect(() => {
     if (
@@ -135,7 +146,11 @@ const AdminDiscover = () => {
     !skillnaavData.discover ||
     skillnaavData.discover.length === 0
   ) {
-    return <Spin spinning={true} indicator={antIcon} />;
+    return (
+      <div className="flex justify-center items-center h-full min-h-[50vh]">
+        <FaSpinner className="animate-spin text-4xl text-blue-500" />
+      </div>
+    );
   }
 
   const discover = skillnaavData.discover[0];

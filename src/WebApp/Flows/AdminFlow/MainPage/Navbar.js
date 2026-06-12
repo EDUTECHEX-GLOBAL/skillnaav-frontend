@@ -7,7 +7,7 @@ import {
   faBell,
 } from "@fortawesome/free-solid-svg-icons";
 import { useNavigate } from "react-router-dom";
-import logo from "../../../../assets-webapp/Skillnaav-logo.png";
+import logo from "../../../../assets-webapp/skillnaav_final_logo.svg";
 import axios from "../../../../api/axiosInstance";
 import { io as ioClient } from "socket.io-client";
 import { useTabContext } from "./UserHomePageContext/HomePageContext";

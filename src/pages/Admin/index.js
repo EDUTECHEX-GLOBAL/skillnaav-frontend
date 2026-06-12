@@ -50,7 +50,7 @@ const Admin = () => {
   };
 
   useEffect(() => {
-    if (!localStorage.getItem("token")) {
+    if (!localStorage.getItem("adminToken")) {
       window.location.href = "/admin-login";
     }
   }, []);
@@ -72,7 +72,7 @@ const Admin = () => {
           </div>
           <span
             onClick={() => {
-              localStorage.removeItem("token");
+              localStorage.removeItem("adminToken");
               window.location.href = "/admin-login";
             }}
             className="text-gray-800 text-lg md:text-xl font-semibold cursor-pointer hover:underline"

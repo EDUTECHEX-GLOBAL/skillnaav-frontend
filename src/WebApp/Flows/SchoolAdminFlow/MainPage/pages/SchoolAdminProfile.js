@@ -20,7 +20,6 @@ const SchoolAdminProfile = () => {
     contactPerson: "",
     contactEmail: "",
     contactPhone: "",
-    bio: "",
     schoolType: "",
     schoolNumber: "",
     languageOfInstruction: "",
@@ -28,35 +27,31 @@ const SchoolAdminProfile = () => {
   });
 
   const [isEditing, setIsEditing] = useState(false);
-  const [profilePic, setProfilePic] = useState("/default-profile.jpg");
+
+  const fetchProfile = async () => {
+    try {
+      const token = localStorage.getItem("schoolAdminToken");
+      const res = await axios.get("/api/school-admin/profile", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setFormData(res.data);
+    } catch (err) {
+      console.error("Error fetching profile:", err);
+    }
+  };
 
   useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const token = localStorage.getItem("schoolAdminToken");
-      // ✅ Token is passed manually
-const res = await axios.get("/api/school-admin/profile", {
-  headers: { Authorization: `Bearer ${token}` },
-});
-        setFormData(res.data);
-      } catch (err) {
-        console.error("Error fetching profile:", err);
-      }
-    };
     fetchProfile();
   }, []);
+
+  const handleCancel = () => {
+    fetchProfile();
+    setIsEditing(false);
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleImageUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const imageUrl = URL.createObjectURL(file);
-      setProfilePic(imageUrl);
-    }
   };
 
   const handleEditToggle = () => setIsEditing(true);
@@ -87,22 +82,7 @@ const res = await axios.get("/api/school-admin/profile", {
       >
         {/* Header */}
         <div className="bg-gradient-to-r from-green-400 to-blue-600 p-6 flex items-center justify-between">
-          <div className="flex items-center space-x-4 relative">
-            <motion.img
-              src={profilePic}
-              alt="Profile"
-              className="w-20 h-20 rounded-full border-4 border-white object-cover"
-              whileHover={{ scale: 1.05 }}
-              transition={{ type: "spring", stiffness: 200 }}
-            />
-            {isEditing && (
-              <input
-                type="file"
-                accept="image/*"
-                className="absolute bottom-0 left-16 w-6 h-6 opacity-0 cursor-pointer"
-                onChange={handleImageUpload}
-              />
-            )}
+          <div className="flex items-center space-x-4">
             <div>
               <h2 className="text-white text-2xl font-semibold">{formData.schoolName}</h2>
               <p className="text-white text-sm">School Admin</p>
@@ -118,14 +98,24 @@ const res = await axios.get("/api/school-admin/profile", {
               <FaEdit className="mr-2" /> Edit Profile
             </motion.button>
           ) : (
-            <motion.button
-              onClick={handleUpdate}
-              className="bg-white text-green-600 font-medium px-4 py-2 rounded-md shadow hover:bg-gray-100"
-              whileTap={{ scale: 0.95 }}
-              whileHover={{ scale: 1.03 }}
-            >
-              Update
-            </motion.button>
+            <div className="flex items-center space-x-3">
+              <motion.button
+                onClick={handleCancel}
+                className="bg-white text-red-500 font-medium px-4 py-2 rounded-md shadow hover:bg-gray-100"
+                whileTap={{ scale: 0.95 }}
+                whileHover={{ scale: 1.03 }}
+              >
+                Cancel
+              </motion.button>
+              <motion.button
+                onClick={handleUpdate}
+                className="bg-white text-green-600 font-medium px-4 py-2 rounded-md shadow hover:bg-gray-100"
+                whileTap={{ scale: 0.95 }}
+                whileHover={{ scale: 1.03 }}
+              >
+                Update
+              </motion.button>
+            </div>
           )}
         </div>
 
@@ -168,20 +158,6 @@ const res = await axios.get("/api/school-admin/profile", {
             )}
           </div>
 
-          <div>
-            <h3 className="text-lg font-semibold text-gray-700 mb-2">Bio</h3>
-            {isEditing ? (
-              <textarea
-                name="bio"
-                rows="2"
-                value={formData.bio}
-                onChange={handleChange}
-                className="w-full p-2 border border-gray-300 rounded-md"
-              />
-            ) : (
-              <p className="bg-gray-50 p-2 border border-gray-300 rounded-md text-sm text-gray-800">{formData.bio}</p>
-            )}
-          </div>
 
           {/* Verification Document (read-only display) */}
           <div>

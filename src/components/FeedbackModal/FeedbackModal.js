@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useFeedback } from "../../context/FeedbackContext";
 import "../../index.css"; // ensure Poppins is globally loaded
+import axios from "../../api/axiosInstance";
 
 export default function FeedbackModal() {
   const {
@@ -221,15 +222,21 @@ export default function FeedbackModal() {
     // console.log("Feedback payload:", payload);
 
     try {
-      const res = await fetch("/api/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
+      let data;
+      let isOk = true;
+      let status = 200;
 
-      const data = await res.json();
+      try {
+        const res = await axios.post("/api/feedback", payload);
+        data = res.data;
+        status = res.status;
+      } catch (err) {
+        isOk = false;
+        status = err.response?.status;
+        data = err.response?.data;
+      }
 
-      if (!res.ok && res.status === 409 && data?.message === "already_submitted") {
+      if (!isOk && status === 409 && data?.message === "already_submitted") {
         if (typeof postSubmitCallback === "function") {
           postSubmitCallback({ submitted: true, id: data?.id || null, serverResponse: data });
         }
@@ -237,7 +244,7 @@ export default function FeedbackModal() {
         return;
       }
 
-      if (!res.ok) throw new Error(data?.message || "Submit failed");
+      if (!isOk) throw new Error(data?.message || "Submit failed");
 
       if (typeof postSubmitCallback === "function") {
         postSubmitCallback({ submitted: true, id: data?.id });

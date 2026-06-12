@@ -4,7 +4,6 @@ import {
   FaMapMarkerAlt, FaCalendarAlt, FaDollarSign, FaLaptopHouse, FaHeart,
   FaSearch, FaTimes, FaChevronLeft, FaChevronRight,
 } from 'react-icons/fa';
-import { BsClockHistory } from 'react-icons/bs';
 import {
   AiOutlineStar, AiOutlineLike, AiOutlineDislike,
 } from 'react-icons/ai';
@@ -12,6 +11,48 @@ import {
 const AI_API = "/api/ai";
 
 const PAGE_SIZE = 6;
+
+/* ─────────────────────────── FILTER CONFIG ─────────────────────────── */
+const FILTER_GROUPS = [
+  {
+    key: 'sector',
+    label: 'Sector',
+    options: [
+      { value: 'advanced-ai',       label: 'Advanced AI' },
+      { value: 'quantum-computing', label: 'Quantum Computing' },
+      { value: 'climate-tech',      label: 'Climate Tech' },
+      { value: 'biotech',           label: 'Biotech' },
+      { value: 'materials-science', label: 'Materials Science' },
+    ],
+  },
+  {
+    key: 'internshipType',
+    label: 'Type',
+    options: [
+      { value: 'FREE',    label: 'Free' },
+      { value: 'STIPEND', label: 'Stipend' },
+      { value: 'PAID',    label: 'Paid' },
+    ],
+  },
+  {
+    key: 'internshipMode',
+    label: 'Mode',
+    options: [
+      { value: 'ONLINE',  label: 'Online' },
+      { value: 'OFFLINE', label: 'Offline' },
+      { value: 'HYBRID',  label: 'Hybrid' },
+    ],
+  },
+  {
+    key: 'classification',
+    label: 'Level',
+    options: [
+      { value: 'Basic',        label: 'Basic' },
+      { value: 'Intermediate', label: 'Intermediate' },
+      { value: 'Advanced',     label: 'Advanced' },
+    ],
+  },
+];
 
 /* ─────────────────────────── SKELETON CARD ─────────────────────────── */
 const SkeletonCard = () => (
@@ -221,6 +262,9 @@ const Internships = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Saved Jobs
+  const [savedJobs, setSavedJobs] = useState([]);
+
   // Search
   const [searchQuery, setSearchQuery] = useState('');
   const debounceRef = useRef(null);
@@ -231,6 +275,17 @@ const Internships = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+
+  // Filters
+  const [activeFilters, setActiveFilters] = useState({
+    sector: null,
+    internshipType: null,
+    internshipMode: null,
+    classification: null,
+  });
+  const hasActiveFilters = Object.values(activeFilters).some(Boolean);
+  const clearAllFilters = () =>
+    setActiveFilters({ sector: null, internshipType: null, internshipMode: null, classification: null });
 
   // Modal
   const [modalStatus, setModalStatus] = useState(null);
@@ -271,7 +326,55 @@ const Internships = () => {
   // Single mount effect — runs exactly once, no dependency races
   useEffect(() => {
     fetchInternships(1, '');
+    fetchSavedJobs();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const fetchSavedJobs = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('schoolAdminToken') || localStorage.getItem('token');
+      const { data } = await axios.get('/api/school-admin/saved-jobs', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const schoolAdminId = localStorage.getItem('schoolAdminId') || localStorage.getItem('adminId');
+      const adminSaved = (data.savedJobs || []).filter(sj => 
+        sj.userId?._id === schoolAdminId || sj.userId === schoolAdminId
+      );
+      setSavedJobs(adminSaved);
+    } catch (err) {
+      console.error("Failed to load saved jobs", err);
+    }
+  }, []);
+
+  const isJobSaved = (jobId) =>
+    savedJobs.some(
+      (savedJob) =>
+        savedJob.jobId?._id === jobId ||
+        savedJob.jobId === jobId ||
+        savedJob._id === jobId
+    );
+
+  const toggleSaveJob = async (job) => {
+    try {
+      const schoolAdminId = localStorage.getItem('schoolAdminId') || localStorage.getItem('adminId');
+      const token = localStorage.getItem('schoolAdminToken') || localStorage.getItem('token');
+      if (!schoolAdminId || !token) return;
+
+      if (isJobSaved(job._id)) {
+        await axios.delete(`/api/school-admin/saved-jobs/remove/${schoolAdminId}/${job._id}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setSavedJobs((prev) => prev.filter(sj => sj.jobId?._id !== job._id && sj.jobId !== job._id));
+      } else {
+        const { data } = await axios.post("/api/school-admin/saved-jobs/save", 
+          { schoolAdminId, jobId: job._id },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setSavedJobs((prev) => [...prev, data?.jobId ? data : { ...data, jobId: job }]);
+      }
+    } catch (err) {
+      console.error("Error toggling save job:", err);
+    }
+  };
 
   // Search input handler — debounce then fetch, never resets state mid-flight
   const handleSearchChange = (e) => {
@@ -394,6 +497,42 @@ const Internships = () => {
             )}
           </p>
         </div>
+
+        {/* Filter dropdowns */}
+        <div className="max-w-5xl mx-auto pt-3 pb-1">
+          <div className="flex flex-wrap gap-3">
+            {FILTER_GROUPS.map((group) => (
+              <div key={group.key} className="flex flex-col gap-1">
+                <label className="text-xs text-gray-500 font-medium">{group.label}</label>
+                <select
+                  value={activeFilters[group.key] ?? ''}
+                  onChange={(e) =>
+                    setActiveFilters((prev) => ({
+                      ...prev,
+                      [group.key]: e.target.value || null,
+                    }))
+                  }
+                  className="px-3 py-2 rounded-lg text-sm border border-gray-200 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-purple-400 cursor-pointer min-w-[130px] transition"
+                >
+                  <option value="">All {group.label}s</option>
+                  {group.options.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+            ))}
+            {hasActiveFilters && (
+              <div className="flex flex-col justify-end">
+                <button
+                  onClick={clearAllFilters}
+                  className="text-xs text-purple-600 underline hover:text-purple-800 pb-2"
+                >
+                  Clear all filters
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* ── Grid ── */}
@@ -426,10 +565,22 @@ const Internships = () => {
         )}
 
         {/* Cards */}
-        {!loading && !error && internships.map((item) => (
+        {!loading && !error && internships
+          .filter((item) =>
+            Object.entries(activeFilters).every(
+              ([key, val]) => !val || item[key] === val
+            )
+          )
+          .map((item) => (
           <div key={item._id} className="bg-white shadow-sm hover:shadow-md transition-shadow rounded-2xl p-5 relative border border-gray-100 flex flex-col">
             {/* Type badge */}
-            <span className="absolute top-4 right-4 bg-green-100 text-green-700 text-xs font-semibold px-2.5 py-1 rounded-full">
+            <span className={`absolute top-4 right-4 text-xs font-semibold px-2.5 py-1 rounded-full ${
+              item.internshipType === 'STIPEND'
+                ? 'bg-blue-100 text-blue-700'
+                : item.internshipType === 'PAID'
+                ? 'bg-red-100 text-red-700'
+                : 'bg-green-100 text-green-700'
+            }`}>
               {item.internshipType || 'FREE'}
             </span>
 
@@ -445,8 +596,7 @@ const Internships = () => {
                 <p className="text-sm text-gray-500 flex items-center gap-1 mt-0.5">
                   {item.companyName}
                   <span className="text-gray-300">·</span>
-                  <BsClockHistory className="inline-block shrink-0" />
-                  <span>{formatPostedDate(item.postedOn)}</span>
+                  <span>{formatPostedDate(item.createdAt)}</span>
                 </p>
               </div>
             </div>
@@ -454,7 +604,7 @@ const Internships = () => {
             {/* Details */}
             <div className="text-sm text-gray-600 mt-4 space-y-1.5">
               <div className="flex items-center gap-2"><FaMapMarkerAlt className="text-gray-400 shrink-0" /><span className="truncate">{item.location}</span></div>
-              <div className="flex items-center gap-2"><FaCalendarAlt className="text-gray-400 shrink-0" /><span>{formatDate(item.startDate)} – {formatDate(item.endDate)}</span></div>
+              <div className="flex items-center gap-2"><FaCalendarAlt className="text-gray-400 shrink-0" /><span>{formatDate(item.startDate)} – {formatDate(item.endDateOrDuration)}</span></div>
               <div className="flex items-center gap-2"><FaDollarSign className="text-gray-400 shrink-0" /><span>{item.pay || 'Unpaid / Free'}</span></div>
               <div className="flex items-center gap-2"><FaLaptopHouse className="text-gray-400 shrink-0" /><span>{item.internshipType}</span></div>
             </div>
@@ -474,7 +624,13 @@ const Internships = () => {
             {/* Footer */}
             <div className="mt-4 flex justify-between items-center">
               <button className="text-purple-600 text-sm font-medium hover:text-purple-700 hover:underline transition">View details</button>
-              <FaHeart className="text-gray-300 hover:text-pink-500 cursor-pointer transition text-lg" />
+              <button
+                onClick={() => toggleSaveJob(item)}
+                className={`transition text-lg ${isJobSaved(item._id) ? "text-pink-500" : "text-gray-300 hover:text-pink-400"}`}
+                aria-label={isJobSaved(item._id) ? "Unsave job" : "Save job"}
+              >
+                <FaHeart />
+              </button>
             </div>
 
             {/* Status actions */}

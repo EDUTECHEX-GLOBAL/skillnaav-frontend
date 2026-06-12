@@ -28,7 +28,7 @@ function Login() {
 
       if (response.data.success) {
         message.success(response.data.message);
-        localStorage.setItem("token", JSON.stringify(response.data));
+        localStorage.setItem("adminToken", JSON.stringify(response.data));
         window.location.href = "/admin"; // Redirect to admin page on successful login
       } else {
         message.error(response.data.message);

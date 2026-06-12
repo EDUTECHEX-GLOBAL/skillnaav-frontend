@@ -8,7 +8,7 @@ const SchoolAdminProfileForm = () => {
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
-    schoolName: "",
+    schoolName: initialRegisterData.schoolName || "",
     schoolType: "",
     schoolNumber: "",
     address: "",
@@ -37,18 +37,27 @@ const SchoolAdminProfileForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const combinedData = {
-      ...initialRegisterData,
-      ...formData,
-    };
+    const formPayload = new FormData();
+    Object.keys(initialRegisterData).forEach((key) => {
+      if (initialRegisterData[key] !== undefined && initialRegisterData[key] !== null) {
+        formPayload.set(key, initialRegisterData[key]);
+      }
+    });
+
+    Object.keys(formData).forEach((key) => {
+      if (formData[key] !== undefined && formData[key] !== null) {
+        formPayload.set(key, formData[key]);
+      }
+    });
 
     try {
       if (initialRegisterData.isGoogleUser) {
         const token = localStorage.getItem("schoolAdminToken");
-        const { data } = await axios.put("/api/school-admin/update-profile", combinedData, {
+        const { data } = await axios.put("/api/school-admin/update-profile", formPayload, {
           headers: {
-            Authorization: `Bearer ${token}`
-          }
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "multipart/form-data",
+          },
         });
         
         if (!data.admin.isApproved) {
@@ -62,7 +71,11 @@ const SchoolAdminProfileForm = () => {
           navigate("/schooladmin/dashboard");
         }
       } else {
-        await axios.post("/api/school-admin/register", combinedData);
+        await axios.post("/api/school-admin/register", formPayload, {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        });
         alert("Registration submitted successfully!");
         navigate("/schooladmin/login");
       }
