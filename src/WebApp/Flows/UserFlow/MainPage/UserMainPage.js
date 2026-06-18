@@ -15,7 +15,7 @@ import PendingApprovalCard from './PendingApprovalCard';
 import chatbotIcon from "../../../../assets-webapp/chat-bot.png";
 
 const UserMainPageContent = () => {
-  const { handleSelectTab } = useTabContext();
+  const { handleSelectTab, selectedTab } = useTabContext();
 
   const [userInfo, setUserInfo] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -160,18 +160,20 @@ const UserMainPageContent = () => {
           />
 
           {/* Desktop chevron toggle button at sidebar boundary */}
-          <button
-            onClick={() => setIsDesktopSidebarOpen((prev) => !prev)}
-            className="hidden md:flex items-center justify-center absolute top-4 z-50
+          {selectedTab !== "assessment" && (
+            <button
+              onClick={() => setIsDesktopSidebarOpen((prev) => !prev)}
+              className="hidden md:flex items-center justify-center absolute top-4 z-50
     w-6 h-6 rounded-full bg-white border border-gray-300 shadow-md
     hover:bg-purple-50 hover:border-purple-400 transition-all duration-200"
-            style={{ left: isDesktopSidebarOpen ? "248px" : "48px" }}
-          >
-            <FontAwesomeIcon
-              icon={isDesktopSidebarOpen ? faChevronLeft : faChevronRight}
-              className="text-purple-600 text-xs"
-            />
-          </button>
+              style={{ left: isDesktopSidebarOpen ? "248px" : "48px" }}
+            >
+              <FontAwesomeIcon
+                icon={isDesktopSidebarOpen ? faChevronLeft : faChevronRight}
+                className="text-purple-600 text-xs"
+              />
+            </button>
+          )}
 
           {/* Main content */}
          <main
@@ -231,6 +233,7 @@ const UserMainPageContent = () => {
       </Modal>
 
       {/* Chatbot widget (fixed floating toggle + panel) */}
+      {selectedTab !== "assessment" && (
       <div className="fixed bottom-6 right-6 z-50">
         {!chatOpen && (
           <button
@@ -264,6 +267,7 @@ const UserMainPageContent = () => {
           </div>
         )}
       </div>
+      )}
     </>
   );
 };

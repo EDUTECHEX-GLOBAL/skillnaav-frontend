@@ -19,6 +19,8 @@ import ClimateTech from "./ClimateTech";
 import BioTech from "./BioTech";
 import Recommendations from "./Recommendations";
 import StudentAssessment from "./StudentAssessment";
+import UserAttendance from "./UserAttendance";
+
 
 const BodyContent = () => {
   const { selectedTab = "home", handleSelectTab } = useTabContext();
@@ -59,6 +61,9 @@ const BodyContent = () => {
       break;
     case "assessment":
       content = <StudentAssessment />;
+      break;
+    case "attendance":
+      content = <UserAttendance />;
       break;
     case "profile":
       content = <ProfilePage />;

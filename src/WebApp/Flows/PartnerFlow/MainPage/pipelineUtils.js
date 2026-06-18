@@ -35,6 +35,25 @@ export const sendL2Assessment = async ({ assessmentId, partnerId }) => {
   return res.data;
 };
 
+export const fetchL2AssessmentReview = async (assessmentId) => {
+  const res = await axios.get(
+    `/api/l2-assessments/${assessmentId}/review`,
+    authHeaders()
+  );
+  return res.data;
+};
+
+export const fetchL2AssessmentReviewByCandidate = async ({ internshipId, studentId }) => {
+  const res = await axios.get(
+    `/api/l2-assessments/review/by-candidate`,
+    {
+      ...authHeaders(),
+      params: { internshipId, studentId },
+    }
+  );
+  return res.data;
+};
+
 // Interviews routes: /api/interviews
 export const createInterview = async ({ internshipId, studentId, partnerId, link, provider }) => {
   const res = await axios.post(

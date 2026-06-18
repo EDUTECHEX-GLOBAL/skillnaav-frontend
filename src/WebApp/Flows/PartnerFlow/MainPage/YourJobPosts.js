@@ -48,7 +48,12 @@ import {
   faLayerGroup,
   faCircleInfo,
   faSliders,
+  faEllipsisVertical,
+  faTrash,
+  faPlus,
+  faArrowsRotate,
 } from "@fortawesome/free-solid-svg-icons";
+import { useTabContext } from "./UserHomePageContext/HomePageContext";
 
 Modal.setAppElement("#root");
 
@@ -198,7 +203,7 @@ const DateInput = ({ label, value, onChange }) => {
         {label}
       </label>
       <div className="relative">
-        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-indigo-400 pointer-events-none">
+        <span className="absolute left-3 inset-y-0 flex items-center text-indigo-400 pointer-events-none">
           <FontAwesomeIcon icon={faCalendarDays} className="text-sm" />
         </span>
         <input
@@ -499,15 +504,7 @@ const ViewModalBody = ({ internship: i, onEdit, onClose }) => (
     </div>
 
     {/* ── Sticky footer ── */}
-    <div className="flex-shrink-0 flex justify-between items-center px-6 py-4 border-t bg-white rounded-b-2xl">
-      <button
-        onClick={onClose}
-        className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition font-medium"
-        style={{ fontFamily: "'Poppins', sans-serif" }}
-      >
-        <FontAwesomeIcon icon={faXmark} className="text-xs" />
-        Close
-      </button>
+    <div className="flex-shrink-0 flex justify-end items-center px-6 py-4 border-t bg-white rounded-b-2xl">
       <button
         onClick={onEdit}
         className="flex items-center gap-2 px-5 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition font-semibold"
@@ -525,6 +522,71 @@ const ViewModalBody = ({ internship: i, onEdit, onClose }) => (
 // ═══════════════════════════════════════════════════════════════════════════════
 const EditModalBody = ({ internship: si, updateField, onSave, onBack, onClose }) => {
   const logoInputRef = useRef(null);
+
+  useEffect(() => {
+    const startVal = si.startDate;
+    const endVal = si.endDateOrDuration;
+
+    if (startVal && endVal && /^\d{4}-\d{2}-\d{2}/.test(String(startVal)) && /^\d{4}-\d{2}-\d{2}/.test(String(endVal))) {
+      const s = new Date(startVal);
+      const e = new Date(endVal);
+      if (!isNaN(s) && !isNaN(e) && s <= e) {
+        let m = (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth());
+        let d = e.getDate() - s.getDate();
+        if (d < 0) {
+          m -= 1;
+          const prev = new Date(e.getFullYear(), e.getMonth(), 0);
+          d += prev.getDate();
+        }
+        const parts = [];
+        if (m > 0) parts.push(`${m} month${m > 1 ? "s" : ""}`);
+        if (d > 0) parts.push(`${d} day${d > 1 ? "s" : ""}`);
+        const calcDuration = parts.length > 0 ? parts.join(" ") : "0 days";
+        
+        if (si.duration !== calcDuration) {
+          updateField("duration", calcDuration);
+        }
+      }
+    }
+  }, [si.startDate, si.endDateOrDuration, si.duration, updateField]);
+
+  const handleTypeChange = (value) => {
+    updateField("internshipType", value);
+    updateField("compensationDetails.type", value);
+    if (value === "FREE") {
+      updateField("compensationDetails.amount", null);
+      updateField("compensationDetails.currency", "");
+      updateField("compensationDetails.frequency", "");
+    } else {
+      if (!si.compensationDetails?.currency) updateField("compensationDetails.currency", "USD");
+      if (!si.compensationDetails?.frequency) updateField("compensationDetails.frequency", "MONTHLY");
+    }
+  };
+
+  const handleDateChange = (field, value) => {
+    updateField(field, value);
+    
+    const startVal = field === "startDate" ? value : si.startDate;
+    const endVal = field === "endDateOrDuration" ? value : si.endDateOrDuration;
+
+    if (startVal && endVal && /^\d{4}-\d{2}-\d{2}/.test(String(startVal)) && /^\d{4}-\d{2}-\d{2}/.test(String(endVal))) {
+      const s = new Date(startVal);
+      const e = new Date(endVal);
+      if (!isNaN(s) && !isNaN(e) && s <= e) {
+        let m = (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth());
+        let d = e.getDate() - s.getDate();
+        if (d < 0) {
+          m -= 1;
+          const prev = new Date(e.getFullYear(), e.getMonth(), 0);
+          d += prev.getDate();
+        }
+        const parts = [];
+        if (m > 0) parts.push(`${m} month${m > 1 ? "s" : ""}`);
+        if (d > 0) parts.push(`${d} day${d > 1 ? "s" : ""}`);
+        updateField("duration", parts.length > 0 ? parts.join(" ") : "0 days");
+      }
+    }
+  };
 
   const handleLogoChange = (e) => {
     const file = e.target.files[0];
@@ -640,7 +702,7 @@ const EditModalBody = ({ internship: si, updateField, onSave, onBack, onClose })
           <DateInput
             label="Start Date"
             value={si.startDate ? String(si.startDate).slice(0, 10) : ""}
-            onChange={(val) => updateField("startDate", val)}
+            onChange={(val) => handleDateChange("startDate", val)}
           />
           <DateInput
             label="End Date"
@@ -649,16 +711,16 @@ const EditModalBody = ({ internship: si, updateField, onSave, onBack, onClose })
                 ? String(si.endDateOrDuration).slice(0, 10)
                 : ""
             }
-            onChange={(val) => updateField("endDateOrDuration", val)}
+            onChange={(val) => handleDateChange("endDateOrDuration", val)}
           />
           <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1" style={{ fontFamily: "'Poppins', sans-serif" }}>Duration (label)</label>
+            <label className="block text-xs font-semibold text-gray-600 mb-1" style={{ fontFamily: "'Poppins', sans-serif" }}>Duration</label>
             <input
               type="text"
+              readOnly
               value={si.duration || ""}
-              onChange={(e) => updateField("duration", e.target.value)}
-              placeholder="e.g. 3 months"
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              placeholder="Auto-calculated"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-500 cursor-not-allowed focus:outline-none"
               style={{ fontFamily: "'Poppins', sans-serif" }}
             />
           </div>
@@ -694,14 +756,17 @@ const EditModalBody = ({ internship: si, updateField, onSave, onBack, onClose })
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1" style={{ fontFamily: "'Poppins', sans-serif" }}>Type (read-only)</label>
-            <input
-              type="text"
-              readOnly
-              value={si.internshipType === "PAID" ? "Paid" : si.internshipType === "STIPEND" ? "Stipend" : "Free"}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 mt-0 text-sm bg-gray-50 text-gray-400 cursor-not-allowed"
+            <label className="block text-xs font-semibold text-gray-600 mb-1" style={{ fontFamily: "'Poppins', sans-serif" }}>Type</label>
+            <select
+              value={si.internshipType || "FREE"}
+              onChange={(e) => handleTypeChange(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
               style={{ fontFamily: "'Poppins', sans-serif" }}
-            />
+            >
+              <option value="FREE">Free</option>
+              <option value="STIPEND">Stipend</option>
+              <option value="PAID">Paid</option>
+            </select>
           </div>
         </div>
 
@@ -802,15 +867,6 @@ const EditModalBody = ({ internship: si, updateField, onSave, onBack, onClose })
         <div className="flex gap-2">
           <button
             type="button"
-            onClick={onClose}
-            className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition font-medium"
-            style={{ fontFamily: "'Poppins', sans-serif" }}
-          >
-            <FontAwesomeIcon icon={faXmark} className="text-xs" />
-            Cancel
-          </button>
-          <button
-            type="button"
             onClick={onSave}
             className="flex items-center gap-2 px-5 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition font-semibold"
             style={{ fontFamily: "'Poppins', sans-serif" }}
@@ -828,10 +884,12 @@ const EditModalBody = ({ internship: si, updateField, onSave, onBack, onClose })
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
 const YourJobPosts = () => {
+  const { handleSelectTab } = useTabContext();
   const [internships, setInternships] = useState([]);
   const [selectedInternship, setSelectedInternship] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState("view");
+  const [openMenuId, setOpenMenuId] = useState(null);
 
   const [currentPage, setCurrentPage] = useState(1);
   const applicationsPerPage = 12;
@@ -848,7 +906,30 @@ const YourJobPosts = () => {
   const debounceRef = useRef(null);
   const isInitialLoadRef = useRef(true);
 
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
   const partnerId = localStorage.getItem("partnerId");
+
+  useEffect(() => {
+    const handleClickOutside = () => setOpenMenuId(null);
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, []);
+
+  const handleDeleteJob = async (id) => {
+    if (!window.confirm("Are you sure you want to move this job post to the Bin?")) return;
+    
+    try {
+      await axios.delete(`/api/interns/${id}`, {
+        params: { deletedBy: "partner" },
+      });
+      setInternships((prev) => prev.filter((i) => i._id !== id));
+      setTotalCount((prev) => Math.max(0, prev - 1));
+    } catch (error) {
+      console.error("Error deleting job post:", error);
+      alert("Failed to delete job post.");
+    }
+  };
 
   const fetchInternships = useCallback(
     async (page, query, sort, order, isFirst = false) => {
@@ -925,6 +1006,22 @@ const YourJobPosts = () => {
     isInitialLoadRef.current = false;
   }, []); // eslint-disable-line
 
+  // ── Auto-refresh every 30 s so admin approval status updates automatically ──
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      if (!partnerId) return;
+      try {
+        const response = await axios.get(`/api/interns/partner/${partnerId}`, {
+          params: { page: currentPage, limit: applicationsPerPage, search: committedQuery, sort: sortCriteria, order: sortDirection },
+        });
+        setInternships(response.data.data || []);
+        setTotalPages(response.data.totalPages || 1);
+        setTotalCount(response.data.total || 0);
+      } catch (_) { /* silent — do not show errors for background poll */ }
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [partnerId, currentPage, committedQuery, sortCriteria, sortDirection]); // eslint-disable-line
+
   useEffect(() => {
     if (isInitialLoadRef.current) return;
     fetchInternships(currentPage, committedQuery, sortCriteria, sortDirection);
@@ -990,7 +1087,7 @@ const YourJobPosts = () => {
       _id,
       jobTitle, companyName, location, jobDescription,
       startDate, endDateOrDuration, duration,
-      sector, classification, internshipMode,
+      sector, classification, internshipMode, internshipType,
       compensationDetails, qualifications, contactInfo,
       imgUrl, applicationOpen,
       country, state, city,
@@ -999,7 +1096,7 @@ const YourJobPosts = () => {
     const payload = {
       jobTitle, companyName, location, jobDescription,
       startDate, endDateOrDuration, duration,
-      sector, classification, internshipMode,
+      sector, classification, internshipMode, internshipType,
       compensationDetails, qualifications, contactInfo,
       imgUrl, applicationOpen,
       country, state, city,
@@ -1067,6 +1164,24 @@ const YourJobPosts = () => {
           <FontAwesomeIcon icon={sortDirection === "asc" ? faArrowUpAZ : faArrowDownZA} className="text-xs" />
           {sortDirection === "asc" ? "Asc" : "Desc"}
         </button>
+
+        {/* Manual refresh button */}
+        <button
+          title="Refresh status"
+          onClick={async () => {
+            setIsRefreshing(true);
+            await fetchInternships(currentPage, committedQuery, sortCriteria, sortDirection);
+            setIsRefreshing(false);
+          }}
+          className="flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm text-indigo-600 border-indigo-200 hover:bg-indigo-50 font-medium flex-shrink-0"
+          style={{ fontFamily: "'Poppins', sans-serif" }}
+        >
+          <FontAwesomeIcon
+            icon={faArrowsRotate}
+            className={`text-xs ${isRefreshing ? "animate-spin" : ""}`}
+          />
+          Refresh
+        </button>
       </div>
 
       {/* Result count */}
@@ -1117,8 +1232,8 @@ const YourJobPosts = () => {
                    hover:shadow-md hover:border-indigo-100 transition-all duration-200 flex flex-col"
               style={{ fontFamily: "'Poppins', sans-serif" }}
             >
-              {/* Logo / Image */}
-              <div className="mb-4 w-full h-32 flex items-center justify-center bg-gray-50 rounded-lg border border-gray-100 overflow-hidden">
+              {/* Logo / Image & Menu */}
+              <div className="relative mb-4 w-full h-32 flex items-center justify-center bg-gray-50 rounded-lg border border-gray-100 overflow-hidden">
                 <img
                   src={internship.imgUrl || defaultCompanyLogo}
                   alt={internship.jobTitle}
@@ -1127,6 +1242,39 @@ const YourJobPosts = () => {
                   height="112"
                   loading="lazy"
                 />
+
+                {/* Three Dots Menu */}
+                <div className="absolute top-2 right-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenMenuId(openMenuId === internship._id ? null : internship._id);
+                    }}
+                    className="w-8 h-8 flex items-center justify-center rounded-full bg-white/80 hover:bg-white text-gray-500 hover:text-gray-700 shadow-sm transition-all"
+                  >
+                    <FontAwesomeIcon icon={faEllipsisVertical} />
+                  </button>
+                  
+                  {openMenuId === internship._id && (
+                    <div 
+                      className="absolute right-0 mt-1 w-36 bg-white rounded-lg shadow-lg border border-gray-100 z-10 py-1"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenMenuId(null);
+                          handleDeleteJob(internship._id);
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
+                        style={{ fontFamily: "'Poppins', sans-serif" }}
+                      >
+                        <FontAwesomeIcon icon={faTrash} className="text-xs" />
+                        Delete Post
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Title + Company */}

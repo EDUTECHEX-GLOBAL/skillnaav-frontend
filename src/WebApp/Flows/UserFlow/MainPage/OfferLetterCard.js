@@ -10,6 +10,7 @@ import { API_BASE, GOOGLE_AUTH_URL } from "../../../../config";
 import CalendarSyncStatus from "./calendarsyncstatus";
 import StipendDetailsModal from "./StipendDetailsModal"; // <--- IMPORTED MODAL
 import OfferLetterCardpaid from "./OfferLetterCardpaid"; // <--- NEW PAID SCHEDULE MODAL
+import defaultCompanyLogo from "../../../../assets/default-company-logo.png";
 
 import {
   faMapMarkerAlt,
@@ -18,8 +19,8 @@ import {
   faCalendarAlt,
   faClock,
   faCreditCard,
-  faDownload,
   faCheck,
+  faCheckCircle,
 } from "@fortawesome/free-solid-svg-icons";
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -37,10 +38,6 @@ if (API_BASE) {
   axios.defaults.withCredentials = true;
 }
 
-const DEFAULT_CERTIFICATE_SIZE = {
-  width: 1120,
-  height: 792,
-};
 
 function formatDateLabel(value) {
   if (!value) return "—";
@@ -60,81 +57,6 @@ function formatEnumLabel(value) {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-function loadImageDimensions(src) {
-  if (!src) return Promise.resolve(null);
-
-  return new Promise((resolve, reject) => {
-    const image = new window.Image();
-    image.crossOrigin = "anonymous";
-    image.onload = () => {
-      resolve({
-        width: image.naturalWidth || image.width,
-        height: image.naturalHeight || image.height,
-      });
-    };
-    image.onerror = () => reject(new Error("Failed to load certificate template image"));
-    image.src = src;
-  });
-}
-
-function getCertificateRenderSize(dimensions) {
-  if (!dimensions?.width || !dimensions?.height) {
-    return DEFAULT_CERTIFICATE_SIZE;
-  }
-
-  const aspectRatio = dimensions.width / dimensions.height;
-  const maxWidth = 1240;
-  const maxHeight = 880;
-
-  let width = maxWidth;
-  let height = width / aspectRatio;
-
-  if (height > maxHeight) {
-    height = maxHeight;
-    width = height * aspectRatio;
-  }
-
-  return {
-    width: Math.round(width),
-    height: Math.round(height),
-  };
-}
-
-function waitForCertificateImages(container) {
-  const images = Array.from(container.querySelectorAll("img"));
-
-  if (!images.length) {
-    return Promise.resolve();
-  }
-
-  return Promise.all(
-    images.map(
-      (image) =>
-        new Promise((resolve, reject) => {
-          if (image.complete && image.naturalWidth > 0) {
-            resolve();
-            return;
-          }
-
-          const handleLoad = () => {
-            cleanup();
-            resolve();
-          };
-          const handleError = () => {
-            cleanup();
-            reject(new Error("Failed to load certificate assets"));
-          };
-          const cleanup = () => {
-            image.removeEventListener("load", handleLoad);
-            image.removeEventListener("error", handleError);
-          };
-
-          image.addEventListener("load", handleLoad);
-          image.addEventListener("error", handleError);
-        })
-    )
-  ).then(() => undefined);
-}
 
 const OfferLetterCard = ({ offer, onStatusChange }) => {
   const [job, setJob] = useState(null);
@@ -158,6 +80,7 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
   const userInfo = (JSON.parse(localStorage.getItem('studentInfo')) || JSON.parse(localStorage.getItem('userInfo')));
   const userPlan = userInfo?.planType;
   const [showCompleteNotice, setShowCompleteNotice] = useState(false);
+  const [attendanceData, setAttendanceData] = useState(null);
   const [showTimeModal, setShowTimeModal] = useState(false);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState(null);
   const [savingTimeSlot, setSavingTimeSlot] = useState(false);
@@ -184,6 +107,24 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
   useEffect(() => {
     setPreferredSlotLocal(offer?.preferredTimeSlot || offer?.selectedTimeSlot || null);
   }, [offer?.preferredTimeSlot, offer?.selectedTimeSlot]);
+
+  // Fetch Attendance to show Schedule Completed badge
+  useEffect(() => {
+    if (offer?.status?.toLowerCase() === "accepted" && offer?.internshipId) {
+      const fetchAttendance = async () => {
+        try {
+          const userToken = localStorage.getItem("userToken");
+          const attRes = await axios.get(`/api/attendance/my/${offer.internshipId}`, {
+            headers: { Authorization: `Bearer ${userToken}` }
+          });
+          setAttendanceData(attRes.data);
+        } catch (err) {
+          // ignore error if attendance is not enabled
+        }
+      };
+      fetchAttendance();
+    }
+  }, [offer?.status, offer?.internshipId]);
 
   useEffect(() => {
     const row = qualificationRowRef.current;
@@ -437,7 +378,16 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
       })
       .catch((err) => {
         console.error("Failed to fetch internship:", err);
-        setErrorJob("Could not load internship details");
+        // Fallback to offer data so the offer letter card still renders
+        setJob({
+          isDeleted: true,
+          jobTitle: offer.position || "Unknown Position",
+          companyName: offer.companyName || "Unknown Company",
+          startDate: offer.startDate || new Date().toISOString(),
+          internshipType: "UNKNOWN",
+          location: "Unknown Location",
+          imgUrl: defaultCompanyLogo
+        });
       })
       .finally(() => setLoadingJob(false));
   }, [offer]);
@@ -1154,7 +1104,9 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
   // ─── 4) "Loading" / "Error" / Header / Details / Actions ───────
   if (loadingJob)
     return <div className="bg-white rounded-lg shadow-lg p-4 animate-pulse h-[420px] min-w-0 w-full overflow-hidden" />;
-  if (errorJob) return <p className="text-red-500">{errorJob}</p>;
+  if (errorJob) {
+    return null;
+  }
 
   // ─── Fix for "Invalid time value" ─────────────────────────────────
   let timeAgo;
@@ -1206,7 +1158,7 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
 
   return (
     // NEW
-    <div className="bg-white rounded-lg shadow-lg p-4 flex h-[420px] min-w-0 w-full flex-col overflow-hidden">
+    <div className="bg-white rounded-lg shadow-lg p-4 flex flex-col h-full min-h-[420px] min-w-0 w-full overflow-hidden">
 
       {/* 5. RENDER STIPEND MODAL */}
       {/* 5. RENDER STIPEND MODAL (Fixed) */}
@@ -1506,7 +1458,7 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
               <div className="flex items-start justify-between gap-4">
                 <div className="flex min-w-0 items-start gap-4">
                   <img
-                    src={job.imgUrl || "/default-image.jpg"}
+                    src={job.imgUrl || defaultCompanyLogo}
                     alt="Company Logo"
                     className="h-12 w-12 flex-shrink-0 rounded-full object-contain"
                   />
@@ -1628,6 +1580,8 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
         </div>
       )}
 
+
+
       <div className="mb-3 flex justify-end">
         <span
           className={`inline-flex max-w-full rounded-full px-3 py-1 text-xs font-medium leading-tight text-center whitespace-normal break-words ${offer.status === "Accepted"
@@ -1646,7 +1600,7 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
         {/* left: logo + text */}
         <div className="flex items-start gap-3 min-w-0">
           <img
-            src={job.imgUrl || "/default-image.jpg"}
+            src={job.imgUrl || defaultCompanyLogo}
             alt="Company Logo"
             className="w-12 h-12 rounded-full object-contain flex-shrink-0"
           />
@@ -1705,11 +1659,11 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
 
       {/* QUALIFICATIONS */}
       <div className="mb-4 flex items-center gap-2">
-        <div
-          ref={qualificationRowRef}
-          className="flex min-w-0 flex-1 flex-nowrap gap-2 overflow-hidden"
-        >
-          {qualifications.length > 0 ? (
+        {qualifications.length > 0 ? (
+          <div
+            ref={qualificationRowRef}
+            className="flex min-w-0 flex-1 flex-nowrap gap-2 overflow-hidden"
+          >
             <>
               {visibleQualifications.map((q, i) => (
                 <span
@@ -1729,19 +1683,21 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
                 </span>
               )}
             </>
-          ) : (
-            <span className="text-xs text-gray-500">No qualifications</span>
+          </div>
+        ) : job?.isDeleted ? (
+          <span className="text-xs text-gray-400 italic">No qualifications</span>
+        ) : null}
+        <div className="ml-auto">
+          {offer.status.toLowerCase() !== "accepted" && (
+            <button
+              type="button"
+              onClick={() => setShowDetailsModal(true)}
+              className="shrink-0 whitespace-nowrap text-sm font-medium text-purple-600 transition hover:text-purple-800"
+            >
+              View details
+            </button>
           )}
         </div>
-        {offer.status.toLowerCase() !== "accepted" && (
-          <button
-            type="button"
-            onClick={() => setShowDetailsModal(true)}
-            className="shrink-0 whitespace-nowrap text-sm font-medium text-purple-600 transition hover:text-purple-800"
-          >
-            View details
-          </button>
-        )}
       </div>
       {qualifications.length > 0 && (
         <div
@@ -1766,6 +1722,14 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
               +{hiddenCount}
             </span>
           ))}
+        </div>
+      )}
+
+      {/* SCHEDULE COMPLETED BADGE */}
+      {attendanceData?.isScheduleClosed && (
+        <div className="mt-3 mb-1 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 flex items-center gap-2">
+          <FontAwesomeIcon icon={faCheckCircle} className="text-emerald-500 flex-shrink-0" />
+          <span className="text-xs font-bold text-emerald-700">Schedule Completed</span>
         </div>
       )}
 
@@ -1949,7 +1913,7 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
       )}
 
       {/* ✅ ACTION BUTTONS */}
-      {(offer.status.toLowerCase() === "sent" || isUnpaidAccepted) && (
+      {(offer.status.toLowerCase() === "sent" || isUnpaidAccepted) && !job.isDeleted && (
         <div className="mt-auto space-y-4 pt-4">
           {/* Status Indicator for STIPEND details */}
           {requiresStipendDetails && (

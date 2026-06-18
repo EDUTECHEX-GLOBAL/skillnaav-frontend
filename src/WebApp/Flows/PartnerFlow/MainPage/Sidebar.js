@@ -15,6 +15,7 @@ import {
   faUsers,
   faCertificate,
   faFileInvoiceDollar,
+  faTrash,
 } from "@fortawesome/free-solid-svg-icons";
 
 import { useTabContext } from "./UserHomePageContext/HomePageContext";
@@ -124,6 +125,7 @@ const Sidebar = ({ isOpen, onClose, isDesktopOpen = true }) => {
     { id: "custom-internship-certificate", label: "Custom Internship Certificate", icon: faCertificate },
     { id: "stipend-details", label: "Stipend Details", icon: faMoneyBillWave },
     { id: "internship-payments", label: "Internship Payments", icon: faFileInvoiceDollar },
+    { id: "bin", label: "Bin", icon: faTrash },
     { id: "profile", label: "Profile", icon: faUser },
   ];
 

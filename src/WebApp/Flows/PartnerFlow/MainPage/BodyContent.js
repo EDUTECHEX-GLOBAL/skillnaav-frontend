@@ -14,6 +14,7 @@ import CustomInternshipCertificateManager from "./CustomInternshipCertificateMan
 import StipendDetails from "./StipendDetails";
 import InstructureManagement from "./InstructureManagement";
 import InternshipPayments from "./InternshipPayments"; // ✅ New
+import Bin from "./Bin";
 
 const BodyContent = () => {
   const { selectedTab } = useTabContext();
@@ -57,6 +58,9 @@ const BodyContent = () => {
     // ✅ New — Payments received for paid internships
     case "internship-payments":
       content = <InternshipPayments />;
+      break;
+    case "bin":
+      content = <Bin />;
       break;
     case "logout":
       content = <div>You have been logged out. Please log in again.</div>;

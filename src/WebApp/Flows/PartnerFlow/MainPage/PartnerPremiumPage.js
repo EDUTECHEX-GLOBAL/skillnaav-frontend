@@ -400,11 +400,12 @@ export default function PartnerPremiumPage() {
         </div>
 
         {/* Active plan banner */}
-        {partner?.isPremium && (() => {
+        {partner?.isPremium && partner?.planType !== "Freemium" && (() => {
           const exp = partner.premiumExpiration ? new Date(partner.premiumExpiration) : null;
           const now = new Date();
+          const isExpired = exp && exp <= now;
           let remainingText = "Expired";
-          if (exp && exp > now) {
+          if (!isExpired) {
             const diff = exp - now;
             const days  = Math.floor(diff / (1000 * 60 * 60 * 24));
             const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
@@ -412,15 +413,17 @@ export default function PartnerPremiumPage() {
             remainingText = `${days}d ${hours}h ${mins}m`;
           }
           return (
-            <div className="w-full lg:w-auto bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-2xl p-5 shadow-sm flex flex-col sm:flex-row gap-6 items-start sm:items-center">
+            <div className={`w-full lg:w-auto bg-gradient-to-r ${isExpired ? "from-red-50 to-orange-50 border-red-200" : "from-purple-50 to-indigo-50 border-purple-200"} border rounded-2xl p-5 shadow-sm flex flex-col sm:flex-row gap-6 items-start sm:items-center`}>
               <div>
-                <p className="text-xs font-bold tracking-widest text-purple-600 uppercase mb-1">Partner Premium Active</p>
-                <h2 className="text-xl font-bold text-purple-700">{partner.planType || "Premium"}</h2>
+                <p className={`text-xs font-bold tracking-widest ${isExpired ? "text-red-600" : "text-purple-600"} uppercase mb-1`}>
+                  {isExpired ? "Partner Premium Expired" : "Partner Premium Active"}
+                </p>
+                <h2 className={`text-xl font-bold ${isExpired ? "text-red-700" : "text-purple-700"}`}>{partner.planType || "Premium"}</h2>
               </div>
-              <div className="hidden sm:block w-px h-10 bg-purple-200"></div>
+              <div className={`hidden sm:block w-px h-10 ${isExpired ? "bg-red-200" : "bg-purple-200"}`}></div>
               <div>
                 <p className="text-[10px] font-bold text-gray-500 uppercase">Time Left</p>
-                <p className="text-sm font-bold text-purple-700">{remainingText}</p>
+                <p className={`text-sm font-bold ${isExpired ? "text-red-600" : "text-purple-700"}`}>{remainingText}</p>
               </div>
               <div>
                 <p className="text-[10px] font-bold text-gray-500 uppercase">Expires On</p>

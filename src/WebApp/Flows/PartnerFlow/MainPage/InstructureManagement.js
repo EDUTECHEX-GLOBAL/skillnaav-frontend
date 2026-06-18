@@ -585,7 +585,6 @@ const InstructureManagement = () => {
   const handleAssignInstructor = async () => {
     try {
       setIsAssigning(true);
-      const partnerId = localStorage.getItem("partnerId") || undefined;
       const { data } = await axios.post(
         "/api/instructors/auto-assign",
         {},
@@ -651,140 +650,137 @@ const InstructureManagement = () => {
   }, [page, totalPages]);
 
   return (
-  <div className="w-full min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-100/70">
-    <div className="space-y-5 sm:space-y-7">
-      {/* ── Top Bar ── */}
-      <div className="rounded-[28px] border border-slate-200/70 bg-white/90 backdrop-blur-sm shadow-sm shadow-slate-200/60 px-4 sm:px-6 py-5 sm:py-6 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 sm:gap-5">
-        <div className="min-w-0">
-          <h1 className="text-[22px] sm:text-[26px] font-extrabold text-slate-900 tracking-tight leading-tight">
-            Instructor Management
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            {filteredInstructors.length} instructor
-            {filteredInstructors.length !== 1 && "s"} registered
-          </p>
-        </div>
+    <div className="w-full min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-100/70">
+      <div className="space-y-5 sm:space-y-7">
+        {/* ── Top Bar ── */}
+        <div className="rounded-[28px] border border-slate-200/70 bg-white/90 backdrop-blur-sm shadow-sm shadow-slate-200/60 px-4 sm:px-6 py-5 sm:py-6 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 sm:gap-5">
+          <div className="min-w-0">
+            <h1 className="text-[22px] sm:text-[26px] font-extrabold text-slate-900 tracking-tight leading-tight">
+              Instructor Management
+            </h1>
+            <p className="text-sm text-slate-500 mt-1">
+              {filteredInstructors.length} instructor
+              {filteredInstructors.length !== 1 && "s"} registered
+            </p>
+          </div>
 
-        <div className="w-full lg:w-auto grid grid-cols-2 gap-3">
-          <button
-            type="button"
-            onClick={() => {
-              setViewing(null);
-              setCountry("");
-              setStateProv("");
-              setQualification("");
-              setTeachingMode("");
-              setRateType("");
-              setCurrency("");
-              setBackgroundCheck("");
-              setIsAddOpen(true);
-            }}
-            className="w-full min-w-0 justify-center inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 text-white text-xs sm:text-sm font-semibold whitespace-nowrap shadow-lg shadow-violet-200/70 hover:from-indigo-700 hover:via-violet-700 hover:to-fuchsia-700 active:scale-[0.98] transition-all duration-150"
-          >
-            <FontAwesomeIcon icon={faPlus} className="text-xs" />
-            Add Instructor
-          </button>
-
-          <button
-            type="button"
-            onClick={handleAssignInstructor}
-            disabled={isAssigning}
-            className="w-full min-w-0 justify-center inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs sm:text-sm font-semibold whitespace-nowrap shadow-lg shadow-amber-200/70 hover:from-amber-600 hover:to-orange-600 active:scale-[0.98] transition-all duration-150 disabled:opacity-70 disabled:cursor-wait"
-          >
-            <FontAwesomeIcon icon={faUserCheck} className="text-xs" />
-            {isAssigning ? "Assigning..." : "Auto-Assign"}
-          </button>
-        </div>
-      </div>
-
-      {/* ── Auto-Assign Status Card ── */}
-      {assignStatus.open && (
-        <div
-          className={`rounded-[28px] border overflow-hidden shadow-sm shadow-slate-200/60 ${
-            assignStatus.type === "success"
-              ? "bg-white border-slate-200/70"
-              : "bg-rose-50/70 border-rose-200/70"
-          }`}
-        >
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 px-4 sm:px-7 py-4 sm:py-5 border-b border-slate-100 bg-white/70">
-            <div className="flex items-start gap-3 min-w-0 flex-1">
-              <div
-                className={`w-11 h-11 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center flex-shrink-0 ${
-                  assignStatus.type === "success"
-                    ? "bg-gradient-to-br from-amber-50 to-orange-50 text-amber-600"
-                    : "bg-gradient-to-br from-rose-100 to-orange-50 text-rose-600"
-                }`}
-              >
-                <FontAwesomeIcon icon={faUserCheck} className="text-sm" />
-              </div>
-
-              <div className="min-w-0">
-                <h3 className="text-sm sm:text-base font-bold text-slate-900">
-                  Auto-Assign Status
-                </h3>
-                <p className="text-sm text-slate-500 mt-0.5 break-words">
-                  {assignStatus.type === "success"
-                    ? `Assigned ${assignStatus.made} session${
-                        assignStatus.made === 1 ? "" : "s"
-                      } successfully.`
-                    : assignStatus.error}
-                </p>
-              </div>
-            </div>
+          <div className="w-full lg:w-auto grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setViewing(null);
+                setCountry("");
+                setStateProv("");
+                setQualification("");
+                setTeachingMode("");
+                setRateType("");
+                setCurrency("");
+                setBackgroundCheck("");
+                setIsAddOpen(true);
+              }}
+              className="w-full min-w-0 justify-center inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 text-white text-xs sm:text-sm font-semibold whitespace-nowrap shadow-lg shadow-violet-200/70 hover:from-indigo-700 hover:via-violet-700 hover:to-fuchsia-700 active:scale-[0.98] transition-all duration-150"
+            >
+              <FontAwesomeIcon icon={faPlus} className="text-xs" />
+              Add Instructor
+            </button>
 
             <button
               type="button"
-              onClick={() =>
-                setAssignStatus({
-                  open: false,
-                  type: "success",
-                  made: 0,
-                  assignments: [],
-                  error: "",
-                })
-              }
-              className="self-end sm:self-auto w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors flex-shrink-0"
+              onClick={handleAssignInstructor}
+              disabled={isAssigning}
+              className="w-full min-w-0 justify-center inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs sm:text-sm font-semibold whitespace-nowrap shadow-lg shadow-amber-200/70 hover:from-amber-600 hover:to-orange-600 active:scale-[0.98] transition-all duration-150 disabled:opacity-70 disabled:cursor-wait"
             >
-              <FontAwesomeIcon icon={faTimes} />
+              <FontAwesomeIcon icon={faUserCheck} className="text-xs" />
+              {isAssigning ? "Assigning..." : "Auto-Assign"}
             </button>
           </div>
-
-          {assignStatus.type === "success" && (
-            <div className="px-4 sm:px-7 py-5 sm:py-6">
-              {assignStatus.assignments.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {assignStatus.assignments.map((row, idx) => {
-                    const updatedCount = Number(row.sessionsUpdated || 0);
-
-                    return (
-                      <div
-                        key={`${row.instructorId || "inst"}-${idx}`}
-                        className="rounded-2xl border border-slate-200 bg-gradient-to-r from-white to-slate-50 p-4"
-                      >
-                        <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                          Instructor Name
-                        </div>
-
-                        <div className="text-sm font-semibold text-slate-800 break-all mt-1">
-                          {row.instructorName || "—"}
-                        </div>
-
-                        <div className="mt-3 inline-flex max-w-full items-center px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-600 border border-indigo-100">
-                          {updatedCount} session{updatedCount === 1 ? "" : "s"} updated
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-5 text-sm text-slate-500">
-                  Auto-assign completed, but there are no assignment rows to display.
-                </div>
-              )}
-            </div>
-          )}
         </div>
-      )}
+
+        {/* ── Auto-Assign Status Card ── */}
+        {assignStatus.open && (
+          <div
+            className={`rounded-[28px] border overflow-hidden shadow-sm shadow-slate-200/60 ${assignStatus.type === "success"
+                ? "bg-white border-slate-200/70"
+                : "bg-rose-50/70 border-rose-200/70"
+              }`}
+          >
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 px-4 sm:px-7 py-4 sm:py-5 border-b border-slate-100 bg-white/70">
+              <div className="flex items-start gap-3 min-w-0 flex-1">
+                <div
+                  className={`w-11 h-11 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center flex-shrink-0 ${assignStatus.type === "success"
+                      ? "bg-gradient-to-br from-amber-50 to-orange-50 text-amber-600"
+                      : "bg-gradient-to-br from-rose-100 to-orange-50 text-rose-600"
+                    }`}
+                >
+                  <FontAwesomeIcon icon={faUserCheck} className="text-sm" />
+                </div>
+
+                <div className="min-w-0">
+                  <h3 className="text-sm sm:text-base font-bold text-slate-900">
+                    Auto-Assign Status
+                  </h3>
+                  <p className="text-sm text-slate-500 mt-0.5 break-words">
+                    {assignStatus.type === "success"
+                      ? `Assigned ${assignStatus.made} session${assignStatus.made === 1 ? "" : "s"
+                      } successfully.`
+                      : assignStatus.error}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setAssignStatus({
+                    open: false,
+                    type: "success",
+                    made: 0,
+                    assignments: [],
+                    error: "",
+                  })
+                }
+                className="self-end sm:self-auto w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors flex-shrink-0"
+              >
+                <FontAwesomeIcon icon={faTimes} />
+              </button>
+            </div>
+
+            {assignStatus.type === "success" && (
+              <div className="px-4 sm:px-7 py-5 sm:py-6">
+                {assignStatus.assignments.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {assignStatus.assignments.map((row, idx) => {
+                      const updatedCount = Number(row.sessionsUpdated || 0);
+
+                      return (
+                        <div
+                          key={`${row.instructorId || "inst"}-${idx}`}
+                          className="rounded-2xl border border-slate-200 bg-gradient-to-r from-white to-slate-50 p-4"
+                        >
+                          <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                            Instructor Name
+                          </div>
+
+                          <div className="text-sm font-semibold text-slate-800 break-all mt-1">
+                            {row.instructorName || "—"}
+                          </div>
+
+                          <div className="mt-3 inline-flex max-w-full items-center px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-600 border border-indigo-100">
+                            {updatedCount} session{updatedCount === 1 ? "" : "s"} updated
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-5 text-sm text-slate-500">
+                    Auto-assign completed, but there are no assignment rows to display.
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── Details View ── */}
         {!isAddOpen && (

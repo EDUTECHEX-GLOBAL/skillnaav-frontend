@@ -12,6 +12,7 @@ import {
   faChevronDown,
   faChevronUp,
   faStar,
+  faCheckCircle,
 } from "@fortawesome/free-solid-svg-icons";
 import { useTabContext } from "./UserHomePageContext/HomePageContext";
 import { useNavigate } from "react-router-dom";
@@ -40,6 +41,7 @@ const Sidebar = ({ isMobile, isOpen, onClose, isDesktopOpen = true }) => {
     { id: "recommendations", icon: faStar, label: "Recommendations" },
     { id: "applications", icon: faFileAlt, label: "Applications" },
     { id: "offer-letter", icon: faFileAlt, label: "Offer Letter" },
+    { id: "attendance", icon: faCheckCircle, label: "Attendance" },
     { id: "saved-jobs", icon: faHeart, label: "Saved Jobs" },
     { id: "profile", icon: faUser, label: "Profile" },
   ];

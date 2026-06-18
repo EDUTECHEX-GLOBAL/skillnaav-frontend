@@ -18,6 +18,7 @@ import {
   faBriefcase,
   faChevronDown,
   faChevronUp,
+  faUserCheck,
 } from "@fortawesome/free-solid-svg-icons";
 import Modal from "./Modal";
 import ScheduleForm from "./ScheduleForm";
@@ -25,6 +26,7 @@ import { ApplicationsTable, ShortlistedTable } from "./Tables";
 import { toast } from "react-toastify";
 import ConfirmCloseSchedule from "./ConfirmCloseSchedule";
 import InternshipScheduleViewer from "./InternshipScheduleViewer";
+import AttendanceDashboard from "./AttendanceDashboard";
 import TimeSlotsSelected from "./TimeSlotsSelected";
 
 const AI_API = "/api/ai";
@@ -112,6 +114,8 @@ const InternshipList = () => {
   const [closeScheduleModal, setCloseScheduleModal] = useState(getDefaultCloseScheduleModalState);
   const [scheduleViewerOpen, setScheduleViewerOpen] = useState(false);
   const [selectedInternshipForView, setSelectedInternshipForView] = useState(null);
+  const [attendanceDashboardOpen, setAttendanceDashboardOpen] = useState(false);
+  const [selectedInternshipForAttendance, setSelectedInternshipForAttendance] = useState(null);
   const [timeSlotsModal, setTimeSlotsModal] = useState({ open: false, internshipId: null });
 
   // ─── Filter state ────────────────────────────────────────────────────────────
@@ -435,6 +439,11 @@ const InternshipList = () => {
     if (!hasPremiumAccess()) { toast.error("Upgrade to Premium Basic or higher to view schedules"); return; }
     setSelectedInternshipForView(internshipId);
     setScheduleViewerOpen(true);
+  };
+
+  const openAttendanceDashboard = (internshipId) => {
+    setSelectedInternshipForAttendance(internshipId);
+    setAttendanceDashboardOpen(true);
   };
 
   const openTimeSlotsSelected = (internshipId) => {
@@ -1277,12 +1286,20 @@ const InternshipList = () => {
                       </button>
 
                       {hasPremiumAccess() ? (
-                        <button
-                          onClick={() => openScheduleViewer(internship._id)}
-                          className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-cyan-500 to-sky-500 text-white text-xs font-semibold rounded-lg shadow hover:from-cyan-600 hover:to-sky-600 transition active:scale-95"
-                        >
-                          <FontAwesomeIcon icon={faCalendarAlt} /> View Schedule
-                        </button>
+                        <>
+                          <button
+                            onClick={() => openScheduleViewer(internship._id)}
+                            className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-cyan-500 to-sky-500 text-white text-xs font-semibold rounded-lg shadow hover:from-cyan-600 hover:to-sky-600 transition active:scale-95"
+                          >
+                            <FontAwesomeIcon icon={faCalendarAlt} /> View Schedule
+                          </button>
+                          <button
+                            onClick={() => openAttendanceDashboard(internship._id)}
+                            className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-teal-500 to-emerald-500 text-white text-xs font-semibold rounded-lg shadow hover:from-teal-600 hover:to-emerald-600 transition active:scale-95"
+                          >
+                            <FontAwesomeIcon icon={faUserCheck} /> Attendance
+                          </button>
+                        </>
                       ) : showPremiumLock("View Schedule", "Premium Basic")}
 
                       <button
@@ -1435,6 +1452,16 @@ const InternshipList = () => {
         isOpen={scheduleViewerOpen}
         onClose={() => { setScheduleViewerOpen(false); setSelectedInternshipForView(null); }}
         internshipId={selectedInternshipForView}
+        partnerId={partnerData?._id || localStorage.getItem("partnerId")}
+      />
+
+      <AttendanceDashboard
+        isOpen={attendanceDashboardOpen}
+        onClose={() => {
+          setAttendanceDashboardOpen(false);
+          setSelectedInternshipForAttendance(null);
+        }}
+        internshipId={selectedInternshipForAttendance}
         partnerId={partnerData?._id || localStorage.getItem("partnerId")}
       />
 

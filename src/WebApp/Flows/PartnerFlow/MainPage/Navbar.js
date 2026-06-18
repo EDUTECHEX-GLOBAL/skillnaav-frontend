@@ -313,6 +313,9 @@ const Navbar = ({ onToggleSidebar }) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const isPremiumExpired = userInfo.isPremium && userInfo.planType !== "Freemium" && userInfo.premiumExpiration && new Date(userInfo.premiumExpiration) <= new Date();
+  const displayPlan = isPremiumExpired ? "Expired" : (userInfo.planType || "Loading");
+
   return (
     <header className="bg-white font-poppins text-gray-800 py-5 px-4 border-b border-gray-300 sticky top-0 z-50 flex justify-between items-center">
       {/* Left: Logo + hamburger */}
@@ -330,15 +333,16 @@ const Navbar = ({ onToggleSidebar }) => {
             <span className="text-gray-800 text-sm">{userInfo.name}</span>
             <span
               className={`mt-1 px-2 py-0.5 text-xs font-medium rounded-full transition-opacity duration-200
-                ${userInfo.planType ? "opacity-100" : "opacity-0"}
+                ${displayPlan ? "opacity-100" : "opacity-0"}
                 ${
-                  userInfo.planType === "Freemium"      ? "bg-gray-200 text-gray-700"     :
-                  userInfo.planType === "Premium Basic" ? "bg-purple-200 text-purple-800" :
-                  userInfo.planType === "Premium Plus"  ? "bg-orange-200 text-orange-800" :
-                                                          "bg-gray-100 text-gray-500"
+                  isPremiumExpired                ? "bg-red-100 text-red-700"       :
+                  displayPlan === "Freemium"      ? "bg-gray-200 text-gray-700"     :
+                  displayPlan === "Premium Basic" ? "bg-purple-200 text-purple-800" :
+                  displayPlan === "Premium Plus"  ? "bg-orange-200 text-orange-800" :
+                                                    "bg-gray-100 text-gray-500"
                 }`}
             >
-              {userInfo.planType || "Loading"}
+              {displayPlan}
             </span>
           </div>
         )}

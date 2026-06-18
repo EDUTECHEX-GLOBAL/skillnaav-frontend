@@ -124,7 +124,8 @@ const ScheduleForm = ({
   const [form, setForm] = useState({
     startDate: '',
     endDate: '',
-    workHours: '',
+    workHoursStart: '',
+    workHoursEnd: '',
     defaultStartTimes: { online: '', offline: '', hybrid: '' },
     defaultEndTimes: { online: '', offline: '', hybrid: '' },
     defaultType: initialInternshipMode ? normalizeInternshipMode(initialInternshipMode) : '', // online / offline / hybrid
@@ -135,7 +136,12 @@ const ScheduleForm = ({
     hybridEventLink: '',
     hybridLocation: { name: '', address: '', mapLink: '' },
     scheduleMode: 'manual', // ✅ manual | automated
-    isClosed: false
+    isClosed: false,
+    attendanceSettings: {
+      minAttendancePercent: 80,
+      onlineMinDurationMins: 0,
+      trackingEnabled: true
+    }
   });
 
   const [error, setError] = useState(null);
@@ -233,11 +239,16 @@ const ScheduleForm = ({
         setForm(f => {
           const effectiveType = f.defaultType || savedType; // ✅ keep type coming from internship post
 
-          return {
-            ...f,
-            startDate: data.startDate.slice(0, 10),
-            endDate: data.endDate.slice(0, 10),
-            workHours: data.workHours,
+            const workHoursParts = (data.workHours || '').replace(' Hours', '').split(' - ');
+            const savedWHStart = workHoursParts[0]?.trim() || '';
+            const savedWHEnd = workHoursParts[1]?.trim() || '';
+
+            return {
+              ...f,
+              startDate: data.startDate.slice(0, 10),
+              endDate: data.endDate.slice(0, 10),
+              workHoursStart: savedWHStart,
+              workHoursEnd: savedWHEnd,
 
             defaultType: effectiveType,
             defaultStartTimes: {
@@ -275,7 +286,8 @@ const ScheduleForm = ({
               address: '',
               mapLink: ''
             },
-            isClosed: !!data.isClosed
+            isClosed: !!data.isClosed,
+            attendanceSettings: data.attendanceSettings || f.attendanceSettings
           };
         });
 
@@ -407,7 +419,8 @@ const ScheduleForm = ({
       endDate,
       defaultType,
       selectedDays,
-      workHours
+      workHoursStart,
+      workHoursEnd
     } = form;
 
     const defaultStartTime = form.defaultStartTimes[defaultType];
@@ -436,7 +449,7 @@ const ScheduleForm = ({
       return setError('End date cannot be before start date');
     }
 
-    if (!workHours || workHours.trim() === '') {
+    if (!workHoursStart || !workHoursEnd) {
       return setError('Fill work hours before generating schedule');
     }
 
@@ -653,7 +666,7 @@ const ScheduleForm = ({
         partnerId: localStorage.getItem('partnerId'),
         startDate: form.startDate,
         endDate: form.endDate,
-        workHours: form.workHours,
+        workHours: `${form.workHoursStart} - ${form.workHoursEnd} Hours`,
         defaultStartTime: form.defaultStartTimes[form.defaultType],
         defaultEndTime: form.defaultEndTimes[form.defaultType],
         defaultEventLink:
@@ -677,7 +690,8 @@ const ScheduleForm = ({
             ...day,
             location: day.type === 'online' ? null : day.location,
             assignment: day.assignment?.name || null
-          }))
+          })),
+        attendanceSettings: form.attendanceSettings
       };
 
       await axios.post('/api/schedule/create', payload, {
@@ -792,15 +806,25 @@ const ScheduleForm = ({
               {/* Work Hours Section */}
               <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
                 <h3 className="text-lg font-semibold text-gray-800 mb-4">Work Hours</h3>
-                <input
-                  type="text"
-                  name="workHours"
-                  value={form.workHours}
-                  onChange={handleFormChange}
-                  placeholder="e.g., 09:00 - 17:00 Hours"
-                  className="block w-full px-4 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  required
-                />
+                <div className="flex items-center gap-4">
+                  <input
+                    type="time"
+                    name="workHoursStart"
+                    value={form.workHoursStart}
+                    onChange={handleFormChange}
+                    className="block w-full px-4 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    required
+                  />
+                  <span className="text-gray-500 font-medium">to</span>
+                  <input
+                    type="time"
+                    name="workHoursEnd"
+                    value={form.workHoursEnd}
+                    onChange={handleFormChange}
+                    className="block w-full px-4 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    required
+                  />
+                </div>
               </div>
 
               {/* Internship Type */}
@@ -1139,57 +1163,53 @@ const ScheduleForm = ({
                 )}
               </div>
 
-              {/* ✅ Schedule Creation Method */}
-              <div className="bg-gray-50 p-5 rounded-xl border border-gray-200 space-y-6">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">
-                  Schedule Creation Method
-                </h3>
-
-                {/* Same layout style as Internship Type */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {/* ✅ Attendance Settings */}
+              <div className="bg-gray-50 p-5 rounded-xl border border-gray-200 space-y-4">
+                <div className="flex justify-between items-center mb-1 flex-wrap gap-2">
+                  <h3 className="text-lg font-semibold text-gray-800">Attendance Settings</h3>
                   <div className="flex items-center">
-                    <input
-                      type="radio"
-                      id="scheduleMode-manual"
-                      name="scheduleMode"
-                      value="manual"
-                      checked={form.scheduleMode === 'manual'}
-                      onChange={handleFormChange}
-                      className="h-5 w-5 text-indigo-600 focus:ring-indigo-500 -mt-0"
-                    />
-                    <label
-                      htmlFor="scheduleMode-manual"
-                      className="ml-2 text-sm font-medium text-gray-700"
-                    >
-                      Manual Schedule
+                    <label htmlFor="trackingEnabledFree" className="mr-3 text-sm font-medium text-gray-700">
+                      Enable Attendance Tracking
                     </label>
-                  </div>
-
-                  <div className="flex items-center">
-                    <input
-                      type="radio"
-                      id="scheduleMode-automated"
-                      name="scheduleMode"
-                      value="automated"
-                      checked={form.scheduleMode === 'automated'}
-                      onChange={handleFormChange}
-                      className="h-5 w-5 text-indigo-600 focus:ring-indigo-500 -mt-0"
-                    />
-                    <label
-                      htmlFor="scheduleMode-automated"
-                      className="ml-2 text-sm font-medium text-gray-700"
+                    <button
+                      type="button"
+                      id="trackingEnabledFree"
+                      onClick={() => setForm(f => ({ ...f, attendanceSettings: { ...f.attendanceSettings, trackingEnabled: !f.attendanceSettings.trackingEnabled } }))}
+                      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${form.attendanceSettings.trackingEnabled ? 'bg-indigo-600' : 'bg-gray-300'}`}
                     >
-                      Automated Schedule
-                    </label>
+                      <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${form.attendanceSettings.trackingEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
+                    </button>
                   </div>
                 </div>
 
-                {form.scheduleMode === 'automated' && (
-                  <p className="text-sm text-gray-500">
-                    Automated Schedule will auto-fill <b>Section Summary</b> for each scheduled day
-                    based on the internship you posted and its <b>Classification</b> level
-                    (<b>Basic</b>, <b>Intermediate</b>, <b>Advanced</b>).
-                  </p>
+                {form.attendanceSettings.trackingEnabled && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Minimum Attendance Required (%) *</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={form.attendanceSettings.minAttendancePercent}
+                        onChange={(e) => setForm(f => ({ ...f, attendanceSettings: { ...f.attendanceSettings, minAttendancePercent: Number(e.target.value) } }))}
+                        placeholder="e.g. 80"
+                        className="block w-full px-3 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                      <p className="mt-1 text-xs text-gray-500">Students must attend at least this % of sessions to receive a certificate.</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Online Session Minimum Duration (minutes)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={form.attendanceSettings.onlineMinDurationMins}
+                        onChange={(e) => setForm(f => ({ ...f, attendanceSettings: { ...f.attendanceSettings, onlineMinDurationMins: Number(e.target.value) } }))}
+                        placeholder="0"
+                        className="block w-full px-3 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                      <p className="mt-1 text-xs text-gray-500">0 = any join counts. Set e.g. 30 to require 30 mins in Google Meet.</p>
+                    </div>
+                  </div>
                 )}
               </div>
 
@@ -1199,8 +1219,7 @@ const ScheduleForm = ({
                   type="button"
                   onClick={generatePreview}
                   disabled={aiGenerating}
-                  className={`flex items-center justify-center px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium rounded-lg shadow-md hover:from-indigo-700 hover:to-purple-700 transition-all transform hover:scale-105 ${aiGenerating ? 'opacity-60 cursor-not-allowed' : ''
-                    }`}
+                  className={`flex items-center justify-center px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium rounded-lg shadow-md hover:from-indigo-700 hover:to-purple-700 transition-all transform hover:scale-105 ${aiGenerating ? 'opacity-60 cursor-not-allowed' : ''}`}
                 >
                   {aiGenerating ? 'Generating with AI...' : 'Generate Preview'}
                   <FiChevronRight className="ml-2" />

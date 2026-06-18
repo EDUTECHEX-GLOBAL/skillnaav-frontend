@@ -280,7 +280,7 @@ export const useProctoring = (onViolation) => {
       // Suppress any events that fire during the startup sequence (longer grace)
       suppressUntilRef.current = Date.now() + 10000;
 
-      return { success: true, verified };
+      return { success: true, verified, stream: mediaStream };
     } catch (error) {
       console.error('Error accessing camera/microphone:', error);
 

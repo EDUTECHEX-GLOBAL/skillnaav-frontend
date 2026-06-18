@@ -2,6 +2,151 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import axios from "../../../../api/axiosInstance";
 import { useProctoring } from "./useProctoring";
 
+// ── Camera Preview Component ──────────────────────────────────────────────────
+const CameraPreview = ({ stream }) => {
+  const videoRef = useRef(null);
+
+  useEffect(() => {
+    if (videoRef.current && stream) {
+      videoRef.current.srcObject = stream;
+    }
+  }, [stream]);
+
+  if (!stream) return null;
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        top: "112px",
+        right: "28px",
+        zIndex: 40,
+        width: "220px",
+        display: "flex",
+        flexDirection: "column",
+        gap: "12px",
+      }}
+    >
+      <div
+        style={{
+          position: "relative",
+          height: "150px",
+          borderRadius: "12px",
+          overflow: "hidden",
+          boxShadow: "0 18px 40px rgba(15,23,42,0.16)",
+          border: "1px solid #dbeafe",
+          background: "#000",
+        }}
+      >
+        <video
+          ref={videoRef}
+          autoPlay
+          muted
+          playsInline
+          style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)" }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            inset: "auto 0 0 0",
+            padding: "8px 10px",
+            background: "linear-gradient(180deg, rgba(0,0,0,0), rgba(0,0,0,0.72))",
+            color: "#fff",
+            fontSize: "12px",
+            fontWeight: 700,
+          }}
+        >
+          Student Camera
+        </div>
+        {/* Recording indicator */}
+        <div
+          style={{
+            position: "absolute",
+            top: "8px",
+            left: "8px",
+            display: "flex",
+            alignItems: "center",
+            gap: "5px",
+            background: "rgba(0,0,0,0.58)",
+            borderRadius: "999px",
+            padding: "3px 8px",
+          }}
+        >
+          <span
+            style={{
+              width: "7px",
+              height: "7px",
+              borderRadius: "50%",
+              background: "#ef4444",
+              display: "inline-block",
+              animation: "pulse 1.2s infinite",
+            }}
+          />
+          <span style={{ color: "#fff", fontSize: "9px", fontWeight: 700 }}>LIVE</span>
+        </div>
+      </div>
+
+      <div
+        style={{
+          height: "132px",
+          borderRadius: "9px",
+          overflow: "hidden",
+          boxShadow: "0 12px 28px rgba(15,23,42,0.16)",
+          border: "1px solid rgba(255,255,255,0.65)",
+          background: "#565656",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          position: "relative",
+          flexDirection: "column",
+          gap: "8px",
+        }}
+      >
+        <div
+          style={{
+            width: "46px",
+            height: "46px",
+            borderRadius: "50%",
+            background: "#c8cee5",
+            border: "1px solid rgba(255,255,255,0.45)",
+            position: "relative",
+            boxShadow: "inset 0 1px 1px rgba(255,255,255,0.45)",
+          }}
+        >
+          <span
+            style={{
+              position: "absolute",
+              top: "10px",
+              left: "50%",
+              transform: "translateX(-50%)",
+              width: "14px",
+              height: "14px",
+              borderRadius: "50%",
+              background: "#ffffff",
+            }}
+          />
+          <span
+            style={{
+              position: "absolute",
+              left: "50%",
+              bottom: "7px",
+              transform: "translateX(-50%)",
+              width: "28px",
+              height: "17px",
+              borderRadius: "14px 14px 8px 8px",
+              background: "#ffffff",
+            }}
+          />
+        </div>
+        <div style={{ color: "#f8fafc", fontSize: "12px", fontWeight: 700 }}>
+          Partner
+        </div>
+      </div>
+      <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }`}</style>
+    </div>
+  );
+};
+
 const StudentAssessment = () => {
   const assessmentId = localStorage.getItem("activeAssessmentId");
 
@@ -19,6 +164,9 @@ const StudentAssessment = () => {
   const handleSubmitRef = useRef(null);
 
   const handleViolationRef = useRef(null);
+
+  const cameraStreamRef = useRef(null);
+  const [cameraStream, setCameraStream] = useState(null);
 
   const {
     startProctoring,
@@ -123,6 +271,9 @@ const StudentAssessment = () => {
         return;
       }
 
+      cameraStreamRef.current = media.stream;
+      setCameraStream(media.stream);
+
       // Start assessment
       await axios.post(`/api/l2-assessments/${assessmentId}/start`, {
         ipAddress: await getPublicIP(),
@@ -171,6 +322,12 @@ const StudentAssessment = () => {
       setSubmitting(false);
       hasSubmittedRef.current = false;
     } finally {
+      // Stop camera stream preview
+      if (cameraStreamRef.current) {
+        cameraStreamRef.current.getTracks().forEach((t) => t.stop());
+        cameraStreamRef.current = null;
+      }
+      setCameraStream(null);
       stopProctoring();
       exitFullscreen();
     }
@@ -335,31 +492,33 @@ const StudentAssessment = () => {
     const answeredCount = Object.keys(answers).length;
 
     return (
-      <div className="min-h-screen bg-white">
+      <div className="h-screen overflow-hidden bg-[#f7f8fc] text-gray-900">
+        {/* Camera preview overlay */}
+        <CameraPreview stream={cameraStream} />
         {/* Header */}
-        <div className="bg-blue-600 text-white p-4 flex justify-between items-center">
+        <div className="bg-white border-b border-gray-200 shadow-sm text-gray-900 px-6 py-3 flex justify-between items-center lg:pr-[280px]">
           <div>
-            <h1 className="text-xl font-semibold">SkillNaav Assessment</h1>
-            <p className="text-sm">Question {currentQ + 1} of {totalQuestions}</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-indigo-500">SkillNaav Assessment</p>
+            <h1 className="text-xl font-bold">Question {currentQ + 1} of {totalQuestions}</h1>
           </div>
 
           <div className="flex items-center gap-6">
             <div className="text-center">
-              <div className={`text-2xl font-bold ${timeLeft < 60 ? 'text-red-300 animate-pulse' : ''}`}>
+              <div className={`text-2xl font-bold ${timeLeft < 60 ? 'text-red-600 animate-pulse' : 'text-indigo-700'}`}>
                 {formatTime(timeLeft)}
               </div>
-              <div className="text-xs">Time Remaining</div>
+              <div className="text-xs text-gray-500">Time Remaining</div>
             </div>
 
             {violationCount > 0 && (
-              <div className="text-yellow-300 text-sm">
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-700">
                 ⚠️ {violationCount} warning{violationCount > 1 ? 's' : ''}
               </div>
             )}
 
             <button
               onClick={() => handleSubmit(true)}
-              className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 text-sm"
+              className="rounded-xl bg-red-500 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-red-600"
             >
               End Exam
             </button>
@@ -373,18 +532,33 @@ const StudentAssessment = () => {
         </div>
 
         {/* Question */}
-        <div className="max-w-4xl mx-auto p-8">
-          <div className="mb-8">
-            <h2 className="text-2xl font-semibold mb-6">{currentQuestion.question}</h2>
+        <div className="max-w-6xl mx-auto px-6 py-4 lg:pr-[280px]">
+          <div className="mb-3 overflow-hidden rounded-full bg-gray-200">
+            <div
+              className="h-2 rounded-full bg-indigo-600 transition-all"
+              style={{ width: `${totalQuestions ? ((currentQ + 1) / totalQuestions) * 100 : 0}%` }}
+            />
+          </div>
 
-            <div className="space-y-3">
+          <div className="mb-4 max-h-[calc(100vh-265px)] overflow-y-auto rounded-2xl border border-gray-200 bg-white p-5 shadow-sm md:p-6">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
+                Multiple Choice
+              </span>
+              <span className="text-sm font-medium text-gray-500">
+                {answeredCount} of {totalQuestions} answered
+              </span>
+            </div>
+            <h2 className="text-lg font-bold leading-snug text-gray-950 mb-5">{currentQuestion.question}</h2>
+
+            <div className="space-y-2.5">
               {currentQuestion.options?.map((option, idx) => (
                 <label
                   key={idx}
-                  className={`flex items-center gap-4 p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                  className={`flex items-start gap-3 p-3 border rounded-xl cursor-pointer transition-all ${
                     answers[currentQuestion.questionId] === idx
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-200 hover:border-gray-300'
+                      ? 'border-indigo-500 bg-indigo-50 shadow-sm'
+                      : 'border-gray-200 bg-white hover:border-indigo-200 hover:bg-gray-50'
                   }`}
                 >
                   <input
@@ -392,25 +566,25 @@ const StudentAssessment = () => {
                     name={`question-${currentQ}`}
                     checked={answers[currentQuestion.questionId] === idx}
                     onChange={() => selectAnswer(currentQuestion.questionId, idx)}
-                    className="w-4 h-4 text-blue-600"
+                    className="mt-1 w-4 h-4 text-indigo-600"
                   />
-                  <span className="text-lg">{option}</span>
+                  <span className="text-sm leading-6 text-gray-800">{option}</span>
                 </label>
               ))}
             </div>
           </div>
 
           {/* Navigation */}
-          <div className="flex justify-between items-center">
+          <div className="flex flex-wrap justify-between items-center gap-3">
             <button
               disabled={currentQ === 0}
               onClick={() => setCurrentQ(prev => prev - 1)}
-              className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:opacity-45 disabled:cursor-not-allowed"
             >
               ← Previous
             </button>
 
-            <div className="text-center">
+            <div className="text-center hidden">
               <p className="text-sm text-gray-600">
                 {answeredCount} of {totalQuestions} answered
               </p>
@@ -420,14 +594,14 @@ const StudentAssessment = () => {
               <button
                 onClick={() => handleSubmit(false)}
                 disabled={submitting}
-                className="px-8 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                className="rounded-xl bg-emerald-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50"
               >
                 {submitting ? 'Submitting...' : 'Submit Exam'}
               </button>
             ) : (
               <button
                 onClick={() => setCurrentQ(prev => prev + 1)}
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                className="rounded-xl bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700"
               >
                 Next →
               </button>
@@ -435,17 +609,17 @@ const StudentAssessment = () => {
           </div>
 
           {/* Question indicators */}
-          <div className="mt-8 flex flex-wrap gap-2 justify-center">
+          <div className="mt-4 flex flex-wrap gap-2 justify-center">
             {questions.map((_, idx) => (
               <button
                 key={idx}
                 onClick={() => setCurrentQ(idx)}
-                className={`w-10 h-10 rounded-full text-sm font-semibold transition-all ${
+                className={`w-9 h-9 rounded-lg text-sm font-semibold transition-all ${
                   idx === currentQ
-                    ? 'bg-blue-600 text-white'
+                    ? 'bg-indigo-600 text-white shadow-sm'
                     : answers[questions[idx]?.questionId] !== undefined
-                    ? 'bg-green-500 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : 'bg-white text-gray-500 ring-1 ring-gray-200 hover:bg-gray-50'
                 }`}
               >
                 {idx + 1}
