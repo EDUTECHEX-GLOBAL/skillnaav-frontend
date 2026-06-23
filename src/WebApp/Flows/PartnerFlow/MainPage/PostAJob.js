@@ -93,10 +93,10 @@ const PostAJob = () => {
   const { saveJob, handleSelectTab } = useTabContext();
 
   const topSectors = [
-    { id: "advanced-ai",       name: "Advanced AI & Autonomous Systems" },
+    { id: "advanced-ai", name: "Advanced AI & Autonomous Systems" },
     { id: "quantum-computing", name: "Quantum Computing & Next-Gen Computing" },
-    { id: "climate-tech",      name: "Climate Tech & Carbon Capture" },
-    { id: "biotech",           name: "Biotechnology & Synthetic Biology" },
+    { id: "climate-tech", name: "Climate Tech & Carbon Capture" },
+    { id: "biotech", name: "Biotechnology & Synthetic Biology" },
     { id: "materials-science", name: "Advanced Materials Science" },
   ];
 
@@ -157,7 +157,7 @@ const PostAJob = () => {
       try {
         const countryIds =
           formData.country === "Canada" ? "CA" :
-          formData.country === "United States" ? "US" : "US,CA";
+            formData.country === "United States" ? "US" : "US,CA";
 
         const resp = await axios.get("/api/cities", {
           params: { namePrefix: q.trim(), limit: 10, minPopulation: 100000, countryIds },
@@ -583,14 +583,12 @@ const PostAJob = () => {
 
           {/* Description banner for Free or Stipend */}
           {(formData.internshipType === "FREE" || formData.internshipType === "STIPEND") && (
-            <div className={`mt-3 px-4 py-3 rounded-xl border flex items-start gap-2 ${
-              formData.internshipType === "STIPEND"
+            <div className={`mt-3 px-4 py-3 rounded-xl border flex items-start gap-2 ${formData.internshipType === "STIPEND"
                 ? "bg-emerald-50/60 border-emerald-100"
                 : "bg-slate-50 border-slate-200"
-            }`}>
-              <p className={`text-sm leading-tight ${
-                formData.internshipType === "STIPEND" ? "text-emerald-700" : "text-slate-600"
               }`}>
+              <p className={`text-sm leading-tight ${formData.internshipType === "STIPEND" ? "text-emerald-700" : "text-slate-600"
+                }`}>
                 {formData.internshipType === "STIPEND" ? (
                   <><strong>Stipend:</strong> Students receive a stipend from your organization during the internship.</>
                 ) : (
@@ -602,13 +600,12 @@ const PostAJob = () => {
 
           {/* Paid radio option */}
           <div className="mt-4">
-            <label className={`flex h-11 items-center px-3 border rounded-lg transition-all ${
-              userType === "Freemium"
+            <label className={`flex h-11 items-center px-3 border rounded-lg transition-all ${userType === "Freemium"
                 ? "opacity-50 cursor-not-allowed bg-gray-50 border-gray-200"
                 : formData.internshipType === "PAID"
-                ? "border-teal-500 bg-teal-50 ring-1 ring-teal-500 cursor-pointer"
-                : "border-gray-300 hover:bg-gray-50 cursor-pointer"
-            }`}>
+                  ? "border-teal-500 bg-teal-50 ring-1 ring-teal-500 cursor-pointer"
+                  : "border-gray-300 hover:bg-gray-50 cursor-pointer"
+              }`}>
               <input
                 type="radio"
                 name="internshipTypeRadio"
@@ -712,3 +709,4 @@ const PostAJob = () => {
 };
 
 export default PostAJob;
+//changesss
