@@ -948,7 +948,7 @@ const SchoolAdminSupport = () => {
 
       if (r.data.success) {
         const newTkt = r.data.ticket;
-        setOwn(p => [newTkt, ...p]);
+        setOwn(p => p.some(t => t._id === newTkt._id) ? p : [newTkt, ...p]);
         setSelTicket(newTkt);
         setShowRaise(false);
         setRaiseData({ category:"", priority:"", message:"" });

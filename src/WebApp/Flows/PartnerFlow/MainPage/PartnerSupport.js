@@ -873,7 +873,7 @@ const PartnerSupport = () => {
       const r = await axios.post(`${API_BASE}/tickets`, fd, { headers: { Authorization:`Bearer ${getToken()}` } });
       if (r.data.ticket) {
         const t = r.data.ticket;
-        setOwn(p => [t, ...p]);
+        setOwn(p => p.some(existing => existing._id === t._id) ? p : [t, ...p]);
         setSelTicket(t);
         setShowNewTicket(false);
         setNewTicket({ category:"", priority:"", description:"" });
