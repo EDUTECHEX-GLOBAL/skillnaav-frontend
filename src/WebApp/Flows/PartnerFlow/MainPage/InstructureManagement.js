@@ -279,6 +279,7 @@ const InstructureManagement = () => {
   const [openMenuId, setOpenMenuId] = useState(null);
   const [portalTarget, setPortalTarget] = useState(null);
   const [isAssigning, setIsAssigning] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const [assignPopup, setAssignPopup] = useState({
     open: false,
@@ -333,6 +334,7 @@ const InstructureManagement = () => {
 
   useEffect(() => {
     const fetchInstructors = async () => {
+      setLoading(true);
       try {
         const { data } = await axios.get("/api/instructors", {
           params: { limit: 200 },
@@ -356,6 +358,8 @@ const InstructureManagement = () => {
               ? "You don't have permission to view instructors."
               : "Failed to load instructors.");
         alert(msg);
+      } finally {
+        setLoading(false);
       }
     };
     fetchInstructors();
@@ -1716,7 +1720,12 @@ const InstructureManagement = () => {
 
           {/* List body */}
           <div className="flex-1 p-5 bg-gradient-to-b from-slate-50/40 via-white to-slate-50/30">
-            {filteredInstructors.length === 0 ? (
+            {loading ? (
+              <div className="flex flex-col items-center justify-center py-20 text-center">
+                <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
+                <p className="text-sm font-semibold text-slate-600">Loading instructors...</p>
+              </div>
+            ) : filteredInstructors.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 text-center">
                 <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
                   <FontAwesomeIcon icon={faSearch} className="text-slate-300 text-xl" />

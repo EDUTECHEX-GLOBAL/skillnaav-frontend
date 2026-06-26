@@ -16,7 +16,7 @@ const BioTech = () => {
       try {
         setLoading(true);
         const res = await axios.get("/api/interns/approved", {
-          params: { isPremium: false, sector: "biotechnology" },
+          params: { isPremium: false, sector: "biotech" },
         });
          setInternships(res.data.data);
       } catch (err) {

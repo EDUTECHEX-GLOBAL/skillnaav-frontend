@@ -1008,13 +1008,13 @@ export const ShortlistedTable = ({ candidates, internshipId, internshipTitle = "
         <>
           <div className="flex flex-wrap gap-2">
             <TabBtn active={activeLevel === "L1"} onClick={() => setActiveLevel("L1")}>
-              Shortlisted <CountPill count={l1Count} color="yellow" />
+              Shortlisted L1 <CountPill count={l1Count} color="yellow" />
             </TabBtn>
             <TabBtn active={activeLevel === "L2"} onClick={() => setActiveLevel("L2")}>
-              Assessment <CountPill count={l2Count} color="purple" />
+              Assessment L2 <CountPill count={l2Count} color="purple" />
             </TabBtn>
             <TabBtn active={activeLevel === "L3"} onClick={() => setActiveLevel("L3")}>
-              Interview <CountPill count={l3Count} color="blue" />
+              Interview L3 <CountPill count={l3Count} color="blue" />
             </TabBtn>
             <TabBtn active={activeLevel === "OFFER"} onClick={() => setActiveLevel("OFFER")}>
               Offer <CountPill count={offerCount} color="green" />

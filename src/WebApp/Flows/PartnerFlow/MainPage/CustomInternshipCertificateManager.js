@@ -68,6 +68,12 @@ const CustomInternshipCertificateManager = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [activeTab, setActiveTab] = useState("upload"); // "upload" | "gallery"
   const [lightboxData, setLightboxData] = useState(null);
+  const [lightboxLoaded, setLightboxLoaded] = useState(false);
+  
+  useEffect(() => {
+    if (!lightboxData) setLightboxLoaded(false);
+  }, [lightboxData]);
+
   const [pendingDeleteItem, setPendingDeleteItem] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [galleryPage, setGalleryPage] = useState(1);
@@ -351,7 +357,7 @@ const CustomInternshipCertificateManager = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-6"
+            className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-6"
             onClick={() => setLightboxData(null)}
           >
             <motion.div
@@ -359,19 +365,37 @@ const CustomInternshipCertificateManager = () => {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.85, opacity: 0 }}
               transition={{ type: "spring", duration: 0.5 }}
-              className="relative max-w-[1120px] w-full"
-              style={{ aspectRatio: "1120 / 792" }}
+              className="relative mx-auto"
+              style={{
+                aspectRatio: "1120 / 792",
+                maxWidth: "min(1120px, calc(90vh * 1120 / 792))",
+                width: "100%",
+              }}
               onClick={(e) => e.stopPropagation()}
             >
               <button
                 onClick={() => setLightboxData(null)}
-                className="absolute -top-4 -right-4 w-10 h-10 rounded-full bg-white shadow-xl flex items-center justify-center text-slate-700 hover:bg-slate-100 z-10 transition-colors"
+                className="absolute -top-4 -right-4 w-10 h-10 rounded-full bg-white shadow-xl flex items-center justify-center text-slate-700 hover:bg-slate-100 z-30 transition-colors"
               >
                 <X size={20} strokeWidth={2.5} />
               </button>
               
               <div className="w-full h-full relative overflow-hidden rounded-2xl shadow-2xl bg-white flex items-center justify-center">
-                <svg viewBox="0 0 1120 792" style={{ width: "100%", height: "auto" }}>
+                {!lightboxLoaded && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-white z-20">
+                    <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
+                    <p className="text-sm font-semibold text-slate-600">Loading design...</p>
+                  </div>
+                )}
+
+                <img 
+                  src={lightboxData.imageUrl} 
+                  className="hidden" 
+                  onLoad={() => setLightboxLoaded(true)} 
+                  alt="preload" 
+                />
+
+                <svg viewBox="0 0 1120 792" className={`w-full h-auto transition-opacity duration-300 ${lightboxLoaded ? 'opacity-100' : 'opacity-0'}`}>
                   <foreignObject width="1120" height="792">
                     <CertificateTemplate 
                       studentName="John Doe"
@@ -813,13 +837,9 @@ const CustomInternshipCertificateManager = () => {
               )}
 
               {isLoading ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
-                  {Array.from({ length: DESIGNS_PER_PAGE }, (_, index) => index + 1).map((i) => (
-                    <div
-                      key={i}
-                      className="animate-pulse bg-slate-200/50 rounded-2xl h-72"
-                    />
-                  ))}
+                <div className="flex flex-col items-center justify-center py-20 text-center w-full">
+                  <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
+                  <p className="text-sm font-semibold text-slate-600">Loading designs...</p>
                 </div>
               ) : certificateItems.length === 0 ? (
                 <motion.div

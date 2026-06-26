@@ -1206,26 +1206,9 @@ const YourJobPosts = () => {
 
       {/* Cards */}
       {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col animate-pulse">
-              <div className="mb-4 w-full h-32 bg-gray-100 rounded-lg" />
-              <div className="h-4 bg-gray-200 rounded w-3/4 mb-2" />
-              <div className="h-3 bg-gray-100 rounded w-1/2 mb-3" />
-              <div className="flex gap-2 mb-4">
-                <div className="h-5 bg-gray-100 rounded-full w-16" />
-                <div className="h-5 bg-gray-100 rounded-full w-12" />
-              </div>
-              <div className="space-y-2 mb-4">
-                <div className="h-3 bg-gray-100 rounded w-full" />
-                <div className="h-3 bg-gray-100 rounded w-5/6" />
-              </div>
-              <div className="mt-auto pt-3 border-t border-gray-100 flex justify-between">
-                <div className="h-6 bg-gray-100 rounded-full w-20" />
-                <div className="h-6 bg-gray-200 rounded-lg w-24" />
-              </div>
-            </div>
-          ))}
+        <div className="flex flex-col items-center justify-center py-24 text-center w-full">
+          <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
+          <p className="text-sm font-semibold text-gray-600" style={{ fontFamily: "'Poppins', sans-serif" }}>Loading your job posts...</p>
         </div>
       ) : internships.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-gray-400">
