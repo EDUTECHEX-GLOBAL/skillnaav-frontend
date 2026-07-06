@@ -336,8 +336,40 @@ const PostAJob = () => {
       setShowSuccessModal(true);
     } catch (err) {
       console.error("Error posting internship:", err);
-      setErrorMessage("Failed to post internship. Please try again.");
-      setTimeout(() => setErrorMessage(""), 3500);
+      let errMsg = "Failed to post internship. Please try again.";
+
+      const backendMsg = err.response?.data?.message || "";
+      const backendErr = err.response?.data?.error || "";
+      const combinedError = `${backendMsg} ${backendErr}`.trim();
+
+      if (combinedError.includes("Freemium partners can post up to 2 internships only")) {
+        errMsg = "You have reached the free limit of 2 internships. Please upgrade your subscription to post more.";
+      } else if (combinedError.includes("validation failed")) {
+        const errorPart = combinedError.split("validation failed: ")[1];
+        if (errorPart) {
+          const rawFields = errorPart.split(",").map(part => part.split(":")[0].trim());
+          const friendlyNames = {
+            "compensationDetails.type": "Compensation Type",
+            "internshipType": "Internship Type",
+            "jobTitle": "Job Title",
+            "companyName": "Company Name",
+            "sector": "Sector",
+            "city": "City",
+            "state": "State",
+            "country": "Country",
+            "classification": "Classification"
+          };
+          const cleanFields = rawFields.map(f => friendlyNames[f] || f);
+          errMsg = `Please fill in all required fields: ${cleanFields.join(", ")}`;
+        } else {
+          errMsg = "Please fill in all required fields.";
+        }
+      } else if (combinedError) {
+        errMsg = combinedError;
+      }
+
+      setErrorMessage(errMsg);
+      setTimeout(() => setErrorMessage(""), 6000);
     }
   };
 

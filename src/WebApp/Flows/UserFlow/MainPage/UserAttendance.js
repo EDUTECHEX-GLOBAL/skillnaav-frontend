@@ -56,7 +56,7 @@ const UserAttendance = () => {
   }
 
   const acceptedOffers = offers.filter(
-    (o) => o.status === "Accepted" && o.internshipId
+    (o) => o.status?.toLowerCase() === "accepted" && o.internshipId
   );
 
   return (

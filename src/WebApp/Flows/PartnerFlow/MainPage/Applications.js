@@ -219,7 +219,7 @@ const InternshipList = () => {
       .get(`/api/custom-internship-certificates/${partnerId}`)
       .then((response) => {
         const items = Array.isArray(response.data?.items)
-          ? response.data.items
+          ? response.data.items.filter(item => item.status === 'Approved')
           : [];
 
         closeScheduleTemplatesCacheRef.current = {

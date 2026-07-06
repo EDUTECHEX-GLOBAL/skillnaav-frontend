@@ -12,6 +12,7 @@ import {
 } from 'react-icons/fi';
 import axios from "../../../../api/axiosInstance";
 import * as XLSX from 'xlsx';
+import CreateMeetingLink from './CreateMeetingLink';
 import ScheduleFormPaid from './ScheduleFormPaid';
 
 const isPastDate = (dateString) => {
@@ -929,6 +930,16 @@ const ScheduleForm = ({
                       />
                     </div>
 
+                    <CreateMeetingLink
+                      internshipId={internshipId}
+                      meetingLink={form.onlineEventLink}
+                      disabled={readOnly}
+                      onMeetingLinkCreated={(meetingLink) => setForm((current) => ({
+                        ...current,
+                        onlineEventLink: meetingLink
+                      }))}
+                    />
+
                     {/* DOWNLOAD TEMPLATE BUTTON FOR ONLINE*/}
                     <div className="pt-2">
                       <a
@@ -1064,6 +1075,16 @@ const ScheduleForm = ({
                         className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                       />
                     </div>
+
+                    <CreateMeetingLink
+                      internshipId={internshipId}
+                      meetingLink={form.hybridEventLink}
+                      disabled={readOnly}
+                      onMeetingLinkCreated={(meetingLink) => setForm((current) => ({
+                        ...current,
+                        hybridEventLink: meetingLink
+                      }))}
+                    />
 
                     {/* Default Location Details – Optional */}
                     {renderLocationFields('hybridLocation', form.hybridLocation, handleFormChange)}

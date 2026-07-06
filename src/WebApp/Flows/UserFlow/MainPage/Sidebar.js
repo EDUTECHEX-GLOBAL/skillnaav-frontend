@@ -265,19 +265,19 @@ const Sidebar = ({ isMobile, isOpen, onClose, isDesktopOpen = true }) => {
             </h3>
             <div className="flex justify-center gap-4">
               <button
-                onClick={() => setShowLogoutModal(false)}
-                className="px-6 py-2.5 rounded-lg text-gray-600 font-medium hover:bg-gray-100 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
                 onClick={async () => {
                   setShowLogoutModal(false);
                   await handleLogoutTrigger();
                 }}
                 className="px-6 py-2.5 rounded-lg bg-[#7520A9] text-white font-medium hover:bg-purple-800 transition-colors"
               >
-                OK
+                Yes
+              </button>
+              <button
+                onClick={() => setShowLogoutModal(false)}
+                className="px-6 py-2.5 rounded-lg text-gray-600 font-medium hover:bg-gray-100 transition-colors"
+              >
+                No
               </button>
             </div>
           </div>

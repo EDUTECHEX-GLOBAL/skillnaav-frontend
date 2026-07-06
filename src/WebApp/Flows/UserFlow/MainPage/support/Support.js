@@ -219,14 +219,6 @@ const SkeletonPulse = memo(({ className="", style={} }) => (
   <div className={`animate-pulse bg-gray-200 rounded ${className}`} style={style} />
 ));
 
-const StatCardSkeleton = memo(() => (
-  <div className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col gap-2">
-    <SkeletonPulse className="h-2.5 w-20" />
-    <SkeletonPulse className="h-8 w-12" />
-    <SkeletonPulse className="h-2 w-24" />
-  </div>
-));
-
 const TicketRowSkeleton = memo(() => (
   <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-3">
     <SkeletonPulse className="w-1 h-12 rounded-full shrink-0" />
@@ -389,7 +381,6 @@ const CreateTicketDrawer = memo(({
               ].map(({ value, label, icon, color, bg, border }) => {
                 const isSelected = category === value;
                 const isInternshipAccessDirect = value === "Internship Access" && !hasPrefill;
-                const isDisabled = hasPrefill && value !== "Internship Access";
                 return (
                   <button key={value} type="button"
                     disabled={hasPrefill && !isInternshipAccessDirect}
@@ -1070,25 +1061,6 @@ const TicketList = memo(({ tickets, ticketsLoading, selectedTicketId, activeTab,
   </div>
 ));
 
-// ── MessageAttachments ─────────────────────────────────────────────
-const MessageAttachments = memo(({ atts=[], senderRole, onDownload }) => {
-  if (!atts.length) return null;
-  return (
-    <div className="mt-2 space-y-1">
-      {atts.map((att, i) => (
-        <div key={i}
-          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-black/5 cursor-pointer hover:bg-black/10 transition-colors"
-          onClick={() => onDownload({ ...att, senderRole })}>
-          {getFileIcon(att.type||att.mimetype, att.filename||att.name)}
-          <span className="flex-1 truncate text-xs font-medium">{att.filename||att.name}</span>
-          <span className="text-xs opacity-60">{fmtSize(att.size)}</span>
-          <FaDownload className="w-3 h-3 opacity-60 hover:opacity-100 shrink-0" />
-        </div>
-      ))}
-    </div>
-  );
-});
-
 // ── ActivityComment — Jira-style comment block ─────────────────────
 const ActivityComment = memo(({ msg, onDelete, onDownload, deletingMessage }) => {
   const isMine   = msg.senderRole === "user";
@@ -1113,7 +1085,7 @@ const ActivityComment = memo(({ msg, onDelete, onDownload, deletingMessage }) =>
   if (isMine) {
     return (
       <div className={`flex justify-end items-end gap-2 px-3 py-1 group ${msg.isSending ? "opacity-60" : ""}`}>
-        <div className="flex flex-col items-end" style={{ maxWidth:"70%" }}>
+        <div className="flex flex-col items-end min-w-0 overflow-hidden" style={{ maxWidth:"70%" }}>
           {/* Meta row */}
           <div className="flex items-center gap-2 mb-0.5">
             {!msg.isSending && (
@@ -1129,7 +1101,7 @@ const ActivityComment = memo(({ msg, onDelete, onDownload, deletingMessage }) =>
           </div>
           {/* Bubble */}
           {msg.text && (
-            <div className="bg-blue-600 text-white px-3 py-2 rounded-2xl rounded-tr-sm text-sm leading-relaxed whitespace-pre-wrap break-words shadow-sm">
+            <div className="bg-blue-600 text-white px-3 py-2 rounded-2xl rounded-tr-sm text-sm leading-relaxed whitespace-pre-wrap break-all shadow-sm">
               {msg.text}
             </div>
           )}
@@ -1172,7 +1144,7 @@ const ActivityComment = memo(({ msg, onDelete, onDownload, deletingMessage }) =>
          msg.senderRole==="partner"      ? <FaBriefcase className="w-3 h-3" /> :
          <FaUserTie className="w-3 h-3" />}
       </div>
-      <div className="flex flex-col items-start" style={{ maxWidth:"70%" }}>
+      <div className="flex flex-col items-start min-w-0 overflow-hidden" style={{ maxWidth:"70%" }}>
         {/* Meta row */}
         <div className="flex items-center gap-1.5 mb-0.5">
           <span className="text-xs font-bold text-gray-700">
@@ -1186,7 +1158,7 @@ const ActivityComment = memo(({ msg, onDelete, onDownload, deletingMessage }) =>
         </div>
         {/* Bubble */}
         {msg.text && (
-          <div className="bg-blue-600 text-white px-3 py-2 rounded-2xl rounded-tl-sm text-sm leading-relaxed whitespace-pre-wrap break-words shadow-sm">
+          <div className="bg-blue-600 text-white px-3 py-2 rounded-2xl rounded-tl-sm text-sm leading-relaxed whitespace-pre-wrap break-all shadow-sm">
             {msg.text}
           </div>
         )}
@@ -1346,45 +1318,6 @@ const ChatInput = memo(({ onSendMessage, onFilesSelected, attachments, onRemoveA
   );
 });
 
-// ── StatCards — compact strip ────────────────────────────────────
-const StatCards = memo(({ stats, statsLoading }) => {
-  const cards = [
-    { label:"Total",    value:stats.total,          icon:<FaInbox className="w-3 h-3" />,       color:"#6366f1" },
-    { label:"Open",     value:stats.open,           icon:<FaClock className="w-3 h-3" />,       color:"#27AE60" },
-    { label:"Resolved", value:stats.resolved,       icon:<FaCheckCircle className="w-3 h-3" />, color:"#7D3C98" },
-    { label:"Unread",   value:stats.unreadMessages, icon:<FaEnvelope className="w-3 h-3" />,    color:"#CA6F1E" },
-  ];
-
-  if (statsLoading) return (
-    <div className="flex items-center border-b border-gray-200 bg-white px-4 shrink-0" style={{ height:40 }}>
-      {[0,1,2,3].map(i => (
-        <div key={i} className="flex-1 flex items-center justify-center gap-2">
-          <SkeletonPulse className="h-3 w-16 rounded" />
-        </div>
-      ))}
-    </div>
-  );
-
-  return (
-    <div className="flex items-center border-b border-gray-200 bg-white shrink-0" style={{ height:40 }}>
-      {cards.map(({ label, value, icon, color }, i) => (
-        <React.Fragment key={label}>
-          {i > 0 && <div className="w-px bg-gray-100 shrink-0" style={{ height:20 }} />}
-          <div className="flex-1 flex items-center justify-center gap-2">
-            <div className="flex items-center justify-center w-5 h-5 rounded-md shrink-0"
-              style={{ background: color + "18", color }}>
-              {icon}
-            </div>
-            <span className="text-sm font-black text-gray-800">{value ?? 0}</span>
-            <span className="text-xs text-gray-400 font-medium hidden sm:inline">{label}</span>
-          </div>
-        </React.Fragment>
-      ))}
-    </div>
-  );
-});
-
-
 // ════════════════════════════════════════════════════════════════════
 //  MAIN COMPONENT
 // ════════════════════════════════════════════════════════════════════
@@ -1414,7 +1347,19 @@ const StudentSupport = ({
   const openTicketId      = propOpenTicketId || routeState.openTicketId || ticketIdFromQuery || null;
 
   const [user] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("user")||"null"); } catch { return null; }
+    try { 
+      let u = JSON.parse(localStorage.getItem("user")||"null") || JSON.parse(sessionStorage.getItem("user")||"null");
+      if (!u || !u._id) {
+        const token = localStorage.getItem("userToken") || sessionStorage.getItem("userToken");
+        if (token) {
+          const decoded = JSON.parse(atob(token.split('.')[1]));
+          if (decoded && (decoded._id || decoded.id)) {
+            u = { ...decoded, _id: decoded._id || decoded.id };
+          }
+        }
+      }
+      return u;
+    } catch { return null; }
   });
 
   // ── Core state ─────────────────────────────────────────────────
@@ -1423,7 +1368,6 @@ const StudentSupport = ({
   const [selectedTicket,  setSelectedTicket]  = useState(null);
   const [messages,        setMessages]        = useState({});
   const [sendClearSignal, setSendClearSignal] = useState(0);
-  const [statsLoading,    setStatsLoading]    = useState(true);
   const [ticketsLoading,  setTicketsLoading]  = useState(true);
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [creatingTicket,  setCreatingTicket]  = useState(false);
@@ -1521,9 +1465,10 @@ const StudentSupport = ({
   // ── SOCKET ─────────────────────────────────────────────────────
   useEffect(() => {
     const token = getToken(); const cu = user;
-    if (!token||!cu) return;
+    if (!token) return;
     const initSocket = async () => {
-      const { default:io } = await getSocket();
+      const socketModule = await getSocket();
+      const io = socketModule.io || socketModule.default || socketModule;
       if (socketRef.current) { socketRef.current.removeAllListeners(); socketRef.current.disconnect(); socketRef.current = null; }
       socketRef.current = io(SOCKET_URL, {
         auth:{ token }, transports:["websocket","polling"],
@@ -1533,7 +1478,7 @@ const StudentSupport = ({
       const s = socketRef.current;
       s.on("connect", () => {
         setSocketConnected(true);
-        if (cu._id) s.emit("join_user_room", cu._id);
+        if (cu?._id) s.emit("join_user_room", cu?._id);
         if (selectedTicketRef.current?._id) s.emit("join_ticket", selectedTicketRef.current._id);
       });
       s.on("disconnect",    () => setSocketConnected(false));
@@ -1597,7 +1542,7 @@ const StudentSupport = ({
     if (initialLoadDone.current) return;
     initialLoadDone.current = true;
     const token = getToken();
-    if (!token) { setTicketsLoading(false); setStatsLoading(false); return; }
+    if (!token) { setTicketsLoading(false); return; }
     const headers = { Authorization:`Bearer ${token}` };
     Promise.all([
       axios.get(`${API_URL}/my-tickets`, { headers, signal:AbortSignal.timeout(8000) }).catch(()=>null),
@@ -1609,7 +1554,6 @@ const StudentSupport = ({
         const s = sRes.data.stats;
         startTransition(()=>setStats({ total:s.total||0, open:s.open||0, resolved:s.resolved||s.closed||0, unreadMessages:s.unreadMessages||0 }));
       }
-      setStatsLoading(false);
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

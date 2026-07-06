@@ -139,19 +139,19 @@ const SchoolAdminNavbar = React.memo(({ onLogout, onToggleSidebar }) => {
             </h3>
             <div className="flex justify-center gap-4">
               <button
-                onClick={() => setShowLogoutModal(false)}
-                className="px-6 py-2.5 rounded-lg text-gray-600 font-medium hover:bg-gray-100 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
                 onClick={() => {
                   setShowLogoutModal(false);
                   handleConfirmLogout();
                 }}
-                className="px-6 py-2.5 rounded-lg bg-teal-600 text-white font-medium hover:bg-teal-700 transition-colors"
+                className="px-6 py-2.5 rounded-lg bg-red-500 text-white font-medium hover:bg-red-600 transition-colors"
               >
-                OK
+                Yes
+              </button>
+              <button
+                onClick={() => setShowLogoutModal(false)}
+                className="px-6 py-2.5 rounded-lg text-gray-600 font-medium hover:bg-gray-100 transition-colors"
+              >
+                No
               </button>
             </div>
           </div>

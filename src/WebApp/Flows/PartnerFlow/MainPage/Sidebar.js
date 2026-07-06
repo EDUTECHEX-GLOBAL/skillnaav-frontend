@@ -194,19 +194,19 @@ const Sidebar = ({ isOpen, onClose, isDesktopOpen = true }) => {
             <p className="text-gray-600 mb-6">Are you sure you want to logout?</p>
             <div className="flex justify-center space-x-3">
               <button
-                onClick={() => setShowLogoutModal(false)}
-                className="px-5 py-2.5 bg-gray-100 text-gray-700 font-semibold rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
                 onClick={() => {
                   setShowLogoutModal(false);
                   handleLogoutTrigger();
                 }}
                 className="px-5 py-2.5 bg-red-500 text-white font-semibold rounded-lg hover:bg-red-600 transition-colors"
               >
-                OK
+                Yes
+              </button>
+              <button
+                onClick={() => setShowLogoutModal(false)}
+                className="px-5 py-2.5 bg-gray-100 text-gray-700 font-semibold rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                No
               </button>
             </div>
           </div>

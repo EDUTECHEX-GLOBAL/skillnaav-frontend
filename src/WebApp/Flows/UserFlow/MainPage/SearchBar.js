@@ -273,7 +273,7 @@ const SearchBar = () => {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="font-poppins px-4 py-4">
+    <div className="font-poppins py-4">
       {selectedJob ? (
         // Detail view — list is unmounted so IntersectionObserver is disconnected
         <ApplyCards job={selectedJob} onBack={handleBack} />
@@ -339,14 +339,14 @@ const SearchBar = () => {
           </div>
 
           {/* Job cards */}
-          <div className="p-4">
+          <div className="py-2 lg:py-4">
             <section className="py-2 px-0">
               <h2 className="text-2xl md:text-3xl font-bold mb-2">Search Results</h2>
               <p className="text-gray-600 mb-4">
                 Showing internships and jobs matching your query
               </p>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
                 {filteredJobs.length > 0 ? (
                   filteredJobs.map((job) => (
                     <div key={job._id} className="relative border rounded-lg p-6 shadow-sm">
@@ -392,9 +392,9 @@ const SearchBar = () => {
                             e.target.src = "/favicon-512x469.png";
                           }}
                         />
-                        <div>
-                          <h3 className="text-lg md:text-xl font-semibold">{job.jobTitle}</h3>
-                          <p className="text-gray-600">
+                        <div className="flex-1 min-w-0 pr-12">
+                          <h3 className="text-lg md:text-xl font-semibold truncate" title={job.jobTitle}>{job.jobTitle}</h3>
+                          <p className="text-gray-600 truncate" title={job.companyName}>
                             {job.companyName} • {calculatePostedTime(job.createdAt)}
                           </p>
                         </div>

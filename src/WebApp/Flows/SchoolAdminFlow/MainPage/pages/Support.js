@@ -14,10 +14,10 @@ import axios from "axios";
 import io from "socket.io-client";
 import logo from "../../../../../assets-webapp/skillnaav_final_logo.svg";
 
-const BASE_URL    = "http://localhost:5000";
+const BASE_URL    = process.env.REACT_APP_API_BASE || "http://localhost:5000";
 const STUDENT_API = `${BASE_URL}/api/support/school-admin`;
 const OWN_API     = `${BASE_URL}/api/support/school-admin/my-tickets`;
-const SOCKET_URL  = BASE_URL;
+const SOCKET_URL  = process.env.REACT_APP_SOCKET_URL || BASE_URL;
 
 const SENT_GRAD     = "linear-gradient(135deg,#3b82f6 0%,#1d4ed8 100%)";
 const RECEIVED_GRAD = "linear-gradient(135deg,#059669 0%,#0d9488 100%)";
@@ -956,6 +956,7 @@ const SchoolAdminSupport = () => {
         raiseAttsRef.current = [];
         if (raiseFileRef.current) raiseFileRef.current.value = "";
         setMainTab("own");
+        setMobilePanel("chat");
         loadOwnStats();
         showAlert("Ticket Created Successfully", "Your ticket has been created! Our team will connect with you soon.", "success");
         setTimeout(() => { loadMessages(newTkt._id); }, 300);

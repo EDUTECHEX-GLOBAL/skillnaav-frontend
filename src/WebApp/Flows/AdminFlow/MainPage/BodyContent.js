@@ -9,6 +9,7 @@ import SchoolAdminAccounts from "./SchoolAdminAccounts";
 import Bin from "./Bin";
 import InternshipPayments from "./InternshipPayments";
 import PartnerPayments from "./PartnerPayments";
+import CertificateApprovals from "./CertificateApprovals";
 
 // Feedback
 import AdminFeedbackList from "./AdminFeedbackList";
@@ -57,6 +58,9 @@ const BodyContent = () => {
 
       case "partner-payments":
         return <PartnerPayments />;
+
+      case "certificate-approvals":
+        return <CertificateApprovals />;
 
       // Analytics
       case "analytics":

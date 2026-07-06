@@ -4,27 +4,26 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   FaEnvelope, FaPaperPlane, FaExclamationTriangle, FaClock, FaCheckCircle,
-  FaDownload, FaSearch, FaChevronDown, FaCreditCard,
+  FaDownload, FaSearch, FaCreditCard,
   FaQuestionCircle, FaBriefcase, FaPaperclip,
-  FaTimesCircle, FaFilter, FaTrash, FaFlag,
+  FaTimesCircle, FaTrash, FaFlag,
   FaHourglassHalf, FaInbox, FaBug, FaLock, FaSpinner, FaInfoCircle,
   FaPlus, FaCheck, FaHeadset, FaCheckDouble,
   FaFile, FaFilePdf, FaFileWord, FaFileAlt, FaImage,
   FaHandshake, FaUserTie, FaReply,
-  FaChevronLeft, FaChevronRight, FaTimes, FaTag,
+  FaChevronLeft, FaChevronRight, FaTimes, FaTag, FaArrowLeft,
 } from "react-icons/fa";
 import logo from "../../../../assets-webapp/skillnaav_final_logo.svg";
 import axios from "axios";
-import io from "socket.io-client";
+import { io } from "socket.io-client";
 
-const BASE_URL    = "http://localhost:5000";
+const BASE_URL    = process.env.REACT_APP_API_BASE || "http://localhost:5000";
 const API_BASE    = `${BASE_URL}/api/support/partner`;
-const SOCKET_URL  = BASE_URL;
+const SOCKET_URL  = process.env.REACT_APP_SOCKET_URL || BASE_URL;
 
 const SENT_GRAD      = "linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%)";
 const RECEIVED_GRAD  = "linear-gradient(135deg,#059669 0%,#0d9488 100%)";
 const ADMIN_GRAD     = "linear-gradient(135deg,#7c3aed 0%,#6d28d9 100%)";
-const ESC_GRAD       = "linear-gradient(135deg,#f97316 0%,#ef4444 100%)";
 const DANGER_GRAD    = "linear-gradient(135deg,#ef4444 0%,#dc2626 100%)";
 
 const LONG_PRESS_MS = 600;
@@ -57,14 +56,68 @@ const dedupMessages = (msgs) => {
   return msgs.filter(m => { if (!m._id || seen.has(m._id)) return false; seen.add(m._id); return true; });
 };
 
-const getToken = () =>
-  localStorage.getItem("partnerToken") ||
-  localStorage.getItem("token") || null;
+const normaliseToken = (value) => {
+  if (typeof value !== "string") return null;
+  const token = value.trim().replace(/^Bearer\s+/i, "").replace(/^['"]|['"]$/g, "");
+  return token || null;
+};
+
+const decodeToken = (token) => {
+  try {
+    const part = token.split(".")[1];
+    if (!part) return null;
+    const base64 = part.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(part.length / 4) * 4, "=");
+    return JSON.parse(atob(base64));
+  } catch {
+    return null;
+  }
+};
+
+const getStoredObject = (key) => {
+  try { return JSON.parse(localStorage.getItem(key) || "null"); }
+  catch { return null; }
+};
+
+const getToken = () => {
+  const partnerInfo = getStoredObject("partnerInfo");
+  const partner = getStoredObject("partner");
+  const candidates = [
+    localStorage.getItem("token"), // canonical key written by PartnerLogin
+    localStorage.getItem("partnerToken"),
+    localStorage.getItem("partnerJwt"),
+    sessionStorage.getItem("partnerToken"),
+    sessionStorage.getItem("token"),
+    partnerInfo?.token,
+    partnerInfo?.partnerToken,
+    partner?.token,
+    partner?.partnerToken,
+  ].map(normaliseToken).filter(Boolean);
+
+  const valid = candidates.map(token => ({ token, payload: decodeToken(token) }))
+    .filter(({ payload }) => payload && (!payload.exp || payload.exp * 1000 > Date.now()));
+  const partnerId = localStorage.getItem("partnerId") || partnerInfo?._id || partnerInfo?.id || partner?._id || partner?.id;
+
+  // Avoid accidentally using another flow's generic `token` when both users
+  // have logged in in the same browser.
+  const matching = partnerId && valid.find(({ payload }) =>
+    String(payload.id || payload._id || payload.partnerId || "") === String(partnerId));
+  return partnerId ? (matching?.token || null) : (valid[0]?.token || null);
+};
 
 const getUser = () => {
   try {
-    const raw = localStorage.getItem("partnerProfile") || localStorage.getItem("userInfo") || "{}";
-    const p   = JSON.parse(raw);
+    let raw = localStorage.getItem("partnerInfo") || localStorage.getItem("partnerProfile") || localStorage.getItem("userInfo");
+    if (!raw) raw = localStorage.getItem("partner");
+    let p = raw ? JSON.parse(raw) : null;
+    if (!p || (!p._id && !p.id)) {
+      const token = getToken();
+      if (token) {
+        const decoded = decodeToken(token);
+        if (decoded && (decoded._id || decoded.id || decoded.partnerId)) {
+          p = { ...decoded, _id: decoded._id || decoded.id || decoded.partnerId };
+        }
+      }
+    }
     return p && (p._id || p.id) ? { ...p, _id: p._id || p.id, name: p.companyName || p.name || "Partner" } : { name:"Partner" };
   } catch { return { name:"Partner" }; }
 };
@@ -416,7 +469,6 @@ const OwnTicketItem = ({ ticket, isSelected, onSelect, onLongPress, priColor, st
 
 // ─── Escalated Ticket Item ────────────────────────────────────────────────────
 const EscTicketItem = ({ ticket, isSelected, onSelect, priColor, statColor }) => {
-  const aCol = "#f97316";
   return (
     <div onClick={() => onSelect(ticket)}
       className={`ticket-row relative flex items-stretch border-b border-gray-100 cursor-pointer transition-colors ${isSelected ? "bg-[#fff2e5]" : "bg-white hover:bg-gray-50"}`}
@@ -514,6 +566,7 @@ const Pagination = ({ currentPage, totalPages, onPageChange, isEsc }) => {
   );
 };
 
+
 // ════════════════════════════════════════════════════════════════════════════
 const PartnerSupport = () => {
   const [mainTab, setMainTab]   = useState("own");       // "own" | "escalated"
@@ -529,11 +582,10 @@ const PartnerSupport = () => {
   const [connected, setConnected] = useState(false);
   const [deletingMsg, setDelMsg]  = useState(null);
   const [search,    setSearch]    = useState("");
-  const [fStatus,   setFStatus]   = useState("all");
-  const [fPriority, setFPriority] = useState("all");
-  const [fCategory, setFCategory] = useState("all");
-  const [sortBy,    setSortBy]    = useState("newest");
-  const [showFilters, setShowFilters] = useState(false);
+  const [fStatus]                 = useState("all");
+  const [fPriority]               = useState("all");
+  const [fCategory]               = useState("all");
+  const [sortBy]                  = useState("newest");
   const [stats,    setStats]    = useState({ total:0, open:0, inProgress:0, resolved:0, urgent:0, unreadMessages:0 });
   const [activeTab, setActiveTab] = useState("all");
   const [mobilePanel, setMobilePanel] = useState("list");
@@ -561,6 +613,7 @@ const PartnerSupport = () => {
   const fileRef   = useRef(null);
   const ownRef    = useRef([]);
   const escRef    = useRef([]);
+  const authAlertShownRef = useRef(false);
 
   useEffect(() => { attsRef.current = atts; },      [atts]);
   useEffect(() => { ownRef.current  = ownTickets; }, [ownTickets]);
@@ -571,18 +624,34 @@ const PartnerSupport = () => {
   const isEsc = mainTab === "escalated";
   const pBg   = isEsc ? "from-orange-500 to-red-500" : "from-indigo-600 to-blue-600";
   const pRing = isEsc ? "focus:ring-orange-400" : "focus:ring-indigo-500";
-  const aCol  = isEsc ? "#f97316" : "#4f46e5";
 
   const scrollDown = useCallback(() => {
     setTimeout(() => endRef.current?.scrollIntoView({ behavior:"smooth" }), 80);
   }, []);
 
-  const hdrs = useCallback(() => ({ Authorization: `Bearer ${getToken()}` }), []);
+  const hdrs = useCallback(() => {
+    const token = getToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }, []);
+
+  const handleAuthError = useCallback((err) => {
+    const status = err?.response?.status;
+    const code = err?.response?.data?.code;
+    if (status !== 401 && status !== 403 && code !== "TOKEN_EXPIRED" && code !== "NO_TOKEN") return false;
+    if (!authAlertShownRef.current) {
+      authAlertShownRef.current = true;
+      showAlert("Session Expired", "Your partner session is missing or expired. Please sign in again.", "error");
+    }
+    return true;
+  }, [showAlert]);
 
   // ── Socket ─────────────────────────────────────────────────────────────────
   useEffect(() => {
     const token = getToken(); const cu = getUser();
-    if (!token || !cu?._id) return;
+    if (!token) {
+      handleAuthError({ response: { status: 401, data: { code: "NO_TOKEN" } } });
+      return;
+    }
     if (socketRef.current) socketRef.current.disconnect();
 
     socketRef.current = io(SOCKET_URL, {
@@ -593,7 +662,7 @@ const PartnerSupport = () => {
 
     socketRef.current.on("connect", () => {
       setConnected(true);
-      socketRef.current.emit("join_partner_room", { partnerId: cu._id });
+      if (cu?._id) socketRef.current.emit("join_partner_room", { partnerId: cu._id });
     });
     socketRef.current.on("connect_error", () => setConnected(false));
     socketRef.current.on("disconnect", () => setConnected(false));
@@ -657,7 +726,7 @@ const PartnerSupport = () => {
 
     return () => socketRef.current?.disconnect();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [handleAuthError]);
 
   useEffect(() => {
     if (socketRef.current?.connected && selTicket) socketRef.current.emit("join_ticket", selTicket._id);
@@ -682,8 +751,8 @@ const PartnerSupport = () => {
     try {
       const r = await axios.get(`${API_BASE}/stats`, { headers: hdrs() });
       setStats(r.data || {});
-    } catch {}
-  }, [hdrs]);
+    } catch (err) { handleAuthError(err); }
+  }, [hdrs, handleAuthError]);
 
   const loadAllTickets = useCallback(async () => {
     try {
@@ -696,9 +765,11 @@ const PartnerSupport = () => {
       setOwn(own.map(t => ({ ...t, unread:(t.unreadByPartner||0)>0, unreadCount:t.unreadByPartner||0 })));
       setEsc(esc.map(t => ({ ...t, unread:(t.unreadByPartner||0)>0, unreadCount:t.unreadByPartner||0 })));
       loadStats();
-    } catch {}
+    } catch (err) {
+      if (!handleAuthError(err)) console.error("loadAllTickets:", err);
+    }
     finally { setLoading(false); }
-  }, [fStatus, search, hdrs, loadStats]);
+  }, [fStatus, search, hdrs, loadStats, handleAuthError]);
 
   useEffect(() => { loadAllTickets(); }, [loadAllTickets]);
 
@@ -820,7 +891,7 @@ const PartnerSupport = () => {
       if (txt) fd.append("text", txt);
       if (savedReply?._id) fd.append("replyTo", savedReply._id);
       for (const att of curAtts) { if (att.file instanceof File) fd.append("attachments", att.file, att.name); }
-      const res = await axios.post(`${API_BASE}/tickets/${selTicket._id}/messages`, fd, { headers: { Authorization:`Bearer ${getToken()}` } });
+      const res = await axios.post(`${API_BASE}/tickets/${selTicket._id}/messages`, fd, { headers: hdrs() });
       const serverMsg = res.data.message;
       setMessages(p => ({ ...p, [selTicket._id]: dedupMessages((p[selTicket._id]||[]).map(m=>m._id===tempId?serverMsg:m)) }));
       scrollDown();
@@ -828,7 +899,7 @@ const PartnerSupport = () => {
       setMessages(p => ({ ...p, [selTicket._id]:(p[selTicket._id]||[]).filter(m=>m._id!==tempId) }));
       alert("Send failed: " + (err.response?.data?.message || err.message));
     } finally { setSending(false); }
-  }, [msgInput, replyTo, selTicket, sending, user, scrollDown]);
+  }, [msgInput, replyTo, selTicket, sending, user, scrollDown, hdrs]);
 
   const handleDownload = useCallback((att) => {
     downloadAttachment(att, getToken());
@@ -870,7 +941,7 @@ const PartnerSupport = () => {
       for (const att of newTicketAtts) {
         if (att.file instanceof File) fd.append("attachments", att.file, att.name);
       }
-      const r = await axios.post(`${API_BASE}/tickets`, fd, { headers: { Authorization:`Bearer ${getToken()}` } });
+      const r = await axios.post(`${API_BASE}/tickets`, fd, { headers: hdrs() });
       if (r.data.ticket) {
         const t = r.data.ticket;
         setOwn(p => p.some(existing => existing._id === t._id) ? p : [t, ...p]);
@@ -879,6 +950,7 @@ const PartnerSupport = () => {
         setNewTicket({ category:"", priority:"", description:"" });
         setNewTicketAtts([]);
         setMainTab("own");
+        setMobilePanel("chat");
         if (r.data.initMessage) setMessages(p => ({ ...p, [t._id]:[r.data.initMessage] }));
         setTimeout(() => loadMessages(t._id, false), 400);
         loadStats();
@@ -889,7 +961,7 @@ const PartnerSupport = () => {
     } finally {
       setLoading(false);
     }
-  }, [newTicket, newTicketAtts, loadMessages, loadStats, showAlert]);
+  }, [newTicket, newTicketAtts, loadMessages, loadStats, showAlert, hdrs]);
 
   // ── Derived ────────────────────────────────────────────────────────────────
   const getIcon   = (cat) => PARTNER_CATEGORIES.find(c => c.id === cat)?.icon || <FaQuestionCircle className="w-3 h-3 text-gray-500"/>;
@@ -1144,6 +1216,12 @@ const PartnerSupport = () => {
                 <div className={`p-3 border-b border-gray-200 flex-shrink-0 ${isEsc ? "bg-gradient-to-r from-orange-50 to-red-50" : "bg-gradient-to-r from-indigo-50 to-blue-50"}`}>
                   <div className="flex items-start justify-between">
                     <div className="flex items-start space-x-2.5">
+                      <button 
+                        className="lg:hidden p-2 -ml-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
+                        onClick={() => setMobilePanel("list")}
+                      >
+                        <FaArrowLeft className="w-4 h-4" />
+                      </button>
                       <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${isEsc ? "bg-orange-100" : "bg-indigo-100"}`}>
                         {isEsc ? <FaFlag className="text-orange-500 w-3 h-3"/> : getIcon(selTicket.category)}
                       </div>
@@ -1191,7 +1269,7 @@ const PartnerSupport = () => {
                         title="Toggle Ticket Details">
                         <FaTag className="w-4 h-4" />
                       </button>
-                      <button onClick={() => setSelTicket(null)}
+                      <button onClick={() => { setSelTicket(null); setMobilePanel("list"); }}
                         className="p-2 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors"
                         title="Close Ticket">
                         <FaTimes className="w-4 h-4" />

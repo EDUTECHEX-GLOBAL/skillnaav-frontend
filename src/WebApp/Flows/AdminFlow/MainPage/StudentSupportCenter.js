@@ -557,6 +557,71 @@ const DeleteTicketModal = ({ ticket, onConfirm, onCancel, loading }) => (
   </div>
 );
 
+const EscalationSuccessModal = ({ onClose }) => {
+  useEffect(() => {
+    const handleKeyDown = (event) => { if (event.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  return (
+    <div role="dialog" aria-modal="true" aria-labelledby="escalation-success-title"
+      style={{
+        position:"fixed", inset:0, zIndex:10000, padding:16,
+        display:"flex", alignItems:"center", justifyContent:"center",
+        background:"rgba(15,23,42,0.58)", backdropFilter:"blur(5px)",
+      }} onClick={onClose}>
+      <div onClick={event => event.stopPropagation()} style={{
+        width:"100%", maxWidth:460, padding:"42px 38px 34px", textAlign:"center",
+        background:"#fff", borderRadius:28, border:"1px solid rgba(255,255,255,0.7)",
+        boxShadow:"0 28px 80px rgba(15,23,42,0.30)",
+        animation:"supportSuccessIn 220ms cubic-bezier(0.34,1.56,0.64,1)",
+      }}>
+        <div style={{
+          width:96, height:96, margin:"0 auto 26px", borderRadius:"50%",
+          display:"flex", alignItems:"center", justifyContent:"center",
+          background:"linear-gradient(135deg,#ecfdf5,#dcfce7)",
+        }}>
+          <div style={{
+            width:52, height:52, borderRadius:"50%", display:"flex",
+            alignItems:"center", justifyContent:"center", background:"#6fcf97",
+            boxShadow:"0 10px 24px rgba(34,197,94,0.24)",
+          }}>
+            <CheckCheck style={{ width:30, height:30, color:"#fff", strokeWidth:3 }} />
+          </div>
+        </div>
+
+        <h2 id="escalation-success-title" style={{
+          margin:"0 0 12px", color:"#111827", fontSize:"1.65rem",
+          lineHeight:1.25, fontWeight:800, letterSpacing:"-0.025em",
+        }}>
+          Ticket Escalated Successfully
+        </h2>
+        <p style={{
+          margin:"0 auto 32px", maxWidth:350, color:"#6b7280",
+          fontSize:"1rem", lineHeight:1.6,
+        }}>
+          The ticket has been forwarded to the partner. Their replies will appear in this conversation.
+        </p>
+        <button type="button" onClick={onClose} autoFocus style={{
+          width:"100%", padding:"14px 20px", border:0, borderRadius:16,
+          color:"#fff", fontSize:"1rem", fontWeight:700, cursor:"pointer",
+          background:"linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%)",
+          boxShadow:"0 12px 28px rgba(99,102,241,0.30)", fontFamily:"inherit",
+        }}>
+          Okay
+        </button>
+      </div>
+      <style>{`
+        @keyframes supportSuccessIn {
+          from { opacity:0; transform:translateY(18px) scale(0.96); }
+          to { opacity:1; transform:translateY(0) scale(1); }
+        }
+      `}</style>
+    </div>
+  );
+};
+
 const EscalateModal = ({ ticket, onConfirm, onCancel, loading }) => {
   const [reason, setReason] = useState("");
   const internshipInfo = ticket?.internshipMeta || {};
@@ -828,6 +893,7 @@ const usePanel = () => {
   const [ticketToDelete,   setTicketToDelete]   = useState(null);
   const [deletingTicket,   setDeletingTicket]   = useState(false);
   const [escalationToasts, setEscalationToasts] = useState([]);
+  const [showEscalationSuccess, setShowEscalationSuccess] = useState(false);
 
   const endRef         = useRef(null);
   const socketRef      = useRef(null);
@@ -891,6 +957,7 @@ const usePanel = () => {
     escalateTarget, setEscalateTarget, escalateLoading, setEscalateLoading,
     ticketToDelete, setTicketToDelete, deletingTicket, setDeletingTicket,
     escalationToasts, addEscalationToast, dismissToast,
+    showEscalationSuccess, setShowEscalationSuccess,
     endRef, socketRef, selRef, ticketsRef,
     loadStatsRef, markReadRef, loadTicketsRef,
     getToken, scrollEnd, pickFiles, removeStaged,
@@ -1270,7 +1337,7 @@ const StudentTicketsPanel = () => {
       if (p.selRef.current?._id === p.escalateTarget._id) p.setSelectedTicket(q => q ? { ...q, escalatedToPartner:true, autoEscalated:false } : q);
       if (res.data.systemMessage) addMessage(p.setMessages, p.escalateTarget._id, res.data.systemMessage);
       p.setEscalateTarget(null);
-      alert("✅ Ticket successfully escalated to partner!");
+      p.setShowEscalationSuccess(true);
     } catch (err) {
       alert(`❌ Escalation failed: ${err.response?.data?.message || err.message}`);
     } finally { p.setEscalateLoading(false); }
@@ -1445,6 +1512,9 @@ const StudentTicketsPanel = () => {
       )}
       {p.escalateTarget && (
         <EscalateModal ticket={p.escalateTarget} onConfirm={handleEscalateToPartner} onCancel={() => p.setEscalateTarget(null)} loading={p.escalateLoading} />
+      )}
+      {p.showEscalationSuccess && (
+        <EscalationSuccessModal onClose={() => p.setShowEscalationSuccess(false)} />
       )}
 
       <StatCards items={STAT_ITEMS} />
@@ -2063,7 +2133,7 @@ const SchoolStudentPanel = () => {
       }
       if (res.data.systemMessage) addMessage(p.setMessages, p.escalateTarget._id, res.data.systemMessage);
       p.setEscalateTarget(null);
-      alert("✅ Ticket successfully escalated to partner!");
+      p.setShowEscalationSuccess(true);
     } catch (err) {
       alert(`❌ Escalation failed: ${err.response?.data?.message || err.message}`);
     } finally { p.setEscalateLoading(false); }
@@ -2217,6 +2287,9 @@ const SchoolStudentPanel = () => {
           onCancel={() => p.setEscalateTarget(null)}
           loading={p.escalateLoading}
         />
+      )}
+      {p.showEscalationSuccess && (
+        <EscalationSuccessModal onClose={() => p.setShowEscalationSuccess(false)} />
       )}
 
       <StatCards items={STAT_ITEMS}/>

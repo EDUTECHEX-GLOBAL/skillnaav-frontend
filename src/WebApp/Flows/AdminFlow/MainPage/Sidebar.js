@@ -37,6 +37,7 @@ const secondaryNavItems = [
 const partnerManagementItems = [
   { key: "partner-accounts", label: "Partner Accounts" },
   { key: "internship-posts", label: "Internship Posts" },
+  { key: "certificate-approvals", label: "Certificate Approvals" },
 ];
 
 const paymentManagementItems = [
@@ -240,16 +241,16 @@ const Sidebar = ({ isOpen, isCompactLayout, onClose, isDesktopOpen = true }) => 
             </p>
             <div className="flex gap-3 w-full">
               <button
-                onClick={() => setShowLogoutModal(false)}
-                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-semibold hover:bg-gray-50 transition-colors text-sm"
-              >
-                Cancel
-              </button>
-              <button
                 onClick={confirmLogout}
                 className="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-semibold hover:bg-red-600 transition-colors text-sm shadow-md"
               >
-                OK, Logout
+                Yes
+              </button>
+              <button
+                onClick={() => setShowLogoutModal(false)}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-semibold hover:bg-gray-50 transition-colors text-sm"
+              >
+                No
               </button>
             </div>
           </div>

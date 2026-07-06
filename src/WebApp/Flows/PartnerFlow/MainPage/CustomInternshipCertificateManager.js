@@ -22,6 +22,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Palette,
+  Clock,
 } from "lucide-react";
 import CertificateTemplate from "../../UserFlow/MainPage/CertificateTemplate";
 
@@ -892,7 +893,7 @@ const CustomInternshipCertificateManager = () => {
                         initial="hidden"
                         animate="visible"
                         variants={fadeUp}
-                        className="group flex h-full flex-col bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-sm hover:shadow-xl hover:shadow-indigo-500/8 hover:border-indigo-200 transition-all duration-300"
+                        className="group flex h-full flex-col bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-sm hover:shadow-xl hover:shadow-indigo-500/8 hover:border-indigo-200 transition-all duration-300 relative"
                       >
                         {/* Image */}
                         <div
@@ -904,6 +905,18 @@ const CustomInternshipCertificateManager = () => {
                             alt={item.name}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                           />
+                          {/* Status Badge */}
+                          <div className="absolute top-3 right-3 z-10 flex gap-2">
+                             {item.status === 'Approved' && (
+                                <span className="bg-emerald-100 text-emerald-800 text-[11px] font-bold px-2.5 py-1 rounded-md flex items-center gap-1 shadow-sm"><CheckCircle2 size={12} /> Approved</span>
+                             )}
+                             {item.status === 'Rejected' && (
+                                <span className="bg-rose-100 text-rose-800 text-[11px] font-bold px-2.5 py-1 rounded-md flex items-center gap-1 shadow-sm"><AlertCircle size={12} /> Rejected</span>
+                             )}
+                             {(!item.status || item.status === 'Pending') && (
+                                <span className="bg-amber-100 text-amber-800 text-[11px] font-bold px-2.5 py-1 rounded-md flex items-center gap-1 shadow-sm"><Clock size={12} /> Pending</span>
+                             )}
+                          </div>
                           {/* Hover overlay */}
                           <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
                             <span className="text-xs text-white font-semibold bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-lg flex items-center gap-1.5">
@@ -925,6 +938,13 @@ const CustomInternshipCertificateManager = () => {
                             <p className="text-xs text-slate-400 mt-1 truncate font-medium">
                               {item.fileName}
                             </p>
+                          )}
+
+                          {item.status === 'Rejected' && item.adminRemarks && (
+                            <div className="mt-3 bg-rose-50/50 p-2.5 rounded-xl border border-rose-100/50">
+                               <p className="text-[11px] font-bold text-rose-800 mb-0.5">Admin Remarks</p>
+                               <p className="text-xs text-rose-600/90 leading-relaxed">{item.adminRemarks}</p>
+                            </div>
                           )}
 
                           <div className="mt-auto flex flex-col gap-3 pt-4">
