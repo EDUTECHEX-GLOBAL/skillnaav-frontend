@@ -329,9 +329,12 @@ const Home = () => {
                       />
                       <div className="flex-1 min-w-0 pr-12">
                         <h3 className="text-xl font-semibold truncate" title={job.jobTitle}>{job.jobTitle}</h3>
-                        <p className="text-gray-600 truncate" title={job.companyName}>
-                          {job.companyName} • {calculatePostedTime(job.createdAt)}
-                        </p>
+                        <div className="flex items-center text-gray-600">
+                          <span className="truncate" title={job.companyName}>{job.companyName}</span>
+                          <span className="mx-1">•</span>
+                          <span className="whitespace-nowrap">{calculatePostedTime(job.createdAt)}</span>
+                        </div>
+                        <p className="text-xs text-gray-400 mt-1 whitespace-nowrap">ID: {job._id}</p>
                       </div>
                     </div>
 

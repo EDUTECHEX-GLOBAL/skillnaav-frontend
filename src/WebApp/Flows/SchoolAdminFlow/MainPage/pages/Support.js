@@ -2,9 +2,9 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   FaEnvelope, FaPaperPlane, FaExclamationTriangle, FaClock, FaCheckCircle,
-  FaDownload, FaSearch, FaChevronDown, FaCreditCard, FaUserGraduate,
+  FaDownload, FaSearch, FaCreditCard, FaUserGraduate,
   FaQuestionCircle, FaBriefcase, FaUsers, FaUserTie, FaPaperclip,
-  FaTimesCircle, FaSchool, FaFilter, FaReply, FaTrash, FaFlag,
+  FaTimesCircle, FaSchool, FaReply, FaTrash, FaFlag,
   FaHourglassHalf, FaInbox, FaBug, FaLock, FaSpinner, FaInfoCircle,
   FaChevronLeft, FaChevronRight, FaPlus, FaCheck, FaHeadset, FaCheckDouble,
   FaFileCsv, FaCrown, FaFile, FaFilePdf, FaFileWord, FaFileAlt, FaImage, FaTimes,
@@ -497,11 +497,10 @@ const SchoolAdminSupport = () => {
   const [connected, setConnected] = useState(false);
   const [deletingMsg, setDelMsg]  = useState(null);
   const [search, setSearch]       = useState("");
-  const [fStatus, setFStatus]     = useState("all");
-  const [fPriority, setFPriority] = useState("all");
+  const [fStatus]     = useState("all");
+  const [fPriority] = useState("all");
   const [fCategory, setFCategory] = useState("all");
-  const [sortBy, setSortBy]       = useState("newest");
-  const [showFilters, setShowFilters] = useState(false);
+  const [sortBy]       = useState("newest");
   const [stats,    setStats]    = useState({ total:0, open:0, inProgress:0, resolved:0, urgent:0, unreadMessages:0 });
   const [ownStats, setOwnStats] = useState({ total:0, open:0, inProgress:0, resolved:0, urgent:0, unreadMessages:0 });
   const [page,    setPage]     = useState(1);
@@ -509,7 +508,6 @@ const SchoolAdminSupport = () => {
   const [ownPage,  setOwnPage]  = useState(1);
   const [ownTot,   setOwnTot]   = useState(1);
   const [mobilePanel, setMobilePanel] = useState("list");
-  const [ticketDetails, setTicketDetails] = useState(null);
   const [showDetails,   setShowDetails]   = useState(false);
   const [apiError,      setApiError]      = useState(null);
   const [activeTab,     setActiveTab]     = useState("all");
@@ -549,7 +547,7 @@ const SchoolAdminSupport = () => {
   const user   = getUser();
   const school = user?.school || "Your School";
   const isOwn  = mainTab === "own";
-  const CATS   = isOwn ? SCHOOL_ADMIN_CATEGORIES : STUDENT_CATEGORIES;
+
 
   const isTicketClosed = useCallback((ticket) => {
     if (!ticket) return false;

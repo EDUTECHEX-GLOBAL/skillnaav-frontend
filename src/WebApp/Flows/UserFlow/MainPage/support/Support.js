@@ -309,6 +309,7 @@ const CreateTicketDrawer = memo(({
   priority, setPriority,
   initialMessage, setInitialMessage,
   courseName, setCourseName,
+  inputInternshipId, setInputInternshipId,
   onSubmit, creatingTicket,
   attachments, onFilesSelected, onRemoveAttachment,
   isSchoolStudent, hasPrefill, prefillInternship,
@@ -380,25 +381,20 @@ const CreateTicketDrawer = memo(({
                 { value:"General Inquiry",    label:"General Inquiry",    icon:<FaQuestionCircle className="w-5 h-5" />,color:"#d97706", bg:"#fffbeb", border:"#fcd34d" },
               ].map(({ value, label, icon, color, bg, border }) => {
                 const isSelected = category === value;
-                const isInternshipAccessDirect = value === "Internship Access" && !hasPrefill;
                 return (
                   <button key={value} type="button"
-                    disabled={hasPrefill && !isInternshipAccessDirect}
+                    disabled={hasPrefill && !isSelected}
                     onClick={() => {
-                      if (isInternshipAccessDirect) {
-                        setInfoMsg("To raise an Internship Access ticket, please visit that particular internship's page and click 'Raise Ticket' there.");
-                        return;
-                      }
                       setInfoMsg("");
-                      if (!hasPrefill) { setCategory(value); setCourseName(""); }
+                      if (!hasPrefill) { setCategory(value); setCourseName(""); setInputInternshipId(""); }
                     }}
                     className="flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all text-center"
                     style={{
-                      borderColor:  isSelected ? color : ((hasPrefill && !isSelected) || isInternshipAccessDirect ? "#f3f4f6" : "#e5e7eb"),
-                      background:   isSelected ? bg : ((hasPrefill && !isSelected) || isInternshipAccessDirect ? "#fafafa" : "#fff"),
+                      borderColor:  isSelected ? color : ((hasPrefill && !isSelected) ? "#f3f4f6" : "#e5e7eb"),
+                      background:   isSelected ? bg : ((hasPrefill && !isSelected) ? "#fafafa" : "#fff"),
                       boxShadow:    isSelected ? `0 0 0 3px ${color}22` : "none",
-                      opacity:      (hasPrefill && !isSelected) || isInternshipAccessDirect ? 0.4 : 1,
-                      cursor:       hasPrefill && !isInternshipAccessDirect ? "not-allowed" : "pointer",
+                      opacity:      (hasPrefill && !isSelected) ? 0.4 : 1,
+                      cursor:       hasPrefill && !isSelected ? "not-allowed" : "pointer",
                     }}>
                     <div className="w-10 h-10 rounded-xl flex items-center justify-center"
                       style={{ background: isSelected ? color : bg, color: isSelected ? "#fff" : color }}>
@@ -422,22 +418,39 @@ const CreateTicketDrawer = memo(({
 
           {/* Course / Internship name (conditional) */}
           {isInternshipCategory && (
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                <FaBookOpen className="inline mr-1.5 text-violet-500 w-3.5 h-3.5" />
-                Course / Internship Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={courseName}
-                onChange={e => setCourseName(e.target.value)}
-                autoFocus={!hasPrefill}
-                readOnly={hasPrefill}
-                placeholder="e.g. Web Development Internship"
-                className={`w-full border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 ${
-                  hasPrefill ? "bg-violet-50 border-violet-200 text-violet-800 cursor-default" : "border-gray-300"
-                }`}
-              />
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <FaBookOpen className="inline mr-1.5 text-violet-500 w-3.5 h-3.5" />
+                  Course / Internship Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={courseName}
+                  onChange={e => setCourseName(e.target.value)}
+                  autoFocus={!hasPrefill}
+                  readOnly={hasPrefill}
+                  placeholder="e.g. Web Development Internship"
+                  className={`w-full border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 ${
+                    hasPrefill ? "bg-violet-50 border-violet-200 text-violet-800 cursor-default" : "border-gray-300"
+                  }`}
+                />
+              </div>
+              {!hasPrefill && (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    <FaBriefcase className="inline mr-1.5 text-violet-500 w-3.5 h-3.5" />
+                    Internship ID <span className="text-gray-400 font-normal">(optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={inputInternshipId}
+                    onChange={e => setInputInternshipId(e.target.value)}
+                    placeholder="e.g. 64d9f... (Find this on the internship card)"
+                    className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+                  />
+                </div>
+              )}
               {hasPrefill && (
                 <p className="flex items-center gap-1 text-xs text-violet-600 mt-1.5">
                   <FaInfoCircle className="w-3 h-3" /> Auto-filled from the internship you're viewing.
@@ -1388,6 +1401,7 @@ const StudentSupport = ({
   const [priority,          setPriority]          = useState("");
   const [initialMessage,    setInitialMessage]    = useState("");
   const [courseName,        setCourseName]        = useState("");
+  const [inputInternshipId, setInputInternshipId] = useState("");
 
   // ── UI state ───────────────────────────────────────────────────
   const [replyingTo,      setReplyingTo]      = useState(null);
@@ -1671,7 +1685,7 @@ const StudentSupport = ({
   // ── Form helpers ───────────────────────────────────────────────
   const resetForm = useCallback(() => {
     setShowNewTicketForm(false); setCategory(""); setPriority("");
-    setInitialMessage(""); setCourseName(""); setNewTicketAttachments([]);
+    setInitialMessage(""); setCourseName(""); setInputInternshipId(""); setNewTicketAttachments([]);
   }, []);
 
   const handleFilesSelected = useCallback(fileArray => {
@@ -1712,6 +1726,8 @@ const StudentSupport = ({
           contactName:prefillInternship.contactName||null, contactEmail:prefillInternship.contactEmail||null,
           contactPhone:prefillInternship.contactPhone||null,
         }));
+      } else if (inputInternshipId.trim()) {
+        fd.append("internshipId", inputInternshipId.trim());
       }
       curAtts.forEach(att=>fd.append("files",att.file,att.name));
       const res = await axios.post(`${API_URL}/create`, fd, {
@@ -1742,7 +1758,7 @@ const StudentSupport = ({
       }
     } catch(err){ showAlert("Error", err.response?.data?.message||"Failed to create ticket", "error"); }
     finally { setCreatingTicket(false); }
-  }, [category,priority,initialMessage,courseName,prefillInternship,user,getToken,resetForm,loadStats,loadMessages,onTicketCreated,showAlert]);
+  }, [category,priority,initialMessage,courseName,prefillInternship,inputInternshipId,user,getToken,resetForm,loadStats,loadMessages,onTicketCreated,showAlert]);
 
   // ── Send message ───────────────────────────────────────────────
   const handleSendMessage = useCallback(async (textFromInput) => {
@@ -1986,6 +2002,7 @@ const StudentSupport = ({
         priority={priority} setPriority={setPriority}
         initialMessage={initialMessage} setInitialMessage={setInitialMessage}
         courseName={courseName} setCourseName={setCourseName}
+        inputInternshipId={inputInternshipId} setInputInternshipId={setInputInternshipId}
         onSubmit={handleCreateTicket}
         creatingTicket={creatingTicket}
         attachments={newTicketAttachments}

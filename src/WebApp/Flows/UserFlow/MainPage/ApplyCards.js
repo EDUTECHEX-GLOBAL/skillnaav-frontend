@@ -576,6 +576,7 @@ const ApplyCards = ({ job, onBack }) => {
           <div>
             <h2 className="text-xl md:text-2xl font-semibold text-gray-800">{job.jobTitle}</h2>
             <p className="text-gray-500">{job.companyName}</p>
+            <p className="text-gray-400 text-sm mt-1 whitespace-nowrap">ID: {job._id}</p>
 
             <div className="text-gray-500 mt-2 text-sm md:text-base flex items-center">
               <FaMapMarkerAlt className="mr-2" />

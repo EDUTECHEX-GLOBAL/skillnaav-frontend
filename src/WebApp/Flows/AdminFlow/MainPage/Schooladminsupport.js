@@ -1477,7 +1477,7 @@ const SchoolAdminSupport = () => {
                                 {/* Avatar */}
                                 <div style={{ position:"relative",width:32,height:32,borderRadius:"50%",
                                               display:"flex",alignItems:"center",justifyContent:"center",
-                                              background:isAutoEsc?G_AMBER:G_GREEN,
+                                              background:G_GREEN,
                                               fontSize:"0.7rem",fontWeight:700,color:"#fff",
                                               flexShrink:0,boxShadow:"0 2px 6px rgba(0,0,0,0.12)" }}>
                                   {schoolName[0]?.toUpperCase()||"S"}
@@ -1508,13 +1508,11 @@ const SchoolAdminSupport = () => {
                                       </span>
                                     )}
                                   </div>
-                                  <p style={{ fontSize:"0.65rem",color:"#9ca3af",margin:0 }}>
-                                    #{ticket._id?.slice(-6)}
-                                  </p>
+
                                 </div>
                               </div>
                               <div style={{ display:"flex",alignItems:"center",gap:6,flexShrink:0,marginLeft:4 }}>
-                                {hasUnread && !isAutoEsc && (
+                                {hasUnread && (
                                   <span style={{ color:"#fff",fontWeight:700,minWidth:18,height:18,
                                                  borderRadius:999,display:"flex",alignItems:"center",
                                                  justifyContent:"center",padding:"0 4px",
@@ -1529,20 +1527,15 @@ const SchoolAdminSupport = () => {
                               </div>
                             </div>
 
-                            {/* Subject */}
-                            <p style={{ fontSize:"0.72rem",fontWeight:500,color:"#4b5563",
-                                        marginBottom:4,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>
-                              {ticket.subject||ticket.category||"No subject"}
-                            </p>
 
-                            {/* Last message */}
-                            <p style={{ fontSize:"0.72rem",
-                                        color:hasUnread||isAutoEsc?"#1f2937":"#6b7280",
-                                        fontWeight:hasUnread||isAutoEsc?500:400,
-                                        marginBottom:6,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>
-                              {ticket.lastMessage||ticket.description||"No messages yet"}
-                            </p>
 
+
+
+                            {ticket.category && (
+                              <p style={{ fontSize:"0.66rem", color:"#9ca3af", marginBottom:4 }}>
+                                {ticket.category}
+                              </p>
+                            )}
                             {/* Badges */}
                             <div style={{ display:"flex",alignItems:"center",gap:6,flexWrap:"wrap" }}>
                               <span className={`px-2 py-0.5 rounded-full font-semibold ${getPriorityColor(ticket.priority)}`}

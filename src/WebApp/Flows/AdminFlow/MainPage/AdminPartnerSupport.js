@@ -835,7 +835,7 @@ function TicketList({ tickets, selected, onSelect, loading, isMobile, activeTab,
   const [currentPage, setCurrentPage] = useState(1);
   useEffect(() => { setCurrentPage(1); }, [activeTab, tickets.length]);
 
-  const unread     = tickets.filter(t => (t.unreadByAdmin||0) > 0 && !isNeedsReplyTicket(t, needsReplyNow)).length;
+  const unread     = tickets.filter(t => (t.unreadByAdmin||0) > 0).length;
   const needsReply = tickets.filter(t => isNeedsReplyTicket(t, needsReplyNow)).length;
   const open       = tickets.filter(t => t.status === "open").length;
   const urgent     = tickets.filter(t => t.priority === "urgent" && !["resolved","closed"].includes(t.status)).length;
@@ -907,11 +907,11 @@ function TicketList({ tickets, selected, onSelect, loading, isMobile, activeTab,
 
                   {isEsc && <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 font-bold border border-orange-200 flex-shrink-0" style={{ fontSize:"0.6rem" }}><FaFlag className="w-2 h-2"/>Escalated</span>}
                 </div>
-                <p className="text-gray-400" style={{ fontSize:"0.65rem" }}>#{t._id?.slice(-6)}</p>
+
               </div>
             </div>
             <div className="flex items-center gap-1.5 flex-shrink-0 ml-1">
-              {hasUnread && !isAutoEsc && (
+              {hasUnread && (
                 <span className="text-white font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center px-1" style={{ background:G_INDIGO, fontSize:"0.58rem", boxShadow:"0 2px 6px rgba(99,102,241,0.4)" }}>
                   {t.unreadByAdmin}
                 </span>
@@ -919,14 +919,11 @@ function TicketList({ tickets, selected, onSelect, loading, isMobile, activeTab,
               <span className="text-gray-400" style={{ fontSize:"0.63rem" }}>{timeAgo(t.lastActivity||t.createdAt)}</span>
             </div>
           </div>
-          <p className="text-gray-600 truncate mb-1" style={{ fontSize:"0.72rem", fontWeight:500 }}>
-            {(t.subject||t.category||"").replace(/^\[(Escalated|Forwarded)\]\s*/i,"").replace("Internship Access - ","")}
-          </p>
-          <p className={`truncate mb-1.5 ${hasUnread||isAutoEsc?"font-medium text-gray-800":"text-gray-500"}`} style={{ fontSize:"0.72rem" }}>
-            {t.lastMessage || t.description}
-          </p>
-
-
+          {t.category && (
+            <p style={{ fontSize:"0.66rem", color:"#9ca3af", marginBottom:4 }}>
+              {t.category}
+            </p>
+          )}
          <div className="flex items-center gap-1.5 flex-wrap">
             <span className={`px-2 py-0.5 rounded-full font-semibold ${PRIORITY_CLASSES[t.priority]||"bg-gray-100 text-gray-600"}`} style={{ fontSize:"0.63rem" }}>{t.priority}</span>
             <span className={`px-2 py-0.5 rounded-full font-semibold ${STATUS_CLASSES[t.status]||"bg-gray-100 text-gray-600"}`} style={{ fontSize:"0.63rem" }}>{t.status}</span>
@@ -1239,7 +1236,7 @@ export default function AdminPartnerSupport() {
   }, [navigate]);
 
   const needsReplyNow   = useNeedsReplyMode();
-  const unreadTotal     = allTickets.filter(t => (t.unreadByAdmin||0) > 0 && !isNeedsReplyTicket(t, needsReplyNow)).length;
+  const unreadTotal     = allTickets.filter(t => (t.unreadByAdmin||0) > 0).length;
   const needsReplyTotal = allTickets.filter(t => isNeedsReplyTicket(t, needsReplyNow)).length;
   const urgentTotal     = allTickets.filter(t => t.priority === "urgent" && !["resolved","closed"].includes(t.status)).length;
 

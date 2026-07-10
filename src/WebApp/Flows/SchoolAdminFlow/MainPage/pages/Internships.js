@@ -598,6 +598,7 @@ const Internships = () => {
                   <span className="text-gray-300">·</span>
                   <span>{formatPostedDate(item.createdAt)}</span>
                 </p>
+                <p className="text-[11px] text-gray-400 mt-0.5 whitespace-nowrap">ID: {item._id}</p>
               </div>
             </div>
 

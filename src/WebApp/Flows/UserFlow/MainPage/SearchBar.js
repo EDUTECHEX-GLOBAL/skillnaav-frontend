@@ -62,10 +62,18 @@ const SearchBar = () => {
     internshipMode: null,
     classification: null,
   });
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 400);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
   const [selectedJob, setSelectedJob] = useState(null);
   const [, setApplicationCount] = useState(0);
   const [showLimitPopup, setShowLimitPopup] = useState(false);
-  const [isPremium, setIsPremium] = useState(false);
+  const [, setIsPremium] = useState(false);
   const [planType, setPlanType] = useState("Freemium");
   const [showSavedJobPopup, setShowSavedJobPopup] = useState(false);
 
@@ -106,14 +114,14 @@ const SearchBar = () => {
   };
 
   // ── Data fetching ─────────────────────────────────────────────────────────
-  const fetchJobData = useCallback(async (pageNumber = 1) => {
+  const fetchJobData = useCallback(async (pageNumber = 1, searchQuery = "") => {
     try {
       if (loadingJobsRef.current || (pageNumber !== 1 && !hasMoreRef.current)) return;
       loadingJobsRef.current = true;
       setLoadingJobs(true);
 
       const response = await axios.get(
-        `/api/interns/approved?page=${pageNumber}&limit=6`
+        `/api/interns/approved?page=${pageNumber}&limit=6&search=${encodeURIComponent(searchQuery)}`
       );
       const { data, hasMore: more } = response.data;
 
@@ -157,8 +165,11 @@ const SearchBar = () => {
     };
 
     fetchUserProfile();
-    fetchJobData(1);
-  }, [fetchJobData]);
+  }, []);
+
+  useEffect(() => {
+    fetchJobData(1, debouncedSearchTerm);
+  }, [debouncedSearchTerm, fetchJobData]);
 
   // ── Infinite scroll — only active when list is visible ───────────────────
   useEffect(() => {
@@ -167,14 +178,14 @@ const SearchBar = () => {
       (entries) => {
         const firstEntry = entries[0];
         if (firstEntry.isIntersecting && hasMoreRef.current && !loadingJobsRef.current) {
-          fetchJobData(page + 1);
+          fetchJobData(page + 1, debouncedSearchTerm);
         }
       },
       { threshold: 0.8 }
     );
     observer.observe(loadMoreRef.current);
     return () => observer.disconnect();
-  }, [fetchJobData, page, selectedJob]);
+  }, [fetchJobData, page, selectedJob, debouncedSearchTerm]);
 
   // ── Job actions ───────────────────────────────────────────────────────────
   const handleViewDetails = async (job) => {
@@ -262,7 +273,8 @@ const SearchBar = () => {
     const matchesSearch =
       job.jobTitle?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       job.companyName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      job.location?.toLowerCase().includes(searchTerm.toLowerCase());
+      job.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      job._id?.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesTags = Object.entries(activeFilters).every(
       ([key, val]) => !val || job[key] === val
@@ -394,9 +406,12 @@ const SearchBar = () => {
                         />
                         <div className="flex-1 min-w-0 pr-12">
                           <h3 className="text-lg md:text-xl font-semibold truncate" title={job.jobTitle}>{job.jobTitle}</h3>
-                          <p className="text-gray-600 truncate" title={job.companyName}>
-                            {job.companyName} • {calculatePostedTime(job.createdAt)}
-                          </p>
+                          <div className="flex items-center text-gray-600">
+                            <span className="truncate" title={job.companyName}>{job.companyName}</span>
+                            <span className="mx-1">•</span>
+                            <span className="whitespace-nowrap">{calculatePostedTime(job.createdAt)}</span>
+                          </div>
+                          <p className="text-xs text-gray-400 mt-1 whitespace-nowrap">ID: {job._id}</p>
                         </div>
                       </div>
 

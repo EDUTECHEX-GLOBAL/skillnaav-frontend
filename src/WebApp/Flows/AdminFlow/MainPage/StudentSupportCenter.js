@@ -1345,7 +1345,7 @@ const StudentTicketsPanel = () => {
 
   const token = p.getToken();
 
-  const unreadCount    = p.tickets.filter(t => t.unread && !isNeedsReply(t)).length;
+  const unreadCount    = p.tickets.filter(t => t.unread).length;
   const urgentCount    = p.tickets.filter(t => t.priority === "urgent" && t.status !== "resolved" && t.status !== "closed").length;
   const openCount      = p.tickets.filter(t => t.status === "open").length;
   const inProgressCount = p.tickets.filter(t => t.status === "in-progress").length;
@@ -1429,11 +1429,11 @@ const StudentTicketsPanel = () => {
                 <p className={`font-semibold truncate ${hasUnread||isAutoEsc?"text-gray-900":"text-gray-700"}`} style={{ fontSize:"0.8rem", margin:0 }}>
                   {t.studentName || "Unknown"}
                 </p>
-                <p className="text-gray-400" style={{ fontSize:"0.65rem", margin:0 }}>#{t._id?.slice(-6)}</p>
+
               </div>
             </div>
             <div className="flex items-center gap-1.5 flex-shrink-0 ml-1">
-              {hasUnread && !isAutoEsc && (
+              {hasUnread && (
                 <span style={{
                   color:"#fff", fontWeight:700, minWidth:18, height:18,
                   borderRadius:999, display:"flex", alignItems:"center", justifyContent:"center",
@@ -1441,16 +1441,6 @@ const StudentTicketsPanel = () => {
                   boxShadow:"0 2px 6px rgba(8, 10, 153, 0.88)",
                 }}>
                   {t.unreadCount || 1}
-                </span>
-              )}
-              {isAutoEsc && (
-                <span style={{
-                  color:"#fff", fontWeight:700, minWidth:18, height:18,
-                  borderRadius:999, display:"flex", alignItems:"center", justifyContent:"center",
-                  padding:"0 3px", background:"#3b82f6", fontSize:"0.58rem",
-                  boxShadow:"0 2px 6px rgba(59,130,246,0.4)",
-                }}>
-                  {t.unreadCount || "!"}
                 </span>
               )}
               <span className="text-gray-400" style={{ fontSize:"0.63rem" }}>{timeAgo(t.lastMessageTime||t.createdAt)}</span>
@@ -1462,9 +1452,7 @@ const StudentTicketsPanel = () => {
               </button>
             </div>
           </div>
-          <p className="text-gray-600 truncate mb-1" style={{ fontSize:"0.72rem", fontWeight:500 }}>
-            {t.lastMessage || t.subject || "No messages yet"}
-          </p>
+
           {t.category && (
             <p className="flex items-center gap-0.5 text-gray-400 mb-1" style={{ fontSize:"0.66rem" }}>
               {catIcon(t.category)}<span>{t.category}</span>
@@ -1484,11 +1472,7 @@ const StudentTicketsPanel = () => {
               </span>
             )}
           </div>
-          {t.assignedTo && (
-            <div className="mt-1 flex items-center text-gray-400 gap-1" style={{ fontSize:"0.68rem" }}>
-              <UserCheck className="w-2.5 h-2.5"/>{t.assignedTo.name}
-            </div>
-          )}
+
         </div>
       </div>
     );
@@ -1667,6 +1651,9 @@ const StudentTicketsPanel = () => {
                       <div className="flex items-center gap-1 flex-wrap mt-0.5">
                         <span style={{ color:isAutoEscalated?"#4b5563":"rgba(255,255,255,0.8)",fontSize:"0.68rem" }}>{p.selectedTicket.studentName || "Unknown"}</span>
                         <span style={{ color:isAutoEscalated?"#6b7280":"rgba(255,255,255,0.6)",fontSize:"0.62rem" }}>· #{p.selectedTicket._id?.slice(-6)}</span>
+                        {p.selectedTicket.internshipId && (
+                          <span style={{ color:isAutoEscalated?"#6b7280":"rgba(255,255,255,0.6)",fontSize:"0.62rem" }}>· ID: {p.selectedTicket.internshipId}</span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -2142,7 +2129,7 @@ const SchoolStudentPanel = () => {
   const token        = p.getToken();
   const autoEscCount = p.tickets.filter(isNeedsReply).length;
   const totalUnread  = p.tickets.filter(t=>t.unread).length;
-  const unreadCount  = p.tickets.filter(t=>t.unread&&!isNeedsReply(t)).length;
+  const unreadCount  = p.tickets.filter(t=>t.unread).length;
   const openCount    = p.tickets.filter(t=>t.status==="open").length;
   const inProgressCount = p.tickets.filter(t=>t.status==="in-progress").length;
   const resolvedCount = p.tickets.filter(t=>t.status==="resolved"||t.status==="closed").length;
@@ -2217,18 +2204,13 @@ const SchoolStudentPanel = () => {
                 <p className={`font-semibold truncate ${hasUnread||isAutoEsc?"text-gray-900":"text-gray-700"}`} style={{fontSize:"0.8rem",margin:0}}>
                   {t.studentName||"Unknown"}
                 </p>
-                <p className="text-gray-400" style={{fontSize:"0.65rem",margin:0}}>#{t._id?.slice(-6)}</p>
+
               </div>
             </div>
             <div className="flex items-center gap-1.5 flex-shrink-0 ml-1">
-              {hasUnread&&!isAutoEsc&&(
+              {hasUnread && (
                 <span style={{color:"#fff",fontWeight:700,minWidth:18,height:18,borderRadius:999,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px",background:G_INDIGO,fontSize:"0.58rem",boxShadow:"0 2px 6px rgba(99,102,241,0.4)"}}>
                   {t.unreadCount||1}
-                </span>
-              )}
-              {isAutoEsc&&(
-                <span style={{color:"#fff",fontWeight:700,minWidth:18,height:18,borderRadius:999,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px",background:"#3b82f6",fontSize:"0.58rem",boxShadow:"0 2px 6px rgba(59,130,246,0.4)"}}>
-                  {t.unreadCount||"!"}
                 </span>
               )}
               <span className="text-gray-400" style={{fontSize:"0.63rem"}}>{timeAgo(t.lastMessageTime||t.createdAt)}</span>
@@ -2238,9 +2220,7 @@ const SchoolStudentPanel = () => {
               </button>
             </div>
           </div>
-          <p className="text-gray-600 truncate mb-1" style={{fontSize:"0.72rem",fontWeight:500}}>
-            {t.lastMessage||t.subject||"No messages yet"}
-          </p>
+
           {t.category&&<p className="text-gray-400 mb-1" style={{fontSize:"0.66rem"}}>{t.category}</p>}
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className={`px-1.5 py-0.5 rounded-full border ${priorityColor(t.priority)}`} style={{fontSize:"0.63rem"}}>{t.priority||"Normal"}</span>
@@ -2257,7 +2237,7 @@ const SchoolStudentPanel = () => {
               </span>
             )}
           </div>
-          {t.assignedTo&&<div className="mt-1 flex items-center text-gray-400 gap-1" style={{fontSize:"0.68rem"}}><UserCheck className="w-2.5 h-2.5"/>{t.assignedTo.name}</div>}
+
         </div>
       </div>
     );

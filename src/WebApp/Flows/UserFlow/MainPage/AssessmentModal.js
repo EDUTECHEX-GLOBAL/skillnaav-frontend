@@ -3,7 +3,7 @@ import axios from "../../../../api/axiosInstance";
 import { useProctoring } from "./useProctoring";
 import ProctoringWarningBanner from "./ProctoringWarningBanner";
 import DetailedAssessmentResults from "./DetailedAssessmentResults"; // ✨ NEW
-import QuestionReview from "./QuestionReview"; // ✨ NEW
+import * as faceapi from '@vladmandic/face-api'; // ✨ NEW: face tracking
 
 const ProctoredAssessment = ({ assessment, studentId, onClose }) => {
   const [answers, setAnswers] = useState(
@@ -15,7 +15,9 @@ const ProctoredAssessment = ({ assessment, studentId, onClose }) => {
   const [isReady, setIsReady] = useState(false);
   const [startTime, setStartTime] = useState(null); // ✨ NEW: Track exam start time
   const [currentTime, setCurrentTime] = useState(Date.now()); // ✨ NEW: Current time for countdown
+  const [studentPhoto, setStudentPhoto] = useState(null); // ✨ NEW: snapshot photo
   const containerRef = useRef(null);
+  const canvasRef = useRef(null); // ✨ NEW: for face tracking overlay
 
   // ─── In-app confirmation dialog (replaces alert for auto-submit) ───
   const [confirmDialog, setConfirmDialog] = useState(null);
@@ -38,6 +40,7 @@ const ProctoredAssessment = ({ assessment, studentId, onClose }) => {
         });
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   );
 
@@ -73,6 +76,18 @@ const ProctoredAssessment = ({ assessment, studentId, onClose }) => {
     fetchSubmission();
   }, [assessment._id, studentId]);
 
+  // ✨ NEW: Load face-api models
+  useEffect(() => {
+    const loadModels = async () => {
+      try {
+        await faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/');
+      } catch (err) {
+        console.error("Failed to load face-api models:", err);
+      }
+    };
+    loadModels();
+  }, []);
+
   // ✨ NEW: Timer update effect - Update current time every second
   useEffect(() => {
     if (!isReady) return;
@@ -91,6 +106,7 @@ const ProctoredAssessment = ({ assessment, studentId, onClose }) => {
       console.log("⏰ Time expired - auto-submitting assessment");
       handleSubmit(true);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentTime, isReady, submitting]);
 
   // ✨ NEW: Helper function to calculate time remaining
@@ -118,6 +134,28 @@ const ProctoredAssessment = ({ assessment, studentId, onClose }) => {
       return;
     }
 
+    // ✨ NEW: Capture a photo reliably
+    const attemptCapture = () => {
+      if (videoRef.current && videoRef.current.readyState >= 2 && videoRef.current.videoWidth > 0) {
+        // Wait an extra 2 seconds for camera exposure to adjust
+        setTimeout(() => {
+          if (!videoRef.current) return;
+          try {
+            const canvas = document.createElement("canvas");
+            canvas.width = videoRef.current.videoWidth;
+            canvas.height = videoRef.current.videoHeight;
+            canvas.getContext("2d").drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+            setStudentPhoto(canvas.toDataURL("image/jpeg"));
+          } catch (e) {
+            console.error("Failed to capture snapshot:", e);
+          }
+        }, 2000);
+      } else {
+        setTimeout(attemptCapture, 500);
+      }
+    };
+    attemptCapture();
+
     if (containerRef.current) {
       await enterFullscreen(containerRef.current);
     }
@@ -132,15 +170,57 @@ const ProctoredAssessment = ({ assessment, studentId, onClose }) => {
       stopProctoring();
       exitFullscreen();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ✨ Ensure video stream is attached when the video element mounts
   useEffect(() => {
     if (isReady && stream && videoRef.current) {
-      videoRef.current.srcObject = stream;
+      if (videoRef.current.srcObject !== stream) {
+        videoRef.current.srcObject = stream;
+      }
       videoRef.current.play().catch(e => console.error("Error playing video:", e));
     }
-  }, [isReady, stream, videoRef]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isReady, stream]); // Removed videoRef from dependencies as it's a ref
+
+  // ✨ NEW: Face tracking loop
+  useEffect(() => {
+    let intervalId;
+    if (isReady && stream && videoRef.current && canvasRef.current) {
+      intervalId = setInterval(async () => {
+        if (videoRef.current.readyState === 4 && faceapi.nets.tinyFaceDetector.isLoaded) {
+          try {
+            const detections = await faceapi.detectAllFaces(
+              videoRef.current,
+              new faceapi.TinyFaceDetectorOptions()
+            );
+            const displaySize = {
+              width: videoRef.current.clientWidth,
+              height: videoRef.current.clientHeight,
+            };
+            faceapi.matchDimensions(canvasRef.current, displaySize);
+            const resizedDetections = faceapi.resizeResults(detections, displaySize);
+            
+            const canvas = canvasRef.current;
+            const ctx = canvas.getContext("2d");
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            resizedDetections.forEach((detection) => {
+              const box = detection.box;
+              ctx.strokeStyle = "#00FF00";
+              ctx.lineWidth = 3;
+              ctx.strokeRect(box.x, box.y, box.width, box.height);
+            });
+          } catch (err) {
+            console.error("Face detection error:", err);
+          }
+        }
+      }, 200);
+    }
+    return () => clearInterval(intervalId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isReady, stream]);
 
   // ─── OPTION SELECT ────────────────────────────────────────────────
   const handleOptionSelect = (index, optionIndex) => {
@@ -393,16 +473,20 @@ const ProctoredAssessment = ({ assessment, studentId, onClose }) => {
 
       {/* Header with progress, timer, and violations */}
       <div className="bg-white shadow-lg p-4 flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">
-            Internship Assessment
-          </h2>
-          <p className="text-sm text-gray-500">
-            Stay focused – This session is being monitored
-          </p>
+        <div className="flex items-center gap-4">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">
+              Internship Assessment
+            </h2>
+            <p className="text-sm text-gray-500">
+              Stay focused – This session is being monitored
+            </p>
+          </div>
         </div>
 
         <div className="flex items-center gap-6">
+
+
           {/* Progress Bar */}
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-600">Progress:</span>
@@ -471,6 +555,11 @@ const ProctoredAssessment = ({ assessment, studentId, onClose }) => {
               Violations: {violationCount}/3
             </span>
           </div>
+
+          {/* ✨ NEW: Show snapshot photo on the far right without the word SNAPSHOT */}
+          {studentPhoto && (
+            <img src={studentPhoto} alt="Student snapshot" className="w-12 h-12 rounded-lg border-2 border-purple-500 object-cover shadow-sm" />
+          )}
         </div>
       </div>
 
@@ -519,12 +608,26 @@ const ProctoredAssessment = ({ assessment, studentId, onClose }) => {
           <h3 className="text-xl font-bold mb-4">Live Monitoring</h3>
 
           {/* Camera Feed */}
-          <div className="mb-6">
+          <div className="mb-6 relative">
             <video
-              ref={videoRef}
+              ref={(el) => {
+                videoRef.current = el;
+                if (el && stream && el.srcObject !== stream) {
+                  el.srcObject = stream;
+                  el.play().catch(e => console.error("Error playing video:", e));
+                }
+              }}
               autoPlay
               muted
-              className="w-full rounded-lg border-2 border-purple-500"
+              playsInline
+              style={{ transform: "scaleX(-1)" }}
+              className="w-full rounded-lg border-2 border-purple-500 relative z-10"
+            />
+            {/* ✨ NEW: Overlay canvas for face tracking */}
+            <canvas
+              ref={canvasRef}
+              style={{ transform: "scaleX(-1)" }}
+              className="absolute top-0 left-0 w-full h-full z-20 pointer-events-none"
             />
             <p className="text-xs text-gray-400 mt-2 text-center">
               📹 Your camera is active

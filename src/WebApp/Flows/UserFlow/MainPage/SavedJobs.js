@@ -370,6 +370,9 @@ const SavedJobs = () => {
                       <p className="sj-company" title={job.jobId?.companyName}>
                         {job.jobId?.companyName || "Unknown Company"}
                       </p>
+                      <p className="sj-company" style={{ fontSize: '11px', marginTop: '4px', whiteSpace: 'nowrap' }}>
+                        ID: {job.jobId?._id}
+                      </p>
                     </div>
                   </div>
 

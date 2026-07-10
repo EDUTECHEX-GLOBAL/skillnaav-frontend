@@ -162,10 +162,12 @@ export const useProctoring = (onViolation) => {
 
     const preventShortcuts = (e) => {
       const prohibited =
-        ['F11', 'F12', 'Escape'].includes(e.key) ||
+        ['F11', 'F12', 'Escape', 'PrintScreen'].includes(e.key) ||
         (e.ctrlKey && ['t', 'w', 'n', 'Tab'].includes(e.key)) ||
         (e.altKey && ['Tab', 'F4'].includes(e.key)) ||
         (e.metaKey && ['Tab', 't', 'w'].includes(e.key)) ||
+        (e.metaKey && e.shiftKey && (e.key === 's' || e.key === 'S')) ||
+        (e.ctrlKey && e.shiftKey && (e.key === 's' || e.key === 'S')) ||
         (e.ctrlKey && e.shiftKey && e.key === 'I');
 
       if (prohibited) {

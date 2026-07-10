@@ -240,8 +240,13 @@ const JobCard = ({
                   />
                   <div className="flex-grow min-w-0 pr-16">
                     <h5 className="text-base font-semibold text-gray-900 truncate">{job.jobTitle}</h5>
-                    <p className="text-sm text-gray-400">
-                      {job.companyName} · {calculatePostedTime(job.createdAt)}
+                    <div className="flex items-center text-sm text-gray-400">
+                      <span className="truncate">{job.companyName}</span>
+                      <span className="mx-1">·</span>
+                      <span className="whitespace-nowrap">{calculatePostedTime(job.createdAt)}</span>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1 whitespace-nowrap">
+                      ID: {job._id}
                     </p>
                   </div>
                 </div>

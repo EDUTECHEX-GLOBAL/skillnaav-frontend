@@ -378,7 +378,8 @@ const PartnerManagement = () => {
       const matchesSearch =
         i.jobTitle?.toLowerCase().includes(q) ||
         i.companyName?.toLowerCase().includes(q) ||
-        i.organization?.toLowerCase().includes(q);
+        i.organization?.toLowerCase().includes(q) ||
+        i._id?.toLowerCase().includes(q);
 
       const s = getStatus(i);
       const matchesStatus =
@@ -524,6 +525,7 @@ const PartnerManagement = () => {
                     </h3>
                     <p className="text-sm text-gray-600 line-clamp-1">{internship.companyName}</p>
                     <p className="text-xs text-gray-500 mt-1">{calculatePostedTime(internship.createdAt)}</p>
+                    <p className="text-[11px] text-gray-400 mt-0.5 whitespace-nowrap">ID: {internship._id}</p>
                   </div>
                 </div>
               </div>

@@ -434,6 +434,7 @@ const SavedJobsPage = () => {
                     <span className="text-gray-300">·</span>
                     <span>{formatPostedDate(job.createdAt)}</span>
                   </p>
+                  <p className="text-[11px] text-gray-400 mt-0.5 whitespace-nowrap">ID: {job._id}</p>
                 </div>
               </div>
 

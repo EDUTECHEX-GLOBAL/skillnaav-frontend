@@ -50,10 +50,8 @@ import {
   faSliders,
   faEllipsisVertical,
   faTrash,
-  faPlus,
   faArrowsRotate,
 } from "@fortawesome/free-solid-svg-icons";
-import { useTabContext } from "./UserHomePageContext/HomePageContext";
 
 Modal.setAppElement("#root");
 
@@ -884,7 +882,7 @@ const EditModalBody = ({ internship: si, updateField, onSave, onBack, onClose })
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
 const YourJobPosts = () => {
-  const { handleSelectTab } = useTabContext();
+
   const [internships, setInternships] = useState([]);
   const [selectedInternship, setSelectedInternship] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -1273,13 +1271,16 @@ const YourJobPosts = () => {
               <h3 className="text-[15px] font-bold text-gray-900 leading-snug mb-0.5">
                 {internship.jobTitle}
               </h3>
-              <p className="text-xs font-medium text-indigo-500 mb-3 flex items-center gap-1">
-                <FontAwesomeIcon icon={faBriefcase} className="text-[9px] text-indigo-300" />
-                {internship.companyName}
-                <span className="text-gray-300 mx-0.5">·</span>
-                <FontAwesomeIcon icon={faLocationDot} className="text-[9px] text-gray-300" />
-                <span className="text-gray-400 font-normal">{internship.location}</span>
-              </p>
+              <div className="flex flex-col gap-1 mb-3">
+                <div className="text-xs font-medium text-indigo-500 flex items-center gap-1">
+                  <FontAwesomeIcon icon={faBriefcase} className="text-[9px] text-indigo-300 shrink-0" />
+                  <span className="truncate">{internship.companyName}</span>
+                  <span className="text-gray-300 mx-0.5 shrink-0">·</span>
+                  <FontAwesomeIcon icon={faLocationDot} className="text-[9px] text-gray-300 shrink-0" />
+                  <span className="text-gray-400 font-normal truncate">{internship.location}</span>
+                </div>
+                <p className="text-[10px] text-gray-400 whitespace-nowrap">ID: {internship._id}</p>
+              </div>
 
               {/* Badges */}
               <div className="flex flex-wrap gap-1.5 mb-4">

@@ -1,15 +1,79 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import axios from "../../../../api/axiosInstance";
 import { useProctoring } from "./useProctoring";
+import * as faceapi from '@vladmandic/face-api'; // ✨ NEW: face tracking
 
 // ── Camera Preview Component ──────────────────────────────────────────────────
-const CameraPreview = ({ stream }) => {
+const CameraPreview = ({ stream, setStudentPhoto }) => {
   const videoRef = useRef(null);
+  const canvasRef = useRef(null); // ✨ NEW: for face tracking overlay
 
   useEffect(() => {
     if (videoRef.current && stream) {
       videoRef.current.srcObject = stream;
     }
+  }, [stream]);
+
+  // ✨ NEW: Snapshot logic
+  useEffect(() => {
+    if (stream && videoRef.current && setStudentPhoto) {
+      let captured = false;
+      const attempt = () => {
+        if (captured) return;
+        if (videoRef.current.readyState >= 2 && videoRef.current.videoWidth > 0) {
+          setTimeout(() => {
+            if (!videoRef.current) return;
+            try {
+              const canvas = document.createElement("canvas");
+              canvas.width = videoRef.current.videoWidth;
+              canvas.height = videoRef.current.videoHeight;
+              canvas.getContext("2d").drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+              setStudentPhoto(canvas.toDataURL("image/jpeg"));
+            } catch (e) {
+              console.error("Failed to capture snapshot:", e);
+            }
+          }, 2000); // 2 second delay for exposure
+          captured = true;
+        } else {
+          setTimeout(attempt, 500);
+        }
+      };
+      attempt();
+    }
+  }, [stream, setStudentPhoto]);
+
+  // ✨ NEW: Face tracking loop
+  useEffect(() => {
+    let intervalId;
+    if (stream && videoRef.current && canvasRef.current) {
+      intervalId = setInterval(async () => {
+        if (videoRef.current.readyState === 4 && faceapi.nets.tinyFaceDetector.isLoaded) {
+          try {
+            const detections = await faceapi.detectAllFaces(
+              videoRef.current,
+              new faceapi.TinyFaceDetectorOptions()
+            );
+            const displaySize = {
+              width: videoRef.current.clientWidth,
+              height: videoRef.current.clientHeight,
+            };
+            faceapi.matchDimensions(canvasRef.current, displaySize);
+            const resizedDetections = faceapi.resizeResults(detections, displaySize);
+            
+            const ctx = canvasRef.current.getContext("2d");
+            ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+
+            resizedDetections.forEach((detection) => {
+              const box = detection.box;
+              ctx.strokeStyle = "#00FF00";
+              ctx.lineWidth = 3;
+              ctx.strokeRect(box.x, box.y, box.width, box.height);
+            });
+          } catch (err) {}
+        }
+      }, 200);
+    }
+    return () => clearInterval(intervalId);
   }, [stream]);
 
   if (!stream) return null;
@@ -44,6 +108,11 @@ const CameraPreview = ({ stream }) => {
           muted
           playsInline
           style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)" }}
+        />
+        {/* ✨ NEW: Overlay canvas for face tracking */}
+        <canvas
+          ref={canvasRef}
+          style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none", transform: "scaleX(-1)" }}
         />
         <div
           style={{
@@ -167,6 +236,19 @@ const StudentAssessment = () => {
 
   const cameraStreamRef = useRef(null);
   const [cameraStream, setCameraStream] = useState(null);
+  const [studentPhoto, setStudentPhoto] = useState(null); // ✨ NEW: snapshot photo
+
+  // ✨ NEW: Load face-api models
+  useEffect(() => {
+    const loadModels = async () => {
+      try {
+        await faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/');
+      } catch (err) {
+        console.error("Failed to load face-api models:", err);
+      }
+    };
+    loadModels();
+  }, []);
 
   const {
     startProctoring,
@@ -494,7 +576,7 @@ const StudentAssessment = () => {
     return (
       <div className="h-screen overflow-hidden bg-[#f7f8fc] text-gray-900">
         {/* Camera preview overlay */}
-        <CameraPreview stream={cameraStream} />
+        <CameraPreview stream={cameraStream} setStudentPhoto={setStudentPhoto} />
         {/* Header */}
         <div className="bg-white border-b border-gray-200 shadow-sm text-gray-900 px-6 py-3 flex justify-between items-center lg:pr-[280px]">
           <div>
@@ -522,6 +604,11 @@ const StudentAssessment = () => {
             >
               End Exam
             </button>
+
+            {/* ✨ NEW: Show snapshot photo on the far right */}
+            {studentPhoto && (
+              <img src={studentPhoto} alt="Student snapshot" className="w-11 h-11 rounded-lg border-2 border-indigo-500 object-cover shadow-sm" />
+            )}
           </div>
 
           {warningMessage && (

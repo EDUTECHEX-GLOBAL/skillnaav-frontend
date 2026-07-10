@@ -313,6 +313,9 @@ const Applications = () => {
                       <p className="app-company" title={job.companyName}>
                         {job.companyName || "Unknown Company"}
                       </p>
+                      <p className="app-company" style={{ fontSize: '11px', marginTop: '4px', whiteSpace: 'nowrap' }}>
+                        ID: {job._id}
+                      </p>
                     </div>
                   </div>
 

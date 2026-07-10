@@ -1127,6 +1127,9 @@ const InternshipList = () => {
                         <span className="mx-1.5">·</span>
                         {calculateDaysAgo(internship.createdAt)}
                       </p>
+                      <p className="text-[11px] text-gray-400 mt-0.5 whitespace-nowrap">
+                        ID: {internship._id}
+                      </p>
                     </div>
                   </div>
 
