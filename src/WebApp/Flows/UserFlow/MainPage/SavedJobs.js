@@ -18,6 +18,8 @@ const SavedJobs = () => {
   const userInfo = (JSON.parse(localStorage.getItem("studentInfo")) || JSON.parse(localStorage.getItem("userInfo"))) || {};
   const userId = userInfo?._id;
 
+  const validSavedJobs = savedJobs?.filter(job => job?.jobId?._id) || [];
+
   useEffect(() => {
     if (userId) {
       getSavedJobs();
@@ -329,15 +331,15 @@ const SavedJobs = () => {
             <FontAwesomeIcon icon={faBookmark} />
           </div>
           <h2>Saved Jobs</h2>
-          {savedJobs?.length > 0 && (
-            <span className="sj-count">{savedJobs.length} saved</span>
+          {validSavedJobs.length > 0 && (
+            <span className="sj-count">{validSavedJobs.length} saved</span>
           )}
         </div>
 
         {/* Grid or Empty */}
-        {savedJobs?.length > 0 ? (
+        {validSavedJobs.length > 0 ? (
           <div className="sj-grid">
-            {savedJobs.map((job) =>
+            {validSavedJobs.map((job) =>
               job?.jobId?._id ? (
                 <div key={job.jobId._id} className="sj-card">
                   {/* Remove button */}

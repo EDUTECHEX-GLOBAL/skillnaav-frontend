@@ -12,6 +12,7 @@ import {
   FaFile, FaFilePdf, FaFileWord, FaFileAlt, FaImage,
   FaHandshake, FaUserTie, FaReply,
   FaChevronLeft, FaChevronRight, FaTimes, FaTag, FaArrowLeft,
+  FaMicrophone, FaMicrophoneSlash
 } from "react-icons/fa";
 import logo from "../../../../assets-webapp/skillnaav_final_logo.svg";
 import axios from "axios";
@@ -598,6 +599,8 @@ const PartnerSupport = () => {
   const [deletingTicket,  setDeletingTicket]  = useState(null);
   const [statusUpdating,  setStatusUpdating]  = useState(false);
   const [alertModal, setAlertModal] = useState({ show: false, title: "", message: "", type: "success" });
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef(null);
   const showAlert = useCallback((title, message, type = "error") => {
     setAlertModal({ show: true, title, message, type });
   }, []);
@@ -1064,6 +1067,11 @@ const PartnerSupport = () => {
       from { transform: translateY(60px); opacity: 0; }
       to   { transform: translateY(0);    opacity: 1; }
     }
+    @keyframes sa-ping-red {
+      0%,100% { box-shadow:0 0 0 0 rgba(239,68,68,0.5); }
+      50%      { box-shadow:0 0 0 4px rgba(239,68,68,0); }
+    }
+    .sa-ping-red  { animation:sa-ping-red 1.5s cubic-bezier(0,0,0.2,1) infinite; }
   `;
 
   return (
@@ -1330,8 +1338,64 @@ const PartnerSupport = () => {
                             accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.webp,.csv,.txt,.xlsx,.xls,.zip"
                             onChange={handleFileChange}/>
                         </label>
+                        <button 
+                          onClick={() => {
+                            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                            if (!SpeechRecognition) {
+                              alert("Speech recognition is not supported in your browser. Please try Chrome.");
+                              return;
+                            }
+
+                            if (isListening) {
+                              recognitionRef.current?.stop();
+                              setIsListening(false);
+                              return;
+                            }
+
+                            const recognition = new SpeechRecognition();
+                            recognition.continuous = true;
+                            recognition.interimResults = true;
+
+                            let baseText = msgInput.trim();
+
+                            recognition.onresult = (e) => {
+                              let finalStr = "";
+                              let interimStr = "";
+                              for (let i = e.resultIndex; i < e.results.length; i++) {
+                                if (e.results[i].isFinal) {
+                                  finalStr += e.results[i][0].transcript;
+                                } else {
+                                  interimStr += e.results[i][0].transcript;
+                                }
+                              }
+                              
+                              if (finalStr) {
+                                baseText = baseText + (baseText ? " " : "") + finalStr;
+                                setMsgInput(baseText + (interimStr ? " " + interimStr : ""));
+                              } else {
+                                setMsgInput(baseText + (baseText ? " " : "") + interimStr);
+                              }
+                            };
+
+                            recognition.onend = () => setIsListening(false);
+                            recognition.onerror = () => setIsListening(false);
+
+                            recognitionRef.current = recognition;
+                            recognition.start();
+                            setIsListening(true);
+                          }}
+                          title="Auto Type (Speech to Text)"
+                          style={{ flexShrink:0,cursor:"pointer",border:"none",background:"transparent",padding:0 }}>
+                          <div className={`${isListening ? 'sa-ping-red' : ''}`} style={{ width:32,height:32,borderRadius:"50%",
+                                        display:"flex",alignItems:"center",justifyContent:"center",
+                                        background:isListening?"#fef2f2":"#f3f4f6",
+                                        color:isListening?"#ef4444":(isEsc?"#f97316":"#6366f1"),
+                                        transition:"all 0.15s" }}>
+                            {isListening ? <FaMicrophoneSlash style={{ width:14,height:14 }} /> : <FaMicrophone style={{ width:14,height:14 }} />}
+                          </div>
+                        </button>
                         <input type="text"
-                          placeholder={atts.length > 0 ? "Add a caption (optional)…" : isEsc ? "Reply to student ticket…" : "Message to admin…"}
+                          placeholder={isListening ? "Listening..." : atts.length > 0 ? "Add a caption (optional)…" : isEsc ? "Reply to student ticket…" : "Message to admin…"}
                           className={`flex-1 border border-gray-300 rounded-full px-4 py-2 text-sm focus:ring-2 ${pRing} focus:border-transparent outline-none`}
                           value={msgInput} onChange={e => setMsgInput(e.target.value)}
                           onKeyDown={e => { if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();handleSend();} }}

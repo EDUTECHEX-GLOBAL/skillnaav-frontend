@@ -117,6 +117,166 @@ const MiniStat = ({ icon, label, bg, onClick }) => (
   </button>
 );
 
+/* ─────────────────────────── DETAILS MODAL ─────────────────────────── */
+const InternshipDetailsModal = ({ internship, onClose }) => {
+  if (!internship) return null;
+  
+  // Local formatDate to avoid hoisting issues with the one at the bottom
+  const formatDateLocal = (dateStr) => {
+    if (!dateStr) return '—';
+    try {
+      return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex justify-center items-center z-[100] p-4 sm:p-6 overflow-y-auto">
+      <div 
+        className="bg-white rounded-2xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl border border-white/20 transform transition-all"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-purple-50 to-indigo-50/50 sticky top-0 z-10 flex items-start justify-between rounded-t-2xl">
+          <div className="flex items-center gap-5">
+            <div className="bg-white p-2 rounded-xl shadow-sm border border-purple-100 shrink-0">
+              <img
+                src={internship.imgUrl || 'https://dummyimage.com/100x100/f3f4f6/a855f7&text=No+Logo'}
+                alt={internship.companyName || 'Company'}
+                className="w-14 h-14 sm:w-16 sm:h-16 rounded-lg object-contain"
+              />
+            </div>
+            <div>
+              <h2 className="text-xl sm:text-2xl font-extrabold text-gray-900 tracking-tight mb-0.5">
+                {internship.jobTitle || 'Internship'}
+              </h2>
+              <p className="text-sm sm:text-base text-purple-600 font-semibold">
+                {internship.companyName || 'Unknown Company'}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-9 h-9 flex items-center justify-center rounded-full bg-white shadow-sm text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0 border border-gray-100"
+            aria-label="Close details"
+          >
+            <FaTimes className="text-sm" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-6 overflow-y-auto flex-grow text-gray-700 space-y-6 bg-white/50">
+          
+          {/* Quick Info Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Location */}
+            <div className="flex items-center gap-3 p-4 bg-gradient-to-br from-blue-50 to-indigo-50/50 rounded-xl border border-blue-100/50 hover:shadow-sm transition-shadow">
+              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                <FaMapMarkerAlt className="text-blue-600 text-lg" />
+              </div>
+              <div>
+                <p className="text-[11px] font-semibold text-blue-600/70 uppercase tracking-wider mb-0.5">Location</p>
+                <p className="font-bold text-gray-900 text-sm leading-tight">{internship.location || '—'}</p>
+              </div>
+            </div>
+
+            {/* Duration */}
+            <div className="flex items-center gap-3 p-4 bg-gradient-to-br from-emerald-50 to-green-50/50 rounded-xl border border-emerald-100/50 hover:shadow-sm transition-shadow">
+              <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+                <FaCalendarAlt className="text-emerald-600 text-lg" />
+              </div>
+              <div>
+                <p className="text-[11px] font-semibold text-emerald-600/70 uppercase tracking-wider mb-0.5">Duration</p>
+                <p className="font-bold text-gray-900 text-sm leading-tight">
+                  {formatDateLocal(internship.startDate)} – {formatDateLocal(internship.endDateOrDuration)}
+                </p>
+              </div>
+            </div>
+
+            {/* Pay / Stipend */}
+            <div className="flex items-center gap-3 p-4 bg-gradient-to-br from-orange-50 to-yellow-50/50 rounded-xl border border-orange-100/50 hover:shadow-sm transition-shadow">
+              <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center shrink-0">
+                <FaDollarSign className="text-orange-600 text-lg" />
+              </div>
+              <div>
+                <p className="text-[11px] font-semibold text-orange-600/70 uppercase tracking-wider mb-0.5">Compensation</p>
+                <p className="font-bold text-gray-900 text-sm leading-tight">{internship.pay || 'Unpaid / Free'}</p>
+              </div>
+            </div>
+
+            {/* Mode / Type */}
+            <div className="flex items-center gap-3 p-4 bg-gradient-to-br from-purple-50 to-pink-50/50 rounded-xl border border-purple-100/50 hover:shadow-sm transition-shadow">
+              <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center shrink-0">
+                <FaLaptopHouse className="text-purple-600 text-lg" />
+              </div>
+              <div>
+                <p className="text-[11px] font-semibold text-purple-600/70 uppercase tracking-wider mb-0.5">Mode / Type</p>
+                <p className="font-bold text-gray-900 text-sm leading-tight">{internship.internshipMode || '—'} · {internship.internshipType || '—'}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left Column (Description) */}
+            <div className="lg:col-span-2 space-y-6">
+              {internship.jobDescription && (
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
+                    <span className="w-1 h-5 bg-purple-500 rounded-full inline-block"></span>
+                    About the Internship
+                  </h3>
+                  <div className="prose prose-sm prose-purple max-w-none text-gray-600 leading-relaxed whitespace-pre-wrap">
+                    {internship.jobDescription}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Right Column (Skills & Meta) */}
+            <div className="space-y-6">
+              {/* Skills */}
+              {((internship.qualifications && internship.qualifications.length > 0) || (internship.skills && internship.skills.length > 0)) && (
+                <div className="bg-gray-50/80 p-5 rounded-xl border border-gray-100">
+                  <h3 className="text-base font-bold text-gray-900 mb-3">Skills & Requirements</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {(internship.qualifications?.length ? internship.qualifications : internship.skills).map((q, i) => (
+                      <span key={i} className="px-2.5 py-1 bg-white border border-purple-100 text-purple-700 text-[13px] rounded-lg font-medium shadow-sm">
+                        {q}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Classification & Sector */}
+              {(internship.sector || internship.classification) && (
+                <div className="bg-gray-50/80 p-5 rounded-xl border border-gray-100 space-y-3">
+                  {internship.sector && (
+                    <div>
+                      <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">Industry Sector</p>
+                      <p className="text-sm font-bold text-gray-800">{internship.sector}</p>
+                    </div>
+                  )}
+                  {internship.classification && (
+                    <div>
+                      <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">Experience Level</p>
+                      <span className="inline-block px-2.5 py-1 bg-indigo-100 text-indigo-700 font-semibold text-xs rounded-md">
+                        {internship.classification}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+          
+        </div>
+      </div>
+    </div>
+  );
+};
+
 /* ─────────────────────────── STATUS MODAL ─────────────────────────── */
 const StatusModal = ({ status, students, loading, onClose }) => (
   <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
@@ -292,6 +452,9 @@ const Internships = () => {
   const [applications, setApplications] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isFetchingApplications, setIsFetchingApplications] = useState(false);
+
+  // Details Modal
+  const [detailsInternship, setDetailsInternship] = useState(null);
 
   const fetchInternships = useCallback(async (pageNumber = 1, query = '') => {
     try {
@@ -573,16 +736,25 @@ const Internships = () => {
           )
           .map((item) => (
           <div key={item._id} className="bg-white shadow-sm hover:shadow-md transition-shadow rounded-2xl p-5 relative border border-gray-100 flex flex-col">
-            {/* Type badge */}
-            <span className={`absolute top-4 right-4 text-xs font-semibold px-2.5 py-1 rounded-full ${
-              item.internshipType === 'STIPEND'
-                ? 'bg-blue-100 text-blue-700'
-                : item.internshipType === 'PAID'
-                ? 'bg-red-100 text-red-700'
-                : 'bg-green-100 text-green-700'
-            }`}>
-              {item.internshipType || 'FREE'}
-            </span>
+            {/* Top Right Actions: Save & Type badge */}
+            <div className="absolute top-4 right-4 flex items-center gap-3">
+              <button
+                onClick={() => toggleSaveJob(item)}
+                className={`transition text-[22px] mt-0.5 ${isJobSaved(item._id) ? "text-pink-500" : "text-gray-200 hover:text-pink-400"}`}
+                aria-label={isJobSaved(item._id) ? "Unsave job" : "Save job"}
+              >
+                <FaHeart />
+              </button>
+              <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+                item.internshipType === 'STIPEND'
+                  ? 'bg-blue-100 text-blue-700'
+                  : item.internshipType === 'PAID'
+                  ? 'bg-red-100 text-red-700'
+                  : 'bg-green-100 text-green-700'
+              }`}>
+                {item.internshipType || 'FREE'}
+              </span>
+            </div>
 
             {/* Header */}
             <div className="flex items-start gap-3">
@@ -591,7 +763,7 @@ const Internships = () => {
                 alt="logo"
                 className="w-10 h-10 object-contain rounded-full border border-gray-100 shrink-0"
               />
-              <div className="min-w-0 pr-14">
+              <div className="min-w-0 pr-28">
                 <h3 className="text-base font-semibold text-gray-800 truncate">{item.jobTitle}</h3>
                 <p className="text-sm text-gray-500 flex items-center gap-1 mt-0.5">
                   {item.companyName}
@@ -623,14 +795,12 @@ const Internships = () => {
             )}
 
             {/* Footer */}
-            <div className="mt-4 flex justify-between items-center">
-              <button className="text-purple-600 text-sm font-medium hover:text-purple-700 hover:underline transition">View details</button>
-              <button
-                onClick={() => toggleSaveJob(item)}
-                className={`transition text-lg ${isJobSaved(item._id) ? "text-pink-500" : "text-gray-300 hover:text-pink-400"}`}
-                aria-label={isJobSaved(item._id) ? "Unsave job" : "Save job"}
+            <div className="mt-4 flex justify-end items-center">
+              <button 
+                onClick={() => setDetailsInternship(item)}
+                className="text-purple-600 text-sm font-medium hover:text-purple-700 hover:underline transition"
               >
-                <FaHeart />
+                View details
               </button>
             </div>
 
@@ -662,6 +832,14 @@ const Internships = () => {
           loading={isFetchingApplications}
           students={applications}
           onClose={closeModal}
+        />
+      )}
+
+      {/* Details Modal */}
+      {detailsInternship && (
+        <InternshipDetailsModal
+          internship={detailsInternship}
+          onClose={() => setDetailsInternship(null)}
         />
       )}
     </div>

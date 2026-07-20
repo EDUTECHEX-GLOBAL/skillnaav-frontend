@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  LineChart, Line,
-  PieChart, Pie, Cell
+  LineChart, Line, CartesianGrid,
+  PieChart, Pie, Cell, Legend,
+  AreaChart, Area
 } from "recharts";
-import { FiKey, FiClock, FiCheckCircle, FiBarChart2, FiUploadCloud, FiTrendingUp, FiTrendingDown } from "react-icons/fi";
+import { FiKey, FiClock, FiBarChart2, FiUploadCloud, FiTrendingUp, FiTrendingDown, FiRefreshCw } from "react-icons/fi";
 import { BsFileEarmarkCheck, BsClipboardData } from "react-icons/bs";
 import { motion } from "framer-motion";
 import axios from "../../../../../api/axiosInstance";
@@ -305,6 +306,7 @@ function UploadOverlay({ modal, onClose }) {
   );
 }
 
+// ─── Mock Data for New Charts ────────────────────────────────────────────────
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 export default function Dashboard() {
   const [selectedFile, setSelectedFile]   = useState(null);
@@ -321,6 +323,8 @@ export default function Dashboard() {
   const [timeRange, setTimeRange] = useState("allTime");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const [metrics, setMetrics] = useState({
     totalCredits: 0, generated: 0, remaining: 0,
@@ -341,9 +345,12 @@ export default function Dashboard() {
       .get(`/api/school-admin/dashboard-metrics?${query}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
-      .then((r) => setMetrics(r.data))
-      .catch((e) => console.error("Failed to fetch metrics:", e));
-  }, [token, timeRange, customStart, customEnd]);
+      .then((r) => {
+        setMetrics(r.data);
+      })
+      .catch((e) => console.error("Failed to fetch metrics:", e))
+      .finally(() => setIsRefreshing(false));
+  }, [token, timeRange, customStart, customEnd, refreshTrigger]);
 
   const handleCSVChange = (e) => {
     setSelectedFile(e.target.files[0]);
@@ -465,6 +472,7 @@ export default function Dashboard() {
       icon:<FiBarChart2 size={32}/>,
       color:"from-orange-400 to-orange-200",
       textColor:"text-orange-600",
+      showTimeInfo: true,
     },
     {
       label:"Credentials Generated",
@@ -501,6 +509,17 @@ export default function Dashboard() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <h2 className="text-2xl font-bold text-gray-800">Overview</h2>
         <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={() => {
+              setIsRefreshing(true);
+              setRefreshTrigger(prev => prev + 1);
+            }}
+            disabled={isRefreshing}
+            className={`flex items-center gap-2 px-4 py-2 border border-indigo-200 text-indigo-600 rounded-lg transition-colors font-medium bg-white shadow-sm ${isRefreshing ? "opacity-70 cursor-not-allowed" : "hover:bg-indigo-50"}`}
+          >
+            <FiRefreshCw size={18} className={isRefreshing ? "animate-spin" : ""} />
+            {isRefreshing ? "Refreshing..." : "Refresh"}
+          </button>
           {timeRange === "custom" && (
             <div className="flex items-center gap-2 bg-white px-3 py-1.5 border border-gray-200 rounded-lg shadow-sm">
               <input 
@@ -533,7 +552,7 @@ export default function Dashboard() {
       </div>
 
       {/* Stats cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+      <div key={`stats-${refreshTrigger}`} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
         {stats.map((stat, idx) => (
           <motion.div
             key={idx}
@@ -632,6 +651,7 @@ export default function Dashboard() {
             ) : (
               <div>
                 <div className={`text-4xl font-bold ${stat.textColor}`}>{stat.value}</div>
+
                 {stat.trend !== undefined && stat.trend !== null && timeRange !== "allTime" && (
                   <div className="mt-2 flex items-center gap-1.5 bg-white/30 rounded-full px-2.5 py-1 w-max">
                     {stat.trend >= 0 ? (
@@ -653,11 +673,23 @@ export default function Dashboard() {
         ))}
       </div>
 
+      {/* School Admin Specific Analytics */}
+      <h3 className="text-xl font-bold text-gray-800 mb-4 mt-6">School Analytics</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6 mb-8">
+        <ChartCard title="Student Enrollment Growth" icon={<FiTrendingUp className="text-blue-500"/>} type="bar" color="#3B82F6" chartData={metrics.enrollmentData || []} />
+        <ChartCard title="Internship Overview" icon={<BsFileEarmarkCheck className="text-yellow-500"/>} type="pie" pieData={metrics.completionData || []} />
+      </div>
+
       {/* Charts */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div key={`charts-${refreshTrigger}`} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6 mb-8">
         <ChartCard title="Applications (Last 6 Months)" icon={<BsClipboardData className="text-indigo-500"/>} type="bar" color="#6366F1" chartData={metrics.chartData || []} />
         <ChartCard title="Application Trend" icon={<BsClipboardData className="text-green-500" />} type="line" color="#10B981" chartData={metrics.chartData || []} />
+      </div>
+
+      {/* Status & Engagement */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6 pb-10">
         <ChartCard title="Application Status" icon={<BsFileEarmarkCheck className="text-pink-500"/>} type="pie" pieData={metrics.pieData || []} />
+        <ChartCard title="Daily Active Students" icon={<FiClock className="text-teal-500"/>} type="line" color="#14B8A6" chartData={metrics.activeStudentsData || []} />
       </div>
     </div>
   );
@@ -666,30 +698,58 @@ export default function Dashboard() {
 // ─── Utility ──────────────────────────────────────────────────────────────────
 function delay(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
+const renderLegendText = (value, entry) => {
+  return <span style={{ color: entry.color, fontWeight: 500, fontSize: '12px', textTransform: 'uppercase' }}>{value}</span>;
+};
+
 // ─── ChartCard ────────────────────────────────────────────────────────────────
-function ChartCard({ title, icon, type, color, chartData = [], pieData = [] }) {
+function ChartCard({ title, icon, type, color, chartData = [], pieData = [], angleX = false, className = "" }) {
   return (
-    <div className="bg-white p-6 rounded-2xl shadow-md font-poppins">
+    <div className={`bg-white p-6 rounded-2xl shadow-md font-poppins ${className}`}>
       <div className="flex items-center gap-3 text-gray-800 text-lg font-medium mb-4">
         {icon}{title}
       </div>
       <ResponsiveContainer width="100%" height={200}>
         {type === "bar" ? (
           <BarChart data={chartData}>
-            <XAxis dataKey="name"/><YAxis/><Tooltip/>
-            <Bar dataKey="value" fill={color} radius={[5,5,0,0]}/>
+            <CartesianGrid strokeDasharray="5 5" stroke="#ccc" vertical={true} horizontal={true} />
+            <XAxis 
+              dataKey="name" 
+              height={angleX ? 60 : 30} 
+              tick={angleX ? { fontSize: 11, angle: -45, textAnchor: 'end', fill: '#555' } : { fontSize: 12, fill: '#555' }} 
+              axisLine={{ stroke: '#999' }} tickLine={true}
+            />
+            <YAxis width={40} tick={{ fontSize: 12, fill: '#555' }} axisLine={{ stroke: '#999' }} tickLine={true} />
+            <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }} />
+            <Bar dataKey="value" fill={color} radius={[5,5,0,0]} maxBarSize={40}/>
+          </BarChart>
+        ) : type === "horizontal-bar" ? (
+          <BarChart data={chartData} layout="vertical" margin={{ left: 20 }}>
+            <XAxis type="number" hide />
+            <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 11 }} />
+            <Tooltip />
+            <Bar dataKey="value" fill={color} radius={[0,5,5,0]} />
           </BarChart>
         ) : type === "line" ? (
           <LineChart data={chartData}>
-            <XAxis dataKey="name"/><YAxis/><Tooltip/>
-            <Line type="monotone" dataKey="value" stroke={color} strokeWidth={3} dot={{ r:4 }}/>
+            <CartesianGrid strokeDasharray="5 5" stroke="#ccc" vertical={true} horizontal={true} />
+            <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#555' }} axisLine={{ stroke: '#999' }} tickLine={true} />
+            <YAxis tick={{ fontSize: 12, fill: '#555' }} axisLine={{ stroke: '#999' }} tickLine={true} />
+            <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }} />
+            <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2.5} dot={{ r: 4, strokeWidth: 2, fill: '#fff', stroke: color }} activeDot={{ r: 6, strokeWidth: 0, fill: color }}/>
           </LineChart>
+        ) : type === "area" ? (
+          <AreaChart data={chartData}>
+            <XAxis dataKey="name" /><YAxis /><Tooltip />
+            <Area type="monotone" dataKey="value" stroke={color} fillOpacity={0.2} fill={color} strokeWidth={3} />
+          </AreaChart>
         ) : (
-          <PieChart>
-            <Pie data={pieData} dataKey="value" outerRadius={60} label>
+          <PieChart margin={{ top: 20, right: 30, bottom: 10, left: 30 }}>
+            <Pie data={pieData} dataKey="value" outerRadius={50} label>
               {pieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]}/>)}
             </Pie>
-            <Tooltip />
+            <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }} />
+            <Legend iconType="square" formatter={renderLegendText} layout="horizontal" verticalAlign="bottom" align="center" wrapperStyle={{ paddingTop: '20px' }} />
           </PieChart>
         )}
       </ResponsiveContainer>

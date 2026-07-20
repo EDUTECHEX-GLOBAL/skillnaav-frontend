@@ -8,7 +8,7 @@ import {
   FaHourglassHalf, FaInbox, FaBug, FaLock, FaSpinner, FaInfoCircle,
   FaChevronLeft, FaChevronRight, FaPlus, FaCheck, FaHeadset, FaCheckDouble,
   FaFileCsv, FaCrown, FaFile, FaFilePdf, FaFileWord, FaFileAlt, FaImage, FaTimes,
-  FaArrowLeft, FaCalendarAlt, FaHistory, FaTag
+  FaArrowLeft, FaCalendarAlt, FaHistory, FaTag, FaMicrophone, FaMicrophoneSlash
 } from "react-icons/fa";
 import axios from "axios";
 import io from "socket.io-client";
@@ -529,15 +529,17 @@ const SchoolAdminSupport = () => {
 
   const [ticketToDelete,  setTicketToDelete]  = useState(null);
   const [deletingTicket,  setDeletingTicket]  = useState(null);
+  const [isListening,     setIsListening]     = useState(false);
 
-  const endRef      = useRef(null);
-  const socketRef   = useRef(null);
-  const selRef      = useRef(null);
-  const statsRef    = useRef(null);
-  const markReadRef = useRef(null);
-  const attsRef     = useRef([]);
-  const fileRef     = useRef(null);
-  const ownRef      = useRef([]);
+  const endRef        = useRef(null);
+  const socketRef     = useRef(null);
+  const selRef        = useRef(null);
+  const statsRef      = useRef(null);
+  const markReadRef   = useRef(null);
+  const attsRef       = useRef([]);
+  const fileRef       = useRef(null);
+  const ownRef        = useRef([]);
+  const recognitionRef = useRef(null);
 
   useEffect(() => { attsRef.current = atts; },             [atts]);
   useEffect(() => { ownRef.current  = ownTickets; },       [ownTickets]);
@@ -1027,6 +1029,52 @@ const SchoolAdminSupport = () => {
   const canSend = (msgInput.trim().length > 0 || atts.length > 0) && !sending && !ownTicketClosed;
   const currentBaseApi = selTicket ? baseFor(selTicket._id) : STUDENT_API;
 
+  const toggleListening = useCallback(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      showAlert("Not Supported", "Speech recognition is not supported in your browser. Please try Chrome.", "error");
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+
+    let baseText = msgInput.trim();
+
+    recognition.onresult = (e) => {
+      let finalStr = "";
+      let interimStr = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) {
+          finalStr += e.results[i][0].transcript;
+        } else {
+          interimStr += e.results[i][0].transcript;
+        }
+      }
+      
+      if (finalStr) {
+        baseText = baseText + (baseText ? " " : "") + finalStr;
+        setMsgInput(baseText + (interimStr ? " " + interimStr : ""));
+      } else {
+        setMsgInput(baseText + (baseText ? " " : "") + interimStr);
+      }
+    };
+
+    recognition.onend = () => setIsListening(false);
+    recognition.onerror = () => setIsListening(false);
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsListening(true);
+  }, [isListening, msgInput, showAlert]);
+
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-gray-50 font-poppins relative">
 
@@ -1349,8 +1397,14 @@ const SchoolAdminSupport = () => {
                             accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.webp,.csv,.txt,.xlsx,.xls,.zip"
                             onChange={handleFileChange}/>
                         </label>
+                        <button 
+                          onClick={toggleListening}
+                          className={`flex-shrink-0 p-2 rounded-full cursor-pointer transition-colors ${isListening ? "text-red-500 bg-red-50 animate-pulse" : "text-gray-500 hover:text-indigo-600 hover:bg-indigo-50"}`} 
+                          title="Auto Type (Speech to Text)">
+                          {isListening ? <FaMicrophoneSlash className="w-4 h-4"/> : <FaMicrophone className="w-4 h-4"/>}
+                        </button>
                         <input type="text"
-                          placeholder={atts.length > 0 ? "Add a caption (optional)…" : isOwn ? "Message to main admin…" : "Reply to student…"}
+                          placeholder={atts.length > 0 ? "Add a caption (optional)…" : isListening ? "Listening..." : isOwn ? "Message to main admin…" : "Reply to student…"}
                           className={`flex-1 border border-gray-300 rounded-full px-4 py-2 text-sm focus:ring-2 ${pRing} focus:border-transparent outline-none`}
                           value={msgInput} onChange={e => setMsgInput(e.target.value)}
                           onKeyDown={e => { if (e.key==="Enter"&&!e.shiftKey){e.preventDefault();handleSend();} }}

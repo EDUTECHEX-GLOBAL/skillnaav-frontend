@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import axios from "../../../../api/axiosInstance";
 import { useProctoring } from "./useProctoring";
-import * as faceapi from '@vladmandic/face-api'; // ✨ NEW: face tracking
+import { loadFaceApi } from "../../../../utils/faceApiLoader";
 
 // ── Camera Preview Component ──────────────────────────────────────────────────
-const CameraPreview = ({ stream, setStudentPhoto }) => {
+const CameraPreview = ({ stream, setStudentPhoto, faceApi }) => {
   const videoRef = useRef(null);
   const canvasRef = useRef(null); // ✨ NEW: for face tracking overlay
 
@@ -45,20 +45,20 @@ const CameraPreview = ({ stream, setStudentPhoto }) => {
   // ✨ NEW: Face tracking loop
   useEffect(() => {
     let intervalId;
-    if (stream && videoRef.current && canvasRef.current) {
+    if (stream && videoRef.current && canvasRef.current && faceApi) {
       intervalId = setInterval(async () => {
-        if (videoRef.current.readyState === 4 && faceapi.nets.tinyFaceDetector.isLoaded) {
+        if (videoRef.current.readyState === 4 && faceApi.nets.tinyFaceDetector.isLoaded) {
           try {
-            const detections = await faceapi.detectAllFaces(
+            const detections = await faceApi.detectAllFaces(
               videoRef.current,
-              new faceapi.TinyFaceDetectorOptions()
+              new faceApi.TinyFaceDetectorOptions()
             );
             const displaySize = {
               width: videoRef.current.clientWidth,
               height: videoRef.current.clientHeight,
             };
-            faceapi.matchDimensions(canvasRef.current, displaySize);
-            const resizedDetections = faceapi.resizeResults(detections, displaySize);
+            faceApi.matchDimensions(canvasRef.current, displaySize);
+            const resizedDetections = faceApi.resizeResults(detections, displaySize);
             
             const ctx = canvasRef.current.getContext("2d");
             ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
@@ -74,7 +74,7 @@ const CameraPreview = ({ stream, setStudentPhoto }) => {
       }, 200);
     }
     return () => clearInterval(intervalId);
-  }, [stream]);
+  }, [stream, faceApi]);
 
   if (!stream) return null;
 
@@ -237,12 +237,15 @@ const StudentAssessment = () => {
   const cameraStreamRef = useRef(null);
   const [cameraStream, setCameraStream] = useState(null);
   const [studentPhoto, setStudentPhoto] = useState(null); // ✨ NEW: snapshot photo
+  const [faceApi, setFaceApi] = useState(null);
 
   // ✨ NEW: Load face-api models
   useEffect(() => {
     const loadModels = async () => {
       try {
-        await faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/');
+        const loadedFaceApi = await loadFaceApi();
+        await loadedFaceApi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/');
+        setFaceApi(loadedFaceApi);
       } catch (err) {
         console.error("Failed to load face-api models:", err);
       }
@@ -576,7 +579,7 @@ const StudentAssessment = () => {
     return (
       <div className="h-screen overflow-hidden bg-[#f7f8fc] text-gray-900">
         {/* Camera preview overlay */}
-        <CameraPreview stream={cameraStream} setStudentPhoto={setStudentPhoto} />
+        <CameraPreview stream={cameraStream} setStudentPhoto={setStudentPhoto} faceApi={faceApi} />
         {/* Header */}
         <div className="bg-white border-b border-gray-200 shadow-sm text-gray-900 px-6 py-3 flex justify-between items-center lg:pr-[280px]">
           <div>

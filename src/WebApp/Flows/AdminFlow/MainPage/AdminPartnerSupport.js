@@ -14,7 +14,8 @@ import {
   FaFilePdf, FaFileWord, FaFileAlt, FaFileImage, FaFile,
   FaTimes, FaExclamationTriangle, FaBolt, FaExclamationCircle,
   FaGraduationCap, FaFilter, FaChevronUp, FaArrowLeft, FaFlag,
-  FaExternalLinkAlt, FaBell, FaHourglass, FaChevronRight, FaChevronLeft,
+  FaHourglass, FaChevronRight, FaChevronLeft,
+  FaMicrophone, FaMicrophoneSlash, FaBell, FaExternalLinkAlt
 } from "react-icons/fa";
 
 const API_BASE   = "/api/support/partner/admin";
@@ -1021,6 +1022,54 @@ function ChatArea({
 }) {
   const msgsEnd   = useRef(null);
   const fileInput = useRef(null);
+  const recognitionRef = useRef(null);
+  const [isListening, setIsListening] = useState(false);
+
+  const toggleListening = useCallback(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Speech recognition is not supported in your browser. Please try Chrome.");
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+
+    let baseText = reply.trim();
+
+    recognition.onresult = (e) => {
+      let finalStr = "";
+      let interimStr = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) {
+          finalStr += e.results[i][0].transcript;
+        } else {
+          interimStr += e.results[i][0].transcript;
+        }
+      }
+      
+      if (finalStr) {
+        baseText = baseText + (baseText ? " " : "") + finalStr;
+        setReply(baseText + (interimStr ? " " + interimStr : ""));
+      } else {
+        setReply(baseText + (baseText ? " " : "") + interimStr);
+      }
+    };
+
+    recognition.onend = () => setIsListening(false);
+    recognition.onerror = () => setIsListening(false);
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsListening(true);
+  }, [isListening, reply, setReply]);
   useEffect(() => { msgsEnd.current?.scrollIntoView({ behavior:"smooth" }); }, [messages, selected]);
 
   const accent    = "#6366f1";
@@ -1160,9 +1209,21 @@ function ChatArea({
               <button onClick={() => fileInput.current?.click()} className="p-2 rounded-full flex-shrink-0 hover:scale-105 transition-all" style={{ background:"#f3f4f6", color:isAutoEsc?"#d97706":isEsc?"#f97316":accent }}>
                 <FaPaperclip className="w-3.5 h-3.5"/>
               </button>
+              <button 
+                onClick={toggleListening}
+                title="Auto Type (Speech to Text)"
+                className="p-2 rounded-full flex-shrink-0 transition-all"
+                style={{ background:isListening?"#fef2f2":"#f3f4f6", color:isListening?"#ef4444":(isAutoEsc?"#d97706":isEsc?"#f97316":accent), position:"relative" }}>
+                {isListening && (
+                  <span style={{ position:"absolute", inset:0, borderRadius:"50%", animation:"partner-ping 1.5s cubic-bezier(0,0,0.2,1) infinite", border:"2px solid #ef4444", zIndex:0 }}/>
+                )}
+                <div style={{ position:"relative", zIndex:1 }}>
+                  {isListening ? <FaMicrophoneSlash className="w-3.5 h-3.5" /> : <FaMicrophone className="w-3.5 h-3.5" />}
+                </div>
+              </button>
               <input
                 type="text"
-                placeholder={isAutoEsc ? "Reply now — marked Needs Reply" : pendingFiles.length ? "Add a caption…" : "Reply… (Enter to send)"}
+                placeholder={isListening ? "Listening..." : isAutoEsc ? "Reply now — marked Needs Reply" : pendingFiles.length ? "Add a caption…" : "Reply… (Enter to send)"}
                 className="flex-1 border border-gray-300 rounded-full px-3 py-2 outline-none"
                 style={{ fontSize:"0.8rem", minWidth:0, borderColor:isAutoEsc?"#41198b":undefined, boxShadow:isAutoEsc?"0 0 0 2px rgba(251,191,36,0.15)":undefined }}
                 onFocus={e => { e.target.style.borderColor = isAutoEsc ? "#4a0e97" : isEsc ? "#171585" : accent; e.target.style.boxShadow = `0 0 0 3px rgba(${isAutoEsc?"251,191,36":isEsc?"249,115,22":"99,102,241"},0.15)`; }}

@@ -3,7 +3,7 @@ import axios from "../../../../api/axiosInstance";
 import { useProctoring } from "./useProctoring";
 import ProctoringWarningBanner from "./ProctoringWarningBanner";
 import DetailedAssessmentResults from "./DetailedAssessmentResults"; // ✨ NEW
-import * as faceapi from '@vladmandic/face-api'; // ✨ NEW: face tracking
+import { loadFaceApi } from "../../../../utils/faceApiLoader";
 
 const ProctoredAssessment = ({ assessment, studentId, onClose }) => {
   const [answers, setAnswers] = useState(
@@ -18,6 +18,7 @@ const ProctoredAssessment = ({ assessment, studentId, onClose }) => {
   const [studentPhoto, setStudentPhoto] = useState(null); // ✨ NEW: snapshot photo
   const containerRef = useRef(null);
   const canvasRef = useRef(null); // ✨ NEW: for face tracking overlay
+  const faceApiRef = useRef(null);
 
   // ─── In-app confirmation dialog (replaces alert for auto-submit) ───
   const [confirmDialog, setConfirmDialog] = useState(null);
@@ -80,6 +81,8 @@ const ProctoredAssessment = ({ assessment, studentId, onClose }) => {
   useEffect(() => {
     const loadModels = async () => {
       try {
+        const faceapi = await loadFaceApi();
+        faceApiRef.current = faceapi;
         await faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/');
       } catch (err) {
         console.error("Failed to load face-api models:", err);
@@ -189,6 +192,9 @@ const ProctoredAssessment = ({ assessment, studentId, onClose }) => {
     let intervalId;
     if (isReady && stream && videoRef.current && canvasRef.current) {
       intervalId = setInterval(async () => {
+        const faceapi = faceApiRef.current;
+        if (!faceapi) return;
+
         if (videoRef.current.readyState === 4 && faceapi.nets.tinyFaceDetector.isLoaded) {
           try {
             const detections = await faceapi.detectAllFaces(

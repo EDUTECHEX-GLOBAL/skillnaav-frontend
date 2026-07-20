@@ -5,11 +5,14 @@ import {
   faTrash,
   faRotateLeft,
   faLayerGroup,
+  faTriangleExclamation,
 } from "@fortawesome/free-solid-svg-icons";
 
 const Bin = () => {
   const [deletedPosts, setDeletedPosts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [postToDelete, setPostToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const partnerId = localStorage.getItem("partnerId");
 
   useEffect(() => {
@@ -50,19 +53,31 @@ const Bin = () => {
     }
   };
 
-  const handlePermanentDelete = async (id) => {
-    if (
-      !window.confirm(
-        "Are you sure you want to permanently delete this post? This action cannot be undone."
-      )
-    )
-      return;
+  useEffect(() => {
+    if (!postToDelete) return undefined;
+
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape" && !deleting) setPostToDelete(null);
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [postToDelete, deleting]);
+
+  const handlePermanentDelete = async () => {
+    if (!postToDelete || deleting) return;
+
+    const id = postToDelete._id;
+    setDeleting(true);
     try {
       await axios.delete(`/api/partner-bin/${partnerId}/${id}/permanent`);
       setDeletedPosts((prev) => prev.filter((p) => p._id !== id));
+      setPostToDelete(null);
     } catch (error) {
       console.error("Error permanently deleting post:", error);
       alert("Failed to permanently delete post.");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -149,7 +164,7 @@ const Bin = () => {
                         Restore
                       </button>
                       <button
-                        onClick={() => handlePermanentDelete(post._id)}
+                        onClick={() => setPostToDelete(post)}
                         className="inline-flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs font-semibold transition-all duration-150 hover:-translate-y-px hover:shadow-md"
                       >
                         <FontAwesomeIcon icon={faTrash} />
@@ -161,6 +176,63 @@ const Bin = () => {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {postToDelete && (
+        <div
+          className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-950/50 px-4 backdrop-blur-[2px]"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !deleting) {
+              setPostToDelete(null);
+            }
+          }}
+          role="presentation"
+        >
+          <div
+            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl sm:p-7"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-post-title"
+            aria-describedby="delete-post-description"
+          >
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600">
+                <FontAwesomeIcon icon={faTriangleExclamation} className="text-xl" />
+              </div>
+              <div>
+                <h3 id="delete-post-title" className="text-lg font-bold text-gray-900">
+                  Permanently delete internship?
+                </h3>
+                <p id="delete-post-description" className="mt-2 text-sm leading-6 text-gray-500">
+                  <span className="font-semibold text-gray-700">
+                    {postToDelete.jobTitle}
+                  </span>{" "}
+                  will be permanently removed. This action cannot be undone.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setPostToDelete(null)}
+                disabled={deleting}
+                className="rounded-lg border border-gray-300 px-5 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handlePermanentDelete}
+                disabled={deleting}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <FontAwesomeIcon icon={faTrash} />
+                {deleting ? "Deleting..." : "Delete permanently"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

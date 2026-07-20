@@ -9,7 +9,7 @@ import {
   FaInfoCircle, FaMapMarkerAlt, FaDollarSign, FaGraduationCap, FaFile,
   FaFilePdf, FaFileWord, FaFileAlt, FaFileImage, FaFileVideo, FaUserSlash,
   FaGlobe, FaSearch, FaPlus, FaTimes, FaChevronRight, FaChevronLeft,
-  FaTag, FaHistory, FaCalendarAlt, FaComments, FaArrowLeft,
+  FaTag, FaHistory, FaCalendarAlt, FaComments, FaArrowLeft, FaMicrophone, FaMicrophoneSlash
 } from "react-icons/fa";
 import axios from "../../../../../api/axiosInstance";
 import { useLocation } from "react-router-dom";
@@ -1229,11 +1229,61 @@ const ChatInput = memo(({ onSendMessage, onFilesSelected, attachments, onRemoveA
   openTicketId, selectedTicketStatus, clearSignal }) => {
   const inputRef  = useRef(null);
   const [hasText, setHasText] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef(null);
 
   useEffect(() => {
     if (inputRef.current) inputRef.current.value = "";
     setHasText(false);
   }, [clearSignal]);
+
+  const toggleListening = useCallback(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Speech recognition is not supported in your browser. Please try Chrome.");
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+
+    let baseText = inputRef.current?.value.trim() || "";
+
+    recognition.onresult = (e) => {
+      let finalStr = "";
+      let interimStr = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) {
+          finalStr += e.results[i][0].transcript;
+        } else {
+          interimStr += e.results[i][0].transcript;
+        }
+      }
+      
+      if (finalStr) {
+        baseText = baseText + (baseText ? " " : "") + finalStr;
+        if (inputRef.current) inputRef.current.value = baseText + (interimStr ? " " + interimStr : "");
+      } else {
+        if (inputRef.current) inputRef.current.value = baseText + (baseText ? " " : "") + interimStr;
+      }
+      
+      setHasText(inputRef.current.value.trim().length > 0);
+    };
+
+    recognition.onend = () => setIsListening(false);
+    recognition.onerror = () => setIsListening(false);
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsListening(true);
+  }, [isListening]);
 
   const canSend = (hasText || attachments.length > 0) && !sendingMessage && !isTicketClosed;
 
@@ -1300,11 +1350,17 @@ const ChatInput = memo(({ onSendMessage, onFilesSelected, attachments, onRemoveA
           className="p-2.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl cursor-pointer transition-colors shrink-0">
           <FaPaperclip className="w-4 h-4" />
         </FileInputButton>
+        <button 
+          onClick={toggleListening}
+          className={`p-2.5 rounded-xl cursor-pointer transition-colors shrink-0 ${isListening ? "text-red-500 bg-red-50 animate-pulse" : "text-gray-400 hover:text-indigo-600 hover:bg-indigo-50"}`} 
+          title="Auto Type (Speech to Text)">
+          {isListening ? <FaMicrophoneSlash className="w-4 h-4"/> : <FaMicrophone className="w-4 h-4"/>}
+        </button>
 
         <input
           ref={inputRef}
           type="text"
-          placeholder={attachments.length > 0 ? "Add a message (optional)…" : "Reply to this ticket…"}
+          placeholder={attachments.length > 0 ? "Add a message (optional)…" : isListening ? "Listening..." : "Reply to this ticket…"}
           className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-gray-50 outline-none focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all"
           onFocus={e=>{e.target.style.borderColor="#6366f1";e.target.style.boxShadow="0 0 0 3px rgba(99,102,241,0.15)";}}
           onBlur={e=>{e.target.style.borderColor="#e5e7eb";e.target.style.boxShadow="none";}}

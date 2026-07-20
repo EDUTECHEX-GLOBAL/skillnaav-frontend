@@ -19,6 +19,44 @@ import {
 import { MdOutlineSchool } from "react-icons/md";
 import UserCard from "./UserCard";
 
+const CustomSelect = ({ value, options, onChange, placeholder }) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const selectedOption = options.find((opt) => opt.value === value);
+
+  return (
+    <div className="relative w-full" tabIndex={0} onBlur={() => setIsOpen(false)}>
+      <div 
+        className="w-full px-4 py-3 text-sm sm:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-poppins bg-white cursor-pointer flex justify-between items-center"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <span className="truncate">{selectedOption ? selectedOption.label : placeholder}</span>
+        <svg className={`w-4 h-4 ml-2 flex-shrink-0 fill-current text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} viewBox="0 0 20 20">
+          <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" fillRule="evenodd" />
+        </svg>
+      </div>
+      {isOpen && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-auto py-1 left-0 right-0">
+          {options.map((opt) => (
+            <div
+              key={opt.value}
+              className={`px-4 py-2.5 text-sm sm:text-base cursor-pointer transition-colors ${value === opt.value ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700 hover:bg-gray-50'}`}
+              onMouseDown={(e) => {
+                // use onMouseDown instead of onClick so it fires before onBlur
+                e.preventDefault();
+                onChange(opt.value);
+                setIsOpen(false);
+              }}
+            >
+              {opt.label}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const UserManagement = () => {
   // ————————————————————————
   // HOOKS
@@ -30,6 +68,7 @@ const UserManagement = () => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [viewMode, setViewMode] = useState("grid");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
   const [isUserCardOpen, setIsUserCardOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null);
   const [confirmLoading, setConfirmLoading] = useState(false);
@@ -113,9 +152,17 @@ const UserManagement = () => {
       });
     }
 
+    if (typeFilter !== "all") {
+      result = result.filter(user => {
+        if (typeFilter === "b2b") return !!user.schoolAdmin;
+        if (typeFilter === "b2c") return !user.schoolAdmin;
+        return true;
+      });
+    }
+
     setFilteredUsers(result);
     setCurrentPage(1);
-  }, [searchQuery, statusFilter, users]);
+  }, [searchQuery, statusFilter, typeFilter, users]);
 
   const handleApprove = (userId) => setConfirmAction({ type: "approve", userId });
   const handleReject = (userId) => setConfirmAction({ type: "reject", userId });
@@ -322,16 +369,18 @@ const UserManagement = () => {
 
         {/* Filters and Search */}
         <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6 mb-6 sm:mb-8">
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
             {/* Search */}
             <div className="relative">
               <AiOutlineSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
               <input
                 type="text"
-                placeholder="Search by name, email, or university..."
+                name="user_search_query"
+                placeholder="Search..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="w-full pl-12 pr-10 py-3 text-sm sm:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-poppins"
+                autoComplete="on"
+                className="w-full pl-12 pr-10 py-3 text-sm sm:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-poppins truncate"
               />
               {searchQuery && (
                 <button
@@ -344,21 +393,36 @@ const UserManagement = () => {
             </div>
 
             {/* Status Filter */}
-            <div>
-              <select
+            <div className="relative">
+              <CustomSelect
                 value={statusFilter}
-                onChange={e => setStatusFilter(e.target.value)}
-                className="w-full px-4 py-3 text-sm sm:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-poppins"
-              >
-                <option value="all">All Statuses</option>
-                <option value="pending">Pending Review</option>
-                <option value="approved">Approved</option>
-                <option value="rejected">Rejected</option>
-              </select>
+                onChange={(val) => setStatusFilter(val)}
+                placeholder="All Statuses"
+                options={[
+                  { value: 'all', label: 'All Statuses' },
+                  { value: 'pending', label: 'Pending Review' },
+                  { value: 'approved', label: 'Approved' },
+                  { value: 'rejected', label: 'Rejected' },
+                ]}
+              />
+            </div>
+
+            {/* Type Filter */}
+            <div className="relative">
+              <CustomSelect
+                value={typeFilter}
+                onChange={(val) => setTypeFilter(val)}
+                placeholder="All Student Types"
+                options={[
+                  { value: 'all', label: 'All Student Types' },
+                  { value: 'b2b', label: 'B2B Students' },
+                  { value: 'b2c', label: 'B2C Students' },
+                ]}
+              />
             </div>
 
             {/* View Toggle */}
-            <div className="flex items-center justify-between sm:justify-end gap-2 sm:col-span-2 xl:col-span-1">
+            <div className="flex items-center justify-between sm:justify-end gap-2 xl:col-span-1">
               <span className="text-gray-600 mr-2 text-sm sm:text-base">View:</span>
               <button
                 onClick={() => setViewMode("grid")}
@@ -736,11 +800,12 @@ const UserManagement = () => {
                 ? `No users match "${searchQuery}"`
                 : "No users match the selected filters"}
             </p>
-            {(searchQuery || statusFilter !== "all") && (
+            {(searchQuery || statusFilter !== "all" || typeFilter !== "all") && (
               <button
                 onClick={() => {
                   setSearchQuery("");
                   setStatusFilter("all");
+                  setTypeFilter("all");
                 }}
                 className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
               >

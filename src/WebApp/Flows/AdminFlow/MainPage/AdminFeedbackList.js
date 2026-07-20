@@ -287,30 +287,30 @@ export default function AdminFeedbackList({ flow: initialFlowProp } = {}) {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
             <h1 className="text-2xl font-semibold text-gray-800">Feedback Inbox</h1>
             
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col lg:flex-row items-start lg:items-center gap-3 w-full sm:w-auto">
               {/* Flow Tabs */}
-              <div className="flex rounded-lg overflow-hidden border border-gray-300">
+              <div className="flex flex-wrap gap-2 w-full lg:w-auto">
                 <button 
                   onClick={() => handleTabClick("all")} 
-                  className={`px-4 py-2 text-sm font-medium transition-colors ${flowFilter === "all" ? "bg-blue-600 text-white" : "bg-white text-gray-700 hover:bg-gray-50"}`}
+                  className={`px-4 py-2 text-sm font-medium rounded-lg border transition-colors ${flowFilter === "all" ? "bg-blue-600 text-white border-blue-600 shadow-sm" : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"}`}
                 >
                   All
                 </button>
                 <button 
                   onClick={() => handleTabClick("user")} 
-                  className={`px-4 py-2 text-sm font-medium transition-colors ${flowFilter === "user" ? "bg-blue-600 text-white" : "bg-white text-gray-700 hover:bg-gray-50"}`}
+                  className={`px-4 py-2 text-sm font-medium rounded-lg border transition-colors ${flowFilter === "user" ? "bg-blue-600 text-white border-blue-600 shadow-sm" : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"}`}
                 >
                   User
                 </button>
                 <button 
                   onClick={() => handleTabClick("partner")} 
-                  className={`px-4 py-2 text-sm font-medium transition-colors ${flowFilter === "partner" ? "bg-blue-600 text-white" : "bg-white text-gray-700 hover:bg-gray-50"}`}
+                  className={`px-4 py-2 text-sm font-medium rounded-lg border transition-colors ${flowFilter === "partner" ? "bg-blue-600 text-white border-blue-600 shadow-sm" : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"}`}
                 >
                   Partner
                 </button>
                 <button 
                   onClick={() => handleTabClick("schoolAdmin")} 
-                  className={`px-4 py-2 text-sm font-medium transition-colors ${flowFilter === "schoolAdmin" ? "bg-blue-600 text-white" : "bg-white text-gray-700 hover:bg-gray-50"}`}
+                  className={`px-4 py-2 text-sm font-medium rounded-lg border transition-colors ${flowFilter === "schoolAdmin" ? "bg-blue-600 text-white border-blue-600 shadow-sm" : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"}`}
                 >
                   School Admin
                 </button>
@@ -318,7 +318,7 @@ export default function AdminFeedbackList({ flow: initialFlowProp } = {}) {
               
               <button
                 onClick={downloadCSV}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors flex items-center gap-2"
+                className="w-full lg:w-auto justify-center px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors flex items-center gap-2"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -330,57 +330,53 @@ export default function AdminFeedbackList({ flow: initialFlowProp } = {}) {
 
           {/* Filters Row */}
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
-            <div className="flex flex-col gap-2">
-              <label className="text-xs font-medium text-gray-600 uppercase tracking-wider">Flow</label>
-              <select 
-                value={flowFilter} 
-                onChange={(e) => { setFlowFilter(e.target.value); setPage(1); }} 
-                className="border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-              >
-                <option value="all">All</option>
-                <option value="user">User</option>
-                <option value="partner">Partner</option>
-                <option value="schoolAdmin">School Admin</option>
-              </select>
-            </div>
+            <CustomSelect
+              label="Flow"
+              value={flowFilter}
+              onChange={(val) => { setFlowFilter(val); setPage(1); }}
+              options={[
+                { value: "all", label: "All" },
+                { value: "user", label: "User" },
+                { value: "partner", label: "Partner" },
+                { value: "schoolAdmin", label: "School Admin" }
+              ]}
+            />
 
-            <div className="flex flex-col gap-2">
-              <label className="text-xs font-medium text-gray-600 uppercase tracking-wider">Status</label>
-              <select 
-                value={statusFilter} 
-                onChange={(e) => setStatusFilter(e.target.value)} 
-                className="border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-              >
-                <option value="all">All</option>
-                <option value="new">New</option>
-                <option value="in_review">In Review</option>
-                <option value="actioned">Actioned</option>
-                <option value="resolved">Resolved</option>
-              </select>
-            </div>
+            <CustomSelect
+              label="Status"
+              value={statusFilter}
+              onChange={(val) => setStatusFilter(val)}
+              options={[
+                { value: "all", label: "All" },
+                { value: "new", label: "New" },
+                { value: "in_review", label: "In Review" },
+                { value: "actioned", label: "Actioned" },
+                { value: "resolved", label: "Resolved" }
+              ]}
+            />
 
             <div className="flex flex-col gap-2">
               <label className="text-xs font-medium text-gray-600 uppercase tracking-wider">Date Range</label>
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <input 
                   type="date" 
                   value={fromDate} 
                   onChange={(e) => setFromDate(e.target.value)} 
-                  className="border border-gray-300 rounded-lg p-2.5 text-sm flex-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                 />
                 <input 
                   type="date" 
                   value={toDate} 
                   onChange={(e) => setToDate(e.target.value)} 
-                  className="border border-gray-300 rounded-lg p-2.5 text-sm flex-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                 />
               </div>
             </div>
           </div>
 
           {/* Search Bar */}
-          <div className="flex gap-3">
-            <div className="flex-1 relative">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex-1 relative w-full">
               <input
                 placeholder="Search text, email or notes"
                 value={search}
@@ -394,13 +390,13 @@ export default function AdminFeedbackList({ flow: initialFlowProp } = {}) {
             </div>
             <button 
               onClick={handleSearch} 
-              className="px-5 py-3 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+              className="px-5 py-3 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors w-full sm:w-auto"
             >
               Search
             </button>
             <button 
               onClick={resetFilters} 
-              className="px-5 py-3 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              className="px-5 py-3 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors w-full sm:w-auto"
             >
               Reset
             </button>
@@ -612,13 +608,13 @@ export default function AdminFeedbackList({ flow: initialFlowProp } = {}) {
       {selected && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white w-full max-w-3xl rounded-xl shadow-lg p-6 overflow-auto max-h-[90vh]">
-            <div className="flex items-start justify-between mb-6">
+            <div className="flex flex-col sm:flex-row items-start justify-between gap-4 mb-6">
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">Feedback Detail</h3>
                 <div className="text-sm text-gray-500 mt-1">{selected._id} • {selected.flow} • {fmtDate(selected.createdAt || selected.timestamp)}</div>
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2 w-full sm:w-auto mt-4 sm:mt-0">
                 <button 
                   onClick={() => markStatus(selected._id, "resolved")} 
                   disabled={actionLoading}
@@ -755,6 +751,51 @@ function InternalNoteEditor({ feedback, onSaved }) {
           Clear
         </button>
       </div>
+    </div>
+  );
+}
+
+function CustomSelect({ label, value, options, onChange }) {
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef(null);
+
+  React.useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (ref.current && !ref.current.contains(event.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const selectedOption = options.find(o => o.value === value) || options[0];
+
+  return (
+    <div className="flex flex-col gap-2 relative" ref={ref}>
+      {label && <label className="text-xs font-medium text-gray-600 uppercase tracking-wider">{label}</label>}
+      <div 
+        onClick={() => setOpen(!open)}
+        className="w-full bg-white border border-gray-300 rounded-lg p-2.5 text-sm outline-none cursor-pointer flex justify-between items-center hover:bg-gray-50 transition-colors"
+      >
+        <span className="text-gray-800">{selectedOption?.label || "Select..."}</span>
+        <svg className={`w-4 h-4 text-gray-500 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </div>
+      {open && (
+        <div className="absolute top-[100%] left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl z-50 overflow-hidden py-1">
+          {options.map((opt) => (
+            <div 
+              key={opt.value}
+              onClick={() => { onChange(opt.value); setOpen(false); }}
+              className={`px-3 py-2 text-sm cursor-pointer transition-colors ${value === opt.value ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-blue-50'}`}
+            >
+              {opt.label}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

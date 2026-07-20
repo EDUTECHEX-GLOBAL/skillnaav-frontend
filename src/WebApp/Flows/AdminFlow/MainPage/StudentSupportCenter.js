@@ -10,6 +10,7 @@ import {
   ChevronDown, Info, Flag, School, MessageSquare,
   AlertCircle, Hourglass, FileText, File, FileImage, Eye, X,
   ExternalLink, Bell, BellRing, Timer,
+  Mic, MicOff
 } from "lucide-react";
 import axios from "axios";
 import io    from "socket.io-client";
@@ -894,7 +895,9 @@ const usePanel = () => {
   const [deletingTicket,   setDeletingTicket]   = useState(false);
   const [escalationToasts, setEscalationToasts] = useState([]);
   const [showEscalationSuccess, setShowEscalationSuccess] = useState(false);
+  const [isListening,      setIsListening]      = useState(false);
 
+  const recognitionRef = useRef(null);
   const endRef         = useRef(null);
   const socketRef      = useRef(null);
   const selRef         = useRef(null);
@@ -920,6 +923,52 @@ const usePanel = () => {
   const dismissToast = useCallback((id) => {
     setEscalationToasts(prev => prev.filter(t => t.id !== id));
   }, []);
+
+  const toggleListening = useCallback(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Speech recognition is not supported in your browser. Please try Chrome.");
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+
+    let baseText = messageInput.trim();
+
+    recognition.onresult = (e) => {
+      let finalStr = "";
+      let interimStr = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) {
+          finalStr += e.results[i][0].transcript;
+        } else {
+          interimStr += e.results[i][0].transcript;
+        }
+      }
+      
+      if (finalStr) {
+        baseText = baseText + (baseText ? " " : "") + finalStr;
+        setMessageInput(baseText + (interimStr ? " " + interimStr : ""));
+      } else {
+        setMessageInput(baseText + (baseText ? " " : "") + interimStr);
+      }
+    };
+
+    recognition.onend = () => setIsListening(false);
+    recognition.onerror = () => setIsListening(false);
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsListening(true);
+  }, [isListening, messageInput]);
 
   const pickFiles = (e) => {
     const files = Array.from(e.target.files);
@@ -961,6 +1010,7 @@ const usePanel = () => {
     endRef, socketRef, selRef, ticketsRef,
     loadStatsRef, markReadRef, loadTicketsRef,
     getToken, scrollEnd, pickFiles, removeStaged,
+    isListening, toggleListening,
   };
 };
 
@@ -1768,8 +1818,20 @@ const StudentTicketsPanel = () => {
                     <Paperclip className="w-3.5 h-3.5"/>
                     <input type="file" className="hidden" multiple accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg,.gif,.webp" onChange={p.pickFiles}/>
                   </label>
+                  <button 
+                    onClick={p.toggleListening}
+                    title="Auto Type (Speech to Text)"
+                    style={{ flexShrink:0,cursor:"pointer",border:"none",background:"transparent",padding:0 }}>
+                    <div className={`${p.isListening ? 'sa-ping-red' : ''}`} style={{ width:32,height:32,borderRadius:"50%",
+                                  display:"flex",alignItems:"center",justifyContent:"center",
+                                  background:p.isListening?"#fef2f2":"#f3f4f6",
+                                  color:p.isListening?"#ef4444":(isAutoEscalated?"#2563eb":"#6366f1"),
+                                  transition:"all 0.15s" }}>
+                      {p.isListening ? <MicOff style={{ width:14,height:14 }} /> : <Mic style={{ width:14,height:14 }} />}
+                    </div>
+                  </button>
                   <input type="text"
-                    placeholder={isAutoEscalated?"Reply now — marked Needs Reply":isEscalatedInfo?"Reply to student…":"Reply… (Enter to send)"}
+                    placeholder={p.isListening ? "Listening..." : isAutoEscalated?"Reply now — marked Needs Reply":isEscalatedInfo?"Reply to student…":"Reply… (Enter to send)"}
                     className="flex-1 border border-gray-300 rounded-full px-3 py-2 outline-none"
                     style={{ fontSize:"0.8rem",minWidth:0,borderColor:isAutoEscalated?"#3b82f6":undefined,boxShadow:isAutoEscalated?"0 0 0 2px rgba(59,130,246,0.15)":undefined }}
                     onFocus={e => { e.target.style.borderColor=isAutoEscalated?"#2563eb":"#6366f1"; e.target.style.boxShadow=`0 0 0 3px rgba(${isAutoEscalated?"37,99,235":"99,102,241"},0.15)`; }}
@@ -2528,8 +2590,20 @@ const SchoolStudentPanel = () => {
                     <Paperclip className="w-3.5 h-3.5"/>
                     <input type="file" className="hidden" multiple accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg,.gif,.webp" onChange={p.pickFiles}/>
                   </label>
+                  <button 
+                    onClick={p.toggleListening}
+                    title="Auto Type (Speech to Text)"
+                    style={{ flexShrink:0,cursor:"pointer",border:"none",background:"transparent",padding:0 }}>
+                    <div className={`${p.isListening ? 'sa-ping-red' : ''}`} style={{ width:32,height:32,borderRadius:"50%",
+                                  display:"flex",alignItems:"center",justifyContent:"center",
+                                  background:p.isListening?"#fef2f2":"#f3f4f6",
+                                  color:p.isListening?"#ef4444":(isAutoEscalated?"#2563eb":"#6366f1"),
+                                  transition:"all 0.15s" }}>
+                      {p.isListening ? <MicOff style={{ width:14,height:14 }} /> : <Mic style={{ width:14,height:14 }} />}
+                    </div>
+                  </button>
                   <input type="text"
-                    placeholder={isAutoEscalated?"Reply now — marked Needs Reply":isEscalatedInfo?"Reply to student (partner notified)…":"Type your response…"}
+                    placeholder={p.isListening ? "Listening..." : isAutoEscalated?"Reply now — marked Needs Reply":isEscalatedInfo?"Reply to student (partner notified)…":"Type your response…"}
                     className="flex-1 border border-gray-300 rounded-full px-3 py-2 outline-none"
                     style={{fontSize:"0.8rem",minWidth:0,borderColor:isAutoEscalated?"#3b82f6":undefined,boxShadow:isAutoEscalated?"0 0 0 2px rgba(59,130,246,0.15)":undefined}}
                     onFocus={e=>{e.target.style.borderColor=isAutoEscalated?"#2563eb":"#6366f1";e.target.style.boxShadow=`0 0 0 3px rgba(${isAutoEscalated?"37,99,235":"99,102,241"},0.15)`;}}
@@ -2589,6 +2663,13 @@ const StudentSupportCenter = ({ initialView = "student" }) => {
 
   return (
     <div className="min-h-screen bg-gray-100 p-6">
+      <style>{`
+        @keyframes sa-ping-red {
+          0%,100% { box-shadow:0 0 0 0 rgba(239,68,68,0.5); }
+          50%      { box-shadow:0 0 0 4px rgba(239,68,68,0); }
+        }
+        .sa-ping-red  { animation:sa-ping-red 1.5s cubic-bezier(0,0,0.2,1) infinite; }
+      `}</style>
       <div className="max-w-7xl mx-auto">
         <div className="mb-5">
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2.5">

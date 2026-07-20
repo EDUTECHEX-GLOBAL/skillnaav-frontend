@@ -214,6 +214,13 @@ const UploadStudents = () => {
 
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadStatus, setUploadStatus] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
+  const [isPageLoading, setIsPageLoading] = useState(true);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => setIsPageLoading(false), 500);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Upload overlay state
   const [uploadModal, setUploadModal] = useState({
@@ -255,6 +262,8 @@ const UploadStudents = () => {
       setUploadStatus("❗ Select a CSV file first.");
       return;
     }
+
+    setIsUploading(true);
 
     Papa.parse(selectedFile, {
       header: true,
@@ -347,6 +356,7 @@ const UploadStudents = () => {
           }));
 
           setUploadStatus(`✅ ${res.data.message}`);
+          setIsUploading(false);
         } catch (err) {
           console.error(err.response?.data || err.message);
 
@@ -359,12 +369,14 @@ const UploadStudents = () => {
           });
 
           setUploadStatus("❌ Upload failed.");
+          setIsUploading(false);
         }
       },
 
       error: (err) => {
         console.error(err);
         setUploadStatus("❌ Failed to parse CSV.");
+        setIsUploading(false);
       },
     });
   };
@@ -390,6 +402,14 @@ const UploadStudents = () => {
     : uploadStatus.includes("❌") || uploadStatus.includes("❗")
     ? "border-rose-200 bg-rose-50 text-rose-700"
     : "border-slate-200 bg-slate-50 text-slate-700";
+
+  if (isPageLoading) {
+    return (
+      <div className="flex min-h-[60vh] w-full items-center justify-center">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-teal-500 border-t-transparent"></div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -455,9 +475,13 @@ const UploadStudents = () => {
 
               <button
                 onClick={handleUpload}
-                className="mt-4 inline-flex w-full items-center justify-center rounded-2xl bg-teal-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-teal-400"
+                disabled={isUploading}
+                className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-teal-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-teal-400 disabled:opacity-70 disabled:cursor-not-allowed"
               >
-                Upload Students CSV
+                {isUploading && (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-900 border-t-transparent"></div>
+                )}
+                {isUploading ? "Uploading..." : "Upload Students CSV"}
               </button>
             </div>
 

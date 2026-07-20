@@ -21,6 +21,7 @@ import {
   ChevronLeft, ChevronRight, Upload, RefreshCw,
   AlertCircle, X,
   FileText, File, FileImage, Zap, Bell,
+  Mic, MicOff
 } from "lucide-react";
 import axios from "axios";
 import io    from "socket.io-client";
@@ -766,12 +767,14 @@ const SchoolAdminSupport = () => {
 
   // pagination state for ticket list
   const [listPage, setListPage] = useState(1);
+  const [isListening, setIsListening] = useState(false);
 
   const messagesEndRef        = useRef(null);
   const socketRef             = useRef(null);
   const selectedTicketRef     = useRef(null);
   const loadStatsRef          = useRef(null);
   const markMessagesAsReadRef = useRef(null);
+  const recognitionRef        = useRef(null);
 
   const token = getToken();
   const user  = getUser();
@@ -1167,6 +1170,52 @@ const SchoolAdminSupport = () => {
     else if (unreadCount > 0) setActiveTab("unread");
   }, [needsReplyTotal, unreadCount]);
 
+  const toggleListening = useCallback(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Speech recognition is not supported in your browser. Please try Chrome.");
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+
+    let baseText = messageInput.trim();
+
+    recognition.onresult = (e) => {
+      let finalStr = "";
+      let interimStr = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) {
+          finalStr += e.results[i][0].transcript;
+        } else {
+          interimStr += e.results[i][0].transcript;
+        }
+      }
+      
+      if (finalStr) {
+        baseText = baseText + (baseText ? " " : "") + finalStr;
+        setMessageInput(baseText + (interimStr ? " " + interimStr : ""));
+      } else {
+        setMessageInput(baseText + (baseText ? " " : "") + interimStr);
+      }
+    };
+
+    recognition.onend = () => setIsListening(false);
+    recognition.onerror = () => setIsListening(false);
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsListening(true);
+  }, [isListening, messageInput]);
+
   // reset list page on tab change
   useEffect(() => { setListPage(1); }, [activeTab]);
 
@@ -1195,8 +1244,13 @@ const SchoolAdminSupport = () => {
           0%,100% { box-shadow:0 0 0 0 rgba(59,130,246,0.5); }
           50%      { box-shadow:0 0 0 4px rgba(59,130,246,0); }
         }
+        @keyframes sa-ping-red {
+          0%,100% { box-shadow:0 0 0 0 rgba(239,68,68,0.5); }
+          50%      { box-shadow:0 0 0 4px rgba(239,68,68,0); }
+        }
         .sa-ping      { animation:sa-ping 1.5s cubic-bezier(0,0,0.2,1) infinite; }
         .sa-ping-blue { animation:sa-ping-blue 1.5s cubic-bezier(0,0,0.2,1) infinite; }
+        .sa-ping-red  { animation:sa-ping-red 1.5s cubic-bezier(0,0,0.2,1) infinite; }
       `}</style>
 
       <EscalationToasts toasts={escalationToasts} onDismiss={dismissToast} />
@@ -1762,9 +1816,21 @@ const SchoolAdminSupport = () => {
                         <input type="file" style={{ display:"none" }} multiple onChange={pickFiles}
                           accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg,.gif,.webp" />
                       </label>
+                      <button 
+                        onClick={toggleListening}
+                        title="Auto Type (Speech to Text)"
+                        style={{ flexShrink:0,cursor:"pointer",border:"none",background:"transparent",padding:0 }}>
+                        <div className={`${isListening ? 'sa-ping-red' : ''}`} style={{ width:32,height:32,borderRadius:"50%",
+                                      display:"flex",alignItems:"center",justifyContent:"center",
+                                      background:isListening?"#fef2f2":"#f3f4f6",
+                                      color:isListening?"#ef4444":(selectedNeedsReply?"#3b82f6":accent),
+                                      transition:"all 0.15s" }}>
+                          {isListening ? <MicOff style={{ width:14,height:14 }} /> : <Mic style={{ width:14,height:14 }} />}
+                        </div>
+                      </button>
                       <input
                         type="text"
-                        placeholder={selectedNeedsReply
+                        placeholder={isListening ? "Listening..." : selectedNeedsReply
                           ? "Reply now — marked Needs Reply"
                           : attachments.length ? "Add a caption…" : "Reply to school admin… (Enter to send)"}
                         style={{ flex:1,border:`1px solid ${selectedNeedsReply?"#93c5fd":"#d1d5db"}`,
