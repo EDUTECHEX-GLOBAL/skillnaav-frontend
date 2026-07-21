@@ -176,15 +176,26 @@ export default function AttendanceDashboard({
     const renderLeftPanel = () => {
         if (!dashboardData?.timetable) return null;
 
-        // Group timetable by timeSlot (startTime-endTime)
+        // Only real multi-batch schedules should be split into tabs. A normal
+        // schedule can contain older sessions at their original time after the
+        // partner edits future sessions; those historical times are not batches.
         const batches = {};
-        dashboardData.timetable.forEach(slot => {
-            const key = `${slot.startTime} - ${slot.endTime}`;
-            if (!batches[key]) batches[key] = [];
-            batches[key].push(slot);
-        });
+        if (dashboardData.isBatchSchedule) {
+            dashboardData.timetable.forEach(slot => {
+                const key = `${slot.startTime} - ${slot.endTime}`;
+                if (!batches[key]) batches[key] = [];
+                batches[key].push(slot);
+            });
+        } else {
+            const key = dashboardData.defaultTimeSlot
+                || (dashboardData.timetable[0]
+                    ? `${dashboardData.timetable[0].startTime} - ${dashboardData.timetable[0].endTime}`
+                    : 'Schedule');
+            batches[key] = dashboardData.timetable;
+        }
         const batchKeys = Object.keys(batches);
-        const activeBatchSlots = batches[batchKeys[selectedBatch]] || [];
+        const activeBatchIndex = selectedBatch < batchKeys.length ? selectedBatch : 0;
+        const activeBatchSlots = batches[batchKeys[activeBatchIndex]] || [];
 
         return (
             <div className="flex flex-col h-full overflow-hidden">
@@ -198,7 +209,7 @@ export default function AttendanceDashboard({
                                 const newBatchSlots = batches[key] || [];
                                 setSelectedTimetableDate(newBatchSlots.length > 0 ? newBatchSlots[0].date : null);
                             }}
-                            className={`px-4 py-1.5 rounded-t-lg text-sm font-semibold border-b-2 transition-colors ${selectedBatch === idx
+                            className={`px-4 py-1.5 rounded-t-lg text-sm font-semibold border-b-2 transition-colors ${activeBatchIndex === idx
                                 ? 'border-indigo-500 text-indigo-700 bg-indigo-50'
                                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
                                 }`}
