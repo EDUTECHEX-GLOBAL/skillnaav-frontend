@@ -704,11 +704,20 @@ const renderLegendText = (value, entry) => {
 
 // ─── ChartCard ────────────────────────────────────────────────────────────────
 function ChartCard({ title, icon, type, color, chartData = [], pieData = [], angleX = false, className = "" }) {
+  const visiblePieData = pieData
+    .map((item) => ({ ...item, value: Number(item.value) || 0 }))
+    .filter((item) => item.value > 0);
+
   return (
     <div className={`bg-white p-6 rounded-2xl shadow-md font-poppins ${className}`}>
       <div className="flex items-center gap-3 text-gray-800 text-lg font-medium mb-4">
         {icon}{title}
       </div>
+      {type === "pie" && visiblePieData.length === 0 ? (
+        <div className="h-[200px] flex items-center justify-center text-sm text-gray-400">
+          No internship data available
+        </div>
+      ) : (
       <ResponsiveContainer width="100%" height={200}>
         {type === "bar" ? (
           <BarChart data={chartData}>
@@ -745,14 +754,15 @@ function ChartCard({ title, icon, type, color, chartData = [], pieData = [], ang
           </AreaChart>
         ) : (
           <PieChart margin={{ top: 20, right: 30, bottom: 10, left: 30 }}>
-            <Pie data={pieData} dataKey="value" outerRadius={50} label>
-              {pieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]}/>)}
+            <Pie data={visiblePieData} dataKey="value" outerRadius={50} label>
+              {visiblePieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]}/>)}
             </Pie>
             <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }} />
             <Legend iconType="square" formatter={renderLegendText} layout="horizontal" verticalAlign="bottom" align="center" wrapperStyle={{ paddingTop: '20px' }} />
           </PieChart>
         )}
       </ResponsiveContainer>
+      )}
     </div>
   );
 }

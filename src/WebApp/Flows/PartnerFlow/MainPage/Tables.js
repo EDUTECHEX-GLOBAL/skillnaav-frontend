@@ -739,6 +739,7 @@ export const ShortlistedTable = ({ candidates, internshipId, internshipTitle = "
 
   // L2 config
   const [l2Config, setL2Config] = useState({
+    assessmentType: "mcqs",
     questionCount: 10,
     difficulty: 2,
     timeLimitMinutes: 20,
@@ -1214,9 +1215,20 @@ export const ShortlistedTable = ({ candidates, internshipId, internshipTitle = "
                   Assessment Configuration
                 </summary>
                 <div className="mt-2 p-4 bg-gray-50 border border-gray-200 rounded-xl">
+                  <div className="mb-4">
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Assessment Type</label>
+                    <select
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                      value={l2Config.assessmentType || "mcqs"}
+                      onChange={(e) => setL2Config((p) => ({ ...p, assessmentType: e.target.value }))}
+                    >
+                      <option value="mcqs">MCQs</option>
+                      <option value="ai_voice_assessment">AI Voice Assessment</option>
+                    </select>
+                  </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                     {[
-                      { label: "MCQ Count", key: "questionCount", type: "number", min: 1 },
+                      { label: l2Config.assessmentType === "ai_voice_assessment" ? "Question Count" : "MCQ Count", key: "questionCount", type: "number", min: 1 },
                       { label: "Difficulty (1-3)", key: "difficulty", type: "number", min: 1, max: 3 },
                       { label: "Time (mins)", key: "timeLimitMinutes", type: "number", min: 1 },
                       { label: "Pass Score (%)", key: "passScore", type: "number", min: 1, max: 100 },

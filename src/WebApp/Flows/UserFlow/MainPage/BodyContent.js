@@ -2,7 +2,6 @@ import React, { useEffect } from "react";
 import { Navigate } from "react-router-dom";
 import { useTabContext } from "./UserHomePageContext/HomePageContext";
 import Message from "./Message";
-import AeronauticalJobs from "./AeronauticalJobs";
 import SearchBar from "./SearchBar";
 import Home from "./Home";
 import Filter from "./Filter";
@@ -40,9 +39,6 @@ const BodyContent = () => {
   switch (selectedTab) {
     case "home":
       content = <Home />;
-      break;
-    case "aeronautical-jobs":
-      content = <AeronauticalJobs />;
       break;
     case "searchbar":
       content = <SearchBar />;

@@ -228,6 +228,13 @@ const StudentAssessment = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
+  // ✨ NEW: AI Voice Assessment State
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [hasGreeted, setHasGreeted] = useState(false);
+  const [interimTranscript, setInterimTranscript] = useState("");
+  const recognitionRef = useRef(null);
+
   const timerRef = useRef(null);
   const hasSubmittedRef = useRef(false);
   const handleSubmitRef = useRef(null);
@@ -282,6 +289,140 @@ const StudentAssessment = () => {
     handleViolationRef.current = handleViolation;
   }, [handleViolation]);
 
+  const stopListening = useCallback(() => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.onend = null; // Prevent loops
+        recognitionRef.current.onresult = null;
+        recognitionRef.current.stop();
+      } catch (e) {}
+      recognitionRef.current = null;
+    }
+    setIsListening(false);
+  }, []);
+
+  const currentQRef = useRef(currentQ);
+  useEffect(() => {
+    currentQRef.current = currentQ;
+  }, [currentQ]);
+
+  const startListening = useCallback(() => {
+    try {
+      const qId = assessment?.questions?.[currentQRef.current]?.questionId;
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) return;
+
+      // Ensure old instance is stopped before creating a new one
+      stopListening();
+
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = "en-US";
+
+      recognition.onresult = (event) => {
+        let finalStr = "";
+        let interimStr = "";
+
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalStr += event.results[i][0].transcript;
+          } else {
+            interimStr += event.results[i][0].transcript;
+          }
+        }
+        
+        setInterimTranscript(interimStr);
+
+        if (finalStr && qId) {
+          setAnswers(prev => {
+            const currentAnswer = (prev[qId] && typeof prev[qId] === 'string') ? prev[qId] : "";
+            return {
+              ...prev,
+              [qId]: (currentAnswer + " " + finalStr).trim()
+            };
+          });
+        }
+      };
+
+      recognition.onend = () => {
+        // If it ended naturally (we didn't manually stop it), restart it!
+        if (recognitionRef.current === recognition) {
+          try { recognition.start(); } catch(e) {
+            setIsListening(false);
+          }
+        } else {
+          setIsListening(false);
+        }
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+      setIsListening(true);
+    } catch (e) {
+      setIsListening(false);
+    }
+  }, [assessment, stopListening]);
+
+  const speakQuestion = useCallback(() => {
+    if (mode === "exam" && assessment?.configSnapshot?.assessmentType === "ai_voice_assessment") {
+       const question = assessment.questions[currentQRef.current];
+       if (question) {
+          window.speechSynthesis.cancel();
+          stopListening();
+          setIsSpeaking(true);
+          setInterimTranscript(""); // clear interim
+          
+          const utterance = new SpeechSynthesisUtterance(question.question);
+          utterance.rate = 0.85; // Slower speed
+          utterance.onend = () => {
+             setIsSpeaking(false);
+             startListening();
+          };
+          utterance.onerror = () => {
+             setIsSpeaking(false);
+          };
+          window.speechSynthesis.speak(utterance);
+       }
+    }
+  }, [mode, assessment, startListening, stopListening]);
+
+  const lastSpokenQRef = useRef(-1);
+
+  // ✨ NEW: Read question out loud if Voice Assessment
+  useEffect(() => {
+    if (mode === "exam" && assessment?.configSnapshot?.assessmentType === "ai_voice_assessment") {
+      if (!hasGreeted) {
+        setIsSpeaking(true);
+        const utterance = new SpeechSynthesisUtterance("Hello, I am SkillNaav AI. I will now start your assessment. Good luck!");
+        utterance.rate = 0.85;
+        utterance.onend = () => {
+          setHasGreeted(true);
+          // Small delay before first question
+          setTimeout(() => {
+            if (lastSpokenQRef.current !== currentQ) {
+              lastSpokenQRef.current = currentQ;
+              speakQuestion();
+            }
+          }, 800);
+        };
+        window.speechSynthesis.speak(utterance);
+      } else {
+        if (lastSpokenQRef.current !== currentQ) {
+          lastSpokenQRef.current = currentQ;
+          speakQuestion();
+        }
+      }
+    }
+  }, [mode, currentQ, hasGreeted, speakQuestion, assessment]);
+
+  // Cancel speech on unmount only
+  useEffect(() => {
+    return () => {
+      window.speechSynthesis.cancel();
+    };
+  }, []);
+
   // Fetch assessment status and data
   useEffect(() => {
     if (!assessmentId) {
@@ -317,6 +458,7 @@ const StudentAssessment = () => {
           _id: assessmentId,
           timeLimitMinutes: statusData.timeLimitMinutes || 20,
           status: statusData.status,
+          configSnapshot: statusData.configSnapshot,
         });
         setMode("instructions");
 
@@ -387,10 +529,13 @@ const StudentAssessment = () => {
     setSubmitting(true);
 
     try {
-      const mcqAnswers = Object.entries(answers).map(([qid, idx]) => ({
-        questionId: qid,
-        selectedIndex: idx,
-      }));
+      const mcqAnswers = Object.entries(answers).map(([qid, val]) => {
+        if (typeof val === 'number') {
+          return { questionId: qid, selectedIndex: val };
+        } else {
+          return { questionId: qid, voiceAnswer: val };
+        }
+      });
 
       await axios.post(`/api/l2-assessments/${assessmentId}/submit`, {
         mcqAnswers,
@@ -421,6 +566,7 @@ const StudentAssessment = () => {
   useEffect(() => {
     handleSubmitRef.current = handleSubmit;
   }, [handleSubmit]);
+
 
   // Auto-submit on time expiry
   useEffect(() => {
@@ -496,10 +642,12 @@ const StudentAssessment = () => {
 
           <div className="space-y-4 mb-8">
             <div className="flex items-start gap-3">
-              <span className="text-blue-600 text-xl">📝</span>
+              <span className="text-blue-600 text-xl">{assessment?.configSnapshot?.assessmentType === "ai_voice_assessment" ? "🎤" : "📝"}</span>
               <div>
                 <p className="font-semibold">Questions</p>
-                <p className="text-gray-600">Multiple choice questions</p>
+                <p className="text-gray-600">
+                  {assessment?.configSnapshot?.assessmentType === "ai_voice_assessment" ? "AI Voice Assessment (Speaking)" : "Multiple choice questions"}
+                </p>
               </div>
             </div>
 
@@ -515,7 +663,7 @@ const StudentAssessment = () => {
               <span className="text-blue-600 text-xl">✅</span>
               <div>
                 <p className="font-semibold">Passing Score</p>
-                <p className="text-gray-600">70% or higher</p>
+                <p className="text-gray-600">{assessment?.configSnapshot?.passScore || 70}% or higher</p>
               </div>
             </div>
           </div>
@@ -633,7 +781,7 @@ const StudentAssessment = () => {
           <div className="mb-4 max-h-[calc(100vh-265px)] overflow-y-auto rounded-2xl border border-gray-200 bg-white p-5 shadow-sm md:p-6">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
-                Multiple Choice
+                {assessment?.configSnapshot?.assessmentType === "ai_voice_assessment" ? "AI Voice Assessment" : "Multiple Choice"}
               </span>
               <span className="text-sm font-medium text-gray-500">
                 {answeredCount} of {totalQuestions} answered
@@ -641,7 +789,39 @@ const StudentAssessment = () => {
             </div>
             <h2 className="text-lg font-bold leading-snug text-gray-950 mb-5">{currentQuestion.question}</h2>
 
-            <div className="space-y-2.5">
+            {assessment?.configSnapshot?.assessmentType === "ai_voice_assessment" ? (
+              <div className="flex flex-col items-center justify-center py-6">
+                <div className={`w-24 h-24 rounded-full flex items-center justify-center mb-6 transition-all duration-300 ${isSpeaking ? 'bg-blue-100 animate-pulse ring-4 ring-blue-300' : isListening ? 'bg-green-100 ring-4 ring-green-300 animate-pulse' : 'bg-gray-100'}`}>
+                  <span className="text-4xl">{isSpeaking ? '🗣️' : isListening ? '🎙️' : '🎤'}</span>
+                </div>
+                <h3 className="text-xl font-semibold mb-6 text-gray-800">
+                  {isSpeaking ? 'AI is speaking...' : isListening ? 'AI is listening...' : 'Ready for next question'}
+                </h3>
+                
+                {/* Live Transcript Box */}
+                <div className="w-full bg-gray-50 rounded-xl p-5 border border-gray-200 min-h-[140px] shadow-inner text-left">
+                  <p className="text-xs font-semibold text-gray-400 mb-3 uppercase tracking-wide flex items-center gap-2">
+                    {isListening && <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />}
+                    Live Transcript
+                  </p>
+                  
+                  <div className="text-gray-800 text-lg leading-relaxed font-medium">
+                    {answers[currentQuestion.questionId] && (
+                      <span>{answers[currentQuestion.questionId]} </span>
+                    )}
+                    {interimTranscript && (
+                      <span className="text-gray-400 italic">{interimTranscript}</span>
+                    )}
+                    {!answers[currentQuestion.questionId] && !interimTranscript && (
+                      <span className="text-gray-400 italic">
+                        {isSpeaking ? "(Listen carefully to the question...)" : "(Waiting for you to speak...)"}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2.5">
               {currentQuestion.options?.map((option, idx) => (
                 <label
                   key={idx}
@@ -662,6 +842,7 @@ const StudentAssessment = () => {
                 </label>
               ))}
             </div>
+            )}
           </div>
 
           {/* Navigation */}

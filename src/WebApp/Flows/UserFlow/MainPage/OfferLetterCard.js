@@ -339,7 +339,9 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
 
   const paypalInitialOptions = {
     "client-id": process.env.REACT_APP_PAYPAL_CLIENT_ID,
-    currency: "USD",
+    // PayPal requires the SDK currency to match the currency of the order.
+    // Keeping this as USD made CAD (and other non-USD) paid internships fail.
+    currency: String(job?.compensationDetails?.currency || "USD").toUpperCase(),
     intent: "capture",
   };
 
@@ -453,7 +455,10 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
 
       const response = await axios.get(
         `/api/internship/payments/status/${offer._id}`,
-        { params: { studentId: userId } }
+        {
+          params: { studentId: userId },
+          headers: { Authorization: `Bearer ${localStorage.getItem("userToken")}` },
+        }
       );
 
       if (response.data.paid) {
@@ -596,6 +601,17 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
 
     // ✅ PAID internship → show payment modal if not paid
     if (job?.internshipType === "PAID") {
+      const amount = Number(job?.compensationDetails?.amount);
+      if (!Number.isFinite(amount) || amount <= 0) {
+        toast.error("This internship has an invalid payment amount. Please contact support.");
+        return;
+      }
+
+      if (!process.env.REACT_APP_PAYPAL_CLIENT_ID) {
+        toast.error("Payments are temporarily unavailable. Please contact support.");
+        return;
+      }
+
       if (!paymentStatus?.paid) {
         setShowPaymentModal(true);
         return;
@@ -620,9 +636,8 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
       const response = await axios.post('/api/internship/payments/create-paypal-order', {
         internshipId: offer.internshipId,
         offerId: offer._id,
-        amount: job.compensationDetails.amount,
-        currency: job.compensationDetails.currency || 'USD',
-        studentId: userInfo._id,
+      }, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("userToken")}` },
       });
 
       return response.data.orderId;
@@ -641,8 +656,8 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
         {
           orderId: data.orderID,
           offerId: offer._id,
-          studentId: userInfo._id,
-        }
+        },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("userToken")}` } }
       );
 
       if (response.data.success) {
@@ -801,7 +816,7 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
   const requiresPayment = job?.internshipType === "PAID";
   const requiresStipendDetails = job?.internshipType === "STIPEND";
   const paymentAmount = job?.compensationDetails?.amount || 0;
-  const currency = job?.compensationDetails?.currency || "USD";
+  const currency = String(job?.compensationDetails?.currency || "USD").toUpperCase();
 
   const isUnpaidAccepted =
     offer?.status?.toLowerCase() === "accepted" &&
@@ -1201,6 +1216,7 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
               <PayPalButtons
                 createOrder={createPayPalOrder}
                 onApprove={onPayPalApprove}
+                forceReRender={[currency]}
                 onError={(error) => {
                   console.error('PayPal error:', error);
                   toast.error('Payment failed. Please try again.');

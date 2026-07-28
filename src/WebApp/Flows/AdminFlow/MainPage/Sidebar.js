@@ -27,10 +27,12 @@ const primaryNavItems = [
   { key: "user-management", icon: faUsers, label: "User Management" },
 ];
 
-const secondaryNavItems = [
+const preSettingsNavItems = [
   { key: "school-accounts", icon: faUniversity, label: "School Admin Accounts" },
   { key: "analytics", icon: faChartBar, label: "Analytics" },
-  { key: "settings", icon: faCogs, label: "Settings" },
+];
+
+const postSettingsNavItems = [
   { key: "bin", icon: faTrash, label: "Bin" },
 ];
 
@@ -66,11 +68,18 @@ const supportItems = [
   { key: "support-school-admins", label: "School Admin", icon: faSchool },
 ];
 
+const settingsItems = [
+  { key: "settings-platform", label: "Platform Settings" },
+  { key: "settings-roles", label: "Admin Access" },
+  { key: "settings-security", label: "Security" }
+];
+
 const PARTNER_MANAGEMENT_TABS = new Set(partnerManagementItems.map(({ key }) => key));
 const PAYMENT_MANAGEMENT_TABS = new Set(paymentManagementItems.map(({ key }) => key));
 const FEEDBACK_MANAGEMENT_TABS = new Set(feedbackManagementItems.map(({ key }) => key));
 const SUBSCRIPTION_TABS = new Set(subscriptionItems.map(({ key }) => key));
 const SUPPORT_TABS = new Set(supportItems.map(({ key }) => key));
+const SETTINGS_TABS = new Set(settingsItems.map(({ key }) => key));
 
 const SubBadge = ({ children, color = "green" }) => {
   const styles = {
@@ -96,6 +105,7 @@ const Sidebar = ({ isOpen, isCompactLayout, onClose, isDesktopOpen = true }) => 
   const [feedbackOpen, setFeedbackOpen] = useState(FEEDBACK_MANAGEMENT_TABS.has(selectedTab));
   const [subscriptionOpen, setSubscriptionOpen] = useState(SUBSCRIPTION_TABS.has(selectedTab));
   const [supportOpen, setSupportOpen] = useState(SUPPORT_TABS.has(selectedTab));
+  const [settingsOpen, setSettingsOpen] = useState(SETTINGS_TABS.has(selectedTab));
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   useEffect(() => {
@@ -104,6 +114,7 @@ const Sidebar = ({ isOpen, isCompactLayout, onClose, isDesktopOpen = true }) => 
     setFeedbackOpen(FEEDBACK_MANAGEMENT_TABS.has(selectedTab));
     setSubscriptionOpen(SUBSCRIPTION_TABS.has(selectedTab));
     setSupportOpen(SUPPORT_TABS.has(selectedTab));
+    setSettingsOpen(SETTINGS_TABS.has(selectedTab));
   }, [selectedTab]);
 
   const handleTabClick = (key) => {
@@ -347,7 +358,29 @@ const Sidebar = ({ isOpen, isCompactLayout, onClose, isDesktopOpen = true }) => 
                 />
               </li>
 
-              {secondaryNavItems.map((item) => (
+              {preSettingsNavItems.map((item) => (
+                <li key={item.key}>
+                  <SidebarButton
+                    item={item}
+                    icon={item.icon}
+                    isActive={selectedTab === item.key}
+                    onClick={() => handleTabClick(item.key)}
+                  />
+                </li>
+              ))}
+
+              <li>
+                <SidebarSection
+                  icon={faCogs}
+                  label="Settings"
+                  isActive={SETTINGS_TABS.has(selectedTab)}
+                  isExpanded={settingsOpen}
+                  setExpanded={setSettingsOpen}
+                  items={settingsItems}
+                />
+              </li>
+
+              {postSettingsNavItems.map((item) => (
                 <li key={item.key}>
                   <SidebarButton
                     item={item}

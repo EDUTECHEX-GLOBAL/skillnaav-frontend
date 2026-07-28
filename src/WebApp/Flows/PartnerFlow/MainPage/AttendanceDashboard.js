@@ -1,11 +1,11 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import axios from '../../../../api/axiosInstance';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
     faUserCheck, faCog, faCheckCircle, faTimesCircle,
     faEdit, faCalendarCheck, faClock, faPlayCircle, faStopCircle
 } from '@fortawesome/free-solid-svg-icons';
-import { format, parseISO, isValid } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 
 export default function AttendanceDashboard({
     isOpen,
@@ -30,41 +30,44 @@ export default function AttendanceDashboard({
     const [reissueResult, setReissueResult] = useState(null);
     const [selectedBatch, setSelectedBatch] = useState(0);
 
-    const fetchDashboard = async (showLoading = true) => {
+    const fetchDashboard = useCallback(async (showLoading = true) => {
         if (!isOpen || !internshipId || !partnerId) return;
-        if (showLoading && !dashboardData) setLoading(true);
+        if (showLoading) setLoading(true);
         try {
             const res = await axios.get(`/api/attendance/dashboard/${internshipId}`, {
                 params: { partnerId },
                 headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
             });
             setDashboardData(res.data);
-            if (!selectedTimetableDate && res.data.timetable && res.data.timetable.length > 0) {
-                // Default to today or first upcoming session
+            setError(null);
+            setSelectedTimetableDate((currentDate) => {
+                if (currentDate || !res.data.timetable?.length) return currentDate;
+
+                // Default to today or the first upcoming session.
                 const today = new Date().toDateString();
-                const todaySlot = res.data.timetable.find(s => new Date(s.date).toDateString() === today);
-                if (todaySlot) {
-                    setSelectedTimetableDate(todaySlot.date);
-                } else {
-                    setSelectedTimetableDate(res.data.timetable[0].date);
-                }
-            }
+                const todaySlot = res.data.timetable.find(
+                    (slot) => new Date(slot.date).toDateString() === today
+                );
+                return todaySlot?.date || res.data.timetable[0].date;
+            });
         } catch (err) {
             console.error('Failed to fetch attendance dashboard:', err);
-            if (!dashboardData) setError(err.response?.data?.message || 'Failed to fetch attendance dashboard.');
+            setError(err.response?.data?.message || 'Failed to fetch attendance dashboard.');
         } finally {
             if (showLoading) setLoading(false);
         }
-    };
+    }, [isOpen, internshipId, partnerId]);
 
     useEffect(() => {
         if (!isOpen) return;
+        setSelectedTimetableDate(null);
+        setSelectedBatch(0);
         fetchDashboard(true);
         const interval = setInterval(() => {
             fetchDashboard(false);
         }, 30000);
         return () => clearInterval(interval);
-    }, [isOpen, internshipId, partnerId]);
+    }, [isOpen, fetchDashboard]);
 
     const handleStartSession = async (date, startTime) => {
         if (startingSession) return;  // guard against double-click

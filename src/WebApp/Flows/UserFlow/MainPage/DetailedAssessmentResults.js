@@ -30,14 +30,7 @@ const DetailedAssessmentResults = ({
   const percentage = evaluation.mcqScore || 0;
   const needPercentage = Math.max(0, passThreshold - percentage);
   
-  // Format time nicely
-  const formatTime = (ms) => {
-    if (!ms) return "0m 0s";
-    const minutes = Math.floor(ms / 60000);
-    const seconds = Math.floor((ms % 60000) / 1000);
-    return `${minutes}m ${seconds}s`;
-  };
-  
+
   return (
     <div className="w-full max-w-4xl font-poppins">
       {/* ═══════════════════════════════════════════════════════════ */}

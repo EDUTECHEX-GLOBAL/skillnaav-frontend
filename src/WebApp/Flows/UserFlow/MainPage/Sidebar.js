@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faHome,
-  faPlane,
   faSearch,
   faFileAlt,
   faHeart,
@@ -37,7 +36,6 @@ const Sidebar = ({ isMobile, isOpen, onClose, isDesktopOpen = true }) => {
 
   const menuItems = [
     { id: "home", icon: faHome, label: "HomePage" },
-    { id: "aeronautical-jobs", icon: faPlane, label: "Aeronautical Jobs" },
     { id: "searchbar", icon: faSearch, label: "Search" },
     { id: "recommendations", icon: faStar, label: "Recommendations" },
     { id: "applications", icon: faFileAlt, label: "Applications" },

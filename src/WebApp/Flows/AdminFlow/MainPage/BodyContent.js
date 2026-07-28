@@ -28,6 +28,9 @@ import AdminPartnerSupport from "./AdminPartnerSupport";
 import AllConversations from "./AllConversations";
 import StudentSupportCenter from "./StudentSupportCenter";
 import SchoolAdminSupport from "./Schooladminsupport";       // ✅ NEW
+import { PlatformConfigSettings } from "./Settings/PlatformConfigSettings";
+import { AdminRolesSettings } from "./Settings/AdminRolesSettings";
+import { SecuritySettings } from "./Settings/SecuritySettings";
 
 const BodyContent = () => {
   const { selectedTab } = useTabContext();
@@ -107,6 +110,15 @@ const BodyContent = () => {
 
       case "support-school-admins":
         return <SchoolAdminSupport />;
+
+      // Settings
+      case "settings-platform":
+        return <PlatformConfigSettings />;
+      case "settings-roles":
+        return <AdminRolesSettings />;
+      case "settings-security":
+        return <SecuritySettings />;
+
 
       default:
         return (

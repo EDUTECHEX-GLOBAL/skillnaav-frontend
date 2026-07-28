@@ -7,7 +7,6 @@ const DEFAULT_TAB = "home";
 const USER_BASE_PATH = "/user-main-page";
 const VALID_TABS = new Set([
   "home",
-  "aeronautical-jobs",
   "searchbar",
   "recommendations",
   "messages",
@@ -30,7 +29,6 @@ const VALID_TABS = new Set([
 
 const TAB_ROUTE_SEGMENTS = {
   home: "home",
-  "aeronautical-jobs": "aeronautical-jobs",
   searchbar: "search",
   recommendations: "recommendations",
   messages: "messages",
