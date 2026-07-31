@@ -207,7 +207,6 @@ const SchoolAdminProfileForm = () => {
                 <option value="">Select Country</option>
                 <option value="Canada">Canada</option>
                 <option value="USA">USA</option>
-                <option value="India">India</option>
               </select>
             </div>
 

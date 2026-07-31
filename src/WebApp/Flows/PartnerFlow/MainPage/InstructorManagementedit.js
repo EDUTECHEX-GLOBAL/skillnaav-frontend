@@ -140,6 +140,7 @@ export default function InstructorManagementedit({ open, item, onClose, onSaved 
   };
 
   const [submitting, setSubmitting] = useState(false);
+  const [currentStep, setCurrentStep] = useState(1);
   const [otpOpen, setOtpOpen] = useState(false);
   const [otpEmail, setOtpEmail] = useState("");
   const [otpCode, setOtpCode] = useState("");
@@ -205,6 +206,7 @@ export default function InstructorManagementedit({ open, item, onClose, onSaved 
     setPrefSlots((p) => p.map((s, i) => (i === idx ? { ...s, [field]: value } : s)));
   const removePrefSlot = (idx) => setPrefSlots((p) => p.filter((_, i) => i !== idx));
 
+  const formRef = useRef(null);
   const startRef = useRef(null);
   const endRef = useRef(null);
   const prefStartRefs = useRef([]);
@@ -461,7 +463,7 @@ export default function InstructorManagementedit({ open, item, onClose, onSaved 
       role="dialog"
       aria-modal="true"
     >
-      <div className="bg-white w-full max-w-5xl max-h-[92vh] rounded-[28px] shadow-[0_25px_60px_-15px_rgba(15,23,42,0.35)] flex flex-col overflow-hidden border border-slate-200/70">
+      <div className="bg-white w-full max-w-4xl max-h-[92vh] rounded-[28px] shadow-[0_25px_60px_-15px_rgba(15,23,42,0.35)] flex flex-col overflow-hidden border border-slate-200/70">
         {/* ── Header ── */}
         <div className="sticky top-0 z-10 flex items-center justify-between px-7 py-4 border-b border-slate-100 bg-white/95 backdrop-blur-sm">
           <div>
@@ -486,7 +488,8 @@ export default function InstructorManagementedit({ open, item, onClose, onSaved 
         <div className="p-7 overflow-y-auto flex-1 min-h-0 bg-gradient-to-b from-slate-50/70 via-white to-slate-50/60">
           <form onSubmit={handleSubmit} className="space-y-7" noValidate>
             {/* ── Personal & Contact ── */}
-            <FormSection title="Personal & Contact" icon={faEnvelope}>
+            <div className={currentStep === 1 ? 'block animate-fade-in' : 'hidden'}>
+                      <FormSection title="Personal & Contact" icon={faEnvelope}>
               <Field label="First Name" required>
                 <input
                   name="firstName"
@@ -620,9 +623,11 @@ export default function InstructorManagementedit({ open, item, onClose, onSaved 
                 />
               </Field>
             </FormSection>
+                    </div>
 
             {/* ── Professional & Teaching ── */}
-            <FormSection title="Professional & Teaching" icon={faStar}>
+            <div className={currentStep === 2 ? 'block animate-fade-in' : 'hidden'}>
+                      <FormSection title="Professional & Teaching" icon={faStar}>
               <Field label="Highest Qualification" required>
                 <select
                   name="qualification"
@@ -662,18 +667,20 @@ export default function InstructorManagementedit({ open, item, onClose, onSaved 
                 />
               </Field>
 
-              <Field label="Teaching Specializations" span={3}>
+              <Field label="Teaching Specializations" required span={3}>
                 <input
                   name="specializations"
+                  required
                   className={inputCls}
                   defaultValue={initialSpecializations}
                   placeholder="e.g., React, Data Structures, Python (comma-separated)"
                 />
               </Field>
 
-              <Field label="Skills / Technologies" span={3}>
+              <Field label="Skills / Technologies" required span={3}>
                 <input
                   name="skills"
+                  required
                   className={inputCls}
                   defaultValue={initialSkills}
                   placeholder="e.g., MongoDB, Node.js, AWS (comma-separated)"
@@ -715,9 +722,11 @@ export default function InstructorManagementedit({ open, item, onClose, onSaved 
                 />
               </Field>
             </FormSection>
+                    </div>
 
             {/* ── Availability ── */}
-            <FormSection title="Availability" icon={faClock}>
+            <div className={currentStep === 3 ? 'block animate-fade-in' : 'hidden'}>
+                      <FormSection title="Availability" icon={faClock}>
               <div className="md:col-span-3">
                 <label className={labelCls}>
                   Weekdays <span className="text-rose-500">*</span>
@@ -907,9 +916,11 @@ export default function InstructorManagementedit({ open, item, onClose, onSaved 
                 </div>
               </div>
             </FormSection>
+                    </div>
 
             {/* ── Compensation / Payout ── */}
-            <FormSection title="Compensation / Payout" icon={faDollarSign}>
+            <div className={currentStep === 4 ? 'block animate-fade-in' : 'hidden'}>
+                      <FormSection title="Compensation / Payout" icon={faDollarSign}>
               <Field label="Rate Type">
                 <select
                   name="rateType"
@@ -979,9 +990,11 @@ export default function InstructorManagementedit({ open, item, onClose, onSaved 
                 />
               </Field>
             </FormSection>
+                    </div>
 
             {/* ── Compliance & Documents ── */}
-            <FormSection title="Compliance & Documents" icon={faShieldAlt}>
+            <div className={currentStep === 5 ? 'block animate-fade-in' : 'hidden'}>
+                      <FormSection title="Compliance & Documents" icon={faShieldAlt}>
               <Field label="Resume / CV (upload to replace)">
                 <input
                   type="file"
@@ -1048,9 +1061,11 @@ export default function InstructorManagementedit({ open, item, onClose, onSaved 
                 </label>
               </div>
             </FormSection>
+                    </div>
 
             {/* ── Assignment ── */}
-            <FormSection title="Assignment" icon={faClipboardList}>
+            <div className={currentStep === 5 ? 'block animate-fade-in' : 'hidden'}>
+                      <FormSection title="Assignment" icon={faClipboardList}>
               <Field label="Assign to Internship (title or ID)">
                 <input
                   name="assignInternship"
@@ -1070,22 +1085,66 @@ export default function InstructorManagementedit({ open, item, onClose, onSaved 
                 />
               </Field>
             </FormSection>
+                    </div>
 
-            {/* Submit */}
-            <div className="flex items-center gap-4 pt-1">
-              <button
-                type="submit"
-                disabled={submitting || otpOpen}
-                className="inline-flex items-center gap-2.5 px-7 py-3 bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 text-white text-sm font-bold rounded-xl shadow-lg shadow-violet-200/70 hover:from-indigo-700 hover:via-violet-700 hover:to-fuchsia-700 disabled:opacity-50 active:scale-[0.98] transition-all duration-150"
-              >
-                <FontAwesomeIcon icon={faCloudUploadAlt} />
-                {submitting ? "Validating..." : "Save Changes"}
-              </button>
+            
+                    {/* Wizard Footer */}
+                    <div className="flex items-center justify-between pt-5 border-t border-slate-100 mt-8">
+                      <button
+                        type="button"
+                        onClick={() => {
+                           setCurrentStep(s => Math.max(1, s - 1));
+                           document.getElementById('wizard-scroll-container')?.scrollTo(0,0);
+                        }}
+                        disabled={currentStep === 1}
+                        className={`px-6 py-2.5 rounded-xl font-semibold text-sm transition-all ${currentStep === 1 ? 'opacity-50 cursor-not-allowed bg-slate-50 text-slate-400 border border-slate-200' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 shadow-sm'}`}
+                      >
+                        Back
+                      </button>
 
-              <span className="text-xs text-slate-500">
-                You'll receive an OTP to confirm the update.
-              </span>
-            </div>
+                      <div className="flex items-center gap-3">
+                        {currentStep < 5 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                                const container = document.getElementById('wizard-scroll-container');
+                                if (!container) return;
+                                
+                                const visibleStep = container.querySelector('.block.animate-fade-in');
+                                if (!visibleStep) return;
+
+                                const inputs = visibleStep.querySelectorAll('input, select, textarea');
+                                let isValid = true;
+                                for (const input of inputs) {
+                                    if (!input.checkValidity()) {
+                                        input.reportValidity();
+                                        isValid = false;
+                                        break;
+                                    }
+                                }
+
+                                if (isValid) {
+                                    setCurrentStep(s => Math.min(5, s + 1));
+                                    container.scrollTo(0,0);
+                                }
+                            }}
+                            className="px-7 py-2.5 rounded-xl bg-slate-900 text-white font-semibold text-sm shadow-md hover:bg-slate-800 active:scale-95 transition-all"
+                          >
+                            Next
+                          </button>
+                        )}
+                        {currentStep === 5 && (
+                          <button
+                            type="submit"
+                            disabled={submitting }
+                            className="inline-flex items-center gap-2.5 px-7 py-2.5 bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 text-white text-sm font-bold rounded-xl shadow-lg shadow-violet-200/70 hover:from-indigo-700 hover:via-violet-700 hover:to-fuchsia-700 disabled:opacity-50 active:scale-[0.98] transition-all duration-150"
+                          >
+                            {submitting ? "Saving..." : "Save Instructor"}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+    
           </form>
         </div>
       </div>

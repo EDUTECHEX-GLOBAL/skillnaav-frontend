@@ -85,8 +85,9 @@ const Navbar = ({ onToggleSidebar }) => {
       const resp = data?.user ? data.user : data;
       if (!resp) return;
 
+      const existingInfo = JSON.parse(localStorage.getItem("partnerInfo")) || JSON.parse(localStorage.getItem("userInfo")) || {};
       const updatedUser = {
-        ...JSON.parse(localStorage.getItem("userInfo") || "{}"),
+        ...existingInfo,
         isPremium:         resp.isPremium,
         planType:          resp.planType,
         premiumExpiration: resp.premiumExpiration,

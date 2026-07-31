@@ -11,11 +11,16 @@ import ProfilePage from "./ProfilePage";
 import PremiumPage from "./PremiumPage";
 import Notifications from "./Notifications";
 import OfferLetter from "./OfferLetter";
-import AdvancedAi from "./AdvancedAi";
-import MaterialScience from "./MaterialScience";
-import QuantumComputing from "./QuantumComputing";
-import ClimateTech from "./ClimateTech";
-import BioTech from "./BioTech";
+import AdvancedAi from "./Sectors/AdvancedAi";
+import MaterialScience from "./Sectors/MaterialScience";
+import QuantumComputing from "./Sectors/QuantumComputing";
+import ClimateTech from "./Sectors/ClimateTech";
+import BioTech from "./Sectors/BioTech";
+import SpaceExploration from "./Sectors/SpaceExploration";
+import Neurotechnology from "./Sectors/Neurotechnology";
+import PrecisionAgriculture from "./Sectors/PrecisionAgriculture";
+import AdvancedRobotics from "./Sectors/AdvancedRobotics";
+import RenewableEnergy from "./Sectors/RenewableEnergy";
 import Recommendations from "./Recommendations";
 import StudentAssessment from "./StudentAssessment";
 import UserAttendance from "./UserAttendance";
@@ -96,6 +101,21 @@ const BodyContent = () => {
       break;
     case "materials-science":
       content = <MaterialScience />;
+      break;
+    case "space-exploration":
+      content = <SpaceExploration />;
+      break;
+    case "neurotechnology":
+      content = <Neurotechnology />;
+      break;
+    case "precision-agriculture":
+      content = <PrecisionAgriculture />;
+      break;
+    case "advanced-robotics":
+      content = <AdvancedRobotics />;
+      break;
+    case "renewable-energy":
+      content = <RenewableEnergy />;
       break;
     default:
       content = <div>Select a tab</div>;

@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from "react";
-import axios from "../../../../api/axiosInstance";
-import JobCard from "./Card";
-import ApplyCards from "./ApplyCards";
+import axios from "../../../../../api/axiosInstance";
+import JobCard from "../Card";
+import ApplyCards from "../ApplyCards";
 
-const AdvancedAi = () => {
+const ClimateTech = () => {
   // State to store fetched internships
   const [internships, setInternships] = useState([]);
   // State to store the selected job for detailed view
@@ -13,13 +13,13 @@ const AdvancedAi = () => {
   // Error state to show if API request fails
   const [error, setError] = useState(null);
 
-  // Fetch internships for "Advanced AI" sector when component mounts
+  // Fetch internships for "Climate Tech" sector when component mounts
   useEffect(() => {
     const fetchSectorInternships = async () => {
       try {
         setLoading(true); // Show loading message
         const res = await axios.get("/api/interns/approved", {
-          params: { isPremium: false, sector: "advanced-ai" }, // Filtering by sector
+          params: { isPremium: false, sector: "climate-tech" }, // Filtering by sector
         });
         setInternships(res.data.data);// Save internships in state
       } catch (err) {
@@ -40,11 +40,11 @@ const AdvancedAi = () => {
   return (
     <div className="p-4">
       {/* Page Title */}
-      <h1 className="text-2xl font-bold mb-2">Advanced AI Internships</h1>
+      <h1 className="text-2xl font-bold mb-2">Climate Tech Internships ({internships.length})</h1>
 
       {/* Short description */}
       <p className="text-gray-600 mb-4">
-        Explore the latest opportunities in the field of Advanced AI.
+        Explore the latest opportunities in the field of Climate Tech and Carbon Capture.
       </p>
 
       {/* If no job is selected, show the job listing */}
@@ -62,4 +62,4 @@ const AdvancedAi = () => {
   );
 };
 
-export default AdvancedAi;
+export default ClimateTech;

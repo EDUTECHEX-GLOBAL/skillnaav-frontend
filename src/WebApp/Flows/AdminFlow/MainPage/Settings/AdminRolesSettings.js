@@ -150,27 +150,27 @@ export const AdminRolesSettings = () => {
   return (
     <div className="p-6 bg-white rounded-2xl shadow-sm border border-gray-200 m-2 sm:m-4 md:m-6">
       {/* Header */}
-      <div className="flex items-start justify-between mb-6">
+      <div className="flex flex-col sm:flex-row items-start sm:justify-between mb-6 gap-4">
         <div>
           <h3 className="text-lg font-semibold text-gray-800">Administrator Access</h3>
           <p className="text-sm text-gray-500 mt-1">
             Manage roles and account status for platform administrators
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
           {isSuperAdmin && (
             <button
               type="button"
               onClick={() => setIsAddOpen(true)}
-              className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700 flex-1 sm:flex-none"
             >
               <UserPlus size={18} />
               Add Admin
             </button>
           )}
-          <div className="flex items-center gap-2 rounded-xl bg-gray-50 border border-gray-200 px-4 py-2.5 ">
+          <div className="flex items-center justify-center gap-2 rounded-xl bg-gray-50 border border-gray-200 px-4 py-2.5 flex-1 sm:flex-none">
             <UsersRound size={18} className="text-indigo-600" />
-            <span className="text-sm font-semibold text-gray-700">
+            <span className="text-sm font-semibold text-gray-700 whitespace-nowrap">
               {activeAdminCount} Active
             </span>
           </div>
@@ -274,82 +274,88 @@ export const AdminRolesSettings = () => {
             const initial = (admin.name || admin.email || "A").charAt(0).toUpperCase();
 
             return (
-              <div key={admin._id} className="group flex items-center gap-4 rounded-2xl bg-white border border-gray-200 p-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md hover:border-indigo-100 shadow-sm">
-                {/* Avatar */}
-                <div className="relative">
-                  <div className={`flex h-14 w-14 items-center justify-center rounded-2xl text-lg font-bold shadow-sm ${
-                    isActive 
-                      ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white' 
-                      : 'bg-gradient-to-br from-gray-200 to-gray-300 text-gray-500'
-                  }`}>
-                    {initial}
-                  </div>
-                  <div className={`absolute -right-1 -bottom-1 h-4 w-4 rounded-full border-[3px] border-white ${
-                    isActive ? 'bg-emerald-500' : 'bg-gray-300'
-                  }`} />
-                </div>
-
-                {/* Info */}
-                <div className="flex-1 min-w-0 ml-2">
-                  <div className="flex items-center gap-3">
-                    <span className="text-lg font-bold text-gray-800">
-                      {admin.name || "Unnamed Admin"}
-                    </span>
-                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
+              <div key={admin._id} className="group flex flex-col sm:flex-row sm:items-center gap-4 rounded-2xl bg-white border border-gray-200 p-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md hover:border-indigo-100 shadow-sm">
+                
+                {/* Avatar and Info wrapper */}
+                <div className="flex items-start sm:items-center gap-4 flex-1 min-w-0">
+                  {/* Avatar */}
+                  <div className="relative flex-shrink-0">
+                    <div className={`flex h-14 w-14 items-center justify-center rounded-2xl text-lg font-bold shadow-sm ${
                       isActive 
-                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
-                        : 'bg-gray-100 text-gray-600 border border-gray-200'
+                        ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white' 
+                        : 'bg-gradient-to-br from-gray-200 to-gray-300 text-gray-500'
                     }`}>
-                      <span className={`h-1.5 w-1.5 rounded-full ${isActive ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'}`} />
-                      {isActive ? 'Active' : 'Suspended'}
-                    </span>
+                      {initial}
+                    </div>
+                    <div className={`absolute -right-1 -bottom-1 h-4 w-4 rounded-full border-[3px] border-white ${
+                      isActive ? 'bg-emerald-500' : 'bg-gray-300'
+                    }`} />
                   </div>
-                  <p className="text-sm font-medium text-gray-500 mt-1 truncate">{admin.email}</p>
-                  <p className="mt-1 text-xs font-semibold text-indigo-600">{admin.role || "Support Admin"}</p>
-                  <p className="text-xs text-gray-400 mt-1.5 flex items-center gap-1.5">
-                    <Calendar size={14} className="text-gray-300" />
-                    Last login: {admin.lastLogin 
-                      ? new Date(admin.lastLogin).toLocaleDateString('en-US', { 
-                          month: 'short', 
-                          day: 'numeric', 
-                          year: 'numeric' 
-                        })
-                      : 'Never'}
-                  </p>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <span className="text-lg font-bold text-gray-800">
+                        {admin.name || "Unnamed Admin"}
+                      </span>
+                      <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
+                        isActive 
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                          : 'bg-gray-100 text-gray-600 border border-gray-200'
+                      }`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${isActive ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'}`} />
+                        {isActive ? 'Active' : 'Suspended'}
+                      </span>
+                    </div>
+                    <p className="text-sm font-medium text-gray-500 mt-1 truncate">{admin.email}</p>
+                    <p className="mt-1 text-xs font-semibold text-indigo-600">{admin.role || "Support Admin"}</p>
+                    <p className="text-xs text-gray-400 mt-1.5 flex items-center gap-1.5">
+                      <Calendar size={14} className="text-gray-300" />
+                      Last login: {admin.lastLogin 
+                        ? new Date(admin.lastLogin).toLocaleDateString('en-US', { 
+                            month: 'short', 
+                            day: 'numeric', 
+                            year: 'numeric' 
+                          })
+                        : 'Never'}
+                    </p>
+                  </div>
                 </div>
 
                 {/* Action */}
-                {isSuperAdmin && <div className="flex items-center gap-3 pl-4 border-l border-gray-100">
-                  {savingId === admin._id ? (
-                    <div className="w-[210px] flex justify-center">
-                      <Loader2 size={24} className="animate-spin text-indigo-600" />
-                    </div>
-                  ) : (
-                    <>
-                      <button
-                        onClick={() => toggleStatus(admin)}
-                        className={`relative overflow-hidden rounded-xl px-5 py-2.5 text-sm font-bold transition-all duration-300 ${
-                          isActive
-                            ? 'bg-white text-red-600 border border-red-200 hover:bg-red-50 hover:border-red-300 hover:shadow-sm'
-                            : 'bg-white text-emerald-600 border border-emerald-200 hover:bg-emerald-50 hover:border-emerald-300 hover:shadow-sm'
-                        }`}
-                      >
-                        {isActive ? 'Suspend Access' : 'Restore Access'}
-                      </button>
-                      {admin._id !== currentAdminId && (
+                {isSuperAdmin && (
+                  <div className="flex items-center justify-between sm:justify-start gap-3 sm:pl-4 sm:border-l sm:border-gray-100 pt-4 sm:pt-0 border-t sm:border-t-0 border-gray-100 w-full sm:w-auto">
+                    {savingId === admin._id ? (
+                      <div className="w-[210px] flex justify-center">
+                        <Loader2 size={24} className="animate-spin text-indigo-600" />
+                      </div>
+                    ) : (
+                      <>
                         <button
-                          type="button"
-                          onClick={() => setDeleteTarget(admin)}
-                          className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-red-200 bg-white text-red-600 transition-colors hover:bg-red-50"
-                          aria-label={`Delete ${admin.name || admin.email}`}
-                          title="Delete account"
+                          onClick={() => toggleStatus(admin)}
+                          className={`relative flex-1 sm:flex-none justify-center overflow-hidden rounded-xl px-5 py-2.5 text-sm font-bold transition-all duration-300 ${
+                            isActive
+                              ? 'bg-white text-red-600 border border-red-200 hover:bg-red-50 hover:border-red-300 hover:shadow-sm'
+                              : 'bg-white text-emerald-600 border border-emerald-200 hover:bg-emerald-50 hover:border-emerald-300 hover:shadow-sm'
+                          }`}
                         >
-                          <Trash2 size={18} />
+                          {isActive ? 'Suspend Access' : 'Restore Access'}
                         </button>
-                      )}
-                    </>
-                  )}
-                </div>}
+                        {admin._id !== currentAdminId && (
+                          <button
+                            type="button"
+                            onClick={() => setDeleteTarget(admin)}
+                            className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-red-200 bg-white text-red-600 transition-colors hover:bg-red-50 flex-shrink-0"
+                            aria-label={`Delete ${admin.name || admin.email}`}
+                            title="Delete account"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}

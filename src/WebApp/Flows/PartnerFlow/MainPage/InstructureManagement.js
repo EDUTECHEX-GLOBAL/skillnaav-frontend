@@ -253,6 +253,7 @@ const Field = ({ label, required, span = 1, children }) => (
 
 const InstructureManagement = () => {
   const [submitting, setSubmitting] = useState(false);
+  const [currentStep, setCurrentStep] = useState(1);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [instructors, setInstructors] = useState([]);
   const [search, setSearch] = useState("");
@@ -297,6 +298,7 @@ const InstructureManagement = () => {
     error: "",
   });
 
+  const formRef = useRef(null);
   const startRef = useRef(null);
   const endRef = useRef(null);
   const prefStartRefs = useRef([]);
@@ -680,7 +682,7 @@ const InstructureManagement = () => {
                 setRateType("");
                 setCurrency("");
                 setBackgroundCheck("");
-                setIsAddOpen(true);
+                { setIsAddOpen(true); setCurrentStep(1); }
               }}
               className="w-full min-w-0 justify-center inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 text-white text-xs sm:text-sm font-semibold whitespace-nowrap shadow-lg shadow-violet-200/70 hover:from-indigo-700 hover:via-violet-700 hover:to-fuchsia-700 active:scale-[0.98] transition-all duration-150"
             >
@@ -808,7 +810,7 @@ const InstructureManagement = () => {
               role="dialog"
               aria-modal="true"
             >
-              <div className="bg-white w-full max-w-5xl max-h-[92vh] rounded-[28px] shadow-[0_25px_60px_-15px_rgba(15,23,42,0.35)] flex flex-col overflow-hidden border border-slate-200/70">
+              <div className="bg-white w-full max-w-4xl max-h-[92vh] rounded-[28px] shadow-[0_25px_60px_-15px_rgba(15,23,42,0.35)] flex flex-col overflow-hidden border border-slate-200/70">
                 {/* Header */}
                 <div className="sticky top-0 z-10 flex items-center justify-between px-7 py-4 border-b border-slate-100 bg-white/95 backdrop-blur-sm">
                   <div>
@@ -830,10 +832,44 @@ const InstructureManagement = () => {
                 </div>
 
                 {/* Body */}
-                <div className="p-7 overflow-y-auto flex-1 min-h-0 bg-gradient-to-b from-slate-50/70 via-white to-slate-50/60">
-                  <form onSubmit={handleSubmit} className="space-y-7">
+                {/* ── Stepper ── */}
+                <div className="px-7 py-4 border-b border-slate-100 bg-slate-50/50">
+                  <div className="flex items-center justify-between max-w-2xl mx-auto overflow-x-auto no-scrollbar">
+                    {[
+                      { step: 1, label: 'Personal' },
+                      { step: 2, label: 'Professional' },
+                      { step: 3, label: 'Availability' },
+                      { step: 4, label: 'Compensation' },
+                      { step: 5, label: 'Compliance' }
+                    ].map((s, idx) => (
+                      <div key={s.step} className="flex items-center">
+                        <div className="flex flex-col items-center gap-1.5 shrink-0">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
+                            currentStep === s.step
+                              ? 'bg-violet-600 text-white shadow-md shadow-violet-200'
+                              : currentStep > s.step
+                              ? 'bg-emerald-500 text-white'
+                              : 'bg-white border-2 border-slate-200 text-slate-400'
+                          }`}>
+                            {currentStep > s.step ? '✓' : s.step}
+                          </div>
+                          <span className={`text-[10px] uppercase tracking-wider font-semibold ${currentStep === s.step ? 'text-violet-700' : 'text-slate-400'}`}>
+                            {s.label}
+                          </span>
+                        </div>
+                        {idx < 5 && (
+                          <div className={`w-8 sm:w-16 h-0.5 mx-2 rounded-full shrink-0 ${currentStep > s.step ? 'bg-emerald-400' : 'bg-slate-200'}`} />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
+                <div className="p-7 overflow-y-auto flex-1 min-h-0 bg-gradient-to-b from-slate-50/70 via-white to-slate-50/60" id="wizard-scroll-container">
+                  <form onSubmit={handleSubmit} className="space-y-7" ref={formRef}>
                     {/* ── Personal & Contact ── */}
-                    <FormSection title="Personal & Contact" icon={faEnvelope}>
+                    <div className={currentStep === 1 ? 'block animate-fade-in' : 'hidden'}>
+                      <FormSection title="Personal & Contact" icon={faEnvelope}>
                       <Field label="First Name" required>
                         <input
                           name="firstName"
@@ -961,9 +997,11 @@ const InstructureManagement = () => {
                         />
                       </Field>
                     </FormSection>
+                    </div>
 
                     {/* ── Professional & Teaching ── */}
-                    <FormSection title="Professional & Teaching" icon={faStar}>
+                    <div className={currentStep === 2 ? 'block animate-fade-in' : 'hidden'}>
+                      <FormSection title="Professional & Teaching" icon={faStar}>
                       <Field label="Highest Qualification">
                         <select
                           name="qualification"
@@ -991,7 +1029,7 @@ const InstructureManagement = () => {
                           className={inputCls}
                           placeholder="e.g., 3"
                         />
-                      </Field>
+                                            </Field>
 
                       <Field label="Current / Recent Organization">
                         <input
@@ -1001,33 +1039,37 @@ const InstructureManagement = () => {
                         />
                       </Field>
 
-                      <Field label="Teaching Specializations" span={3}>
+                      <Field label="Teaching Specializations" required span={3}>
                         <input
                           name="specializations"
+                          required
                           className={inputCls}
                           placeholder="e.g., React, Data Structures, Python (comma-separated)"
                         />
                       </Field>
 
-                      <Field label="Skills / Technologies" span={3}>
+                      <Field label="Skills / Technologies" required span={3}>
                         <input
                           name="skills"
+                          required
                           className={inputCls}
                           placeholder="e.g., MongoDB, Node.js, AWS (comma-separated)"
                         />
                       </Field>
 
-                      <Field label="Languages" span={2}>
+                      <Field label="Languages" required span={2}>
                         <input
                           name="languages"
+                          required
                           className={inputCls}
                           placeholder="e.g., English, Spanish (comma-separated)"
                         />
                       </Field>
 
-                      <Field label="Teaching Mode">
+                      <Field label="Teaching Mode" required>
                         <select
                           name="teachingMode"
+                          required
                           className={inputCls}
                           value={teachingMode}
                           onChange={(e) => setTeachingMode(e.target.value)}
@@ -1050,9 +1092,11 @@ const InstructureManagement = () => {
                         />
                       </Field>
                     </FormSection>
+                    </div>
 
                     {/* ── Availability ── */}
-                    <FormSection title="Availability" icon={faClock}>
+                    <div className={currentStep === 3 ? 'block animate-fade-in' : 'hidden'}>
+                      <FormSection title="Availability" icon={faClock}>
                       <div className="md:col-span-3">
                         <label className={labelCls}>
                           Weekdays <span className="text-rose-500">*</span>
@@ -1237,9 +1281,11 @@ const InstructureManagement = () => {
                         </div>
                       </div>
                     </FormSection>
+                    </div>
 
                     {/* ── Compensation / Payout ── */}
-                    <FormSection title="Compensation / Payout" icon={faDollarSign}>
+                    <div className={currentStep === 4 ? 'block animate-fade-in' : 'hidden'}>
+                      <FormSection title="Compensation / Payout" icon={faDollarSign}>
                       <Field label="Rate Type">
                         <select
                           name="rateType"
@@ -1319,9 +1365,11 @@ const InstructureManagement = () => {
                         />
                       </Field>
                     </FormSection>
+                    </div>
 
                     {/* ── Compliance & Documents ── */}
-                    <FormSection title="Compliance & Documents" icon={faShieldAlt}>
+                    <div className={currentStep === 5 ? 'block animate-fade-in' : 'hidden'}>
+                      <FormSection title="Compliance & Documents" icon={faShieldAlt}>
                       <Field label="Resume / CV" required>
                         <input
                           type="file"
@@ -1393,9 +1441,11 @@ const InstructureManagement = () => {
                         </label>
                       </div>
                     </FormSection>
+                    </div>
 
                     {/* ── Assignment ── */}
-                    <FormSection title="Assignment" icon={faClipboardList}>
+                    <div className={currentStep === 5 ? 'block animate-fade-in' : 'hidden'}>
+                      <FormSection title="Assignment" icon={faClipboardList}>
                       <Field label="Assign to Internship (title or ID)">
                         <input
                           name="assignInternship"
@@ -1413,22 +1463,66 @@ const InstructureManagement = () => {
                         />
                       </Field>
                     </FormSection>
+                    </div>
 
-                    {/* Submit */}
-                    <div className="flex items-center gap-4 pt-1">
+                    
+                    {/* Wizard Footer */}
+                    <div className="flex items-center justify-between pt-5 border-t border-slate-100 mt-8">
                       <button
-                        type="submit"
-                        disabled={submitting || otpOpen}
-                        className="inline-flex items-center gap-2.5 px-7 py-3 bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 text-white text-sm font-bold rounded-xl shadow-lg shadow-violet-200/70 hover:from-indigo-700 hover:via-violet-700 hover:to-fuchsia-700 disabled:opacity-50 active:scale-[0.98] transition-all duration-150"
+                        type="button"
+                        onClick={() => {
+                           setCurrentStep(s => Math.max(1, s - 1));
+                           document.getElementById('wizard-scroll-container')?.scrollTo(0,0);
+                        }}
+                        disabled={currentStep === 1}
+                        className={`px-6 py-2.5 rounded-xl font-semibold text-sm transition-all ${currentStep === 1 ? 'opacity-50 cursor-not-allowed bg-slate-50 text-slate-400 border border-slate-200' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 shadow-sm'}`}
                       >
-                        <FontAwesomeIcon icon={faCloudUploadAlt} />
-                        {submitting ? "Saving..." : "Save Instructor"}
+                        Back
                       </button>
 
-                      <span className="text-xs text-slate-500">
-                        You can edit or assign later from the list below.
-                      </span>
+                      <div className="flex items-center gap-3">
+                        {currentStep < 5 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                                const container = document.getElementById('wizard-scroll-container');
+                                if (!container) return;
+                                
+                                const visibleStep = container.querySelector('.block.animate-fade-in');
+                                if (!visibleStep) return;
+
+                                const inputs = visibleStep.querySelectorAll('input, select, textarea');
+                                let isValid = true;
+                                for (const input of inputs) {
+                                    if (!input.checkValidity()) {
+                                        input.reportValidity();
+                                        isValid = false;
+                                        break;
+                                    }
+                                }
+
+                                if (isValid) {
+                                    setCurrentStep(s => Math.min(5, s + 1));
+                                    container.scrollTo(0,0);
+                                }
+                            }}
+                            className="px-7 py-2.5 rounded-xl bg-slate-900 text-white font-semibold text-sm shadow-md hover:bg-slate-800 active:scale-95 transition-all"
+                          >
+                            Next
+                          </button>
+                        )}
+                        {currentStep === 5 && (
+                          <button
+                            type="submit"
+                            disabled={submitting || otpOpen}
+                            className="inline-flex items-center gap-2.5 px-7 py-2.5 bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 text-white text-sm font-bold rounded-xl shadow-lg shadow-violet-200/70 hover:from-indigo-700 hover:via-violet-700 hover:to-fuchsia-700 disabled:opacity-50 active:scale-[0.98] transition-all duration-150"
+                          >
+                            {submitting ? "Saving..." : "Save Instructor"}
+                          </button>
+                        )}
+                      </div>
                     </div>
+    
                   </form>
                 </div>
               </div>

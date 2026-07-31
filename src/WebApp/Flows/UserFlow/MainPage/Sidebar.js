@@ -32,6 +32,11 @@ const Sidebar = ({ isMobile, isOpen, onClose, isDesktopOpen = true }) => {
     { id: "climate-tech", name: "Climate Tech & Carbon Capture" },
     { id: "biotech", name: "Biotechnology & Synthetic Biology" },
     { id: "materials-science", name: "Advanced Materials Science" },
+    { id: "space-exploration", name: "Space Exploration & Commercial Space" },
+    { id: "neurotechnology", name: "Neurotechnology & Brain-Computer Interfaces" },
+    { id: "precision-agriculture", name: "Precision Agriculture & AgriTech" },
+    { id: "advanced-robotics", name: "Advanced Robotics & Human-Machine Collaboration" },
+    { id: "renewable-energy", name: "Renewable Energy & Grid Innovation" },
   ];
 
   const menuItems = [

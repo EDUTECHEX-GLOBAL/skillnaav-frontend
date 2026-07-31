@@ -15,17 +15,6 @@ import ApplyCards from "./ApplyCards";
 // ── Filter config ─────────────────────────────────────────────────────────────
 const FILTER_GROUPS = [
   {
-    key: "sector",
-    label: "Sector",
-    options: [
-      { value: "advanced-ai",       label: "Advanced AI" },
-      { value: "quantum-computing", label: "Quantum Computing" },
-      { value: "climate-tech",      label: "Climate Tech" },
-      { value: "biotech",           label: "Biotech" },
-      { value: "materials-science", label: "Materials Science" },
-    ],
-  },
-  {
     key: "internshipType",
     label: "Type",
     options: [
@@ -57,7 +46,6 @@ const FILTER_GROUPS = [
 const SearchBar = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [activeFilters, setActiveFilters] = useState({
-    sector: null,
     internshipType: null,
     internshipMode: null,
     classification: null,
@@ -99,7 +87,7 @@ const SearchBar = () => {
 
   // ── Filter helpers ────────────────────────────────────────────────────────
   const clearAllFilters = () =>
-    setActiveFilters({ sector: null, internshipType: null, internshipMode: null, classification: null });
+    setActiveFilters({ internshipType: null, internshipMode: null, classification: null });
 
   const hasActiveFilters = Object.values(activeFilters).some(Boolean);
 

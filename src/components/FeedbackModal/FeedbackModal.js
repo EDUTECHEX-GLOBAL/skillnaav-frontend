@@ -31,7 +31,11 @@ export default function FeedbackModal() {
       questions.forEach((q) => {
         initial[q.id] = ""; // intentionally empty
       });
-      if (userObj?.email) initial.contactEmail = userObj.email;
+      if (userObj?.email) {
+        initial.contactEmail = userObj.email;
+        initial.contactEmail_partner = userObj.email;
+        initial.contactEmail_school = userObj.email;
+      }
       setAnswers(initial);
       setErrors({});
     }

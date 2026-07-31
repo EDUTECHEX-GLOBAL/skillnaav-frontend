@@ -62,6 +62,11 @@ const SECTOR_LABELS = {
   "climate-tech": "Climate Tech & Carbon Capture",
   "biotech": "Biotechnology & Synthetic Biology",
   "materials-science": "Advanced Materials Science",
+  "space-exploration": "Space Exploration & Commercial Space",
+  "neurotechnology": "Neurotechnology & Brain-Computer Interfaces",
+  "precision-agriculture": "Precision Agriculture & AgriTech",
+  "advanced-robotics": "Advanced Robotics & Human-Machine Collaboration",
+  "renewable-energy": "Renewable Energy & Grid Innovation",
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
