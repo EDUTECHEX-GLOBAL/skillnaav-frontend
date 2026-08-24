@@ -32,7 +32,8 @@ const ProfileForm = () => {
   });
 
   const [citySuggestions, setCitySuggestions] = useState([]);
-  const [filteredInstitutionSuggestions, setFilteredInstitutionSuggestions] = useState([]);
+  const [filteredInstitutionSuggestions, setFilteredInstitutionSuggestions] =
+    useState([]);
   const cityTimerRef = useRef(null);
   const cityAbortRef = useRef(null);
   const institutionTimerRef = useRef(null);
@@ -46,33 +47,35 @@ const ProfileForm = () => {
 
   const [isEditing, setIsEditing] = useState(false);
   const [tempUser, setTempUser] = useState({});
+  //Add this for loading effect for save changes button - 11-08-2026
+  const [isSaving, setIsSaving] = useState(false);
 
   const stateList =
     tempUser.country === "Canada"
       ? CA_PROVINCES
       : tempUser.country === "United States"
-      ? US_STATES
-      : [];
+        ? US_STATES
+        : [];
 
   const stateLabel =
     tempUser.country === "Canada"
       ? "Province / Territory"
       : tempUser.country === "United States"
-      ? "State"
-      : "State / Province";
+        ? "State"
+        : "State / Province";
 
   const zipLabel =
     tempUser.country === "Canada"
       ? "Postal Code"
       : tempUser.country === "United States"
-      ? "ZIP Code"
-      : "ZIP / Postal Code";
+        ? "ZIP Code"
+        : "ZIP / Postal Code";
 
   const educationLevels = [
     { value: "", label: "Select Education Level" },
     { value: "highschool", label: "High School" },
     { value: "undergraduate", label: "Undergraduate" },
-    { value: "graduate", label: "Graduate" }
+    { value: "graduate", label: "Graduate" },
   ];
 
   const gradeOptions = [
@@ -80,7 +83,7 @@ const ProfileForm = () => {
     ...Array.from({ length: 5 }, (_, i) => {
       const grade = i + 8;
       return { value: `Grade ${grade}`, label: `Grade ${grade}` };
-    })
+    }),
   ];
 
   const fieldOptions = [
@@ -89,7 +92,7 @@ const ProfileForm = () => {
     { value: "Aeronautical", label: "Aeronautical Internships" },
     { value: "Tech", label: "Tech Internships" },
     { value: "Research", label: "Research Internships" },
-    { value: "Education", label: "Education Internships" }
+    { value: "Education", label: "Education Internships" },
   ];
 
   const isValidDate = (date) => {
@@ -114,8 +117,12 @@ const ProfileForm = () => {
         const formattedData = {
           ...data,
           dob: isValidDate(data.dob) ? new Date(data.dob) : "",
-          skills: Array.isArray(data.skills) ? data.skills.join(", ") : data.skills || "",
-          interests: Array.isArray(data.interests) ? data.interests.join(", ") : data.interests || "",
+          skills: Array.isArray(data.skills)
+            ? data.skills.join(", ")
+            : data.skills || "",
+          interests: Array.isArray(data.interests)
+            ? data.interests.join(", ")
+            : data.interests || "",
           preferredLocations: Array.isArray(data.preferredLocations)
             ? data.preferredLocations.join(", ")
             : data.preferredLocations || "",
@@ -211,8 +218,8 @@ const ProfileForm = () => {
       try {
         const res = await fetch(
           `/api/locations/universities?country=${encodeURIComponent(
-            tempUser.country
-          )}&query=${encodeURIComponent(value.trim())}`
+            tempUser.country,
+          )}&query=${encodeURIComponent(value.trim())}`,
         );
 
         if (!res.ok) return;
@@ -246,8 +253,8 @@ const ProfileForm = () => {
       try {
         const res = await fetch(
           `/api/locations/cities?country=${encodeURIComponent(
-            tempUser.country
-          )}&query=${encodeURIComponent(value.trim())}`
+            tempUser.country,
+          )}&query=${encodeURIComponent(value.trim())}`,
         );
 
         if (!res.ok) return;
@@ -275,13 +282,15 @@ const ProfileForm = () => {
       country: value,
       state: "",
       city: "",
-      universityName: ""
+      universityName: "",
     }));
     setCitySuggestions([]);
     setFilteredInstitutionSuggestions([]);
   };
 
   const handleUpdateProfile = async () => {
+    //for save loading effect - 11-08-2026
+    setIsSaving(true);
     setErrorMessage(null);
     setSuccessMessage("");
 
@@ -322,7 +331,7 @@ const ProfileForm = () => {
       await axios.put("/api/users/profile", formData, {
         headers: {
           Authorization: `Bearer ${token}`,
-          "Content-Type": "multipart/form-data"
+          "Content-Type": "multipart/form-data",
         },
       });
 
@@ -333,12 +342,17 @@ const ProfileForm = () => {
       const formattedUpdatedUser = {
         ...updatedUser,
         dob: isValidDate(updatedUser.dob) ? new Date(updatedUser.dob) : "",
-        skills: Array.isArray(updatedUser.skills) ? updatedUser.skills.join(", ") : updatedUser.skills || "",
-        interests: Array.isArray(updatedUser.interests) ? updatedUser.interests.join(", ") : updatedUser.interests || "",
+        skills: Array.isArray(updatedUser.skills)
+          ? updatedUser.skills.join(", ")
+          : updatedUser.skills || "",
+        interests: Array.isArray(updatedUser.interests)
+          ? updatedUser.interests.join(", ")
+          : updatedUser.interests || "",
         preferredLocations: Array.isArray(updatedUser.preferredLocations)
           ? updatedUser.preferredLocations.join(", ")
           : updatedUser.preferredLocations || "",
-        universityName: updatedUser.universityName || updatedUser.institutionName || "",
+        universityName:
+          updatedUser.universityName || updatedUser.institutionName || "",
         currentGrade: updatedUser.currentGrade || updatedUser.grade || "",
         postalCode: updatedUser.postalCode || updatedUser.zip || "",
       };
@@ -350,16 +364,28 @@ const ProfileForm = () => {
       //    lacks isPremium/planType fields that Navbar reads). Merge with existing stored
       //    premium fields so they are never wiped on a profile save.
       const existingStored = (() => {
-        try { return (JSON.parse(localStorage.getItem("studentInfo")) || JSON.parse(localStorage.getItem("userInfo"))) || {}; } catch { return {}; }
+        try {
+          return (
+            JSON.parse(localStorage.getItem("studentInfo")) ||
+            JSON.parse(localStorage.getItem("userInfo")) ||
+            {}
+          );
+        } catch {
+          return {};
+        }
       })();
-      localStorage.setItem("studentInfo", JSON.stringify({
-        ...existingStored,
-        ...updatedUser,
-        // Never overwrite premium fields from a profile-update response
-        isPremium: existingStored.isPremium ?? updatedUser.isPremium,
-        planType: existingStored.planType ?? updatedUser.planType ?? "Free",
-        premiumExpiration: existingStored.premiumExpiration ?? updatedUser.premiumExpiration,
-      }));
+      localStorage.setItem(
+        "studentInfo",
+        JSON.stringify({
+          ...existingStored,
+          ...updatedUser,
+          // Never overwrite premium fields from a profile-update response
+          isPremium: existingStored.isPremium ?? updatedUser.isPremium,
+          planType: existingStored.planType ?? updatedUser.planType ?? "Free",
+          premiumExpiration:
+            existingStored.premiumExpiration ?? updatedUser.premiumExpiration,
+        }),
+      );
 
       // ✅ FIX: Dispatch "userInfoUpdated" (what Navbar actually listens for after our fix),
       //    AND the native "storage" event for any other listeners.
@@ -371,12 +397,12 @@ const ProfileForm = () => {
 
       setCitySuggestions([]);
       setFilteredInstitutionSuggestions([]);
-
     } catch (err) {
       console.error(err);
-      setErrorMessage(
-        err.response?.data?.message || "Profile update failed."
-      );
+      setErrorMessage(err.response?.data?.message || "Profile update failed.");
+    } finally {
+      //Add this for save loading effect - 11-08-2026
+      setIsSaving(false);
     }
   };
 
@@ -394,14 +420,16 @@ const ProfileForm = () => {
 
   const getDisplayValue = (value, options) => {
     if (!value) return "";
-    const option = options.find(opt => opt.value === value);
+    const option = options.find((opt) => opt.value === value);
     return option ? option.label : value;
   };
 
   // ✅ FIX: Use tempUser.educationLevel in edit mode for conditional rendering,
   //    and user.educationLevel in view mode — previously both always used user.educationLevel
   //    which meant grade/school fields showed stale values while editing.
-  const activeEducationLevel = isEditing ? tempUser.educationLevel : user.educationLevel;
+  const activeEducationLevel = isEditing
+    ? tempUser.educationLevel
+    : user.educationLevel;
 
   return (
     <div className="min-h-screen mt-12 flex justify-center bg-gray-50 font-poppins">
@@ -411,33 +439,73 @@ const ProfileForm = () => {
           <div>
             <h2 className="text-3xl font-bold text-gray-800">Your Profile</h2>
             <p className="text-gray-500">
-              {isEditing ? "Edit your personal and academic details" : "View your personal and academic details"}
+              {isEditing
+                ? "Edit your personal and academic details"
+                : "View your personal and academic details"}
             </p>
           </div>
 
           {!isEditing ? (
+            //Add the "h-12" for decrease the height of the button - 06-08-2026
             <button
               onClick={handleEditClick}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition duration-200"
+              className="h-12 flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition duration-200"
             >
               <PencilIcon className="h-4 w-4" />
               Edit Profile
             </button>
           ) : (
             <div className="flex gap-2">
+              {/* Add the "h-12" for decrease the height of the button - 06-08-2026 */}
               <button
                 onClick={handleCancelClick}
-                className="flex items-center gap-2 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition duration-200"
+                className="h-12 flex items-center gap-2 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition duration-200"
               >
                 <XMarkIcon className="h-4 w-4" />
                 Cancel
               </button>
+              {/*Add the "h-12" for decrease the height of the button,change px-4 to px-1 add sm:px-4 - 06-08-2026 */}
               <button
                 onClick={handleUpdateProfile}
-                className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition duration-200"
+                disabled={isSaving} //add for loading - 11-08-2026
+                //className="h-12 flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-1 sm:px-4 py-2 rounded-lg transition duration-200"
+                className={`h-12 flex items-center justify-center gap-2 text-white px-1 sm:px-4 py-2 rounded-lg transition duration-200 ${
+                  isSaving
+                    ? "bg-green-500 cursor-not-allowed"
+                    : "bg-green-600 hover:bg-green-700"
+                }`}
               >
-                <CheckIcon className="h-4 w-4" />
-                Save Changes
+                {/*add this condition for effect - 11-08-2026 */}
+                {isSaving ? (
+                  <>
+                    <svg
+                      className="animate-spin h-4 w-4"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                      />
+                    </svg>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <CheckIcon className="h-4 w-4" />
+                    Save Changes
+                  </>
+                )}
               </button>
             </div>
           )}
@@ -461,7 +529,9 @@ const ProfileForm = () => {
             className="flex justify-between items-center p-4 bg-blue-50 cursor-pointer hover:bg-blue-100"
             onClick={() => setIsLevel1Open(!isLevel1Open)}
           >
-            <h3 className="text-xl font-semibold text-gray-800">Personal & Academic Information</h3>
+            <h3 className="text-xl font-semibold text-gray-800">
+              Personal & Academic Information
+            </h3>
             <span className="text-gray-600">{isLevel1Open ? "▲" : "▼"}</span>
           </div>
 
@@ -470,7 +540,9 @@ const ProfileForm = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Full Name */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Full Name</label>
+                  <label className="text-sm font-medium text-gray-700">
+                    Full Name
+                  </label>
                   {isEditing ? (
                     <input
                       type="text"
@@ -488,15 +560,20 @@ const ProfileForm = () => {
 
                 {/* Email Address */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Email Address</label>
-                  <div className="border border-gray-200 bg-gray-50 px-3 py-2 rounded-lg">
+                  <label className="text-sm font-medium text-gray-700">
+                    Email Address
+                  </label>
+                  {/*Add the "break-words" style to the email - 04-08-2026 */}
+                  <div className="border border-gray-200 bg-gray-50 px-3 py-2 rounded-lg break-words">
                     {user.email}
                   </div>
                 </div>
 
                 {/* LinkedIn Profile */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">LinkedIn Profile</label>
+                  <label className="text-sm font-medium text-gray-700">
+                    LinkedIn Profile
+                  </label>
                   {isEditing ? (
                     <input
                       type="url"
@@ -507,19 +584,29 @@ const ProfileForm = () => {
                       placeholder="https://linkedin.com/in/username"
                     />
                   ) : (
-                    <div className="border border-gray-200 bg-gray-50 px-3 py-2 rounded-lg">
+                    /*Add the "break-words" style to the linkedIn profile - 04-08-2026 */
+                    <div className="border border-gray-200 bg-gray-50 px-3 py-2 rounded-lg break-words">
                       {user.linkedin ? (
-                        <a href={user.linkedin} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                        <a
+                          href={user.linkedin}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline"
+                        >
                           {user.linkedin}
                         </a>
-                      ) : "Not provided"}
+                      ) : (
+                        "Not provided"
+                      )}
                     </div>
                   )}
                 </div>
 
                 {/* Portfolio */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Portfolio</label>
+                  <label className="text-sm font-medium text-gray-700">
+                    Portfolio
+                  </label>
                   {isEditing ? (
                     <input
                       type="url"
@@ -532,10 +619,17 @@ const ProfileForm = () => {
                   ) : (
                     <div className="border border-gray-200 bg-gray-50 px-3 py-2 rounded-lg">
                       {user.portfolio ? (
-                        <a href={user.portfolio} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                        <a
+                          href={user.portfolio}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline"
+                        >
                           {user.portfolio}
                         </a>
-                      ) : "Not provided"}
+                      ) : (
+                        "Not provided"
+                      )}
                     </div>
                   )}
                 </div>
@@ -543,7 +637,9 @@ const ProfileForm = () => {
 
               {/* Education Level */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Current level of education</label>
+                <label className="text-sm font-medium text-gray-700">
+                  Current level of education
+                </label>
                 {isEditing ? (
                   <select
                     name="educationLevel"
@@ -567,7 +663,9 @@ const ProfileForm = () => {
               {/* ✅ FIX: Use activeEducationLevel so grade/school fields react to edits instantly */}
               {activeEducationLevel === "highschool" && (
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Current Grade</label>
+                  <label className="text-sm font-medium text-gray-700">
+                    Current Grade
+                  </label>
                   {isEditing ? (
                     <select
                       name="currentGrade"
@@ -592,7 +690,9 @@ const ProfileForm = () => {
               {activeEducationLevel && (
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-700">
-                    {activeEducationLevel === "highschool" ? "School Name" : "College / University Name"}
+                    {activeEducationLevel === "highschool"
+                      ? "School Name"
+                      : "College / University Name"}
                   </label>
                   {isEditing ? (
                     <div className="relative">
@@ -616,14 +716,19 @@ const ProfileForm = () => {
                               <li
                                 key={index}
                                 onClick={() => {
-                                  setTempUser((prev) => ({ ...prev, universityName: u.name }));
+                                  setTempUser((prev) => ({
+                                    ...prev,
+                                    universityName: u.name,
+                                  }));
                                   setFilteredInstitutionSuggestions([]);
                                 }}
                                 className="cursor-pointer px-4 py-2 hover:bg-blue-50"
                               >
                                 {u.name}
                                 {u.state && (
-                                  <span className="text-xs text-gray-500 ml-2">{u.state}</span>
+                                  <span className="text-xs text-gray-500 ml-2">
+                                    {u.state}
+                                  </span>
                                 )}
                               </li>
                             ))}
@@ -640,7 +745,9 @@ const ProfileForm = () => {
 
               {/* Date of Birth */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Date of Birth</label>
+                <label className="text-sm font-medium text-gray-700">
+                  Date of Birth
+                </label>
                 {isEditing ? (
                   <DatePicker
                     selected={tempUser.dob}
@@ -662,7 +769,9 @@ const ProfileForm = () => {
 
               {/* Field of Study */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Field of Study</label>
+                <label className="text-sm font-medium text-gray-700">
+                  Field of Study
+                </label>
                 {isEditing ? (
                   <select
                     name="fieldOfStudy"
@@ -685,7 +794,9 @@ const ProfileForm = () => {
 
               {/* Desired Field */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Desired field of Internship/Job</label>
+                <label className="text-sm font-medium text-gray-700">
+                  Desired field of Internship/Job
+                </label>
                 {isEditing ? (
                   <select
                     name="desiredField"
@@ -709,7 +820,9 @@ const ProfileForm = () => {
               {/* Skills, Interests, Preferred Locations */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Skills</label>
+                  <label className="text-sm font-medium text-gray-700">
+                    Skills
+                  </label>
                   {isEditing ? (
                     <input
                       type="text"
@@ -727,7 +840,9 @@ const ProfileForm = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Interests</label>
+                  <label className="text-sm font-medium text-gray-700">
+                    Interests
+                  </label>
                   {isEditing ? (
                     <input
                       type="text"
@@ -745,7 +860,9 @@ const ProfileForm = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Preferred Locations</label>
+                  <label className="text-sm font-medium text-gray-700">
+                    Preferred Locations
+                  </label>
                   {isEditing ? (
                     <input
                       type="text"
@@ -765,16 +882,24 @@ const ProfileForm = () => {
 
               {/* Profile Image */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Profile Image</label>
+                <label className="text-sm font-medium text-gray-700">
+                  Profile Image
+                </label>
                 <div className="flex items-center gap-6">
                   {(user.profileImage || tempUser.profileImage) && (
                     <img
                       src={
-                        typeof (isEditing ? tempUser.profileImage : user.profileImage) === "object"
-                          ? URL.createObjectURL(isEditing ? tempUser.profileImage : user.profileImage)
-                          : isEditing
+                        typeof (isEditing
                           ? tempUser.profileImage
-                          : user.profileImage
+                          : user.profileImage) === "object"
+                          ? URL.createObjectURL(
+                              isEditing
+                                ? tempUser.profileImage
+                                : user.profileImage,
+                            )
+                          : isEditing
+                            ? tempUser.profileImage
+                            : user.profileImage
                       }
                       alt="Profile"
                       className="w-24 h-24 rounded-full object-cover border-2 border-gray-300"
@@ -788,7 +913,9 @@ const ProfileForm = () => {
                         onChange={handleFileChange}
                         className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                       />
-                      <p className="text-xs text-gray-500 mt-1">Upload a new profile image (JPEG, PNG, JPG)</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Upload a new profile image (JPEG, PNG, JPG)
+                      </p>
                     </div>
                   )}
                 </div>
@@ -803,7 +930,9 @@ const ProfileForm = () => {
             className="flex justify-between items-center p-4 bg-blue-50 cursor-pointer hover:bg-blue-100"
             onClick={() => setIsLevel2Open(!isLevel2Open)}
           >
-            <h3 className="text-xl font-semibold text-gray-800">Location & Additional Information</h3>
+            <h3 className="text-xl font-semibold text-gray-800">
+              Location & Additional Information
+            </h3>
             <span className="text-gray-600">{isLevel2Open ? "▲" : "▼"}</span>
           </div>
 
@@ -811,7 +940,9 @@ const ProfileForm = () => {
             <div className="p-6 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Financial Status</label>
+                  <label className="text-sm font-medium text-gray-700">
+                    Financial Status
+                  </label>
                   {isEditing ? (
                     <input
                       type="text"
@@ -831,7 +962,9 @@ const ProfileForm = () => {
                 {/* ✅ FIX: Use activeEducationLevel here too for consistency */}
                 {activeEducationLevel !== "highschool" && (
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Grade Percentage</label>
+                    <label className="text-sm font-medium text-gray-700">
+                      Grade Percentage
+                    </label>
                     {isEditing ? (
                       <input
                         type="text"
@@ -851,10 +984,14 @@ const ProfileForm = () => {
               </div>
 
               <div className="space-y-4">
-                <h4 className="text-lg font-semibold text-gray-700">Location Information</h4>
+                <h4 className="text-lg font-semibold text-gray-700">
+                  Location Information
+                </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Country</label>
+                    <label className="text-sm font-medium text-gray-700">
+                      Country
+                    </label>
                     {isEditing ? (
                       <select
                         name="country"
@@ -874,7 +1011,9 @@ const ProfileForm = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">{stateLabel}</label>
+                    <label className="text-sm font-medium text-gray-700">
+                      {stateLabel}
+                    </label>
                     {isEditing ? (
                       <select
                         name="state"
@@ -885,7 +1024,9 @@ const ProfileForm = () => {
                       >
                         <option value="">Select</option>
                         {stateList.map((s) => (
-                          <option key={s} value={s}>{s}</option>
+                          <option key={s} value={s}>
+                            {s}
+                          </option>
                         ))}
                       </select>
                     ) : (
@@ -896,7 +1037,9 @@ const ProfileForm = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">City</label>
+                    <label className="text-sm font-medium text-gray-700">
+                      City
+                    </label>
                     {isEditing ? (
                       <div className="relative">
                         <input
@@ -931,7 +1074,9 @@ const ProfileForm = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">{zipLabel}</label>
+                    <label className="text-sm font-medium text-gray-700">
+                      {zipLabel}
+                    </label>
                     {isEditing ? (
                       <input
                         type="text"
@@ -939,7 +1084,11 @@ const ProfileForm = () => {
                         value={tempUser.postalCode}
                         onChange={handleTempChange}
                         className="w-full border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        placeholder={tempUser.country === "Canada" ? "e.g., K1A 0B1" : "e.g., 94105"}
+                        placeholder={
+                          tempUser.country === "Canada"
+                            ? "e.g., K1A 0B1"
+                            : "e.g., 94105"
+                        }
                         autoComplete="postal-code"
                       />
                     ) : (
@@ -950,7 +1099,9 @@ const ProfileForm = () => {
                   </div>
 
                   <div className="md:col-span-2 space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Address</label>
+                    <label className="text-sm font-medium text-gray-700">
+                      Address
+                    </label>
                     {isEditing ? (
                       <textarea
                         name="address"
@@ -979,7 +1130,9 @@ const ProfileForm = () => {
             className="flex justify-between items-center p-4 bg-blue-50 cursor-pointer hover:bg-blue-100"
             onClick={() => setIsLevel3Open(!isLevel3Open)}
           >
-            <h3 className="text-xl font-semibold text-gray-800">Profile Level 3</h3>
+            <h3 className="text-xl font-semibold text-gray-800">
+              Profile Level 3
+            </h3>
             <span className="text-gray-600">{isLevel3Open ? "▲" : "▼"}</span>
           </div>
 

@@ -12,7 +12,6 @@ import {
   faClock,
   faDollarSign,
   faClipboardList,
-  faCloudUploadAlt,
   faPlus,
 } from "@fortawesome/free-solid-svg-icons";
 
@@ -206,7 +205,6 @@ export default function InstructorManagementedit({ open, item, onClose, onSaved 
     setPrefSlots((p) => p.map((s, i) => (i === idx ? { ...s, [field]: value } : s)));
   const removePrefSlot = (idx) => setPrefSlots((p) => p.filter((_, i) => i !== idx));
 
-  const formRef = useRef(null);
   const startRef = useRef(null);
   const endRef = useRef(null);
   const prefStartRefs = useRef([]);
@@ -233,7 +231,6 @@ export default function InstructorManagementedit({ open, item, onClose, onSaved 
   const toCSV = (arr) =>
     Array.isArray(arr) ? arr.join(", ") : typeof arr === "string" ? arr : "";
 
-  const initialSpecializations = toCSV(item?.specializations);
   const initialSkills = toCSV(item?.skills);
   const initialLanguages = toCSV(item?.languages);
 
@@ -485,7 +482,7 @@ export default function InstructorManagementedit({ open, item, onClose, onSaved 
         </div>
 
         {/* ── Body ── */}
-        <div className="p-7 overflow-y-auto flex-1 min-h-0 bg-gradient-to-b from-slate-50/70 via-white to-slate-50/60">
+        <div id="wizard-scroll-container" className="p-7 overflow-y-auto flex-1 min-h-0 bg-gradient-to-b from-slate-50/70 via-white to-slate-50/60">
           <form onSubmit={handleSubmit} className="space-y-7" noValidate>
             {/* ── Personal & Contact ── */}
             <div className={currentStep === 1 ? 'block animate-fade-in' : 'hidden'}>
@@ -667,15 +664,7 @@ export default function InstructorManagementedit({ open, item, onClose, onSaved 
                 />
               </Field>
 
-              <Field label="Teaching Specializations" required span={3}>
-                <input
-                  name="specializations"
-                  required
-                  className={inputCls}
-                  defaultValue={initialSpecializations}
-                  placeholder="e.g., React, Data Structures, Python (comma-separated)"
-                />
-              </Field>
+
 
               <Field label="Skills / Technologies" required span={3}>
                 <input
@@ -687,7 +676,7 @@ export default function InstructorManagementedit({ open, item, onClose, onSaved 
                 />
               </Field>
 
-              <Field label="Languages" span={2}>
+              <Field label="Spoken Languages" span={2}>
                 <input
                   name="languages"
                   className={inputCls}

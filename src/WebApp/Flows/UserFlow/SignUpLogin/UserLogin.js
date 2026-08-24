@@ -236,7 +236,16 @@ const UserLogin = () => {
           <div className="flex justify-center mt-4">
             <p className="text-sm text-gray-600">
               Don't have an account?{" "}
-              <Link to="/user-create-account" className="text-teal-500 hover:text-teal-700">
+              <Link 
+                to="/user-create-account" 
+                onClick={() => {
+                  localStorage.removeItem("userToken");
+                  localStorage.removeItem("studentInfo");
+                  sessionStorage.removeItem("reg_step");
+                  sessionStorage.removeItem("reg_formdata");
+                }}
+                className="text-teal-500 hover:text-teal-700"
+              >
                 Sign Up
               </Link>
             </p>

@@ -27,6 +27,7 @@ const isFutureDate = (dateString) => {
 };
 
 // ✅ ADD THIS (below isFutureDate)
+// eslint-disable-next-line no-unused-vars
 const parseWorkHoursRange = (text = '') => {
   // Accepts: "09:00 - 17:00" or "09:00–17:00"
   const m = String(text).match(/(\d{1,2}:\d{2})\s*[-–—]\s*(\d{1,2}:\d{2})/);
@@ -142,6 +143,7 @@ const ScheduleFormPaid = ({ internshipId, onClose, initialInternshipMode = '' })
   const [previewed, setPreviewed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [excelData, setExcelData] = useState({});
+  const [mockInterviews, setMockInterviews] = useState([]);
   const todayRef = useRef(null);
   const previewScrollRef = useRef(null);
   const hasAutoScrolledRef = useRef(false);
@@ -357,7 +359,8 @@ const ScheduleFormPaid = ({ internshipId, onClose, initialInternshipMode = '' })
           sectionSummary: entry.sectionSummary || '',
           instructor: entry.instructor || '',
           assignment: entry.assignment || null,
-          events: entry.events || []
+          events: entry.events || [],
+          mockInterview: entry.mockInterview || { enabled: false, questions: [] }
         }));
 
         if (data.batches && data.batches.length > 0) {
@@ -379,6 +382,15 @@ const ScheduleFormPaid = ({ internshipId, onClose, initialInternshipMode = '' })
           }
           setBatchTimetables({ [fallbackSlot]: formatTimetable(data.timetable) });
           setActiveBatchTab(fallbackSlot);
+        }
+
+        try {
+          const miResponse = await axios.get(`/api/mock-interviews/internship/${internshipId}`, {
+            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+          });
+          setMockInterviews(miResponse.data || []);
+        } catch (e) {
+          console.error("Failed to load mock interviews", e);
         }
 
         // ✅ Always go straight to preview if schedule exists
@@ -483,6 +495,55 @@ const ScheduleFormPaid = ({ internshipId, onClose, initialInternshipMode = '' })
     const newBatchTimetables = {};
     let firstSlot = "";
 
+    // Calculate target mock interview weeks
+    const startObj = new Date(startDate);
+    const endObj = new Date(endDate);
+    const diffDays = Math.ceil(Math.abs(endObj - startObj) / (1000 * 60 * 60 * 24));
+    const weeksCount = diffDays / 7;
+    const targetMockWeeks = [];
+    const weeksRound = Math.round(weeksCount);
+    if (weeksRound <= 4) {
+      targetMockWeeks.push(2);
+    } else {
+      // Automatically add a mock interview every 3 weeks (3, 6, 9, 12, etc.)
+      for (let w = 3; w <= weeksRound - 2; w += 3) {
+        targetMockWeeks.push(w);
+      }
+    }
+
+    const newMockInterviews = [...mockInterviews];
+
+    targetMockWeeks.forEach(w => {
+      let lastDayOfW = null;
+      for (let d = new Date(startDate); d <= new Date(endDate); d.setDate(d.getDate() + 1)) {
+        const wNum = Math.floor((d - startObj) / (7 * 24 * 60 * 60 * 1000)) + 1;
+        const dayName = d.toLocaleString('en-us', { weekday: 'long' });
+        if (wNum === w && selectedDays.includes(dayName)) {
+          lastDayOfW = new Date(d).toISOString().split('T')[0];
+        }
+      }
+      
+      if (lastDayOfW) {
+         const exists = newMockInterviews.find(mi => mi.weekNumber === w);
+         if (!exists) {
+            newMockInterviews.push({
+               weekNumber: w,
+               title: `Mock Interview ${newMockInterviews.length + 1}`,
+               interviewType: 'Technical',
+               date: lastDayOfW,
+               startTime: workHoursStart,
+               endTime: workHoursEnd,
+               duration: 60,
+               interviewer: '',
+               meetingLink: '',
+               instructions: 'Please be prepared for a technical mock interview.',
+               status: 'Scheduled'
+            });
+         }
+      }
+    });
+    setMockInterviews(newMockInterviews);
+
     // ✅ PRE-FETCH AI SUMMARIES ONCE FOR ALL BATCHES
     let sharedAiSummaryMap = {};
     if (form.scheduleMode === 'automated') {
@@ -586,7 +647,11 @@ const ScheduleFormPaid = ({ internshipId, onClose, initialInternshipMode = '' })
                 mapLink: useExcelData ? (excelEntry.mapLink || location.mapLink) : location.mapLink
               }
               : { name: '', address: '', mapLink: '' },
-            events: []
+            events: [],
+            mockInterview: {
+              enabled: false,
+              questions: []
+            }
           });
 
           dayCounter++;
@@ -637,6 +702,30 @@ const ScheduleFormPaid = ({ internshipId, onClose, initialInternshipMode = '' })
       hasAutoScrolledRef.current = false;
     }
   }, [previewed]);
+
+  const generateMockQuestions = async (idx) => {
+    setAiGenerating(true);
+    try {
+      const { data } = await axios.post(
+        '/api/schedule/ai-mock-interview',
+        { internshipId },
+        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+      );
+      
+      setBatchTimetables(prev => {
+        if (!activeBatchTab) return prev;
+        const tt = prev[activeBatchTab] || [];
+        const copy = [...tt];
+        copy[idx].mockInterview.questions = data.questions;
+        return { ...prev, [activeBatchTab]: copy };
+      });
+    } catch (err) {
+      console.error('Mock Interview generation failed:', err);
+      setError(err.response?.data?.error || 'Failed to generate mock interview questions.');
+    } finally {
+      setAiGenerating(false);
+    }
+  };
 
   const toggleDay = idx =>
     setBatchTimetables(prev => {
@@ -831,9 +920,23 @@ const ScheduleFormPaid = ({ internshipId, onClose, initialInternshipMode = '' })
         timetable: [] // legacy field left empty since we use batches now
       };
 
-      await axios.post('/api/schedule/create', payload, {
+      const resp = await axios.post('/api/schedule/create', payload, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
+      
+      try {
+        await axios.post('/api/mock-interviews', {
+          internshipId,
+          scheduleId: resp.data.scheduleId || null,
+          partnerId: localStorage.getItem('partnerId'),
+          mockInterviews
+        }, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        });
+      } catch (miErr) {
+        console.error("Failed to save mock interviews", miErr);
+      }
+
       setIsPersisted(true); // <— ADD THIS
       onClose();
     } catch (err) {
@@ -1662,6 +1765,40 @@ const ScheduleFormPaid = ({ internshipId, onClose, initialInternshipMode = '' })
                               </div>
                             )}
 
+                            {/* Mock Interview UI */}
+                            {day.mockInterview?.enabled && (
+                              <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-lg">
+                                <div className="flex items-center justify-between mb-2">
+                                  <h4 className="text-md font-semibold text-indigo-800 flex items-center">
+                                    🎯 Mock Interview Scheduled
+                                  </h4>
+                                  {!ro && (
+                                    <button
+                                      type="button"
+                                      onClick={() => generateMockQuestions(idx)}
+                                      disabled={aiGenerating}
+                                      className="px-3 py-1 bg-indigo-600 text-white text-xs font-semibold rounded hover:bg-indigo-700"
+                                    >
+                                      {aiGenerating ? 'Generating...' : 'Generate Mock Questions'}
+                                    </button>
+                                  )}
+                                </div>
+                                <p className="text-xs text-indigo-600 mb-2">
+                                  This day is designated for a Mock Interview. Students will see a "Take Mock Interview" button on this day.
+                                </p>
+                                {day.mockInterview.questions && day.mockInterview.questions.length > 0 && (
+                                  <div className="mt-2 text-sm text-gray-700">
+                                    <p className="font-semibold mb-1">Generated Questions:</p>
+                                    <ul className="list-disc pl-5 space-y-1">
+                                      {day.mockInterview.questions.map((q, i) => (
+                                        <li key={i}>{q}</li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
                             {/* Section Summary */}
                             <div>
                               <label className="text-md font-semibold text-gray-700 mb-1 flex items-center">
@@ -1765,6 +1902,187 @@ const ScheduleFormPaid = ({ internshipId, onClose, initialInternshipMode = '' })
                     );
                   })}
                 </div>
+              </div>
+
+              {/* Mock Interviews Section */}
+              <div className="bg-indigo-50 p-5 rounded-xl border border-indigo-200 mt-6 mb-6">
+                <h4 className="text-lg font-semibold text-indigo-900 mb-4 flex items-center">
+                   🎯 Scheduled Mock Interviews
+                </h4>
+                {mockInterviews.length === 0 ? (
+                   <p className="text-sm text-indigo-700">No mock interviews scheduled for this duration.</p>
+                ) : (
+                   <div className="space-y-4">
+                     {mockInterviews.map((mi, idx) => {
+                        // Parse date for input value (YYYY-MM-DD)
+                        let dateInputValue = '';
+                        let displayDate = mi.date;
+                        if (mi.date) {
+                           const d = new Date(mi.date);
+                           if (!isNaN(d.getTime())) {
+                              dateInputValue = d.toISOString().split('T')[0];
+                              displayDate = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                           }
+                        }
+
+                        return (
+                        <div key={idx} className="p-4 bg-white rounded-lg shadow-sm border border-indigo-100 relative">
+                           {!readOnly && (
+                               <button
+                                 type="button"
+                                 onClick={() => {
+                                    const updated = [...mockInterviews];
+                                    updated.splice(idx, 1);
+                                    setMockInterviews(updated);
+                                 }}
+                                 className="absolute top-3 right-3 text-red-400 hover:text-red-600 focus:outline-none"
+                                 title="Remove Mock Interview"
+                               >
+                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                               </button>
+                           )}
+                           <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-4 pr-8">
+                               <span className="font-bold text-indigo-900 text-base flex items-center">
+                                    Mock Interview {idx + 1}
+                                   <span className="text-gray-400 font-normal ml-2 mr-2">|</span> 
+                                   <span className="text-indigo-600 font-medium">{displayDate}</span>
+                               </span>
+                               <span className="text-xs bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full font-semibold mt-2 md:mt-0 self-start md:self-auto border border-indigo-200 tracking-wide uppercase">{mi.status}</span>
+                           </div>
+                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                 <label className="block text-xs font-semibold text-gray-600 mb-1">Title</label>
+                                 <input
+                                   type="text"
+                                   value={mi.title}
+                                   readOnly={readOnly}
+                                   onChange={(e) => {
+                                      const updated = [...mockInterviews];
+                                      updated[idx].title = e.target.value;
+                                      setMockInterviews(updated);
+                                   }}
+                                   className="block w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                                 />
+                              </div>
+                              <div>
+                                 <label className="block text-xs font-semibold text-gray-600 mb-1">Date</label>
+                                 <input
+                                   type="date"
+                                   value={dateInputValue}
+                                   readOnly={readOnly}
+                                   onChange={(e) => {
+                                      const updated = [...mockInterviews];
+                                      updated[idx].date = e.target.value;
+                                      setMockInterviews(updated);
+                                   }}
+                                   className="block w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                                 />
+                              </div>
+                              <div>
+                                 <label className="block text-xs font-semibold text-gray-600 mb-1">Type</label>
+                                 <select
+                                   value={mi.interviewType}
+                                   disabled={readOnly}
+                                   onChange={(e) => {
+                                      const updated = [...mockInterviews];
+                                      updated[idx].interviewType = e.target.value;
+                                      setMockInterviews(updated);
+                                   }}
+                                   className="block w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                                 >
+                                    <option value="Technical">Technical</option>
+                                    <option value="HR">HR</option>
+                                    <option value="AI Voice">AI Voice</option>
+                                    <option value="Coding">Coding</option>
+                                    <option value="Other">Other</option>
+                                 </select>
+                              </div>
+                              <div>
+                                 <label className="block text-xs font-semibold text-gray-600 mb-1">Meeting Link (Live/External)</label>
+                                 <input
+                                   type="url"
+                                   value={mi.meetingLink}
+                                   readOnly={readOnly}
+                                   onChange={(e) => {
+                                      const updated = [...mockInterviews];
+                                      updated[idx].meetingLink = e.target.value;
+                                      setMockInterviews(updated);
+                                   }}
+                                   className="block w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                                   placeholder="https://..."
+                                 />
+                              </div>
+                              <div className="md:col-span-2">
+                                 <label className="block text-xs font-semibold text-gray-600 mb-1">Interviewer (Optional)</label>
+                                 <input
+                                   type="text"
+                                   value={mi.interviewer}
+                                   readOnly={readOnly}
+                                   onChange={(e) => {
+                                      const updated = [...mockInterviews];
+                                      updated[idx].interviewer = e.target.value;
+                                      setMockInterviews(updated);
+                                   }}
+                                   className="block w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                                 />
+                              </div>
+                           </div>
+                           <div className="mt-4">
+                              <label className="block text-xs font-semibold text-gray-600 mb-1">Instructions</label>
+                              <textarea
+                                value={mi.instructions}
+                                readOnly={readOnly}
+                                onChange={(e) => {
+                                   const updated = [...mockInterviews];
+                                   updated[idx].instructions = e.target.value;
+                                   setMockInterviews(updated);
+                                }}
+                                className="block w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                                rows={2}
+                              />
+                           </div>
+                        </div>
+                        );
+                     })}
+                   </div>
+                )}
+                 {!readOnly && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                         const nextWeekNum = mockInterviews.length > 0 
+                             ? Math.max(...mockInterviews.map(m => m.weekNumber || 0)) + 3 
+                             : 2;
+                         // Default to a date within the internship if possible
+                         let defaultDate = new Date().toISOString();
+                         if (mockInterviews.length > 0 && mockInterviews[mockInterviews.length - 1].date) {
+                             const lastDate = new Date(mockInterviews[mockInterviews.length - 1].date);
+                             if (!isNaN(lastDate.getTime())) {
+                                lastDate.setDate(lastDate.getDate() + 21); // add 3 weeks
+                                defaultDate = lastDate.toISOString();
+                             }
+                         }
+
+                         setMockInterviews([...mockInterviews, {
+                            weekNumber: nextWeekNum,
+                             title: `Mock Interview ${mockInterviews.length + 1}`,
+                            interviewType: 'Technical',
+                            date: defaultDate,
+                            startTime: '09:00',
+                            endTime: '10:00',
+                            duration: 60,
+                            interviewer: '',
+                            meetingLink: '',
+                            instructions: 'Please be prepared for a technical mock interview.',
+                            status: 'Scheduled'
+                         }]);
+                      }}
+                      className="mt-4 flex items-center justify-center w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 border border-transparent font-medium"
+                    >
+                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
+                      Add Mock Interview
+                    </button>
+                 )}
               </div>
 
               {/* Add Additional Day Section */}

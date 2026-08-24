@@ -92,7 +92,9 @@ export const useProctoring = (onViolation) => {
     // 3) Enforce cooldown after last recorded violation
     if (now - lastRecordedTimeRef.current < COOLDOWN_AFTER_VIOLATION) {
       // Still within cooldown — drop silently
-      return;
+      if (type !== 'FACE_NOT_DETECTED' && type !== 'MULTIPLE_FACES') {
+        return;
+      }
     }
 
     // 4) Buffer this event

@@ -15,6 +15,8 @@ import {
   faFileInvoiceDollar,
   faTrash,
   faHeadset,
+  faFileContract,
+  faComments,
 } from "@fortawesome/free-solid-svg-icons";
 
 import { useTabContext } from "./UserHomePageContext/HomePageContext";
@@ -46,10 +48,13 @@ const Sidebar = ({ isOpen, onClose, isDesktopOpen = true }) => {
         await axios.post(
           "/api/sessions/logout",
           { sessionId },
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${token}` } },
         );
       } catch (err) {
-        console.warn("Logout session API failed:", err?.response?.data || err?.message || err);
+        console.warn(
+          "Logout session API failed:",
+          err?.response?.data || err?.message || err,
+        );
       }
     }
 
@@ -70,13 +75,15 @@ const Sidebar = ({ isOpen, onClose, isDesktopOpen = true }) => {
 
   const handleLogoutTrigger = async () => {
     const loginTime = Number(localStorage.getItem("loginTime"));
-    const oneMinutePassed = !isNaN(loginTime) && Date.now() - loginTime >= 60000;
+    const oneMinutePassed =
+      !isNaN(loginTime) && Date.now() - loginTime >= 60000;
 
     if (!oneMinutePassed) {
       return performLogout();
     }
 
-    const sessionUser = parseStorageJson("partnerInfo") || parseStorageJson("userInfo");
+    const sessionUser =
+      parseStorageJson("partnerInfo") || parseStorageJson("userInfo");
     const userId = sessionUser?._id;
 
     if (!userId) {
@@ -121,7 +128,11 @@ const Sidebar = ({ isOpen, onClose, isDesktopOpen = true }) => {
     }
 
     if (tab === "support") {
-      const win = window.open("/partner-support", "_blank", "noopener,noreferrer");
+      const win = window.open(
+        "/partner-support",
+        "_blank",
+        "noopener,noreferrer",
+      );
       if (win) win.opener = null;
       if (onClose) onClose();
       return;
@@ -137,10 +148,20 @@ const Sidebar = ({ isOpen, onClose, isDesktopOpen = true }) => {
     { id: "messages", label: "Messages", icon: faEnvelope },
     { id: "applications", label: "Applications", icon: faFileAlt },
     { id: "instructors", label: "Instructor Management", icon: faUsers },
-    { id: "offer-templates", label: "Offer Templates", icon: faFileAlt },
-    { id: "custom-internship-certificate", label: "Custom Internship Certificate", icon: faCertificate },
+    // change the faFileAlt to faFileContract icon - 04-08-2026
+    { id: "offer-templates", label: "Offer Templates", icon: faFileContract },
+    {
+      id: "custom-internship-certificate",
+      label: "Custom Internship Certificate",
+      icon: faCertificate,
+    },
     { id: "stipend-details", label: "Stipend Details", icon: faMoneyBillWave },
-    { id: "internship-payments", label: "Internship Payments", icon: faFileInvoiceDollar },
+    {
+      id: "internship-payments",
+      label: "Internship Payments",
+      icon: faFileInvoiceDollar,
+    },
+    { id: "mock-interviews", label: "Mock Interviews", icon: faComments },
     { id: "bin", label: "Bin", icon: faTrash },
     { id: "support", label: "Support", icon: faHeadset },
     { id: "profile", label: "Profile", icon: faUser },
@@ -191,7 +212,9 @@ const Sidebar = ({ isOpen, onClose, isDesktopOpen = true }) => {
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full text-center">
             <h3 className="text-xl font-bold text-gray-900 mb-2">Logout</h3>
-            <p className="text-gray-600 mb-6">Are you sure you want to logout?</p>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to logout?
+            </p>
             <div className="flex justify-center space-x-3">
               <button
                 onClick={() => {
@@ -246,7 +269,9 @@ const Sidebar = ({ isOpen, onClose, isDesktopOpen = true }) => {
 
           {isDesktopOpen && (
             <div className="p-4 bg-teal-100 rounded-lg m-3">
-              <h3 className="text-teal-700 text-sm font-semibold">UPGRADE TO PREMIUM</h3>
+              <h3 className="text-teal-700 text-sm font-semibold">
+                UPGRADE TO PREMIUM
+              </h3>
               <p className="text-xs text-teal-600 mt-1">
                 Your team has used 80% of your available space. Need more?
               </p>

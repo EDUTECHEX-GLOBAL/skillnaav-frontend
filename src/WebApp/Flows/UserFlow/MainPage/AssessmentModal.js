@@ -19,6 +19,8 @@ const ProctoredAssessment = ({ assessment, studentId, onClose }) => {
   const containerRef = useRef(null);
   const canvasRef = useRef(null); // ✨ NEW: for face tracking overlay
   const faceApiRef = useRef(null);
+  const noFaceFramesRef = useRef(0);
+  const multipleFacesFramesRef = useRef(0);
 
   // ─── In-app confirmation dialog (replaces alert for auto-submit) ───
   const [confirmDialog, setConfirmDialog] = useState(null);
@@ -57,6 +59,7 @@ const ProctoredAssessment = ({ assessment, studentId, onClose }) => {
     exitFullscreen,
     violationCount,
     showWarning,
+    addViolation,
   } = useProctoring(handleViolation);
 
   // ─── CHECK FOR EXISTING SUBMISSION ────────────────────────────────
@@ -137,27 +140,7 @@ const ProctoredAssessment = ({ assessment, studentId, onClose }) => {
       return;
     }
 
-    // ✨ NEW: Capture a photo reliably
-    const attemptCapture = () => {
-      if (videoRef.current && videoRef.current.readyState >= 2 && videoRef.current.videoWidth > 0) {
-        // Wait an extra 2 seconds for camera exposure to adjust
-        setTimeout(() => {
-          if (!videoRef.current) return;
-          try {
-            const canvas = document.createElement("canvas");
-            canvas.width = videoRef.current.videoWidth;
-            canvas.height = videoRef.current.videoHeight;
-            canvas.getContext("2d").drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-            setStudentPhoto(canvas.toDataURL("image/jpeg"));
-          } catch (e) {
-            console.error("Failed to capture snapshot:", e);
-          }
-        }, 2000);
-      } else {
-        setTimeout(attemptCapture, 500);
-      }
-    };
-    attemptCapture();
+
 
     if (containerRef.current) {
       await enterFullscreen(containerRef.current);
@@ -184,8 +167,34 @@ const ProctoredAssessment = ({ assessment, studentId, onClose }) => {
       }
       videoRef.current.play().catch(e => console.error("Error playing video:", e));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isReady, stream]); // Removed videoRef from dependencies as it's a ref
+  }, [isReady, stream, videoRef]);
+
+  // ✨ NEW: Snapshot logic
+  useEffect(() => {
+    if (isReady && stream && !studentPhoto) {
+      let timeoutId;
+      const attemptCapture = () => {
+        if (videoRef.current && videoRef.current.readyState >= 2 && videoRef.current.videoWidth > 0) {
+          timeoutId = setTimeout(() => {
+            if (!videoRef.current) return;
+            try {
+              const canvas = document.createElement("canvas");
+              canvas.width = videoRef.current.videoWidth;
+              canvas.height = videoRef.current.videoHeight;
+              canvas.getContext("2d").drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+              setStudentPhoto(canvas.toDataURL("image/jpeg"));
+            } catch (e) {
+              console.error("Failed to capture snapshot:", e);
+            }
+          }, 2000);
+        } else {
+          timeoutId = setTimeout(attemptCapture, 500);
+        }
+      };
+      attemptCapture();
+      return () => clearTimeout(timeoutId);
+    }
+  }, [isReady, stream, studentPhoto, videoRef]);
 
   // ✨ NEW: Face tracking loop
   useEffect(() => {
@@ -195,7 +204,7 @@ const ProctoredAssessment = ({ assessment, studentId, onClose }) => {
         const faceapi = faceApiRef.current;
         if (!faceapi) return;
 
-        if (videoRef.current.readyState === 4 && faceapi.nets.tinyFaceDetector.isLoaded) {
+        if (videoRef.current && videoRef.current.readyState === 4 && faceapi.nets.tinyFaceDetector.isLoaded) {
           try {
             const detections = await faceapi.detectAllFaces(
               videoRef.current,
@@ -218,6 +227,25 @@ const ProctoredAssessment = ({ assessment, studentId, onClose }) => {
               ctx.lineWidth = 3;
               ctx.strokeRect(box.x, box.y, box.width, box.height);
             });
+
+            if (detections.length === 0) {
+              noFaceFramesRef.current += 1;
+              multipleFacesFramesRef.current = 0;
+              if (noFaceFramesRef.current > 15) { // 3 seconds at 200ms
+                if (addViolation) addViolation('FACE_NOT_DETECTED', 'Face not detected in camera');
+                noFaceFramesRef.current = 0;
+              }
+            } else if (detections.length > 1) {
+              multipleFacesFramesRef.current += 1;
+              noFaceFramesRef.current = 0;
+              if (multipleFacesFramesRef.current > 15) { // 3 seconds
+                if (addViolation) addViolation('MULTIPLE_FACES', 'Multiple faces detected in camera');
+                multipleFacesFramesRef.current = 0;
+              }
+            } else {
+              noFaceFramesRef.current = 0;
+              multipleFacesFramesRef.current = 0;
+            }
           } catch (err) {
             console.error("Face detection error:", err);
           }

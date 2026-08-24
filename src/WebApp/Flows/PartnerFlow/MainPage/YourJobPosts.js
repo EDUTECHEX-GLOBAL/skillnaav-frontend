@@ -60,36 +60,62 @@ const SECTOR_LABELS = {
   "advanced-ai": "Advanced AI & Autonomous Systems",
   "quantum-computing": "Quantum Computing & Next-Gen Computing",
   "climate-tech": "Climate Tech & Carbon Capture",
-  "biotech": "Biotechnology & Synthetic Biology",
+  biotech: "Biotechnology & Synthetic Biology",
   "materials-science": "Advanced Materials Science",
   "space-exploration": "Space Exploration & Commercial Space",
-  "neurotechnology": "Neurotechnology & Brain-Computer Interfaces",
+  neurotechnology: "Neurotechnology & Brain-Computer Interfaces",
   "precision-agriculture": "Precision Agriculture & AgriTech",
   "advanced-robotics": "Advanced Robotics & Human-Machine Collaboration",
   "renewable-energy": "Renewable Energy & Grid Innovation",
+  "architecture-built-environment": "Architecture & Built Environment",
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmtDate = (d) =>
-  d ? new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
+  d
+    ? new Date(d).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : "—";
 
 // ─── StatusPill ───────────────────────────────────────────────────────────────
-const StatusPill = ({ adminStatus, adminReviewed, adminApproved, className = "" }) => {
+const StatusPill = ({
+  adminStatus,
+  adminReviewed,
+  adminApproved,
+  className = "",
+}) => {
   // Derive display state from adminStatus (new field) with fallback to legacy booleans
-  const status = adminStatus || (
-    adminApproved ? "approved" :
-      adminReviewed ? "in_review" :
-        "pending"
-  );
+  const status =
+    adminStatus ||
+    (adminApproved ? "approved" : adminReviewed ? "in_review" : "pending");
 
   const cfg =
     status === "approved"
-      ? { bg: "bg-green-100 text-green-800 border border-green-200", icon: faCircleCheck, label: "Approved" }
+      ? {
+          bg: "bg-green-100 text-green-800 border border-green-200",
+          icon: faCircleCheck,
+          label: "Approved",
+        }
       : status === "rejected"
-        ? { bg: "bg-red-100 text-red-700 border border-red-200", icon: faCircleXmark, label: "Rejected" }
+        ? {
+            bg: "bg-red-100 text-red-700 border border-red-200",
+            icon: faCircleXmark,
+            label: "Rejected",
+          }
         : status === "in_review"
-          ? { bg: "bg-yellow-100 text-yellow-800 border border-yellow-200", icon: faMagnifyingGlass, label: "In Review" }
-          : { bg: "bg-gray-100 text-gray-500 border border-gray-200", icon: faCircle, label: "Pending" };
+          ? {
+              bg: "bg-yellow-100 text-yellow-800 border border-yellow-200",
+              icon: faMagnifyingGlass,
+              label: "In Review",
+            }
+          : {
+              bg: "bg-gray-100 text-gray-500 border border-gray-200",
+              icon: faCircle,
+              label: "Pending",
+            };
 
   return (
     <span
@@ -106,10 +132,22 @@ const StatusPill = ({ adminStatus, adminReviewed, adminApproved, className = "" 
 const ModePill = ({ mode }) => {
   const cfg =
     mode === "ONLINE"
-      ? { cls: "bg-teal-50 text-teal-700 border border-teal-200", icon: faGlobe, label: "Online" }
+      ? {
+          cls: "bg-teal-50 text-teal-700 border border-teal-200",
+          icon: faGlobe,
+          label: "Online",
+        }
       : mode === "OFFLINE"
-        ? { cls: "bg-orange-50 text-orange-700 border border-orange-200", icon: faMapPin, label: "Offline" }
-        : { cls: "bg-purple-50 text-purple-700 border border-purple-200", icon: faShuffle, label: "Hybrid" };
+        ? {
+            cls: "bg-orange-50 text-orange-700 border border-orange-200",
+            icon: faMapPin,
+            label: "Offline",
+          }
+        : {
+            cls: "bg-purple-50 text-purple-700 border border-purple-200",
+            icon: faShuffle,
+            label: "Hybrid",
+          };
 
   return (
     <span
@@ -126,10 +164,22 @@ const ModePill = ({ mode }) => {
 const TypePill = ({ type }) => {
   const cfg =
     type === "PAID"
-      ? { cls: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: faMoneyBillWave, label: "Paid" }
+      ? {
+          cls: "bg-emerald-50 text-emerald-700 border-emerald-200",
+          icon: faMoneyBillWave,
+          label: "Paid",
+        }
       : type === "STIPEND"
-        ? { cls: "bg-blue-50 text-blue-700 border-blue-200", icon: faHandHoldingDollar, label: "Stipend" }
-        : { cls: "bg-gray-50 text-gray-500 border-gray-200", icon: faGraduationCap, label: "Free" };
+        ? {
+            cls: "bg-blue-50 text-blue-700 border-blue-200",
+            icon: faHandHoldingDollar,
+            label: "Stipend",
+          }
+        : {
+            cls: "bg-gray-50 text-gray-500 border-gray-200",
+            icon: faGraduationCap,
+            label: "Free",
+          };
 
   return (
     <span
@@ -144,13 +194,18 @@ const TypePill = ({ type }) => {
 
 // ─── CompLabel ────────────────────────────────────────────────────────────────
 const CompLabel = ({ i }) => {
-  if (i.internshipType === "FREE") return <span className="text-gray-500">Unpaid / Free</span>;
+  if (i.internshipType === "FREE")
+    return <span className="text-gray-500">Unpaid / Free</span>;
   const c = i.compensationDetails;
   const text = c?.amount
     ? `${c.amount} ${c.currency} / ${(c.frequency || "").toLowerCase()}`
     : "Amount not specified";
   return (
-    <span className={i.internshipType === "PAID" ? "text-green-700" : "text-blue-700"}>
+    <span
+      className={
+        i.internshipType === "PAID" ? "text-green-700" : "text-blue-700"
+      }
+    >
       {text}
     </span>
   );
@@ -163,10 +218,15 @@ const DetailRow = ({ icon, label, children }) => (
       className="text-[10px] uppercase tracking-widest text-gray-400 font-semibold mb-1 flex items-center gap-1.5"
       style={{ fontFamily: "'Poppins', sans-serif" }}
     >
-      {icon && <FontAwesomeIcon icon={icon} className="text-indigo-400 text-[11px]" />}
+      {icon && (
+        <FontAwesomeIcon icon={icon} className="text-indigo-400 text-[11px]" />
+      )}
       {label}
     </p>
-    <div className="text-sm text-gray-800" style={{ fontFamily: "'Poppins', sans-serif" }}>
+    <div
+      className="text-sm text-gray-800"
+      style={{ fontFamily: "'Poppins', sans-serif" }}
+    >
       {children || "—"}
     </div>
   </div>
@@ -248,7 +308,10 @@ const QualTagInput = ({ qualifications, onChange }) => {
               className="inline-flex items-center gap-1 px-3 py-1 bg-indigo-50 border border-indigo-100 text-indigo-700 text-xs rounded-full font-medium"
               style={{ fontFamily: "'Poppins', sans-serif" }}
             >
-              <FontAwesomeIcon icon={faCheck} className="text-[9px] text-indigo-400" />
+              <FontAwesomeIcon
+                icon={faCheck}
+                className="text-[9px] text-indigo-400"
+              />
               {q}
               <button
                 type="button"
@@ -270,9 +333,16 @@ const QualTagInput = ({ qualifications, onChange }) => {
           value={inputVal}
           onChange={(e) => setInputVal(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") { e.preventDefault(); addTag(); }
+            if (e.key === "Enter") {
+              e.preventDefault();
+              addTag();
+            }
           }}
-          placeholder={qualifications.length === 0 ? "Type a skill and press Enter or Add..." : "Add another skill..."}
+          placeholder={
+            qualifications.length === 0
+              ? "Type a skill and press Enter or Add..."
+              : "Add another skill..."
+          }
           className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
           style={{ fontFamily: "'Poppins', sans-serif" }}
         />
@@ -286,7 +356,10 @@ const QualTagInput = ({ qualifications, onChange }) => {
           Add
         </button>
       </div>
-      <p className="text-xs text-gray-400 mt-1" style={{ fontFamily: "'Poppins', sans-serif" }}>
+      <p
+        className="text-xs text-gray-400 mt-1"
+        style={{ fontFamily: "'Poppins', sans-serif" }}
+      >
         Press Enter or click Add. Click × on a tag to remove it.
       </p>
     </div>
@@ -329,7 +402,10 @@ const ViewModalBody = ({ internship: i, onEdit, onClose }) => (
             className="text-indigo-100 text-sm mt-0.5 font-medium flex items-center gap-1.5"
             style={{ fontFamily: "'Poppins', sans-serif" }}
           >
-            <FontAwesomeIcon icon={faBriefcase} className="text-[10px] opacity-70" />
+            <FontAwesomeIcon
+              icon={faBriefcase}
+              className="text-[10px] opacity-70"
+            />
             {i.companyName}
           </p>
           <p
@@ -337,21 +413,27 @@ const ViewModalBody = ({ internship: i, onEdit, onClose }) => (
             style={{ fontFamily: "'Poppins', sans-serif" }}
           >
             <FontAwesomeIcon icon={faLocationDot} className="text-[10px]" />
-            {i.location || [i.city, i.state, i.country].filter(Boolean).join(", ")}
+            {i.location ||
+              [i.city, i.state, i.country].filter(Boolean).join(", ")}
           </p>
         </div>
       </div>
 
       {/* ── Floating badge strip ── */}
       <div className="absolute -bottom-5 left-6 right-6 flex flex-wrap items-center gap-2 z-10">
-        <StatusPill adminStatus={i.adminStatus} adminReviewed={i.adminReviewed} adminApproved={i.adminApproved} />
+        <StatusPill
+          adminStatus={i.adminStatus}
+          adminReviewed={i.adminReviewed}
+          adminApproved={i.adminApproved}
+        />
 
         {/* Open / Closed */}
         <span
-          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold shadow-sm border ${i.applicationOpen
-            ? "bg-teal-50 text-teal-700 border-teal-200"
-            : "bg-gray-100 text-gray-500 border-gray-200"
-            }`}
+          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold shadow-sm border ${
+            i.applicationOpen
+              ? "bg-teal-50 text-teal-700 border-teal-200"
+              : "bg-gray-100 text-gray-500 border-gray-200"
+          }`}
           style={{ fontFamily: "'Poppins', sans-serif" }}
         >
           <FontAwesomeIcon
@@ -377,32 +459,56 @@ const ViewModalBody = ({ internship: i, onEdit, onClose }) => (
 
     {/* ── Scrollable body ── */}
     <div className="flex-1 min-h-0 overflow-y-auto px-6 pt-10 pb-4 space-y-5 bg-white">
-
       {/* Rejection reason banner */}
-      {(i.adminStatus === "rejected" || (!i.adminStatus && !i.adminApproved && i.adminReviewed)) && i.rejectionReason && (
-        <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-xl p-4">
-          <FontAwesomeIcon icon={faCircleXmark} className="text-red-400 mt-0.5 flex-shrink-0" />
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-red-500 mb-1" style={{ fontFamily: "'Poppins', sans-serif" }}>
-              Rejection Reason
-            </p>
-            <p className="text-sm text-red-700" style={{ fontFamily: "'Poppins', sans-serif" }}>
-              {i.rejectionReason}
-            </p>
+      {(i.adminStatus === "rejected" ||
+        (!i.adminStatus && !i.adminApproved && i.adminReviewed)) &&
+        i.rejectionReason && (
+          <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-xl p-4">
+            <FontAwesomeIcon
+              icon={faCircleXmark}
+              className="text-red-400 mt-0.5 flex-shrink-0"
+            />
+            <div>
+              <p
+                className="text-xs font-semibold uppercase tracking-widest text-red-500 mb-1"
+                style={{ fontFamily: "'Poppins', sans-serif" }}
+              >
+                Rejection Reason
+              </p>
+              <p
+                className="text-sm text-red-700"
+                style={{ fontFamily: "'Poppins', sans-serif" }}
+              >
+                {i.rejectionReason}
+              </p>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
       {/* Key facts grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 bg-gray-50 rounded-xl p-4 border border-gray-100">
-        <DetailRow icon={faLaptopHouse} label="Mode"><ModePill mode={i.internshipMode} /></DetailRow>
-        <DetailRow icon={faClock} label="Duration">{i.duration}</DetailRow>
-        <DetailRow icon={faCoins} label="Compensation"><CompLabel i={i} /></DetailRow>
-        <DetailRow icon={faCalendarDay} label="Start Date">{fmtDate(i.startDate)}</DetailRow>
-        <DetailRow icon={faCalendarCheck} label="End / Duration">{i.endDateOrDuration}</DetailRow>
-        <DetailRow icon={faCalendarPlus} label="Posted">{fmtDate(i.createdAt)}</DetailRow>
+        <DetailRow icon={faLaptopHouse} label="Mode">
+          <ModePill mode={i.internshipMode} />
+        </DetailRow>
+        <DetailRow icon={faClock} label="Duration">
+          {i.duration}
+        </DetailRow>
+        <DetailRow icon={faCoins} label="Compensation">
+          <CompLabel i={i} />
+        </DetailRow>
+        <DetailRow icon={faCalendarDay} label="Start Date">
+          {fmtDate(i.startDate)}
+        </DetailRow>
+        <DetailRow icon={faCalendarCheck} label="End / Duration">
+          {i.endDateOrDuration}
+        </DetailRow>
+        <DetailRow icon={faCalendarPlus} label="Posted">
+          {fmtDate(i.createdAt)}
+        </DetailRow>
         <div className="col-span-2 sm:col-span-3">
-          <DetailRow icon={faIndustry} label="Sector">{SECTOR_LABELS[i.sector] || i.sector}</DetailRow>
+          <DetailRow icon={faIndustry} label="Sector">
+            {SECTOR_LABELS[i.sector] || i.sector}
+          </DetailRow>
         </div>
       </div>
 
@@ -422,7 +528,10 @@ const ViewModalBody = ({ internship: i, onEdit, onClose }) => (
         <div>
           <SectionLabel icon={faListCheck}>Qualifications</SectionLabel>
           <div className="flex flex-wrap gap-2">
-            {(Array.isArray(i.qualifications) ? i.qualifications : [i.qualifications])
+            {(Array.isArray(i.qualifications)
+              ? i.qualifications
+              : [i.qualifications]
+            )
               .filter(Boolean)
               .map((q, idx) => (
                 <span
@@ -430,7 +539,10 @@ const ViewModalBody = ({ internship: i, onEdit, onClose }) => (
                   className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-50 border border-indigo-100 text-indigo-700 text-xs rounded-full font-medium"
                   style={{ fontFamily: "'Poppins', sans-serif" }}
                 >
-                  <FontAwesomeIcon icon={faCheck} className="text-[9px] text-indigo-400" />
+                  <FontAwesomeIcon
+                    icon={faCheck}
+                    className="text-[9px] text-indigo-400"
+                  />
                   {q}
                 </span>
               ))}
@@ -449,7 +561,10 @@ const ViewModalBody = ({ internship: i, onEdit, onClose }) => (
                 className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-50 border border-green-100 text-green-700 text-xs rounded-full"
                 style={{ fontFamily: "'Poppins', sans-serif" }}
               >
-                <FontAwesomeIcon icon={faStar} className="text-[9px] text-green-400" />
+                <FontAwesomeIcon
+                  icon={faStar}
+                  className="text-[9px] text-green-400"
+                />
                 {b}
               </span>
             ))}
@@ -468,7 +583,10 @@ const ViewModalBody = ({ internship: i, onEdit, onClose }) => (
                 className="text-sm text-gray-600 flex items-center gap-2"
                 style={{ fontFamily: "'Poppins', sans-serif" }}
               >
-                <FontAwesomeIcon icon={faCircleDot} className="text-[8px] text-gray-400" />
+                <FontAwesomeIcon
+                  icon={faCircleDot}
+                  className="text-[8px] text-gray-400"
+                />
                 {c.description}: {c.amount} {c.currency}
               </p>
             ))}
@@ -479,25 +597,45 @@ const ViewModalBody = ({ internship: i, onEdit, onClose }) => (
       {/* Contact */}
       <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
         <SectionLabel icon={faAddressCard}>Contact</SectionLabel>
-        <div className="space-y-2 text-sm" style={{ fontFamily: "'Poppins', sans-serif" }}>
+        <div
+          className="space-y-2 text-sm"
+          style={{ fontFamily: "'Poppins', sans-serif" }}
+        >
           {i.contactInfo?.name && (
             <p className="flex items-center gap-2.5">
-              <FontAwesomeIcon icon={faUser} className="w-4 text-center text-indigo-300 text-xs" />
-              <span className="font-medium text-gray-800">{i.contactInfo.name}</span>
+              <FontAwesomeIcon
+                icon={faUser}
+                className="w-4 text-center text-indigo-300 text-xs"
+              />
+              <span className="font-medium text-gray-800">
+                {i.contactInfo.name}
+              </span>
             </p>
           )}
           {i.contactInfo?.email && (
             <p className="flex items-center gap-2.5">
-              <FontAwesomeIcon icon={faEnvelope} className="w-4 text-center text-indigo-300 text-xs" />
-              <a href={`mailto:${i.contactInfo.email}`} className="text-indigo-600 hover:underline">
+              <FontAwesomeIcon
+                icon={faEnvelope}
+                className="w-4 text-center text-indigo-300 text-xs"
+              />
+              <a
+                href={`mailto:${i.contactInfo.email}`}
+                className="text-indigo-600 hover:underline"
+              >
                 {i.contactInfo.email}
               </a>
             </p>
           )}
           {i.contactInfo?.phone && (
             <p className="flex items-center gap-2.5">
-              <FontAwesomeIcon icon={faPhone} className="w-4 text-center text-indigo-300 text-xs" />
-              <a href={`tel:${i.contactInfo.phone}`} className="text-indigo-600 hover:underline">
+              <FontAwesomeIcon
+                icon={faPhone}
+                className="w-4 text-center text-indigo-300 text-xs"
+              />
+              <a
+                href={`tel:${i.contactInfo.phone}`}
+                className="text-indigo-600 hover:underline"
+              >
                 {i.contactInfo.phone}
               </a>
             </p>
@@ -523,18 +661,31 @@ const ViewModalBody = ({ internship: i, onEdit, onClose }) => (
 // ═══════════════════════════════════════════════════════════════════════════════
 // EDIT MODAL BODY
 // ═══════════════════════════════════════════════════════════════════════════════
-const EditModalBody = ({ internship: si, updateField, onSave, onBack, onClose }) => {
+const EditModalBody = ({
+  internship: si,
+  updateField,
+  onSave,
+  onBack,
+  onClose,
+}) => {
   const logoInputRef = useRef(null);
 
   useEffect(() => {
     const startVal = si.startDate;
     const endVal = si.endDateOrDuration;
 
-    if (startVal && endVal && /^\d{4}-\d{2}-\d{2}/.test(String(startVal)) && /^\d{4}-\d{2}-\d{2}/.test(String(endVal))) {
+    if (
+      startVal &&
+      endVal &&
+      /^\d{4}-\d{2}-\d{2}/.test(String(startVal)) &&
+      /^\d{4}-\d{2}-\d{2}/.test(String(endVal))
+    ) {
       const s = new Date(startVal);
       const e = new Date(endVal);
       if (!isNaN(s) && !isNaN(e) && s <= e) {
-        let m = (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth());
+        let m =
+          (e.getFullYear() - s.getFullYear()) * 12 +
+          (e.getMonth() - s.getMonth());
         let d = e.getDate() - s.getDate();
         if (d < 0) {
           m -= 1;
@@ -545,7 +696,7 @@ const EditModalBody = ({ internship: si, updateField, onSave, onBack, onClose })
         if (m > 0) parts.push(`${m} month${m > 1 ? "s" : ""}`);
         if (d > 0) parts.push(`${d} day${d > 1 ? "s" : ""}`);
         const calcDuration = parts.length > 0 ? parts.join(" ") : "0 days";
-        
+
         if (si.duration !== calcDuration) {
           updateField("duration", calcDuration);
         }
@@ -561,22 +712,31 @@ const EditModalBody = ({ internship: si, updateField, onSave, onBack, onClose })
       updateField("compensationDetails.currency", "");
       updateField("compensationDetails.frequency", "");
     } else {
-      if (!si.compensationDetails?.currency) updateField("compensationDetails.currency", "USD");
-      if (!si.compensationDetails?.frequency) updateField("compensationDetails.frequency", "MONTHLY");
+      if (!si.compensationDetails?.currency)
+        updateField("compensationDetails.currency", "USD");
+      if (!si.compensationDetails?.frequency)
+        updateField("compensationDetails.frequency", "MONTHLY");
     }
   };
 
   const handleDateChange = (field, value) => {
     updateField(field, value);
-    
+
     const startVal = field === "startDate" ? value : si.startDate;
     const endVal = field === "endDateOrDuration" ? value : si.endDateOrDuration;
 
-    if (startVal && endVal && /^\d{4}-\d{2}-\d{2}/.test(String(startVal)) && /^\d{4}-\d{2}-\d{2}/.test(String(endVal))) {
+    if (
+      startVal &&
+      endVal &&
+      /^\d{4}-\d{2}-\d{2}/.test(String(startVal)) &&
+      /^\d{4}-\d{2}-\d{2}/.test(String(endVal))
+    ) {
       const s = new Date(startVal);
       const e = new Date(endVal);
       if (!isNaN(s) && !isNaN(e) && s <= e) {
-        let m = (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth());
+        let m =
+          (e.getFullYear() - s.getFullYear()) * 12 +
+          (e.getMonth() - s.getMonth());
         let d = e.getDate() - s.getDate();
         if (d < 0) {
           m -= 1;
@@ -617,7 +777,10 @@ const EditModalBody = ({ internship: si, updateField, onSave, onBack, onClose })
             />
             {/* Hover overlay */}
             <div className="absolute inset-0 rounded-xl bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-              <FontAwesomeIcon icon={faPenToSquare} className="text-white text-sm" />
+              <FontAwesomeIcon
+                icon={faPenToSquare}
+                className="text-white text-sm"
+              />
             </div>
           </div>
           <input
@@ -635,7 +798,10 @@ const EditModalBody = ({ internship: si, updateField, onSave, onBack, onClose })
             >
               Edit Internship
             </h2>
-            <p className="text-xs text-gray-400 mt-0.5" style={{ fontFamily: "'Poppins', sans-serif" }}>
+            <p
+              className="text-xs text-gray-400 mt-0.5"
+              style={{ fontFamily: "'Poppins', sans-serif" }}
+            >
               {si.jobTitle} · {si.companyName}
             </p>
           </div>
@@ -650,7 +816,6 @@ const EditModalBody = ({ internship: si, updateField, onSave, onBack, onClose })
 
       {/* Scrollable form */}
       <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-5">
-
         <FormSectionLabel icon={faCircleInfo}>Basic Info</FormSectionLabel>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {[
@@ -710,14 +875,20 @@ const EditModalBody = ({ internship: si, updateField, onSave, onBack, onClose })
           <DateInput
             label="End Date"
             value={
-              si.endDateOrDuration && /^\d{4}-\d{2}-\d{2}/.test(si.endDateOrDuration)
+              si.endDateOrDuration &&
+              /^\d{4}-\d{2}-\d{2}/.test(si.endDateOrDuration)
                 ? String(si.endDateOrDuration).slice(0, 10)
                 : ""
             }
             onChange={(val) => handleDateChange("endDateOrDuration", val)}
           />
           <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1" style={{ fontFamily: "'Poppins', sans-serif" }}>Duration</label>
+            <label
+              className="block text-xs font-semibold text-gray-600 mb-1"
+              style={{ fontFamily: "'Poppins', sans-serif" }}
+            >
+              Duration
+            </label>
             <input
               type="text"
               readOnly
@@ -729,10 +900,17 @@ const EditModalBody = ({ internship: si, updateField, onSave, onBack, onClose })
           </div>
         </div>
 
-        <FormSectionLabel icon={faSliders}>Format & Classification</FormSectionLabel>
+        <FormSectionLabel icon={faSliders}>
+          Format & Classification
+        </FormSectionLabel>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1" style={{ fontFamily: "'Poppins', sans-serif" }}>Mode</label>
+            <label
+              className="block text-xs font-semibold text-gray-600 mb-1"
+              style={{ fontFamily: "'Poppins', sans-serif" }}
+            >
+              Mode
+            </label>
             <select
               value={si.internshipMode || ""}
               onChange={(e) => updateField("internshipMode", e.target.value)}
@@ -745,7 +923,12 @@ const EditModalBody = ({ internship: si, updateField, onSave, onBack, onClose })
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1" style={{ fontFamily: "'Poppins', sans-serif" }}>Classification</label>
+            <label
+              className="block text-xs font-semibold text-gray-600 mb-1"
+              style={{ fontFamily: "'Poppins', sans-serif" }}
+            >
+              Classification
+            </label>
             <select
               value={si.classification || ""}
               onChange={(e) => updateField("classification", e.target.value)}
@@ -759,7 +942,12 @@ const EditModalBody = ({ internship: si, updateField, onSave, onBack, onClose })
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1" style={{ fontFamily: "'Poppins', sans-serif" }}>Type</label>
+            <label
+              className="block text-xs font-semibold text-gray-600 mb-1"
+              style={{ fontFamily: "'Poppins', sans-serif" }}
+            >
+              Type
+            </label>
             <select
               value={si.internshipType || "FREE"}
               onChange={(e) => handleTypeChange(e.target.value)}
@@ -778,32 +966,60 @@ const EditModalBody = ({ internship: si, updateField, onSave, onBack, onClose })
             <FormSectionLabel icon={faCoins}>Compensation</FormSectionLabel>
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1" style={{ fontFamily: "'Poppins', sans-serif" }}>Amount</label>
+                <label
+                  className="block text-xs font-semibold text-gray-600 mb-1"
+                  style={{ fontFamily: "'Poppins', sans-serif" }}
+                >
+                  Amount
+                </label>
                 <input
                   type="number"
                   placeholder="0"
                   value={si.compensationDetails?.amount || ""}
-                  onChange={(e) => updateField("compensationDetails.amount", Number(e.target.value))}
+                  onChange={(e) =>
+                    updateField(
+                      "compensationDetails.amount",
+                      Number(e.target.value),
+                    )
+                  }
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 mt-0 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
                   style={{ fontFamily: "'Poppins', sans-serif" }}
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1" style={{ fontFamily: "'Poppins', sans-serif" }}>Currency</label>
+                <label
+                  className="block text-xs font-semibold text-gray-600 mb-1"
+                  style={{ fontFamily: "'Poppins', sans-serif" }}
+                >
+                  Currency
+                </label>
                 <select
                   value={si.compensationDetails?.currency || "USD"}
-                  onChange={(e) => updateField("compensationDetails.currency", e.target.value)}
+                  onChange={(e) =>
+                    updateField("compensationDetails.currency", e.target.value)
+                  }
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
                   style={{ fontFamily: "'Poppins', sans-serif" }}
                 >
-                  {["USD", "CAD", "EUR", "INR", "GBP"].map((c) => <option key={c} value={c}>{c}</option>)}
+                  {["USD", "CAD", "EUR", "INR", "GBP"].map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1" style={{ fontFamily: "'Poppins', sans-serif" }}>Frequency</label>
+                <label
+                  className="block text-xs font-semibold text-gray-600 mb-1"
+                  style={{ fontFamily: "'Poppins', sans-serif" }}
+                >
+                  Frequency
+                </label>
                 <select
                   value={si.compensationDetails?.frequency || "MONTHLY"}
-                  onChange={(e) => updateField("compensationDetails.frequency", e.target.value)}
+                  onChange={(e) =>
+                    updateField("compensationDetails.frequency", e.target.value)
+                  }
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
                   style={{ fontFamily: "'Poppins', sans-serif" }}
                 >
@@ -827,7 +1043,9 @@ const EditModalBody = ({ internship: si, updateField, onSave, onBack, onClose })
 
         <FormSectionLabel icon={faListCheck}>Qualifications</FormSectionLabel>
         <QualTagInput
-          qualifications={Array.isArray(si.qualifications) ? si.qualifications : []}
+          qualifications={
+            Array.isArray(si.qualifications) ? si.qualifications : []
+          }
           onChange={(updated) => updateField("qualifications", updated)}
         />
 
@@ -839,7 +1057,10 @@ const EditModalBody = ({ internship: si, updateField, onSave, onBack, onClose })
             { label: "Phone", field: "contactInfo.phone", type: "text" },
           ].map(({ label, field, type }) => (
             <div key={field}>
-              <label className="block text-xs font-semibold text-gray-600 mb-1" style={{ fontFamily: "'Poppins', sans-serif" }}>
+              <label
+                className="block text-xs font-semibold text-gray-600 mb-1"
+                style={{ fontFamily: "'Poppins', sans-serif" }}
+              >
                 {label}
               </label>
               <input
@@ -887,7 +1108,6 @@ const EditModalBody = ({ internship: si, updateField, onSave, onBack, onClose })
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
 const YourJobPosts = () => {
-
   const [internships, setInternships] = useState([]);
   const [selectedInternship, setSelectedInternship] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -944,7 +1164,13 @@ const YourJobPosts = () => {
       isFirst ? setLoading(true) : setIsSearching(true);
       try {
         const response = await axios.get(`/api/interns/partner/${partnerId}`, {
-          params: { page, limit: applicationsPerPage, search: query, sort, order },
+          params: {
+            page,
+            limit: applicationsPerPage,
+            search: query,
+            sort,
+            order,
+          },
         });
         setInternships(response.data.data || []);
         setTotalPages(response.data.totalPages || 1);
@@ -958,11 +1184,14 @@ const YourJobPosts = () => {
         setIsSearching(false);
       }
     },
-    [partnerId]
+    [partnerId],
   );
 
   useEffect(() => {
-    if (!selectedInternship?.startDate || !selectedInternship?.endDateOrDuration) {
+    if (
+      !selectedInternship?.startDate ||
+      !selectedInternship?.endDateOrDuration
+    ) {
       return;
     }
 
@@ -974,10 +1203,7 @@ const YourJobPosts = () => {
     const start = parseDate(selectedInternship.startDate);
     const end = parseDate(selectedInternship.endDateOrDuration);
 
-    if (
-      isNaN(start.getTime()) ||
-      isNaN(end.getTime())
-    ) {
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
       updateField("duration", "");
       return;
     }
@@ -987,9 +1213,7 @@ const YourJobPosts = () => {
       return;
     }
 
-    const totalDays = Math.round(
-      (end - start) / (1000 * 60 * 60 * 24)
-    );
+    const totalDays = Math.round((end - start) / (1000 * 60 * 60 * 24));
 
     const months = Math.floor(totalDays / 30);
     const days = totalDays % 30;
@@ -1007,11 +1231,7 @@ const YourJobPosts = () => {
     }
 
     updateField("duration", duration);
-
-  }, [
-    selectedInternship?.startDate,
-    selectedInternship?.endDateOrDuration
-  ]);
+  }, [selectedInternship?.startDate, selectedInternship?.endDateOrDuration]);
 
   useEffect(() => {
     fetchInternships(1, "", sortCriteria, sortDirection, true);
@@ -1024,12 +1244,20 @@ const YourJobPosts = () => {
       if (!partnerId) return;
       try {
         const response = await axios.get(`/api/interns/partner/${partnerId}`, {
-          params: { page: currentPage, limit: applicationsPerPage, search: committedQuery, sort: sortCriteria, order: sortDirection },
+          params: {
+            page: currentPage,
+            limit: applicationsPerPage,
+            search: committedQuery,
+            sort: sortCriteria,
+            order: sortDirection,
+          },
         });
         setInternships(response.data.data || []);
         setTotalPages(response.data.totalPages || 1);
         setTotalCount(response.data.total || 0);
-      } catch (_) { /* silent — do not show errors for background poll */ }
+      } catch (_) {
+        /* silent — do not show errors for background poll */
+      }
     }, 30000);
     return () => clearInterval(interval);
   }, [partnerId, currentPage, committedQuery, sortCriteria, sortDirection]); // eslint-disable-line
@@ -1070,7 +1298,10 @@ const YourJobPosts = () => {
 
   const closeModal = () => {
     setIsModalOpen(false);
-    setTimeout(() => { setSelectedInternship(null); setModalMode("view"); }, 200);
+    setTimeout(() => {
+      setSelectedInternship(null);
+      setModalMode("view");
+    }, 200);
   };
 
   const updateField = (field, value) => {
@@ -1097,27 +1328,55 @@ const YourJobPosts = () => {
     // The backend PUT route always resets to "pending" on partner edits.
     const {
       _id,
-      jobTitle, companyName, location, jobDescription,
-      startDate, endDateOrDuration, duration,
-      sector, classification, internshipMode, internshipType,
-      compensationDetails, qualifications, contactInfo,
-      imgUrl, applicationOpen,
-      country, state, city,
+      jobTitle,
+      companyName,
+      location,
+      jobDescription,
+      startDate,
+      endDateOrDuration,
+      duration,
+      sector,
+      classification,
+      internshipMode,
+      internshipType,
+      compensationDetails,
+      qualifications,
+      contactInfo,
+      imgUrl,
+      applicationOpen,
+      country,
+      state,
+      city,
     } = selectedInternship;
 
     const payload = {
-      jobTitle, companyName, location, jobDescription,
-      startDate, endDateOrDuration, duration,
-      sector, classification, internshipMode, internshipType,
-      compensationDetails, qualifications, contactInfo,
-      imgUrl, applicationOpen,
-      country, state, city,
+      jobTitle,
+      companyName,
+      location,
+      jobDescription,
+      startDate,
+      endDateOrDuration,
+      duration,
+      sector,
+      classification,
+      internshipMode,
+      internshipType,
+      compensationDetails,
+      qualifications,
+      contactInfo,
+      imgUrl,
+      applicationOpen,
+      country,
+      state,
+      city,
     };
 
     try {
       const response = await axios.put(`/api/interns/${_id}`, payload);
       // Update local list with the response (which has adminStatus: "pending" from backend)
-      setInternships((prev) => prev.map((i) => i._id === _id ? response.data : i));
+      setInternships((prev) =>
+        prev.map((i) => (i._id === _id ? response.data : i)),
+      );
       // Also update the selected internship so the view modal reflects pending status
       setSelectedInternship(response.data);
       setModalMode("view");
@@ -1127,20 +1386,23 @@ const YourJobPosts = () => {
   };
 
   return (
-    <div className="p-6 rounded-lg shadow-md min-h-screen" style={{ fontFamily: "'Poppins', sans-serif" }}>
-
+    <div
+      className="p-6 rounded-lg shadow-md min-h-screen"
+      style={{ fontFamily: "'Poppins', sans-serif" }}
+    >
       {/* Search + Sort Row */}
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
         <div className="relative flex-1">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
             <FontAwesomeIcon icon={faMagnifyingGlass} className="text-sm" />
           </span>
+          {/*Add "!mt-0" style to input class for alignment - 04-08-2026 */}
           <input
             type="text"
             placeholder="Search by Organization, Role, or Company"
             value={searchQuery}
             onChange={handleSearchChange}
-            className="p-2 pl-9 pr-8 border rounded-lg w-full text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            className="!mt-0 p-2 pl-9 pr-8 border rounded-lg w-full text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
             style={{ fontFamily: "'Poppins', sans-serif" }}
           />
           {isSearching && (
@@ -1163,17 +1425,21 @@ const YourJobPosts = () => {
           className="p-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 w-40 flex-shrink-0"
           style={{ fontFamily: "'Poppins', sans-serif" }}
         >
-
           <option value="jobTitle">Sort by Title</option>
           <option value="companyName">Sort by Company</option>
           <option value="createdAt">Sort by Date</option>
         </select>
         <button
-          onClick={() => setSortDirection((d) => (d === "asc" ? "desc" : "asc"))}
+          onClick={() =>
+            setSortDirection((d) => (d === "asc" ? "desc" : "asc"))
+          }
           className="flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm text-gray-700 hover:bg-gray-100 font-medium w-24 justify-center flex-shrink-0"
           style={{ fontFamily: "'Poppins', sans-serif" }}
         >
-          <FontAwesomeIcon icon={sortDirection === "asc" ? faArrowUpAZ : faArrowDownZA} className="text-xs" />
+          <FontAwesomeIcon
+            icon={sortDirection === "asc" ? faArrowUpAZ : faArrowDownZA}
+            className="text-xs"
+          />
           {sortDirection === "asc" ? "Asc" : "Desc"}
         </button>
 
@@ -1182,7 +1448,12 @@ const YourJobPosts = () => {
           title="Refresh status"
           onClick={async () => {
             setIsRefreshing(true);
-            await fetchInternships(currentPage, committedQuery, sortCriteria, sortDirection);
+            await fetchInternships(
+              currentPage,
+              committedQuery,
+              sortCriteria,
+              sortDirection,
+            );
             setIsRefreshing(false);
           }}
           className="flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm text-indigo-600 border-indigo-200 hover:bg-indigo-50 font-medium flex-shrink-0"
@@ -1197,12 +1468,20 @@ const YourJobPosts = () => {
       </div>
 
       {/* Result count */}
-      <p className="text-xs text-gray-400 mb-3 flex items-center gap-1.5 min-h-[20px]" style={{ fontFamily: "'Poppins', sans-serif" }}>
+      <p
+        className="text-xs text-gray-400 mb-3 flex items-center gap-1.5 min-h-[20px]"
+        style={{ fontFamily: "'Poppins', sans-serif" }}
+      >
         {!loading && totalCount > 0 && (
           <>
             <FontAwesomeIcon icon={faLayerGroup} className="text-gray-300" />
             {totalCount} result{totalCount !== 1 ? "s" : ""}
-            {committedQuery && <> for "<em className="text-gray-600">{committedQuery}</em>"</>}
+            {committedQuery && (
+              <>
+                {" "}
+                for "<em className="text-gray-600">{committedQuery}</em>"
+              </>
+            )}
           </>
         )}
       </p>
@@ -1211,12 +1490,25 @@ const YourJobPosts = () => {
       {loading ? (
         <div className="flex flex-col items-center justify-center py-24 text-center w-full">
           <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
-          <p className="text-sm font-semibold text-gray-600" style={{ fontFamily: "'Poppins', sans-serif" }}>Loading your job posts...</p>
+          <p
+            className="text-sm font-semibold text-gray-600"
+            style={{ fontFamily: "'Poppins', sans-serif" }}
+          >
+            Loading your job posts...
+          </p>
         </div>
       ) : internships.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-gray-400">
-          <FontAwesomeIcon icon={faBriefcase} className="text-4xl mb-3 opacity-30" />
-          <p className="text-sm" style={{ fontFamily: "'Poppins', sans-serif" }}>No internships found.</p>
+          <FontAwesomeIcon
+            icon={faBriefcase}
+            className="text-4xl mb-3 opacity-30"
+          />
+          <p
+            className="text-sm"
+            style={{ fontFamily: "'Poppins', sans-serif" }}
+          >
+            No internships found.
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1232,15 +1524,17 @@ const YourJobPosts = () => {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    setOpenMenuId(openMenuId === internship._id ? null : internship._id);
+                    setOpenMenuId(
+                      openMenuId === internship._id ? null : internship._id,
+                    );
                   }}
                   className="p-2 flex items-center justify-center text-gray-500 hover:text-gray-700 transition-all"
                 >
                   <FontAwesomeIcon icon={faEllipsisVertical} />
                 </button>
-                
+
                 {openMenuId === internship._id && (
-                  <div 
+                  <div
                     className="absolute right-0 mt-1 w-36 bg-white rounded-lg shadow-lg border border-gray-100 z-20 py-1"
                     onClick={(e) => e.stopPropagation()}
                   >
@@ -1278,13 +1572,23 @@ const YourJobPosts = () => {
               </h3>
               <div className="flex flex-col gap-1 mb-3">
                 <div className="text-xs font-medium text-indigo-500 flex items-center gap-1">
-                  <FontAwesomeIcon icon={faBriefcase} className="text-[9px] text-indigo-300 shrink-0" />
+                  <FontAwesomeIcon
+                    icon={faBriefcase}
+                    className="text-[9px] text-indigo-300 shrink-0"
+                  />
                   <span className="truncate">{internship.companyName}</span>
                   <span className="text-gray-300 mx-0.5 shrink-0">·</span>
-                  <FontAwesomeIcon icon={faLocationDot} className="text-[9px] text-gray-300 shrink-0" />
-                  <span className="text-gray-400 font-normal truncate">{internship.location}</span>
+                  <FontAwesomeIcon
+                    icon={faLocationDot}
+                    className="text-[9px] text-gray-300 shrink-0"
+                  />
+                  <span className="text-gray-400 font-normal truncate">
+                    {internship.location}
+                  </span>
                 </div>
-                <p className="text-[10px] text-gray-400 whitespace-nowrap">ID: {internship._id}</p>
+                <p className="text-[10px] text-gray-400 whitespace-nowrap">
+                  ID: {internship._id}
+                </p>
               </div>
 
               {/* Badges */}
@@ -1302,32 +1606,54 @@ const YourJobPosts = () => {
               {/* Details */}
               <div className="space-y-1.5 mb-4">
                 <p className="text-xs text-gray-600 flex items-center gap-1.5">
-                  <FontAwesomeIcon icon={faClock} className="text-gray-300 w-3.5 text-center" />
-                  <span className="font-semibold text-gray-700">Duration:</span>{" "}{internship.duration || "—"}
+                  <FontAwesomeIcon
+                    icon={faClock}
+                    className="text-gray-300 w-3.5 text-center"
+                  />
+                  <span className="font-semibold text-gray-700">Duration:</span>{" "}
+                  {internship.duration || "—"}
                 </p>
                 <p className="text-xs text-gray-600 flex items-center gap-1.5">
-                  <FontAwesomeIcon icon={faCoins} className="text-gray-300 w-3.5 text-center" />
-                  <span className="font-semibold text-gray-700">Compensation:</span>{" "}<CompLabel i={internship} />
+                  <FontAwesomeIcon
+                    icon={faCoins}
+                    className="text-gray-300 w-3.5 text-center"
+                  />
+                  <span className="font-semibold text-gray-700">
+                    Compensation:
+                  </span>{" "}
+                  <CompLabel i={internship} />
                 </p>
                 {internship.sector && (
                   <p className="text-xs text-gray-600 flex items-center gap-1.5">
-                    <FontAwesomeIcon icon={faIndustry} className="text-gray-300 w-3.5 text-center" />
+                    <FontAwesomeIcon
+                      icon={faIndustry}
+                      className="text-gray-300 w-3.5 text-center"
+                    />
                     <span className="font-semibold text-gray-700">Sector:</span>{" "}
-                    <span className="text-indigo-600">{SECTOR_LABELS[internship.sector] || internship.sector}</span>
+                    <span className="text-indigo-600">
+                      {SECTOR_LABELS[internship.sector] || internship.sector}
+                    </span>
                   </p>
                 )}
               </div>
 
               {/* Card footer */}
               <div className="mt-auto flex items-center justify-between pt-3 border-t border-gray-100">
-                <StatusPill adminStatus={internship.adminStatus} adminReviewed={internship.adminReviewed} adminApproved={internship.adminApproved} />
+                <StatusPill
+                  adminStatus={internship.adminStatus}
+                  adminReviewed={internship.adminReviewed}
+                  adminApproved={internship.adminApproved}
+                />
                 <button
                   onClick={() => openViewModal(internship)}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-semibold
                        rounded-lg hover:bg-indigo-700 active:scale-95 transition-all duration-150"
                 >
                   View Details
-                  <FontAwesomeIcon icon={faArrowRight} className="text-[10px]" />
+                  <FontAwesomeIcon
+                    icon={faArrowRight}
+                    className="text-[10px]"
+                  />
                 </button>
               </div>
             </div>
@@ -1339,7 +1665,7 @@ const YourJobPosts = () => {
       <div className="flex justify-between items-center mt-5 min-h-[40px]">
         <button
           onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-          disabled={currentPage === 1 || isSearching || loading}  // ✅ also disable during loading
+          disabled={currentPage === 1 || isSearching || loading} // ✅ also disable during loading
           className="flex items-center gap-2 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 disabled:opacity-50 transition"
         >
           <FontAwesomeIcon icon={faChevronLeft} className="text-xs" />
@@ -1349,7 +1675,9 @@ const YourJobPosts = () => {
           {loading ? "" : `Page ${currentPage} of ${totalPages}`}
         </span>
         <button
-          onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+          onClick={() =>
+            setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+          }
           disabled={currentPage === totalPages || isSearching || loading}
           className="flex items-center gap-2 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 disabled:opacity-50 transition"
         >
@@ -1362,7 +1690,9 @@ const YourJobPosts = () => {
       <Modal
         isOpen={isModalOpen}
         onRequestClose={closeModal}
-        contentLabel={modalMode === "view" ? "Internship Details" : "Edit Internship"}
+        contentLabel={
+          modalMode === "view" ? "Internship Details" : "Edit Internship"
+        }
         className="fixed inset-0 z-[1000] flex items-center justify-center p-4"
         overlayClassName="fixed inset-0 bg-black bg-opacity-50 z-[999]"
       >
@@ -1370,8 +1700,8 @@ const YourJobPosts = () => {
           className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col"
           style={{ maxHeight: "90vh", fontFamily: "'Poppins', sans-serif" }}
         >
-          {selectedInternship && (
-            modalMode === "view" ? (
+          {selectedInternship &&
+            (modalMode === "view" ? (
               <ViewModalBody
                 internship={selectedInternship}
                 onEdit={() => setModalMode("edit")}
@@ -1385,8 +1715,7 @@ const YourJobPosts = () => {
                 onBack={() => setModalMode("view")}
                 onClose={closeModal}
               />
-            )
-          )}
+            ))}
         </div>
       </Modal>
 
@@ -1398,13 +1727,22 @@ const YourJobPosts = () => {
         >
           <div
             className="bg-white rounded-2xl shadow-2xl px-8 py-8 flex flex-col items-center"
-            style={{ minWidth: 320, maxWidth: 380, fontFamily: "'Poppins', sans-serif" }}
+            style={{
+              minWidth: 320,
+              maxWidth: 380,
+              fontFamily: "'Poppins', sans-serif",
+            }}
           >
             {/* Icon */}
             <div className="flex items-center justify-center w-16 h-16 rounded-full bg-red-50 mb-4">
-              <FontAwesomeIcon icon={faTrash} className="text-red-500 w-7 h-7" />
+              <FontAwesomeIcon
+                icon={faTrash}
+                className="text-red-500 w-7 h-7"
+              />
             </div>
-            <h2 className="text-lg font-bold text-gray-800 mb-1">Move to Bin?</h2>
+            <h2 className="text-lg font-bold text-gray-800 mb-1">
+              Move to Bin?
+            </h2>
             <p className="text-sm text-gray-500 mb-6 text-center">
               Are you sure you want to move this job post to the Bin?
             </p>

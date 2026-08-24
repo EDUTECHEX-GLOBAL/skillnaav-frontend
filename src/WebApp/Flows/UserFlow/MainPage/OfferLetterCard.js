@@ -2,6 +2,7 @@
 
 // 1. IMPORT StipendDetailsModal 
 import React, { useCallback, useEffect, useState, useRef } from "react";
+import MockInterviewModal from "./MockInterviewModal";
 import axios from "../../../../api/axiosInstance";
 import { toast } from "react-toastify";
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
@@ -65,11 +66,13 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
   const [showModal, setShowModal] = useState(false);
   const [responseType, setResponseType] = useState(null);
   const [schedule, setSchedule] = useState(null);
+  const [mockInterviews, setMockInterviews] = useState([]);
   const [loadingSchedule, setLoadingSchedule] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [selectedSummary, setSelectedSummary] = useState(null);
+  const [selectedMockSession, setSelectedMockSession] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState(null);
@@ -103,6 +106,7 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
   const [preferredSlotLocal, setPreferredSlotLocal] = useState(
     offer?.preferredTimeSlot || offer?.selectedTimeSlot || null
   );
+  const [previewBatchIndex, setPreviewBatchIndex] = useState(0);
 
   useEffect(() => {
     setPreferredSlotLocal(offer?.preferredTimeSlot || offer?.selectedTimeSlot || null);
@@ -233,9 +237,19 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
       params: { internshipId, partnerId },
     });
 
+    try {
+      const miRes = await axios.get(`/api/mock-interviews/student`, {
+        params: { internshipId, studentId: userInfo?._id },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token") || localStorage.getItem("userToken")}` }
+      });
+      setMockInterviews(miRes.data || []);
+    } catch (e) {
+      console.error("Failed to load mock interviews", e);
+    }
+
     setSchedule(res.data);
     return res.data;
-  }, [offer?.internshipId, resolvePartnerId]);
+  }, [offer?.internshipId, resolvePartnerId, userInfo?._id]);
 
   // ✅ NEW: For FREE + STIPEND — accept immediately and open schedule (no confirmation/time-slot modal)
   const acceptAndOpenSchedule = async () => {
@@ -378,18 +392,61 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
         // This requires a new API endpoint, but for now, we'll assume a flag
         // is necessary if the offer was previously accepted/re-sent.
       })
-      .catch((err) => {
+      .catch(async (err) => {
         console.error("Failed to fetch internship:", err);
-        // Fallback to offer data so the offer letter card still renders
-        setJob({
+        // The offer contains an internship snapshot. Use it when a partner has
+        // deleted the original post, so the student can still view its details.
+        let fallbackJob = {
           isDeleted: true,
           jobTitle: offer.position || "Unknown Position",
           companyName: offer.companyName || "Unknown Company",
           startDate: offer.startDate || new Date().toISOString(),
-          internshipType: "UNKNOWN",
-          location: "Unknown Location",
-          imgUrl: defaultCompanyLogo
-        });
+          endDateOrDuration: offer.endDateOrDuration || offer.duration || "",
+          duration: offer.duration || "",
+          internshipType: offer.internshipType || offer.compensationDetails?.type || "UNKNOWN",
+          internshipMode: offer.internshipMode || "",
+          classification: offer.classification || "",
+          location: offer.location || "Unknown Location",
+          compensationDetails: offer.compensationDetails || offer.stipend || {},
+          jobDescription: offer.jobDescription || "",
+          qualifications: Array.isArray(offer.qualifications) ? offer.qualifications : [],
+          contactInfo: offer.contactInfo || {},
+          imgUrl: offer.imgUrl || defaultCompanyLogo,
+          partnerId: offer.partnerId || null,
+        };
+
+        // If it's an old offer that is missing snapshot details, extract from PDF
+        if ((!offer.jobDescription || !offer.companyName) && offer.s3Url) {
+          try {
+            const pdfRes = await axios.post('/api/offer-letters/extract-pdf-data', { s3Url: offer.s3Url });
+            const pdfData = pdfRes.data;
+            if (pdfData) {
+              fallbackJob = {
+                ...fallbackJob,
+                companyName: pdfData.companyName || fallbackJob.companyName,
+                jobTitle: pdfData.jobTitle || fallbackJob.jobTitle,
+                location: pdfData.location || fallbackJob.location,
+                jobDescription: pdfData.jobDescription || fallbackJob.jobDescription,
+                qualifications: pdfData.qualifications?.length > 0 ? pdfData.qualifications : fallbackJob.qualifications,
+                duration: pdfData.duration || fallbackJob.duration,
+                internshipType: pdfData.internshipType || fallbackJob.internshipType,
+                internshipMode: pdfData.internshipMode || fallbackJob.internshipMode,
+                classification: pdfData.classification || fallbackJob.classification,
+                compensationDetails: {
+                  ...fallbackJob.compensationDetails,
+                  pdfExtractedCompensation: pdfData.pdfExtractedCompensation
+                },
+                contactInfo: {
+                  ...fallbackJob.contactInfo,
+                  ...(pdfData.contactInfo?.name ? { name: pdfData.contactInfo.name } : {})
+                }
+              };
+            }
+          } catch (pdfErr) {
+            console.error("Failed to extract PDF data:", pdfErr);
+          }
+        }
+        setJob(fallbackJob);
       })
       .finally(() => setLoadingJob(false));
   }, [offer]);
@@ -565,27 +622,27 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
     if (showScheduleModal) {
       let displayTimetable = schedule?.timetable || [];
       if (job?.internshipType === "PAID" && Array.isArray(schedule?.batches) && schedule.batches.length > 0) {
-          const matchedBatch = schedule.batches.find(b => b.timeSlot === preferredSlotLocal);
-          if (matchedBatch) displayTimetable = matchedBatch.timetable || [];
+        const matchedBatch = schedule.batches.find(b => b.timeSlot === preferredSlotLocal);
+        if (matchedBatch) displayTimetable = matchedBatch.timetable || [];
       }
-      
+
       if (displayTimetable.length > 0) {
         const todaySession = displayTimetable.find((session) =>
           isToday(parseISO(session.date))
         );
 
-      if (todaySession) {
-        const refKey = `${todaySession.date}-${todaySession.startTime}`;
-        const todayRef = rowRefs.current[refKey];
-        if (todayRef?.current && scrollContainerRef.current) {
-          scrollContainerRef.current.scrollTo({
-            top: todayRef.current.offsetTop - 33,
-            behavior: "smooth",
-          });
+        if (todaySession) {
+          const refKey = `${todaySession.date}-${todaySession.startTime}`;
+          const todayRef = rowRefs.current[refKey];
+          if (todayRef?.current && scrollContainerRef.current) {
+            scrollContainerRef.current.scrollTo({
+              top: todayRef.current.offsetTop - 33,
+              behavior: "smooth",
+            });
+          }
         }
       }
     }
-  }
   }, [showScheduleModal, schedule, job, preferredSlotLocal]);
 
   // 3. UPDATE handleRespond logic
@@ -837,8 +894,8 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
     setSyncModalOpen(true);
     let syncTimetable = schedule?.timetable || [];
     if (job?.internshipType === "PAID" && Array.isArray(schedule?.batches) && schedule.batches.length > 0) {
-        const matchedBatch = schedule.batches.find(b => b.timeSlot === preferredSlotLocal);
-        if (matchedBatch) syncTimetable = matchedBatch.timetable || [];
+      const matchedBatch = schedule.batches.find(b => b.timeSlot === preferredSlotLocal);
+      if (matchedBatch) syncTimetable = matchedBatch.timetable || [];
     }
     setSyncTotal(Array.isArray(syncTimetable) ? syncTimetable.length : 0);
 
@@ -951,10 +1008,29 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
             )}
           </div>
 
+          {/* ── BATCH TABS for PAID Internships ────────────────────── */}
+          {job?.internshipType === "PAID" && Array.isArray(schedule?.batches) && schedule.batches.length > 0 &&
+            (!preferredSlotLocal || !schedule.batches.some(b => b.timeSlot === preferredSlotLocal)) && (
+              <div className="mt-4 flex flex-wrap mb-2 border-b border-gray-200">
+                {schedule.batches.map((b, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setPreviewBatchIndex(i)}
+                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${previewBatchIndex === i
+                        ? "border-indigo-600 text-indigo-600 bg-indigo-50/50"
+                        : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                      }`}
+                  >
+                    Batch: {b.timeSlot}
+                  </button>
+                ))}
+              </div>
+            )}
+
           {/* ── SCROLLABLE Session Table ─────────────────────────── */}
           <div
             ref={scrollContainerRef}
-            className="mt-4 max-h-[65vh] overflow-auto relative hide-scrollbar"
+            className="mt-4 max-h-[65vh] overflow-auto relative custom-scrollbar"
           >
             <table className="min-w-full bg-white rounded-lg">
               <thead className="bg-indigo-50 border-b border-indigo-200 sticky top-0 z-10">
@@ -970,16 +1046,20 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
               <tbody>
                 {(() => {
                   let displayTimetable = Array.isArray(schedule?.timetable) ? schedule.timetable : [];
-                  
+
                   // Use batch-specific timetable for PAID internships if available
                   if (job?.internshipType === "PAID" && Array.isArray(schedule?.batches) && schedule.batches.length > 0) {
-                      const savedPreferredSlot = preferredSlotLocal;
-                      if (savedPreferredSlot) {
-                          const matchedBatch = schedule.batches.find(b => b.timeSlot === savedPreferredSlot);
-                          if (matchedBatch && Array.isArray(matchedBatch.timetable)) {
-                              displayTimetable = matchedBatch.timetable;
-                          }
+                    const savedPreferredSlot = preferredSlotLocal;
+                    const matchedBatch = savedPreferredSlot ? schedule.batches.find(b => b.timeSlot === savedPreferredSlot) : null;
+
+                    if (matchedBatch && Array.isArray(matchedBatch.timetable)) {
+                      displayTimetable = matchedBatch.timetable;
+                    } else {
+                      const previewBatch = schedule.batches[previewBatchIndex] || schedule.batches[0];
+                      if (previewBatch && Array.isArray(previewBatch.timetable)) {
+                        displayTimetable = previewBatch.timetable;
                       }
+                    }
                   }
 
                   return displayTimetable.length > 0 ? (
@@ -990,128 +1070,220 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
 
                       const displayTime = `${session.startTime} - ${session.endTime}`;
 
-                    if (isTodaySession) {
-                      rowRefs.current[rowRefKey] = React.createRef();
-                    }
+                      if (isTodaySession) {
+                        rowRefs.current[rowRefKey] = React.createRef();
+                      }
 
-                    const summaryText = session.sectionSummary || "-";
-                    const isOnline = session.type === "online";
-                    const isOffline = session.type === "offline";
+                      const summaryText = session.sectionSummary || "-";
+                      const isOnline = session.type === "online";
+                      const isOffline = session.type === "offline";
 
-                    return (
-                      <tr
-                        key={idx}
-                        ref={isTodaySession ? rowRefs.current[rowRefKey] : null}
-                        className={idx % 2 === 0 ? "bg-gray-50" : "bg-white"}
-                      >
-                        <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap text-center">
-                          {format(parseISO(session.date), "dd MMM yyyy")}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap text-center">
-                          {format(parseISO(session.date), "EEE")}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap text-center">
-                          {displayTime}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-indigo-600 hover:text-indigo-800 whitespace-nowrap text-center">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setSelectedSummary({
-                                sectionSummary: summaryText,
-                                instructor: session.instructor || ""
-                              })
-                            }
-                            className="text-indigo-600 hover:underline text-xs font-medium"
-                          >
-                            View Summary
-                          </button>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap text-center">
-                          {isOnline ? (
-                            session.eventLink ? (
-                              <a
-                                href={normalizeUrl(session.eventLink)}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center text-indigo-600 hover:text-indigo-800 text-xs font-medium"
-                              >
-                                <FontAwesomeIcon icon={faLink} className="mr-1" />
-                                Join Meeting
-                              </a>
-                            ) : (
-                              <span className="text-gray-400 text-xs">Link Pending</span>
-                            )
-                          ) : isOffline ? (
-                            session.location?.address ? (
+                      return (
+                        <tr
+                          key={idx}
+                          ref={isTodaySession ? rowRefs.current[rowRefKey] : null}
+                          className={idx % 2 === 0 ? "bg-gray-50" : "bg-white"}
+                        >
+                          <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap text-center">
+                            {format(parseISO(session.date), "dd MMM yyyy")}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap text-center">
+                            {format(parseISO(session.date), "EEE")}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap text-center">
+                            {displayTime}
+                          </td>
+                          <td className="px-4 py-3 text-sm whitespace-nowrap text-center flex flex-col items-center justify-center space-y-2 h-full">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setSelectedSummary({
+                                  sectionSummary: summaryText,
+                                  instructor: session.instructor || ""
+                                })
+                              }
+                              className="text-indigo-600 hover:underline text-xs font-medium block mx-auto"
+                            >
+                              View Summary
+                            </button>
+                            {session.mockInterview?.enabled && (
                               <button
                                 type="button"
-                                onClick={() => setSelectedLocation(session.location)}
-                                className="inline-flex items-center text-indigo-600 hover:text-indigo-800 text-xs font-medium"
+                                onClick={() => {
+                                  if (!isTodaySession) {
+                                    toast.info(`This mock interview is only available on ${format(sessionDate, 'dd MMM yyyy')}`);
+                                  } else {
+                                    setSelectedMockSession(session);
+                                  }
+                                }}
+                                className={`mt-2 block mx-auto text-[10px] px-2 py-1 rounded font-medium ${isTodaySession ? "bg-indigo-600 text-white hover:bg-indigo-700" : "bg-gray-300 text-gray-600 cursor-not-allowed"}`}
                               >
-                                <FontAwesomeIcon icon={faMapMarkerAlt} className="mr-1" />
-                                Location
+                                Take Mock Interview
                               </button>
-                            ) : (
-                              <span className="text-gray-400 text-xs">Location TBA</span>
-                            )
-                          ) : (
-                            <>
-                              {session.eventLink && (
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap text-center">
+                            {isOnline ? (
+                              session.eventLink ? (
                                 <a
                                   href={normalizeUrl(session.eventLink)}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="inline-flex items-center text-indigo-600 hover:text-indigo-800 text-xs font-medium mr-2"
+                                  className="inline-flex items-center text-indigo-600 hover:text-indigo-800 text-xs font-medium"
                                 >
                                   <FontAwesomeIcon icon={faLink} className="mr-1" />
                                   Join Meeting
                                 </a>
-                              )}
-                              {session.location?.address && (
-                                <p className="inline-flex items-center">
-                                  <FontAwesomeIcon icon={faMapMarkerAlt} className="mr-1 text-gray-600" />
-                                  <span className="text-gray-700 text-sm">
-                                    {session.location.name}
-                                  </span>
-                                </p>
-                              )}
-                              {!session.eventLink && !session.location?.address && (
-                                <span className="text-gray-400 text-xs">TBA</span>
-                              )}
-                            </>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-sm whitespace-nowrap text-center">
-                          <span
-                            className={`
+                              ) : (
+                                <span className="text-gray-400 text-xs">Link Pending</span>
+                              )
+                            ) : isOffline ? (
+                              session.location?.address ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedLocation(session.location)}
+                                  className="inline-flex items-center text-indigo-600 hover:text-indigo-800 text-xs font-medium"
+                                >
+                                  <FontAwesomeIcon icon={faMapMarkerAlt} className="mr-1" />
+                                  Location
+                                </button>
+                              ) : (
+                                <span className="text-gray-400 text-xs">Location TBA</span>
+                              )
+                            ) : (
+                              <>
+                                {session.eventLink && (
+                                  <a
+                                    href={normalizeUrl(session.eventLink)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center text-indigo-600 hover:text-indigo-800 text-xs font-medium mr-2"
+                                  >
+                                    <FontAwesomeIcon icon={faLink} className="mr-1" />
+                                    Join Meeting
+                                  </a>
+                                )}
+                                {session.location?.address && (
+                                  <p className="inline-flex items-center">
+                                    <FontAwesomeIcon icon={faMapMarkerAlt} className="mr-1 text-gray-600" />
+                                    <span className="text-gray-700 text-sm">
+                                      {session.location.name}
+                                    </span>
+                                  </p>
+                                )}
+                                {!session.eventLink && !session.location?.address && (
+                                  <span className="text-gray-400 text-xs">TBA</span>
+                                )}
+                              </>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-sm whitespace-nowrap text-center">
+                            <span
+                              className={`
                 inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full capitalize
                 ${isOnline
-                                ? "bg-blue-100 text-blue-700"
-                                : isOffline
-                                  ? "bg-green-100 text-green-700"
-                                  : "bg-purple-100 text-purple-700"
-                              }
+                                  ? "bg-blue-100 text-blue-700"
+                                  : isOffline
+                                    ? "bg-green-100 text-green-700"
+                                    : "bg-purple-100 text-purple-700"
+                                }
               `}
-                          >
-                            {session.type}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })
-                ) : (
-                  <tr>
-                    <td colSpan="6" className="text-center text-sm text-gray-500 py-4">
-                      Internship schedule coming soon.
-                    </td>
-                  </tr>
-                );
+                            >
+                              {session.type}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan="6" className="text-center text-sm text-gray-500 py-4">
+                        Internship schedule coming soon.
+                      </td>
+                    </tr>
+                  );
                 })()}
               </tbody>
             </table>
           </div>
         </div>
+
+        {/* Mock Interviews Display */}
+        {schedule && mockInterviews.length > 0 && (
+          <div className="mt-8 px-2">
+            <h3 className="text-md font-semibold text-gray-800 mb-4 flex items-center border-b pb-2">
+              <span className="text-xl mr-2">🎯</span> Scheduled Mock Interviews
+            </h3>
+            <div className="space-y-4">
+              {mockInterviews.map((mi, idx) => {
+                const miDate = parseISO(mi.date);
+                const isTodaySession = isValid(miDate) && isToday(miDate);
+                const isPast = isValid(miDate) && miDate < new Date(new Date().setHours(0, 0, 0, 0));
+                let actionText = "Not Started";
+                let actionClass = "bg-white text-gray-600 border-2 border-gray-100";
+
+                if (mi.studentStatus === "Completed" || mi.status === "Completed") {
+                  actionText = "Completed";
+                  actionClass = "bg-green-100 text-green-800 border-2 border-green-200";
+                } else if (isTodaySession) {
+                  actionText = "Take Mock Interview";
+                  actionClass = "bg-indigo-600 text-white hover:bg-indigo-700 cursor-pointer shadow-md border-2 border-transparent transition-transform hover:-translate-y-0.5";
+                } else if (isPast) {
+                  actionText = "Missed";
+                  actionClass = "bg-red-50 text-red-700 border-2 border-red-100";
+                }
+
+                return (
+                  <div key={idx} className="bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-100 rounded-xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center shadow-sm hover:shadow-md transition-shadow">
+                    <div className="mb-3 md:mb-0">
+                      <p className="text-lg font-bold text-indigo-900">{`Mock Interview ${idx + 1}`}</p>
+                      <div className="flex items-center gap-3 mt-2 text-sm font-medium text-indigo-700 bg-white/60 w-max px-3 py-1 rounded-full shadow-sm border border-indigo-50">
+                        <span className="flex items-center"><FontAwesomeIcon icon={faCalendarAlt} className="mr-1.5" /> {isValid(miDate) ? format(miDate, "dd MMM yyyy") : mi.date}</span>
+                        <span className="text-indigo-300">|</span>
+                        <span className="flex items-center"><FontAwesomeIcon icon={faClock} className="mr-1.5" /> {mi.startTime} - {mi.endTime}</span>
+                      </div>
+                      <p className="text-sm text-gray-700 mt-3 font-medium bg-white/50 px-3 py-1 rounded-md inline-block">
+                        <span className="text-gray-500 mr-1">Type:</span> <span className="text-gray-800">{mi.interviewType}</span>
+                        {mi.interviewer && (
+                          <span className="ml-3 border-l pl-3 border-gray-300">
+                            <span className="text-gray-500 mr-1">Interviewer:</span> <span className="text-gray-800">{mi.interviewer}</span>
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    <div className="text-right flex flex-col items-end w-full md:w-auto mt-2 md:mt-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (actionText === "Take Mock Interview") {
+                            setSelectedMockSession({
+                              ...mi,
+                              mockInterview: {
+                                enabled: true,
+                                questions: mi.questions || []
+                              }
+                            });
+                          } else if (actionText === "Not Started") {
+                            toast.info(`This mock interview is scheduled for ${format(miDate, 'dd MMM yyyy')}`);
+                          }
+                        }}
+                        className={`inline-block px-5 py-2 rounded-full text-xs font-bold uppercase tracking-wide ${actionClass}`}
+                      >
+                        {actionText}
+                      </button>
+
+                      {mi.meetingLink && actionText === "Take Mock Interview" && (
+                        <a href={normalizeUrl(mi.meetingLink)} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center text-indigo-600 hover:text-indigo-800 hover:bg-indigo-100/50 px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors">
+                          <FontAwesomeIcon icon={faLink} className="mr-2" /> Join External Meeting
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
     );
   };
@@ -1142,12 +1314,12 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
     : 0;
   const visibleQualifications = qualifications.slice(0, safeVisibleQualificationCount);
   const hiddenQualifications = qualifications.slice(safeVisibleQualificationCount);
-  const compensationText =
-    job.internshipType === "STIPEND"
-      ? `${job.compensationDetails?.amount || "—"} ${job.compensationDetails?.currency || ""}${
-          job.compensationDetails?.frequency
-            ? ` per ${job.compensationDetails.frequency.toLowerCase()}`
-            : ""
+  const compensationText = job.compensationDetails?.pdfExtractedCompensation
+    ? job.compensationDetails.pdfExtractedCompensation
+    : job.internshipType === "STIPEND"
+      ? `${job.compensationDetails?.amount || "—"} ${job.compensationDetails?.currency || ""}${job.compensationDetails?.frequency
+          ? ` per ${job.compensationDetails.frequency.toLowerCase()}`
+          : ""
         }`.trim()
       : job.internshipType === "FREE"
         ? "Unpaid / Free"
@@ -1363,7 +1535,7 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
                   </div>
                 ) : availableSlots.length > 0 ? (
                   // ✅ EXACTLY 4 slots visible then scroll
-                  <div className="max-h-[324px] overflow-y-auto space-y-3 hide-scrollbar pr-1">
+                  <div className="max-h-[324px] overflow-y-auto space-y-3 custom-scrollbar pr-1">
                     {availableSlots.map((slot, i) => {
                       const label = `${slot.startTime} - ${slot.endTime}`; // keep for saving
                       const isSelected = selectedTimeSlot === label;
@@ -1498,7 +1670,7 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
               </div>
             </div>
 
-            <div className="min-h-0 flex-1 space-y-6 overflow-y-auto hide-scrollbar px-6 py-5">
+            <div className="min-h-0 flex-1 space-y-6 overflow-y-auto custom-scrollbar px-6 py-5">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {detailRows.map((item) => (
                   <div
@@ -1591,6 +1763,17 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
                   {job.contactInfo?.phone ? `, ${job.contactInfo.phone}` : ""}
                 </p>
               </div>
+
+              {offer.s3Url && (
+                <a
+                  href={offer.s3Url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
+                >
+                  View Original Offer Letter PDF
+                </a>
+              )}
             </div>
           </div>
         </div>
@@ -1646,9 +1829,9 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
         </p>
         <p className="flex items-center">
           <FontAwesomeIcon icon={faClock} className="mr-2" />
-          {format(new Date(job.startDate), "dd MMM yyyy")} –{" "}
-          {job.endDateOrDuration
-            ? format(new Date(job.endDateOrDuration), "dd MMM yyyy")
+          {isNaN(Date.parse(job.startDate)) ? (job.startDate || "Date unknown") : format(new Date(job.startDate), "dd MMM yyyy")} –{" "}
+          {(job.endDateOrDuration || job.duration)
+            ? (isNaN(Date.parse(job.endDateOrDuration || job.duration)) ? (job.endDateOrDuration || job.duration) : format(new Date(job.endDateOrDuration || job.duration), "dd MMM yyyy"))
             : "—"}
         </p>
 
@@ -1660,16 +1843,9 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
           </p>
         )}
 
-        <p>
-          <FontAwesomeIcon icon={faDollarSign} className="mr-2" />
-          {job.internshipType === "STIPEND"
-            ? `${job.compensationDetails?.amount} ${job.compensationDetails?.currency} per ${job.compensationDetails?.frequency?.toLowerCase()}`
-            : job.internshipType === "FREE"
-              ? "Unpaid / Free"
-              : job.internshipType === "PAID"
-                ? `Student Pays: ${job.compensationDetails?.amount} ${job.compensationDetails?.currency}`
-                : "N/A"
-          }
+        <p className="flex items-start">
+          <FontAwesomeIcon icon={faDollarSign} className="mr-2 mt-1" />
+          <span>{compensationText}</span>
         </p>
       </div>
 
@@ -1795,8 +1971,8 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
 
       {/* ✅ Schedule Modal (FREE + STIPEND) — keep existing code SAME */}
       {showScheduleModal && job?.internshipType !== "PAID" && (
-        <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl relative p-6">
+        <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4 sm:p-6">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl relative p-6 max-h-[90vh] overflow-y-auto custom-scrollbar flex flex-col">
             <button
               onClick={() => setShowScheduleModal(false)}
               className="absolute top-3 right-3 text-gray-500 hover:text-gray-700 text-2xl"
@@ -1897,6 +2073,14 @@ const OfferLetterCard = ({ offer, onStatusChange }) => {
         selectedSummary={selectedSummary}
         setSelectedSummary={setSelectedSummary}
         normalizeUrl={normalizeUrl}
+      />
+
+      <MockInterviewModal
+        show={!!selectedMockSession}
+        onClose={() => setSelectedMockSession(null)}
+        session={selectedMockSession}
+        job={job}
+        userInfo={userInfo}
       />
 
       {/* Complete Internship Notice */}

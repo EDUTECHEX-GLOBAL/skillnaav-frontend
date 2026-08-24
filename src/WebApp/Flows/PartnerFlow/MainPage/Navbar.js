@@ -318,19 +318,19 @@ const Navbar = ({ onToggleSidebar }) => {
   const displayPlan = isPremiumExpired ? "Expired" : (userInfo.planType || "Loading");
 
   return (
-    <header className="bg-white font-poppins text-gray-800 py-5 px-4 border-b border-gray-300 sticky top-0 z-50 flex justify-between items-center">
+    <header className="bg-white font-poppins text-gray-800 py-3 sm:py-5 px-4 border-b border-gray-300 sticky top-0 z-50 flex justify-between items-center">
       {/* Left: Logo + hamburger */}
       <div className="flex items-center gap-3">
         <button onClick={onToggleSidebar} className="md:hidden text-gray-700 focus:outline-none">
           <FontAwesomeIcon icon={faBars} className="text-xl" />
         </button>
-        <img src={logo} alt="Skillnaav Logo" className="h-10 w-auto object-contain" width="120" height="56" />
+        <img src={logo} alt="Skillnaav Logo" className="h-8 sm:h-10 w-auto object-contain" width="120" height="56" />
       </div>
 
       {/* Right: User info + dropdown */}
-      <div className="relative flex items-center gap-2 ml-auto">
+      <div className="relative flex items-center gap-2 sm:gap-3 ml-auto">
         {userInfo.name && (
-          <div className="order-2 flex flex-col items-end min-w-[90px] min-h-[40px] justify-center">
+          <div className="order-2 hidden sm:flex flex-col items-end min-w-[90px] min-h-[40px] justify-center">
             <span className="text-gray-800 text-sm">{userInfo.name}</span>
             <span
               className={`mt-1 px-2 py-0.5 text-xs font-medium rounded-full transition-opacity duration-200

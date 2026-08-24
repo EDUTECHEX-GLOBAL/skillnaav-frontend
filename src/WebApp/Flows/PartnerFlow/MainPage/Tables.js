@@ -61,7 +61,9 @@ const CountPill = ({ count, color = "blue" }) => {
     purple: "bg-purple-100 text-purple-700",
   };
   return (
-    <span className={`ml-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold ${colors[color] || colors.gray}`}>
+    <span
+      className={`ml-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold ${colors[color] || colors.gray}`}
+    >
       {count}
     </span>
   );
@@ -73,10 +75,11 @@ const CountPill = ({ count, color = "blue" }) => {
 const FilterPill = ({ active, onClick, children }) => (
   <button
     onClick={onClick}
-    className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${active
+    className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${
+      active
         ? "bg-gray-900 text-white border-gray-900 shadow-sm"
         : "bg-white text-gray-600 border-gray-200 hover:border-gray-400 hover:text-gray-800"
-      }`}
+    }`}
   >
     {children}
   </button>
@@ -90,19 +93,25 @@ const OFFER_SENT_STATUSES = new Set(["Sent", "Accepted", "Rejected"]);
 const TableWrapper = ({ children }) => (
   <div className="rounded-xl border border-gray-200 overflow-hidden">
     <div className="overflow-auto max-h-[65vh]">
-      <table className="min-w-[1120px] font-poppins text-sm bg-white">{children}</table>
+      <table className="min-w-[1120px] font-poppins text-sm bg-white">
+        {children}
+      </table>
     </div>
   </div>
 );
 
 const Th = ({ children, className = "" }) => (
-  <th className={`px-5 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider bg-gray-50 sticky top-0 z-10 border-b border-gray-200 ${className}`}>
+  <th
+    className={`px-5 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider bg-gray-50 sticky top-0 z-10 border-b border-gray-200 ${className}`}
+  >
     {children}
   </th>
 );
 
 const Td = ({ children, className = "" }) => (
-  <td className={`px-5 py-3.5 text-sm text-gray-700 align-middle ${className}`}>{children}</td>
+  <td className={`px-5 py-3.5 text-sm text-gray-700 align-middle ${className}`}>
+    {children}
+  </td>
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -110,34 +119,61 @@ const Td = ({ children, className = "" }) => (
 // ─────────────────────────────────────────────────────────────────────────────
 const getL2StatusLabel = (status) => {
   switch ((status || "").toLowerCase()) {
-    case "not_sent": case "not_used": case "": return "Pending";
-    case "generated": return "Generated";
-    case "sent": return "Sent";
-    case "started": return "In Progress";
-    case "submitted": return "Submitted";
-    case "evaluated": return "Evaluated";
-    case "passed": return "Passed";
-    case "rejected": return "Rejected";
-    case "expired": return "Expired";
-    default: return status;
+    case "not_sent":
+    case "not_used":
+    case "":
+      return "Pending";
+    case "generated":
+      return "Generated";
+    case "sent":
+      return "Sent";
+    case "started":
+      return "In Progress";
+    case "submitted":
+      return "Submitted";
+    case "evaluated":
+      return "Evaluated";
+    case "passed":
+      return "Passed";
+    case "rejected":
+      return "Rejected";
+    case "expired":
+      return "Expired";
+    default:
+      return status;
   }
 };
 
 const getL2StatusColor = (status) => {
   switch ((status || "").toLowerCase()) {
-    case "sent": return "bg-blue-100 text-blue-700 border-blue-200";
-    case "started": return "bg-amber-100 text-amber-800 border-amber-200";
-    case "submitted": return "bg-purple-100 text-purple-800 border-purple-200";
-    case "evaluated": return "bg-indigo-100 text-indigo-800 border-indigo-200";
-    case "passed": return "bg-green-100 text-green-800 border-green-200";
-    case "rejected": case "expired": return "bg-red-100 text-red-800 border-red-200";
-    case "generated": return "bg-teal-100 text-teal-700 border-teal-200";
-    default: return "bg-gray-100 text-gray-500 border-gray-200";
+    case "sent":
+      return "bg-blue-100 text-blue-700 border-blue-200";
+    case "started":
+      return "bg-amber-100 text-amber-800 border-amber-200";
+    case "submitted":
+      return "bg-purple-100 text-purple-800 border-purple-200";
+    case "evaluated":
+      return "bg-indigo-100 text-indigo-800 border-indigo-200";
+    case "passed":
+      return "bg-green-100 text-green-800 border-green-200";
+    case "rejected":
+    case "expired":
+      return "bg-red-100 text-red-800 border-red-200";
+    case "generated":
+      return "bg-teal-100 text-teal-700 border-teal-200";
+    default:
+      return "bg-gray-100 text-gray-500 border-gray-200";
   }
 };
 
 const ASSIGNMENT_LOCKED_STATUSES = new Set([
-  "sent", "started", "submitted", "evaluated", "passed", "rejected", "expired",
+  "sent",
+  "started",
+  "submitted",
+  "evaluated",
+  "passed",
+  "rejected",
+  "expired",
 ]);
 
 const ASSESSMENT_RESULT_STATUSES = new Set(["evaluated", "passed", "rejected"]);
@@ -145,7 +181,8 @@ const ASSESSMENT_RESULT_STATUSES = new Set(["evaluated", "passed", "rejected"]);
 const getAssessmentResult = (item) => {
   const status = (item?.l2?.status || "").toLowerCase();
   const rawScore = item?.l2?.score;
-  const score = typeof rawScore === "number" ? Math.round(rawScore * 10) / 10 : null;
+  const score =
+    typeof rawScore === "number" ? Math.round(rawScore * 10) / 10 : null;
 
   if (!ASSESSMENT_RESULT_STATUSES.has(status) || score == null) {
     return null;
@@ -164,7 +201,11 @@ const getAssessmentResult = (item) => {
 const hasReviewQuestions = (review) =>
   Array.isArray(review?.questions) && review.questions.length > 0;
 
-const downloadAssessmentResultPDF = async ({ item, internshipTitle, internshipId }) => {
+const downloadAssessmentResultPDF = async ({
+  item,
+  internshipTitle,
+  internshipId,
+}) => {
   const result = getAssessmentResult(item);
   if (!result) return;
 
@@ -196,11 +237,14 @@ const downloadAssessmentResultPDF = async ({ item, internshipTitle, internshipId
   }
 
   if (!hasReviewQuestions(review)) {
-    window.alert("Question and answer details are not available yet. Please evaluate or refresh the assessment result and try again.");
+    window.alert(
+      "Question and answer details are not available yet. Please evaluate or refresh the assessment result and try again.",
+    );
     return;
   }
 
-  const completedSource = review?.evaluatedAt || review?.submittedAt || item?.l2?.updatedAt;
+  const completedSource =
+    review?.evaluatedAt || review?.submittedAt || item?.l2?.updatedAt;
   const completedAt = completedSource
     ? new Date(completedSource).toLocaleString()
     : new Date().toLocaleString();
@@ -268,7 +312,10 @@ const downloadAssessmentResultPDF = async ({ item, internshipTitle, internshipId
   doc.setFontSize(10);
   writeLabelValue("Name:", name);
   writeLabelValue("Email:", email);
-  writeLabelValue("Assessment ID:", review?.assessmentId || assessmentId || "N/A");
+  writeLabelValue(
+    "Assessment ID:",
+    review?.assessmentId || assessmentId || "N/A",
+  );
   writeLabelValue("Completed:", completedAt);
 
   y += 4;
@@ -287,7 +334,7 @@ const downloadAssessmentResultPDF = async ({ item, internshipTitle, internshipId
   if (Array.isArray(review?.files) && review.files.length > 0) {
     writeLabelValue(
       "Uploaded Files:",
-      review.files.map((file) => file.name || file.url).join(", ")
+      review.files.map((file) => file.name || file.url).join(", "),
     );
   }
 
@@ -305,7 +352,7 @@ const downloadAssessmentResultPDF = async ({ item, internshipTitle, internshipId
     writeWrapped(
       "Question and answer details are not available for this assessment yet.",
       marginX,
-      contentWidth
+      contentWidth,
     );
   }
 
@@ -326,27 +373,55 @@ const downloadAssessmentResultPDF = async ({ item, internshipTitle, internshipId
         `${prefix} ${option}${markers.length ? ` (${markers.join(", ")})` : ""}`,
         marginX + 4,
         contentWidth - 4,
-        4.5
+        4.5,
       );
     });
 
     y += 1;
     doc.setFont("helvetica", "bold");
-    doc.setTextColor(question.isCorrect ? 22 : 185, question.isCorrect ? 101 : 28, question.isCorrect ? 52 : 28);
-    writeWrapped(`AI Result: ${question.isCorrect ? "Correct" : "Incorrect"}`, marginX + 4, contentWidth - 4, 4.5);
+    doc.setTextColor(
+      question.isCorrect ? 22 : 185,
+      question.isCorrect ? 101 : 28,
+      question.isCorrect ? 52 : 28,
+    );
+    writeWrapped(
+      `AI Result: ${question.isCorrect ? "Correct" : "Incorrect"}`,
+      marginX + 4,
+      contentWidth - 4,
+      4.5,
+    );
     doc.setTextColor(17, 24, 39);
     doc.setFont("helvetica", "normal");
-    writeWrapped(`Student Answer: ${question.selectedAnswer || "Not answered"}`, marginX + 4, contentWidth - 4, 4.5);
-    writeWrapped(`Correct Answer: ${question.correctAnswer || "Not available"}`, marginX + 4, contentWidth - 4, 4.5);
+    writeWrapped(
+      `Student Answer: ${question.selectedAnswer || "Not answered"}`,
+      marginX + 4,
+      contentWidth - 4,
+      4.5,
+    );
+    writeWrapped(
+      `Correct Answer: ${question.correctAnswer || "Not available"}`,
+      marginX + 4,
+      contentWidth - 4,
+      4.5,
+    );
     if (question.explanation) {
-      writeWrapped(`AI Explanation: ${question.explanation}`, marginX + 4, contentWidth - 4, 4.5);
+      writeWrapped(
+        `AI Explanation: ${question.explanation}`,
+        marginX + 4,
+        contentWidth - 4,
+        4.5,
+      );
     }
     if (question.domain || question.difficulty || question.timeSpentSeconds) {
       const meta = [
         question.domain ? `Domain: ${question.domain}` : null,
         question.difficulty ? `Difficulty: ${question.difficulty}` : null,
-        question.timeSpentSeconds ? `Time: ${question.timeSpentSeconds}s` : null,
-      ].filter(Boolean).join(" | ");
+        question.timeSpentSeconds
+          ? `Time: ${question.timeSpentSeconds}s`
+          : null,
+      ]
+        .filter(Boolean)
+        .join(" | ");
       writeWrapped(meta, marginX + 4, contentWidth - 4, 4.5);
     }
     y += 6;
@@ -361,7 +436,8 @@ const downloadAssessmentResultPDF = async ({ item, internshipTitle, internshipId
     doc.text(`Page ${page} of ${pageCount}`, 194, 286, { align: "right" });
   }
 
-  const safeName = name.replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "") || "candidate";
+  const safeName =
+    name.replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "") || "candidate";
   doc.save(`assessment_answer_paper_${safeName}.pdf`);
 };
 
@@ -375,25 +451,52 @@ const formatAppDate = (iso) => {
 };
 
 const APP_STATUS_CONFIG = {
-  shortlisted: { label: "Shortlisted", cls: "bg-amber-100 text-amber-800 border-amber-200" },
-  approved: { label: "Approved", cls: "bg-green-100 text-green-800 border-green-200" },
-  selected: { label: "Approved", cls: "bg-green-100 text-green-800 border-green-200" },
-  accepted: { label: "Accepted", cls: "bg-green-100 text-green-800 border-green-200" },
-  rejected: { label: "Rejected", cls: "bg-red-100 text-red-800 border-red-200" },
-  declined: { label: "Rejected", cls: "bg-red-100 text-red-800 border-red-200" },
-  pending: { label: "Applied", cls: "bg-gray-100 text-gray-600 border-gray-200" },
+  shortlisted: {
+    label: "Shortlisted",
+    cls: "bg-amber-100 text-amber-800 border-amber-200",
+  },
+  approved: {
+    label: "Approved",
+    cls: "bg-green-100 text-green-800 border-green-200",
+  },
+  selected: {
+    label: "Approved",
+    cls: "bg-green-100 text-green-800 border-green-200",
+  },
+  accepted: {
+    label: "Accepted",
+    cls: "bg-green-100 text-green-800 border-green-200",
+  },
+  rejected: {
+    label: "Rejected",
+    cls: "bg-red-100 text-red-800 border-red-200",
+  },
+  declined: {
+    label: "Rejected",
+    cls: "bg-red-100 text-red-800 border-red-200",
+  },
+  pending: {
+    label: "Applied",
+    cls: "bg-gray-100 text-gray-600 border-gray-200",
+  },
 };
 
 const getAppStatusConfig = (status) => {
   const key = (status || "").trim().toLowerCase();
-  return APP_STATUS_CONFIG[key] || {
-    label: status ? status.charAt(0).toUpperCase() + status.slice(1) : "Applied",
-    cls: "bg-gray-100 text-gray-600 border-gray-200",
-  };
+  return (
+    APP_STATUS_CONFIG[key] || {
+      label: status
+        ? status.charAt(0).toUpperCase() + status.slice(1)
+        : "Applied",
+      cls: "bg-gray-100 text-gray-600 border-gray-200",
+    }
+  );
 };
 
 const StatusPill = ({ label, cls }) => (
-  <span className={`inline-flex items-center whitespace-nowrap px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${cls}`}>
+  <span
+    className={`inline-flex items-center whitespace-nowrap px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${cls}`}
+  >
     {label}
   </span>
 );
@@ -420,11 +523,7 @@ const normaliseCandidate = (raw) => {
   if (!raw) return null;
 
   // student_id: prefer snake_case, fall back to camelCase variants
-  const student_id =
-    raw.student_id ||
-    raw.studentId ||
-    raw.student_ID ||
-    null;
+  const student_id = raw.student_id || raw.studentId || raw.student_ID || null;
 
   // ATS score: prefer ats_score_pct, derive from similarity_score if absent
   let ats_score_pct = raw.ats_score_pct;
@@ -453,7 +552,9 @@ const AtsScorePill = ({ score }) => {
         ? "bg-amber-100 text-amber-800 border-amber-200"
         : "bg-red-100 text-red-700 border-red-200";
   return (
-    <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${cls}`}>
+    <span
+      className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${cls}`}
+    >
       {score}%
     </span>
   );
@@ -466,11 +567,20 @@ const AiReasoningPanel = ({ reasoning }) => {
   const [open, setOpen] = useState(false);
   if (!reasoning || reasoning.claude_evaluated === false) return null;
 
-  const { shortlist, confidence, strengths = [], gaps = [], recommendation, reasoning: reason } = reasoning;
+  const {
+    shortlist,
+    confidence,
+    strengths = [],
+    gaps = [],
+    recommendation,
+    reasoning: reason,
+  } = reasoning;
   const confColor =
-    confidence >= 80 ? "text-green-700 bg-green-50 border-green-200" :
-      confidence >= 60 ? "text-amber-700 bg-amber-50 border-amber-200" :
-        "text-red-700 bg-red-50 border-red-200";
+    confidence >= 80
+      ? "text-green-700 bg-green-50 border-green-200"
+      : confidence >= 60
+        ? "text-amber-700 bg-amber-50 border-amber-200"
+        : "text-red-700 bg-red-50 border-red-200";
 
   return (
     <div className="mt-1">
@@ -485,19 +595,21 @@ const AiReasoningPanel = ({ reasoning }) => {
       {open && (
         <div className="mt-2 p-3 rounded-xl border border-violet-100 bg-violet-50 text-xs space-y-2 w-72 shadow-sm">
           {/* Confidence */}
-          <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border text-[11px] font-semibold ${confColor}`}>
+          <div
+            className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border text-[11px] font-semibold ${confColor}`}
+          >
             Confidence: {confidence}%
           </div>
 
           {/* Recommendation */}
           {recommendation && (
-            <p className="text-gray-700 font-medium leading-snug">{recommendation}</p>
+            <p className="text-gray-700 font-medium leading-snug">
+              {recommendation}
+            </p>
           )}
 
           {/* Reasoning */}
-          {reason && (
-            <p className="text-gray-500 leading-snug">{reason}</p>
-          )}
+          {reason && <p className="text-gray-500 leading-snug">{reason}</p>}
 
           {/* Strengths */}
           {strengths.length > 0 && (
@@ -505,7 +617,9 @@ const AiReasoningPanel = ({ reasoning }) => {
               <p className="font-semibold text-green-700 mb-1">✅ Strengths</p>
               <ul className="space-y-0.5">
                 {strengths.map((s, i) => (
-                  <li key={i} className="text-gray-600">• {s}</li>
+                  <li key={i} className="text-gray-600">
+                    • {s}
+                  </li>
                 ))}
               </ul>
             </div>
@@ -517,7 +631,9 @@ const AiReasoningPanel = ({ reasoning }) => {
               <p className="font-semibold text-red-600 mb-1">⚠️ Gaps</p>
               <ul className="space-y-0.5">
                 {gaps.map((g, i) => (
-                  <li key={i} className="text-gray-600">• {g}</li>
+                  <li key={i} className="text-gray-600">
+                    • {g}
+                  </li>
                 ))}
               </ul>
             </div>
@@ -536,7 +652,12 @@ export const ApplicationsTable = ({ applications = [] }) => {
   const [appSearch, setAppSearch] = useState("");
 
   const counts = useMemo(() => {
-    const c = { all: applications.length, shortlisted: 0, applied: 0, rejected: 0 };
+    const c = {
+      all: applications.length,
+      shortlisted: 0,
+      applied: 0,
+      rejected: 0,
+    };
     applications.forEach((a) => {
       const key = (a.status || "").trim().toLowerCase();
       if (key === "shortlisted") c.shortlisted++;
@@ -548,14 +669,27 @@ export const ApplicationsTable = ({ applications = [] }) => {
 
   const filtered = useMemo(() => {
     let base = applications;
-    if (filter === "shortlisted") base = applications.filter((a) => (a.status || "").toLowerCase() === "shortlisted");
-    else if (filter === "rejected") base = applications.filter((a) => ["rejected", "declined"].includes((a.status || "").toLowerCase()));
-    else if (filter === "applied") base = applications.filter((a) => !["shortlisted", "rejected", "declined"].includes((a.status || "").toLowerCase()));
+    if (filter === "shortlisted")
+      base = applications.filter(
+        (a) => (a.status || "").toLowerCase() === "shortlisted",
+      );
+    else if (filter === "rejected")
+      base = applications.filter((a) =>
+        ["rejected", "declined"].includes((a.status || "").toLowerCase()),
+      );
+    else if (filter === "applied")
+      base = applications.filter(
+        (a) =>
+          !["shortlisted", "rejected", "declined"].includes(
+            (a.status || "").toLowerCase(),
+          ),
+      );
     if (appSearch.trim()) {
       const q = appSearch.trim().toLowerCase();
-      base = base.filter((a) =>
-        (a.userName || "").toLowerCase().includes(q) ||
-        (a.userEmail || "").toLowerCase().includes(q)
+      base = base.filter(
+        (a) =>
+          (a.userName || "").toLowerCase().includes(q) ||
+          (a.userEmail || "").toLowerCase().includes(q),
       );
     }
     return base;
@@ -566,15 +700,34 @@ export const ApplicationsTable = ({ applications = [] }) => {
       {/* ── Stats bar ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { key: "shortlisted", label: "Shortlisted", color: "border-l-amber-400", bg: "bg-amber-50", text: "text-amber-700" },
-          { key: "applied", label: "Applied", color: "border-l-blue-400", bg: "bg-blue-50", text: "text-blue-700" },
-          { key: "rejected", label: "Rejected", color: "border-l-red-400", bg: "bg-red-50", text: "text-red-700" },
+          {
+            key: "shortlisted",
+            label: "Shortlisted",
+            color: "border-l-amber-400",
+            bg: "bg-amber-50",
+            text: "text-amber-700",
+          },
+          {
+            key: "applied",
+            label: "Applied",
+            color: "border-l-blue-400",
+            bg: "bg-blue-50",
+            text: "text-blue-700",
+          },
+          {
+            key: "rejected",
+            label: "Rejected",
+            color: "border-l-red-400",
+            bg: "bg-red-50",
+            text: "text-red-700",
+          },
         ].map(({ key, label, color, bg, text }) => (
           <button
             key={key}
             onClick={() => setFilter(filter === key ? "all" : key)}
-            className={`${bg} border border-transparent border-l-4 ${color} rounded-xl px-4 py-3 text-left transition hover:shadow-sm ${filter === key ? "ring-2 ring-offset-1 ring-gray-400" : ""
-              }`}
+            className={`${bg} border border-transparent border-l-4 ${color} rounded-xl px-4 py-3 text-left transition hover:shadow-sm ${
+              filter === key ? "ring-2 ring-offset-1 ring-gray-400" : ""
+            }`}
           >
             <p className={`text-2xl font-bold ${text}`}>{counts[key]}</p>
             <p className="text-xs text-gray-500 font-medium mt-0.5">{label}</p>
@@ -587,33 +740,51 @@ export const ApplicationsTable = ({ applications = [] }) => {
         <FilterPill active={filter === "all"} onClick={() => setFilter("all")}>
           All <CountPill count={counts.all} color="gray" />
         </FilterPill>
-        <FilterPill active={filter === "shortlisted"} onClick={() => setFilter("shortlisted")}>
+        <FilterPill
+          active={filter === "shortlisted"}
+          onClick={() => setFilter("shortlisted")}
+        >
           Shortlisted <CountPill count={counts.shortlisted} color="yellow" />
         </FilterPill>
-        <FilterPill active={filter === "applied"} onClick={() => setFilter("applied")}>
+        <FilterPill
+          active={filter === "applied"}
+          onClick={() => setFilter("applied")}
+        >
           Applied <CountPill count={counts.applied} color="blue" />
         </FilterPill>
-        <FilterPill active={filter === "rejected"} onClick={() => setFilter("rejected")}>
+        <FilterPill
+          active={filter === "rejected"}
+          onClick={() => setFilter("rejected")}
+        >
           Rejected <CountPill count={counts.rejected} color="red" />
         </FilterPill>
         <span className="ml-auto text-xs text-gray-400">
-          Showing <span className="font-semibold text-gray-700">{filtered.length}</span> of{" "}
-          <span className="font-semibold text-gray-700">{counts.all}</span>
+          Showing{" "}
+          <span className="font-semibold text-gray-700">{filtered.length}</span>{" "}
+          of <span className="font-semibold text-gray-700">{counts.all}</span>
         </span>
       </div>
 
       {/* ── Search ── */}
       <div className="relative">
-        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none">🔍</span>
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none">
+          🔍
+        </span>
+        {/*Add "!mt-0" for icon alignment - 07-08-2026 */}
         <input
           type="text"
           value={appSearch}
           onChange={(e) => setAppSearch(e.target.value)}
           placeholder="Search by name or email…"
-          className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white placeholder-gray-400"
+          className="!mt-0 w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white placeholder-gray-400"
         />
         {appSearch && (
-          <button onClick={() => setAppSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs">✕</button>
+          <button
+            onClick={() => setAppSearch("")}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs"
+          >
+            ✕
+          </button>
         )}
       </div>
 
@@ -631,12 +802,19 @@ export const ApplicationsTable = ({ applications = [] }) => {
         </thead>
         <tbody className="divide-y divide-gray-100">
           {filtered.length === 0 ? (
-            <EmptyState icon="🔍" message={`No ${filter === "all" ? "" : filter + " "}applications`} sub="Try a different filter" />
+            <EmptyState
+              icon="🔍"
+              message={`No ${filter === "all" ? "" : filter + " "}applications`}
+              sub="Try a different filter"
+            />
           ) : (
             filtered.map((student, idx) => {
               const cfg = getAppStatusConfig(student.status);
               return (
-                <tr key={student._id} className="hover:bg-gray-50 transition-colors">
+                <tr
+                  key={student._id}
+                  className="hover:bg-gray-50 transition-colors"
+                >
                   <Td className="text-gray-400 text-xs w-10">{idx + 1}</Td>
                   <Td>
                     <div className="flex items-center gap-2.5">
@@ -645,11 +823,17 @@ export const ApplicationsTable = ({ applications = [] }) => {
                           {(student.userName || "?").charAt(0).toUpperCase()}
                         </span>
                       </div>
-                      <span className="font-medium text-gray-800">{student.userName || "N/A"}</span>
+                      <span className="font-medium text-gray-800">
+                        {student.userName || "N/A"}
+                      </span>
                     </div>
                   </Td>
-                  <Td className="text-gray-500">{student.userEmail || "N/A"}</Td>
-                  <Td className="text-gray-500 whitespace-nowrap">{formatAppDate(student.appliedDate)}</Td>
+                  <Td className="text-gray-500">
+                    {student.userEmail || "N/A"}
+                  </Td>
+                  <Td className="text-gray-500 whitespace-nowrap">
+                    {formatAppDate(student.appliedDate)}
+                  </Td>
                   <Td>
                     {student.resumeUrl ? (
                       <a
@@ -685,17 +869,18 @@ const getPartnerId = () => {
   try {
     const info = JSON.parse(localStorage.getItem("partnerInfo") || "null");
     if (info?._id) return info._id;
-  } catch (_) { }
+  } catch (_) {}
   return localStorage.getItem("partnerId") || null;
 };
 
 const TabBtn = ({ active, children, onClick }) => (
   <button
     onClick={onClick}
-    className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all border ${active
+    className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all border ${
+      active
         ? "bg-gray-900 text-white border-gray-900 shadow-sm"
         : "bg-white text-gray-600 border-gray-200 hover:border-gray-400 hover:text-gray-800"
-      }`}
+    }`}
   >
     {children}
   </button>
@@ -704,7 +889,11 @@ const TabBtn = ({ active, children, onClick }) => (
 // ─────────────────────────────────────────────────────────────────────────────
 // ShortlistedTable
 // ─────────────────────────────────────────────────────────────────────────────
-export const ShortlistedTable = ({ candidates, internshipId, internshipTitle = "Internship" }) => {
+export const ShortlistedTable = ({
+  candidates,
+  internshipId,
+  internshipTitle = "Internship",
+}) => {
   const partnerId = useMemo(() => getPartnerId(), []);
 
   const [activeLevel, setActiveLevel] = useState("L1");
@@ -727,8 +916,23 @@ export const ShortlistedTable = ({ candidates, internshipId, internshipTitle = "
   // L3 schedule modal
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [scheduleTarget, setScheduleTarget] = useState(null);
-  const [scheduleForm, setScheduleForm] = useState({ scheduledAt: "", durationMinutes: 30 });
+  const [scheduleForm, setScheduleForm] = useState({
+    scheduledAt: "",
+    durationMinutes: 30,
+  });
+  const [googleAuthUrl, setGoogleAuthUrl] = useState("");
+  const [googleConnected, setGoogleConnected] = useState(false);
   const [isScheduling, setIsScheduling] = useState(false);
+
+  useEffect(() => {
+    const handleGoogleConnected = (event) => {
+      if (event.data?.type !== "skillnaav-google-calendar-connected") return;
+      setGoogleAuthUrl("");
+      setGoogleConnected(true);
+    };
+    window.addEventListener("message", handleGoogleConnected);
+    return () => window.removeEventListener("message", handleGoogleConnected);
+  }, []);
 
   // L1 filter + search
   const [l1Filter, setL1Filter] = useState("all");
@@ -753,7 +957,7 @@ export const ShortlistedTable = ({ candidates, internshipId, internshipTitle = "
   //         of whether the data came from a fresh POST or a GET of old DB docs.
   const normalisedCandidates = useMemo(
     () => (candidates || []).map(normaliseCandidate).filter(Boolean),
-    [candidates]
+    [candidates],
   );
 
   // ── Dedup candidates ────────────────────────────────────────────────────────
@@ -777,7 +981,7 @@ export const ShortlistedTable = ({ candidates, internshipId, internshipTitle = "
         .filter(Boolean)
         .sort()
         .join(","),
-    [uniqueCandidates]
+    [uniqueCandidates],
   );
 
   // ── Load offer statuses ─────────────────────────────────────────────────────
@@ -829,7 +1033,13 @@ export const ShortlistedTable = ({ candidates, internshipId, internshipTitle = "
 
   // ── L1 filter counts ────────────────────────────────────────────────────────
   const l1Counts = useMemo(() => {
-    const c = { all: l1Count, shortlisted: 0, applied: 0, accepted: 0, rejected: 0 };
+    const c = {
+      all: l1Count,
+      shortlisted: 0,
+      applied: 0,
+      accepted: 0,
+      rejected: 0,
+    };
     uniqueCandidates.forEach((s) => {
       const st = offerStatuses[s.student_id] || "";
       if (st === "Accepted") c.accepted++;
@@ -842,15 +1052,28 @@ export const ShortlistedTable = ({ candidates, internshipId, internshipTitle = "
 
   const filteredL1 = useMemo(() => {
     let base = uniqueCandidates;
-    if (l1Filter === "accepted") base = uniqueCandidates.filter((s) => offerStatuses[s.student_id] === "Accepted");
-    else if (l1Filter === "rejected") base = uniqueCandidates.filter((s) => offerStatuses[s.student_id] === "Rejected");
-    else if (l1Filter === "shortlisted") base = uniqueCandidates.filter((s) => offerStatuses[s.student_id] === "Sent");
-    else if (l1Filter === "applied") base = uniqueCandidates.filter((s) => !OFFER_SENT_STATUSES.has(offerStatuses[s.student_id]));
+    if (l1Filter === "accepted")
+      base = uniqueCandidates.filter(
+        (s) => offerStatuses[s.student_id] === "Accepted",
+      );
+    else if (l1Filter === "rejected")
+      base = uniqueCandidates.filter(
+        (s) => offerStatuses[s.student_id] === "Rejected",
+      );
+    else if (l1Filter === "shortlisted")
+      base = uniqueCandidates.filter(
+        (s) => offerStatuses[s.student_id] === "Sent",
+      );
+    else if (l1Filter === "applied")
+      base = uniqueCandidates.filter(
+        (s) => !OFFER_SENT_STATUSES.has(offerStatuses[s.student_id]),
+      );
     if (l1Search.trim()) {
       const q = l1Search.trim().toLowerCase();
-      base = base.filter((s) =>
-        (s.name || "").toLowerCase().includes(q) ||
-        (s.email || "").toLowerCase().includes(q)
+      base = base.filter(
+        (s) =>
+          (s.name || "").toLowerCase().includes(q) ||
+          (s.email || "").toLowerCase().includes(q),
       );
     }
     return base;
@@ -861,8 +1084,12 @@ export const ShortlistedTable = ({ candidates, internshipId, internshipTitle = "
     if (e.target.checked) {
       setSelectedStudents(
         filteredL1
-          .filter((s) => s.student_id && !OFFER_SENT_STATUSES.has(offerStatuses[s.student_id]))
-          .map((s) => s.student_id)
+          .filter(
+            (s) =>
+              s.student_id &&
+              !OFFER_SENT_STATUSES.has(offerStatuses[s.student_id]),
+          )
+          .map((s) => s.student_id),
       );
     } else {
       setSelectedStudents([]);
@@ -872,7 +1099,7 @@ export const ShortlistedTable = ({ candidates, internshipId, internshipTitle = "
   const toggleStudentSelect = (id) => {
     if (!id || OFFER_SENT_STATUSES.has(offerStatuses[id])) return;
     setSelectedStudents((prev) =>
-      prev.includes(id) ? prev.filter((sid) => sid !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((sid) => sid !== id) : [...prev, id],
     );
   };
 
@@ -885,20 +1112,28 @@ export const ShortlistedTable = ({ candidates, internshipId, internshipTitle = "
 
   const handleOfferSuccess = () => {
     if (selectedStudent?.student_id) {
-      setOfferStatuses((prev) => ({ ...prev, [selectedStudent.student_id]: "Sent" }));
+      setOfferStatuses((prev) => ({
+        ...prev,
+        [selectedStudent.student_id]: "Sent",
+      }));
     }
     setShowOfferModal(false);
     setSelectedStudent(null);
   };
 
-  const handleCloseOfferModal = () => { setShowOfferModal(false); setSelectedStudent(null); };
+  const handleCloseOfferModal = () => {
+    setShowOfferModal(false);
+    setSelectedStudent(null);
+  };
 
   const handleBulkOfferSuccess = (sentStudents) => {
     setShowBulkModal(false);
     setSelectedStudents([]);
     setOfferStatuses((prev) => {
       const updated = { ...prev };
-      sentStudents.forEach((s) => { if (s?.student_id) updated[s.student_id] = "Sent"; });
+      sentStudents.forEach((s) => {
+        if (s?.student_id) updated[s.student_id] = "Sent";
+      });
       return updated;
     });
   };
@@ -907,7 +1142,9 @@ export const ShortlistedTable = ({ candidates, internshipId, internshipTitle = "
   const handleSendAssignment = async (item) => {
     const sid = item?.studentId?._id
       ? String(item.studentId._id)
-      : item?.studentId ? String(item.studentId) : null;
+      : item?.studentId
+        ? String(item.studentId)
+        : null;
 
     if (!sid || sendingMap[sid]) return;
     const l2Status = item?.l2?.status;
@@ -915,10 +1152,19 @@ export const ShortlistedTable = ({ candidates, internshipId, internshipTitle = "
 
     setSendingMap((prev) => ({ ...prev, [sid]: true }));
     try {
-      let assessmentId = item?.l2?.assessmentId ? String(item.l2.assessmentId) : null;
+      let assessmentId = item?.l2?.assessmentId
+        ? String(item.l2.assessmentId)
+        : null;
       if (!assessmentId) {
-        const genRes = await generateL2Assessment({ internshipId, studentId: sid, partnerId, config: l2Config });
-        assessmentId = genRes?.assessmentId ? String(genRes.assessmentId) : null;
+        const genRes = await generateL2Assessment({
+          internshipId,
+          studentId: sid,
+          partnerId,
+          config: l2Config,
+        });
+        assessmentId = genRes?.assessmentId
+          ? String(genRes.assessmentId)
+          : null;
         if (!assessmentId) throw new Error("Generate returned no assessmentId");
       }
       await sendL2Assessment({ assessmentId, partnerId });
@@ -942,7 +1188,11 @@ export const ShortlistedTable = ({ candidates, internshipId, internshipTitle = "
       const sid = item?.studentId?._id || item?.studentId;
       let interviewId = item?.l3?.interviewId?._id || item?.l3?.interviewId;
       if (!interviewId) {
-        const res = await createInterview({ internshipId, studentId: sid, partnerId });
+        const res = await createInterview({
+          internshipId,
+          studentId: sid,
+          partnerId,
+        });
         interviewId = res.interviewId;
       }
       await scheduleInterview({
@@ -959,7 +1209,11 @@ export const ShortlistedTable = ({ candidates, internshipId, internshipTitle = "
       setScheduleTarget(null);
     } catch (err) {
       console.error("❌ Schedule failed:", err);
-      alert("Failed to schedule interview. Please try again.");
+      if (err.response?.status === 409 && err.response?.data?.authUrl) {
+        setGoogleAuthUrl(err.response.data.authUrl);
+      } else {
+        alert("Failed to schedule interview. Please try again.");
+      }
     } finally {
       setIsScheduling(false);
     }
@@ -974,9 +1228,10 @@ export const ShortlistedTable = ({ candidates, internshipId, internshipTitle = "
         return;
       }
 
-      const confirmMsg = result === "passed"
-        ? "Mark candidate as Passed? They will be moved to the Offer stage."
-        : "Mark candidate as Rejected?";
+      const confirmMsg =
+        result === "passed"
+          ? "Mark candidate as Passed? They will be moved to the Offer stage."
+          : "Mark candidate as Rejected?";
 
       if (!window.confirm(confirmMsg)) return;
 
@@ -994,7 +1249,12 @@ export const ShortlistedTable = ({ candidates, internshipId, internshipTitle = "
   // ── Offer pill ──────────────────────────────────────────────────────────────
   const renderOfferStatusPill = (sid) => {
     const status = offerStatuses[sid] || "Not Sent";
-    return <StatusPill label={getOfferStatusText(status)} cls={getOfferStatusColor(status) + " border"} />;
+    return (
+      <StatusPill
+        label={getOfferStatusText(status)}
+        cls={getOfferStatusColor(status) + " border"}
+      />
+    );
   };
 
   const isLoading = isLoadingAll || pipelineLoading;
@@ -1003,21 +1263,32 @@ export const ShortlistedTable = ({ candidates, internshipId, internshipTitle = "
   // ────────────────────────────────────────────────────────────────────────────
   return (
     <div className="p-5 space-y-5">
-
       {/* ── Main table content — hidden when an inline panel is showing ── */}
       {!isInlinePanel && (
         <>
           <div className="flex flex-wrap gap-2">
-            <TabBtn active={activeLevel === "L1"} onClick={() => setActiveLevel("L1")}>
+            <TabBtn
+              active={activeLevel === "L1"}
+              onClick={() => setActiveLevel("L1")}
+            >
               Shortlisted L1 <CountPill count={l1Count} color="yellow" />
             </TabBtn>
-            <TabBtn active={activeLevel === "L2"} onClick={() => setActiveLevel("L2")}>
+            <TabBtn
+              active={activeLevel === "L2"}
+              onClick={() => setActiveLevel("L2")}
+            >
               Assessment L2 <CountPill count={l2Count} color="purple" />
             </TabBtn>
-            <TabBtn active={activeLevel === "L3"} onClick={() => setActiveLevel("L3")}>
+            <TabBtn
+              active={activeLevel === "L3"}
+              onClick={() => setActiveLevel("L3")}
+            >
               Interview L3 <CountPill count={l3Count} color="blue" />
             </TabBtn>
-            <TabBtn active={activeLevel === "OFFER"} onClick={() => setActiveLevel("OFFER")}>
+            <TabBtn
+              active={activeLevel === "OFFER"}
+              onClick={() => setActiveLevel("OFFER")}
+            >
               Offer <CountPill count={offerCount} color="green" />
             </TabBtn>
           </div>
@@ -1033,18 +1304,48 @@ export const ShortlistedTable = ({ candidates, internshipId, internshipTitle = "
           {/* ════════════════════════════ LEVEL 1 ════════════════════════════ */}
           {activeLevel === "L1" && (
             <div className="space-y-4">
-
               {/* Stats row */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {[
-                  { key: "shortlisted", label: "Offer Sent", color: "border-l-amber-400", bg: "bg-amber-50", text: "text-amber-700" },
-                  { key: "applied", label: "Pending", color: "border-l-blue-400", bg: "bg-blue-50", text: "text-blue-700" },
-                  { key: "accepted", label: "Accepted", color: "border-l-green-400", bg: "bg-green-50", text: "text-green-700" },
-                  { key: "rejected", label: "Rejected", color: "border-l-red-400", bg: "bg-red-50", text: "text-red-700" },
+                  {
+                    key: "shortlisted",
+                    label: "Offer Sent",
+                    color: "border-l-amber-400",
+                    bg: "bg-amber-50",
+                    text: "text-amber-700",
+                  },
+                  {
+                    key: "applied",
+                    label: "Pending",
+                    color: "border-l-blue-400",
+                    bg: "bg-blue-50",
+                    text: "text-blue-700",
+                  },
+                  {
+                    key: "accepted",
+                    label: "Accepted",
+                    color: "border-l-green-400",
+                    bg: "bg-green-50",
+                    text: "text-green-700",
+                  },
+                  {
+                    key: "rejected",
+                    label: "Rejected",
+                    color: "border-l-red-400",
+                    bg: "bg-red-50",
+                    text: "text-red-700",
+                  },
                 ].map(({ key, label, color, bg, text }) => (
-                  <div key={key} className={`${bg} border-l-4 ${color} rounded-xl px-4 py-3`}>
-                    <p className={`text-2xl font-bold ${text}`}>{l1Counts[key]}</p>
-                    <p className="text-xs text-gray-500 font-medium mt-0.5">{label}</p>
+                  <div
+                    key={key}
+                    className={`${bg} border-l-4 ${color} rounded-xl px-4 py-3`}
+                  >
+                    <p className={`text-2xl font-bold ${text}`}>
+                      {l1Counts[key]}
+                    </p>
+                    <p className="text-xs text-gray-500 font-medium mt-0.5">
+                      {label}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -1052,13 +1353,42 @@ export const ShortlistedTable = ({ candidates, internshipId, internshipTitle = "
               {/* Filter pills */}
               <div className="flex flex-wrap items-center gap-2">
                 {[
-                  { key: "all", label: "All", count: l1Counts.all, color: "gray" },
-                  { key: "shortlisted", label: "Offer Sent", count: l1Counts.shortlisted, color: "yellow" },
-                  { key: "applied", label: "Pending", count: l1Counts.applied, color: "blue" },
-                  { key: "accepted", label: "Accepted", count: l1Counts.accepted, color: "green" },
-                  { key: "rejected", label: "Rejected", count: l1Counts.rejected, color: "red" },
+                  {
+                    key: "all",
+                    label: "All",
+                    count: l1Counts.all,
+                    color: "gray",
+                  },
+                  {
+                    key: "shortlisted",
+                    label: "Offer Sent",
+                    count: l1Counts.shortlisted,
+                    color: "yellow",
+                  },
+                  {
+                    key: "applied",
+                    label: "Pending",
+                    count: l1Counts.applied,
+                    color: "blue",
+                  },
+                  {
+                    key: "accepted",
+                    label: "Accepted",
+                    count: l1Counts.accepted,
+                    color: "green",
+                  },
+                  {
+                    key: "rejected",
+                    label: "Rejected",
+                    count: l1Counts.rejected,
+                    color: "red",
+                  },
                 ].map(({ key, label, count, color }) => (
-                  <FilterPill key={key} active={l1Filter === key} onClick={() => setL1Filter(key)}>
+                  <FilterPill
+                    key={key}
+                    active={l1Filter === key}
+                    onClick={() => setL1Filter(key)}
+                  >
                     {label} <CountPill count={count} color={color} />
                   </FilterPill>
                 ))}
@@ -1066,7 +1396,9 @@ export const ShortlistedTable = ({ candidates, internshipId, internshipTitle = "
                 <div className="ml-auto flex items-center gap-2">
                   <span className="text-xs text-gray-400">
                     {selectedStudents.length > 0 && (
-                      <span className="mr-2 font-semibold text-gray-700">{selectedStudents.length} selected</span>
+                      <span className="mr-2 font-semibold text-gray-700">
+                        {selectedStudents.length} selected
+                      </span>
                     )}
                   </span>
                   <button
@@ -1081,16 +1413,24 @@ export const ShortlistedTable = ({ candidates, internshipId, internshipTitle = "
 
               {/* Search */}
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none">🔍</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none">
+                  🔍
+                </span>
+                {/*Add "!mt-0" for icon alignment - 07-08-2026 */}
                 <input
                   type="text"
                   value={l1Search}
                   onChange={(e) => setL1Search(e.target.value)}
                   placeholder="Search by name or email…"
-                  className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white placeholder-gray-400"
+                  className="!mt-0 w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white placeholder-gray-400"
                 />
                 {l1Search && (
-                  <button onClick={() => setL1Search("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs">✕</button>
+                  <button
+                    onClick={() => setL1Search("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs"
+                  >
+                    ✕
+                  </button>
                 )}
               </div>
 
@@ -1105,7 +1445,13 @@ export const ShortlistedTable = ({ candidates, internshipId, internshipTitle = "
                         checked={
                           selectedStudents.length > 0 &&
                           selectedStudents.length ===
-                          filteredL1.filter((s) => s.student_id && !OFFER_SENT_STATUSES.has(offerStatuses[s.student_id])).length
+                            filteredL1.filter(
+                              (s) =>
+                                s.student_id &&
+                                !OFFER_SENT_STATUSES.has(
+                                  offerStatuses[s.student_id],
+                                ),
+                            ).length
                         }
                         onChange={handleSelectAll}
                       />
@@ -1122,23 +1468,37 @@ export const ShortlistedTable = ({ candidates, internshipId, internshipTitle = "
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {isLoading ? (
-                    Array.from({ length: 4 }).map((_, i) => <SkeletonRow key={i} cols={9} />)
+                    Array.from({ length: 4 }).map((_, i) => (
+                      <SkeletonRow key={i} cols={9} />
+                    ))
                   ) : filteredL1.length === 0 ? (
-                    <EmptyState icon="👤" message="No candidates found" sub="Try a different filter" />
+                    <EmptyState
+                      icon="👤"
+                      message="No candidates found"
+                      sub="Try a different filter"
+                    />
                   ) : (
                     filteredL1.map((student, idx) => {
-                      const status = offerStatuses[student.student_id] || "Not Sent";
+                      const status =
+                        offerStatuses[student.student_id] || "Not Sent";
                       const offerSent = OFFER_SENT_STATUSES.has(status);
                       return (
-                        <tr key={student.student_id || student.resumeUrl || idx} className="hover:bg-gray-50 transition-colors">
+                        <tr
+                          key={student.student_id || student.resumeUrl || idx}
+                          className="hover:bg-gray-50 transition-colors"
+                        >
                           <Td>
                             <input
                               type="checkbox"
                               className="rounded"
-                              checked={selectedStudents.includes(student.student_id)}
+                              checked={selectedStudents.includes(
+                                student.student_id,
+                              )}
                               // ✅ FIX: disable checkbox only when offer is already sent OR student_id is missing
                               disabled={offerSent || !student.student_id}
-                              onChange={() => toggleStudentSelect(student.student_id)}
+                              onChange={() =>
+                                toggleStudentSelect(student.student_id)
+                              }
                             />
                           </Td>
                           <Td className="text-gray-400 text-xs">{idx + 1}</Td>
@@ -1146,13 +1506,19 @@ export const ShortlistedTable = ({ candidates, internshipId, internshipTitle = "
                             <div className="flex items-center gap-2.5">
                               <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
                                 <span className="text-indigo-600 text-xs font-bold">
-                                  {(student.name || "?").charAt(0).toUpperCase()}
+                                  {(student.name || "?")
+                                    .charAt(0)
+                                    .toUpperCase()}
                                 </span>
                               </div>
-                              <span className="font-medium text-gray-800">{student.name || "N/A"}</span>
+                              <span className="font-medium text-gray-800">
+                                {student.name || "N/A"}
+                              </span>
                             </div>
                           </Td>
-                          <Td className="text-gray-500">{student.email || "N/A"}</Td>
+                          <Td className="text-gray-500">
+                            {student.email || "N/A"}
+                          </Td>
                           <Td>
                             {/* ✅ FIX: Use AtsScorePill which handles null gracefully and reads
                             the normalised ats_score_pct field (derived from similarity_score
@@ -1161,10 +1527,13 @@ export const ShortlistedTable = ({ candidates, internshipId, internshipTitle = "
                           </Td>
                           <Td>
                             {/* AI reasoning panel — only visible for borderline Claude-evaluated candidates */}
-                            {student.ai_reasoning?.claude_evaluated
-                              ? <AiReasoningPanel reasoning={student.ai_reasoning} />
-                              : <span className="text-gray-300 text-xs">—</span>
-                            }
+                            {student.ai_reasoning?.claude_evaluated ? (
+                              <AiReasoningPanel
+                                reasoning={student.ai_reasoning}
+                              />
+                            ) : (
+                              <span className="text-gray-300 text-xs">—</span>
+                            )}
                           </Td>
                           <Td>
                             {student.resumeUrl ? (
@@ -1191,7 +1560,9 @@ export const ShortlistedTable = ({ candidates, internshipId, internshipTitle = "
                               </button>
                             ) : (
                               <span className="text-xs text-gray-400 italic">
-                                {offerSent ? getOfferStatusText(status) : "No ID"}
+                                {offerSent
+                                  ? getOfferStatusText(status)
+                                  : "No ID"}
                               </span>
                             )}
                           </Td>
@@ -1207,39 +1578,81 @@ export const ShortlistedTable = ({ candidates, internshipId, internshipTitle = "
           {/* ════════════════════════════ LEVEL 2 ════════════════════════════ */}
           {activeLevel === "L2" && (
             <div className="space-y-4">
-
               {/* Config panel */}
               <details className="group">
                 <summary className="cursor-pointer px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 flex items-center gap-2 list-none">
-                  <span className="group-open:rotate-90 transition-transform text-gray-400 inline-block">▶</span>
+                  <span className="group-open:rotate-90 transition-transform text-gray-400 inline-block">
+                    ▶
+                  </span>
                   Assessment Configuration
                 </summary>
                 <div className="mt-2 p-4 bg-gray-50 border border-gray-200 rounded-xl">
                   <div className="mb-4">
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Assessment Type</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Assessment Type
+                    </label>
                     <select
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
                       value={l2Config.assessmentType || "mcqs"}
-                      onChange={(e) => setL2Config((p) => ({ ...p, assessmentType: e.target.value }))}
+                      onChange={(e) =>
+                        setL2Config((p) => ({
+                          ...p,
+                          assessmentType: e.target.value,
+                        }))
+                      }
                     >
                       <option value="mcqs">MCQs</option>
-                      <option value="ai_voice_assessment">AI Voice Assessment</option>
+                      <option value="ai_voice_assessment">
+                        AI Voice Assessment
+                      </option>
                     </select>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                     {[
-                      { label: l2Config.assessmentType === "ai_voice_assessment" ? "Question Count" : "MCQ Count", key: "questionCount", type: "number", min: 1 },
-                      { label: "Difficulty (1-3)", key: "difficulty", type: "number", min: 1, max: 3 },
-                      { label: "Time (mins)", key: "timeLimitMinutes", type: "number", min: 1 },
-                      { label: "Pass Score (%)", key: "passScore", type: "number", min: 1, max: 100 },
+                      {
+                        label:
+                          l2Config.assessmentType === "ai_voice_assessment"
+                            ? "Question Count"
+                            : "MCQ Count",
+                        key: "questionCount",
+                        type: "number",
+                        min: 1,
+                      },
+                      {
+                        label: "Difficulty (1-3)",
+                        key: "difficulty",
+                        type: "number",
+                        min: 1,
+                        max: 3,
+                      },
+                      {
+                        label: "Time (mins)",
+                        key: "timeLimitMinutes",
+                        type: "number",
+                        min: 1,
+                      },
+                      {
+                        label: "Pass Score (%)",
+                        key: "passScore",
+                        type: "number",
+                        min: 1,
+                        max: 100,
+                      },
                     ].map(({ label, key, ...rest }) => (
                       <div key={key}>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          {label}
+                        </label>
                         <input
                           {...rest}
                           className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                           value={l2Config[key]}
-                          onChange={(e) => setL2Config((p) => ({ ...p, [key]: Number(e.target.value) }))}
+                          onChange={(e) =>
+                            setL2Config((p) => ({
+                              ...p,
+                              [key]: Number(e.target.value),
+                            }))
+                          }
                         />
                       </div>
                     ))}
@@ -1249,12 +1662,21 @@ export const ShortlistedTable = ({ candidates, internshipId, internshipTitle = "
                       { label: "Text Answer", key: "allowText" },
                       { label: "File Upload", key: "allowFileUpload" },
                     ].map(({ label, key }) => (
-                      <label key={key} className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                      <label
+                        key={key}
+                        className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer"
+                      >
+                        {/*Add "!mt-0 h-7" for decrease the checkboxes size - 10-08-2026 */}
                         <input
                           type="checkbox"
-                          className="rounded"
+                          className="!mt-0 h-7 rounded"
                           checked={l2Config[key]}
-                          onChange={(e) => setL2Config((p) => ({ ...p, [key]: e.target.checked }))}
+                          onChange={(e) =>
+                            setL2Config((p) => ({
+                              ...p,
+                              [key]: e.target.checked,
+                            }))
+                          }
                         />
                         {label}
                       </label>
@@ -1266,19 +1688,28 @@ export const ShortlistedTable = ({ candidates, internshipId, internshipTitle = "
               {/* Count + Search */}
               <div className="flex items-center gap-3">
                 <span className="text-sm text-gray-500">
-                  Assessment stage: <span className="font-bold text-gray-800">{l2Count}</span>
+                  Assessment stage:{" "}
+                  <span className="font-bold text-gray-800">{l2Count}</span>
                 </span>
                 <div className="relative flex-1 max-w-xs">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none">🔍</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none">
+                    🔍
+                  </span>
+                  {/*Add "!mt-0" for icon alignment - 07-08-2026 */}
                   <input
                     type="text"
                     value={l2Search}
                     onChange={(e) => setL2Search(e.target.value)}
                     placeholder="Search name or email…"
-                    className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white placeholder-gray-400"
+                    className="!mt-0 w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white placeholder-gray-400"
                   />
                   {l2Search && (
-                    <button onClick={() => setL2Search("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs">✕</button>
+                    <button
+                      onClick={() => setL2Search("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs"
+                    >
+                      ✕
+                    </button>
                   )}
                 </div>
               </div>
@@ -1297,107 +1728,160 @@ export const ShortlistedTable = ({ candidates, internshipId, internshipTitle = "
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {isLoading ? (
-                    Array.from({ length: 3 }).map((_, i) => <SkeletonRow key={i} cols={7} />)
+                    Array.from({ length: 3 }).map((_, i) => (
+                      <SkeletonRow key={i} cols={7} />
+                    ))
                   ) : l2Items.filter((item) => {
-                    if (!l2Search.trim()) return true;
-                    const q = l2Search.trim().toLowerCase();
-                    return (item?.studentId?.name || "").toLowerCase().includes(q) ||
-                      (item?.studentId?.email || "").toLowerCase().includes(q);
-                  }).length === 0 ? (
-                    <EmptyState icon="📋" message="No matching candidates" sub="Try a different search" />
-                  ) : (
-                    l2Items.filter((item) => {
                       if (!l2Search.trim()) return true;
                       const q = l2Search.trim().toLowerCase();
-                      return (item?.studentId?.name || "").toLowerCase().includes(q) ||
-                        (item?.studentId?.email || "").toLowerCase().includes(q);
-                    }).map((item, idx) => {
-                      const sid = item?.studentId?._id
-                        ? String(item.studentId._id)
-                        : String(item?.studentId);
-                      const name = item?.studentId?.name || "—";
-                      const email = item?.studentId?.email || "—";
-                      const l2Status = item?.l2?.status || "";
-                      const offerStatus = offerStatuses[sid] || "Not Sent";
-                      const offerCandidate = { student_id: sid, name, email, resumeUrl: item?.resumeUrl };
-                      const isSending = !!sendingMap[sid];
-                      const isLocked = ASSIGNMENT_LOCKED_STATUSES.has(l2Status);
-                      const assessmentResult = getAssessmentResult(item);
-
                       return (
-                        <tr key={sid} className="hover:bg-gray-50 transition-colors">
-                          <Td className="text-gray-400 text-xs">{idx + 1}</Td>
-                          <Td>
-                            <div className="flex items-center gap-2.5">
-                              <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0">
-                                <span className="text-purple-600 text-xs font-bold">
-                                  {name.charAt(0).toUpperCase()}
-                                </span>
-                              </div>
-                              <span className="font-medium text-gray-800">{name}</span>
-                            </div>
-                          </Td>
-                          <Td className="text-gray-500">{email}</Td>
-                          <Td>
-                            <StatusPill
-                              label={getL2StatusLabel(l2Status)}
-                              cls={getL2StatusColor(l2Status)}
-                            />
-                          </Td>
-                          <Td className="min-w-[180px]">
-                            {assessmentResult ? (
-                              <div className="flex flex-col gap-1.5">
-                                <span className={`inline-flex w-fit items-center px-2.5 py-1 rounded-full text-[11px] font-bold border ${assessmentResult.passed
-                                    ? "bg-green-50 text-green-700 border-green-200"
-                                    : "bg-red-50 text-red-700 border-red-200"
-                                  }`}>
-                                  {assessmentResult.label}
-                                </span>
-                                <p className="text-sm text-gray-700 whitespace-nowrap">
-                                  Marks: <span className="font-semibold text-gray-900">{assessmentResult.marks}/100</span>
-                                </p>
-                                <p className="text-sm text-gray-700 whitespace-nowrap">
-                                  Percentage: <span className="font-semibold text-gray-900">{assessmentResult.percentage}%</span>
-                                </p>
-                              </div>
-                            ) : (
-                              <span className="text-xs text-gray-400 italic">Not completed</span>
-                            )}
-                          </Td>
-                          <Td>{renderOfferStatusPill(sid)}</Td>
-                          <Td className="w-[330px] max-w-[330px]">
-                            <div className="flex w-[330px] max-w-full flex-nowrap items-center gap-2 overflow-x-auto pb-1 whitespace-nowrap">
-                              <button
-                                onClick={() => handleSendAssignment(item)}
-                                disabled={isSending || isLocked}
-                                className={`flex-shrink-0 px-3 py-1.5 text-xs font-semibold rounded-lg transition active:scale-95 disabled:cursor-not-allowed ${isLocked
-                                    ? "bg-purple-100 text-purple-700"
-                                    : "bg-purple-50 text-purple-700 hover:bg-purple-100 disabled:opacity-40"
-                                  }`}
-                              >
-                                {isSending ? "Sending…" : isLocked ? "Sent ✓" : "Send Assessment"}
-                              </button>
-                              {assessmentResult && (
-                                <button
-                                  onClick={() => downloadAssessmentResultPDF({ item, internshipTitle, internshipId })}
-                                  className="flex-shrink-0 px-3 py-1.5 bg-orange-50 text-orange-600 text-xs font-semibold rounded-lg hover:bg-orange-100 transition active:scale-95"
-                                >
-                                  Download PDF
-                                </button>
-                              )}
-                              {offerStatus === "Not Sent" && (
-                                <button
-                                  onClick={() => handleSendOfferClick(offerCandidate)}
-                                  className="flex-shrink-0 px-3 py-1.5 bg-blue-50 text-blue-600 text-xs font-semibold rounded-lg hover:bg-blue-100 transition active:scale-95"
-                                >
-                                  Send Offer
-                                </button>
-                              )}
-                            </div>
-                          </Td>
-                        </tr>
+                        (item?.studentId?.name || "")
+                          .toLowerCase()
+                          .includes(q) ||
+                        (item?.studentId?.email || "").toLowerCase().includes(q)
                       );
-                    })
+                    }).length === 0 ? (
+                    <EmptyState
+                      icon="📋"
+                      message="No matching candidates"
+                      sub="Try a different search"
+                    />
+                  ) : (
+                    l2Items
+                      .filter((item) => {
+                        if (!l2Search.trim()) return true;
+                        const q = l2Search.trim().toLowerCase();
+                        return (
+                          (item?.studentId?.name || "")
+                            .toLowerCase()
+                            .includes(q) ||
+                          (item?.studentId?.email || "")
+                            .toLowerCase()
+                            .includes(q)
+                        );
+                      })
+                      .map((item, idx) => {
+                        const sid = item?.studentId?._id
+                          ? String(item.studentId._id)
+                          : String(item?.studentId);
+                        const name = item?.studentId?.name || "—";
+                        const email = item?.studentId?.email || "—";
+                        const l2Status = item?.l2?.status || "";
+                        const offerStatus = offerStatuses[sid] || "Not Sent";
+                        const offerCandidate = {
+                          student_id: sid,
+                          name,
+                          email,
+                          resumeUrl: item?.resumeUrl,
+                        };
+                        const isSending = !!sendingMap[sid];
+                        const isLocked =
+                          ASSIGNMENT_LOCKED_STATUSES.has(l2Status);
+                        const assessmentResult = getAssessmentResult(item);
+
+                        return (
+                          <tr
+                            key={sid}
+                            className="hover:bg-gray-50 transition-colors"
+                          >
+                            <Td className="text-gray-400 text-xs">{idx + 1}</Td>
+                            <Td>
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0">
+                                  <span className="text-purple-600 text-xs font-bold">
+                                    {name.charAt(0).toUpperCase()}
+                                  </span>
+                                </div>
+                                <span className="font-medium text-gray-800">
+                                  {name}
+                                </span>
+                              </div>
+                            </Td>
+                            <Td className="text-gray-500">{email}</Td>
+                            <Td>
+                              <StatusPill
+                                label={getL2StatusLabel(l2Status)}
+                                cls={getL2StatusColor(l2Status)}
+                              />
+                            </Td>
+                            <Td className="min-w-[180px]">
+                              {assessmentResult ? (
+                                <div className="flex flex-col gap-1.5">
+                                  <span
+                                    className={`inline-flex w-fit items-center px-2.5 py-1 rounded-full text-[11px] font-bold border ${
+                                      assessmentResult.passed
+                                        ? "bg-green-50 text-green-700 border-green-200"
+                                        : "bg-red-50 text-red-700 border-red-200"
+                                    }`}
+                                  >
+                                    {assessmentResult.label}
+                                  </span>
+                                  <p className="text-sm text-gray-700 whitespace-nowrap">
+                                    Marks:{" "}
+                                    <span className="font-semibold text-gray-900">
+                                      {assessmentResult.marks}/100
+                                    </span>
+                                  </p>
+                                  <p className="text-sm text-gray-700 whitespace-nowrap">
+                                    Percentage:{" "}
+                                    <span className="font-semibold text-gray-900">
+                                      {assessmentResult.percentage}%
+                                    </span>
+                                  </p>
+                                </div>
+                              ) : (
+                                <span className="text-xs text-gray-400 italic">
+                                  Not completed
+                                </span>
+                              )}
+                            </Td>
+                            <Td>{renderOfferStatusPill(sid)}</Td>
+                            <Td className="w-[330px] max-w-[330px]">
+                              <div className="flex w-[330px] max-w-full flex-nowrap items-center gap-2 overflow-x-auto pb-1 whitespace-nowrap">
+                                <button
+                                  onClick={() => handleSendAssignment(item)}
+                                  disabled={isSending || isLocked}
+                                  className={`flex-shrink-0 px-3 py-1.5 text-xs font-semibold rounded-lg transition active:scale-95 disabled:cursor-not-allowed ${
+                                    isLocked
+                                      ? "bg-purple-100 text-purple-700"
+                                      : "bg-purple-50 text-purple-700 hover:bg-purple-100 disabled:opacity-40"
+                                  }`}
+                                >
+                                  {isSending
+                                    ? "Sending…"
+                                    : isLocked
+                                      ? "Sent ✓"
+                                      : "Send Assessment"}
+                                </button>
+                                {assessmentResult && (
+                                  <button
+                                    onClick={() =>
+                                      downloadAssessmentResultPDF({
+                                        item,
+                                        internshipTitle,
+                                        internshipId,
+                                      })
+                                    }
+                                    className="flex-shrink-0 px-3 py-1.5 bg-orange-50 text-orange-600 text-xs font-semibold rounded-lg hover:bg-orange-100 transition active:scale-95"
+                                  >
+                                    Download PDF
+                                  </button>
+                                )}
+                                {offerStatus === "Not Sent" && (
+                                  <button
+                                    onClick={() =>
+                                      handleSendOfferClick(offerCandidate)
+                                    }
+                                    className="flex-shrink-0 px-3 py-1.5 bg-blue-50 text-blue-600 text-xs font-semibold rounded-lg hover:bg-blue-100 transition active:scale-95"
+                                  >
+                                    Send Offer
+                                  </button>
+                                )}
+                              </div>
+                            </Td>
+                          </tr>
+                        );
+                      })
                   )}
                 </tbody>
               </TableWrapper>
@@ -1409,19 +1893,28 @@ export const ShortlistedTable = ({ candidates, internshipId, internshipTitle = "
             <div className="space-y-4">
               <div className="flex items-center gap-3">
                 <span className="text-sm text-gray-500">
-                  Interview stage: <span className="font-bold text-gray-800">{l3Count}</span>
+                  Interview stage:{" "}
+                  <span className="font-bold text-gray-800">{l3Count}</span>
                 </span>
                 <div className="relative flex-1 max-w-xs">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none">🔍</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none">
+                    🔍
+                  </span>
+                  {/*Add "!mt-0" for icon alignment - 07-08-2026 */}
                   <input
                     type="text"
                     value={l3Search}
                     onChange={(e) => setL3Search(e.target.value)}
                     placeholder="Search name or email…"
-                    className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white placeholder-gray-400"
+                    className="!mt-0 w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white placeholder-gray-400"
                   />
                   {l3Search && (
-                    <button onClick={() => setL3Search("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs">✕</button>
+                    <button
+                      onClick={() => setL3Search("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs"
+                    >
+                      ✕
+                    </button>
                   )}
                 </div>
               </div>
@@ -1439,114 +1932,170 @@ export const ShortlistedTable = ({ candidates, internshipId, internshipTitle = "
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {isLoading ? (
-                    Array.from({ length: 3 }).map((_, i) => <SkeletonRow key={i} cols={6} />)
+                    Array.from({ length: 3 }).map((_, i) => (
+                      <SkeletonRow key={i} cols={6} />
+                    ))
                   ) : l3Items.filter((item) => {
-                    if (!l3Search.trim()) return true;
-                    const q = l3Search.trim().toLowerCase();
-                    return (item?.studentId?.name || "").toLowerCase().includes(q) ||
-                      (item?.studentId?.email || "").toLowerCase().includes(q);
-                  }).length === 0 ? (
-                    <EmptyState icon="🎙️" message="No matching candidates" sub="Try a different search" />
-                  ) : (
-                    l3Items.filter((item) => {
                       if (!l3Search.trim()) return true;
                       const q = l3Search.trim().toLowerCase();
-                      return (item?.studentId?.name || "").toLowerCase().includes(q) ||
-                        (item?.studentId?.email || "").toLowerCase().includes(q);
-                    }).map((item, idx) => {
-                      const sid = item?.studentId?._id
-                        ? String(item.studentId._id)
-                        : String(item?.studentId);
-                      const name = item?.studentId?.name || "—";
-                      const email = item?.studentId?.email || "—";
-                      const l3Status = item?.l3?.status || "";
-                      const offerStatus = offerStatuses[sid] || "Not Sent";
-                      const offerCandidate = { student_id: sid, name, email, resumeUrl: item?.resumeUrl };
-
                       return (
-                        <tr key={sid} className="hover:bg-gray-50 transition-colors">
-                          <Td className="text-gray-400 text-xs">{idx + 1}</Td>
-                          <Td>
-                            <div className="flex items-center gap-2.5">
-                              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                                <span className="text-blue-600 text-xs font-bold">
-                                  {name.charAt(0).toUpperCase()}
+                        (item?.studentId?.name || "")
+                          .toLowerCase()
+                          .includes(q) ||
+                        (item?.studentId?.email || "").toLowerCase().includes(q)
+                      );
+                    }).length === 0 ? (
+                    <EmptyState
+                      icon="🎙️"
+                      message="No matching candidates"
+                      sub="Try a different search"
+                    />
+                  ) : (
+                    l3Items
+                      .filter((item) => {
+                        if (!l3Search.trim()) return true;
+                        const q = l3Search.trim().toLowerCase();
+                        return (
+                          (item?.studentId?.name || "")
+                            .toLowerCase()
+                            .includes(q) ||
+                          (item?.studentId?.email || "")
+                            .toLowerCase()
+                            .includes(q)
+                        );
+                      })
+                      .map((item, idx) => {
+                        const sid = item?.studentId?._id
+                          ? String(item.studentId._id)
+                          : String(item?.studentId);
+                        const name = item?.studentId?.name || "—";
+                        const email = item?.studentId?.email || "—";
+                        const l3Status = item?.l3?.status || "";
+                        const offerStatus = offerStatuses[sid] || "Not Sent";
+                        const offerCandidate = {
+                          student_id: sid,
+                          name,
+                          email,
+                          resumeUrl: item?.resumeUrl,
+                        };
+
+                        return (
+                          <tr
+                            key={sid}
+                            className="hover:bg-gray-50 transition-colors"
+                          >
+                            <Td className="text-gray-400 text-xs">{idx + 1}</Td>
+                            <Td>
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                                  <span className="text-blue-600 text-xs font-bold">
+                                    {name.charAt(0).toUpperCase()}
+                                  </span>
+                                </div>
+                                <span className="font-medium text-gray-800">
+                                  {name}
                                 </span>
                               </div>
-                              <span className="font-medium text-gray-800">{name}</span>
-                            </div>
-                          </Td>
-                          <Td className="text-gray-500">{email}</Td>
-                          <Td>
-                            <div className="flex flex-col gap-1.5">
-                              <StatusPill
-                                label={l3Status || "Scheduled"}
-                                cls="bg-blue-100 text-blue-700 border-blue-200 self-start"
-                              />
-                              {(item?.l3?.scheduledAt || item?.l3?.interviewId?.scheduledAt) && (
-                                <span className="text-[11px] text-gray-500 font-medium">
-                                  {new Date(item?.l3?.scheduledAt || item?.l3?.interviewId?.scheduledAt).toLocaleString("en-GB", {
-                                    day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit"
-                                  })}
-                                </span>
-                              )}
-                              {item?.l3?.interviewId?.link && (
-                                <a href={item.l3.interviewId.link} target="_blank" rel="noopener noreferrer" className="text-[11px] text-blue-600 font-medium hover:underline flex items-center gap-1 w-fit">
-                                  🎥 Meet Link
-                                </a>
-                              )}
-                            </div>
-                          </Td>
-                          <Td>{renderOfferStatusPill(sid)}</Td>
-                          <Td>
-                            <div className="flex gap-2 flex-wrap items-center">
-                              {["scheduled", "sent", "completed"].includes(l3Status) ? (
-                                <button
-                                  onClick={() => { setScheduleTarget(item); setShowScheduleModal(true); }}
-                                  className="px-3 py-1.5 bg-white text-orange-600 border border-orange-200 text-xs font-semibold rounded-lg hover:bg-orange-50 transition active:scale-95 shadow-sm"
-                                >
-                                  Reschedule
-                                </button>
-                              ) : (
-                                <button
-                                  onClick={() => { setScheduleTarget(item); setShowScheduleModal(true); }}
-                                  className="px-3 py-1.5 bg-orange-500 text-white text-xs font-semibold rounded-lg hover:bg-orange-600 transition active:scale-95 shadow-sm"
-                                >
-                                  Schedule
-                                </button>
-                              )}
-
-                              {/* Pass / Reject actions once interview is scheduled */}
-                              {["scheduled", "sent", "completed"].includes(l3Status) && (
-                                <>
-                                  <button
-                                    onClick={() => handleInterviewResult(item, "passed")}
-                                    className="px-3 py-1.5 bg-emerald-500 text-white text-xs font-semibold rounded-lg hover:bg-emerald-600 transition active:scale-95 shadow-sm"
+                            </Td>
+                            <Td className="text-gray-500">{email}</Td>
+                            <Td>
+                              <div className="flex flex-col gap-1.5">
+                                <StatusPill
+                                  label={l3Status || "Scheduled"}
+                                  cls="bg-blue-100 text-blue-700 border-blue-200 self-start"
+                                />
+                                {(item?.l3?.scheduledAt ||
+                                  item?.l3?.interviewId?.scheduledAt) && (
+                                  <span className="text-[11px] text-gray-500 font-medium">
+                                    {new Date(
+                                      item?.l3?.scheduledAt ||
+                                        item?.l3?.interviewId?.scheduledAt,
+                                    ).toLocaleString("en-GB", {
+                                      day: "2-digit",
+                                      month: "short",
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    })}
+                                  </span>
+                                )}
+                                {item?.l3?.interviewId?.link && (
+                                  <a
+                                    href={item.l3.interviewId.link}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[11px] text-blue-600 font-medium hover:underline flex items-center gap-1 w-fit"
                                   >
-                                    Pass
-                                  </button>
+                                    🎥 Meet Link
+                                  </a>
+                                )}
+                              </div>
+                            </Td>
+                            <Td>{renderOfferStatusPill(sid)}</Td>
+                            <Td>
+                              <div className="flex gap-2 flex-wrap items-center">
+                                {["scheduled", "sent", "completed"].includes(
+                                  l3Status,
+                                ) ? (
                                   <button
-                                    onClick={() => handleInterviewResult(item, "rejected")}
-                                    className="px-3 py-1.5 bg-rose-500 text-white text-xs font-semibold rounded-lg hover:bg-rose-600 transition active:scale-95 shadow-sm"
+                                    onClick={() => {
+                                      setScheduleTarget(item);
+                                      setShowScheduleModal(true);
+                                    }}
+                                    className="px-3 py-1.5 bg-white text-orange-600 border border-orange-200 text-xs font-semibold rounded-lg hover:bg-orange-50 transition active:scale-95 shadow-sm"
                                   >
-                                    Reject
+                                    Reschedule
                                   </button>
-                                </>
-                              )}
+                                ) : (
+                                  <button
+                                    onClick={() => {
+                                      setScheduleTarget(item);
+                                      setShowScheduleModal(true);
+                                    }}
+                                    className="px-3 py-1.5 bg-orange-500 text-white text-xs font-semibold rounded-lg hover:bg-orange-600 transition active:scale-95 shadow-sm"
+                                  >
+                                    Schedule
+                                  </button>
+                                )}
 
-                              {offerStatus === "Not Sent" && (
-                                <button
-                                  onClick={() => handleSendOfferClick(offerCandidate)}
-                                  className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition active:scale-95 shadow-sm"
-                                >
-                                  Send Offer
-                                </button>
-                              )}
-                            </div>
-                          </Td>
-                        </tr>
-                      );
-                    })
+                                {/* Pass / Reject actions once interview is scheduled */}
+                                {["scheduled", "sent", "completed"].includes(
+                                  l3Status,
+                                ) && (
+                                  <>
+                                    <button
+                                      onClick={() =>
+                                        handleInterviewResult(item, "passed")
+                                      }
+                                      className="px-3 py-1.5 bg-emerald-500 text-white text-xs font-semibold rounded-lg hover:bg-emerald-600 transition active:scale-95 shadow-sm"
+                                    >
+                                      Pass
+                                    </button>
+                                    <button
+                                      onClick={() =>
+                                        handleInterviewResult(item, "rejected")
+                                      }
+                                      className="px-3 py-1.5 bg-rose-500 text-white text-xs font-semibold rounded-lg hover:bg-rose-600 transition active:scale-95 shadow-sm"
+                                    >
+                                      Reject
+                                    </button>
+                                  </>
+                                )}
+
+                                {offerStatus === "Not Sent" && (
+                                  <button
+                                    onClick={() =>
+                                      handleSendOfferClick(offerCandidate)
+                                    }
+                                    className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition active:scale-95 shadow-sm"
+                                  >
+                                    Send Offer
+                                  </button>
+                                )}
+                              </div>
+                            </Td>
+                          </tr>
+                        );
+                      })
                   )}
                 </tbody>
               </TableWrapper>
@@ -1556,22 +2105,31 @@ export const ShortlistedTable = ({ candidates, internshipId, internshipTitle = "
           {/* ════════════════════════════ OFFER STAGE ════════════════════════════ */}
           {activeLevel === "OFFER" && (
             <div className="space-y-4">
-
               <div className="flex items-center justify-between flex-wrap gap-3">
-                <span className="ml-auto font-semibold">{offerCount} candidate{offerCount !== 1 ? "s" : ""}</span>
+                <span className="ml-auto font-semibold">
+                  {offerCount} candidate{offerCount !== 1 ? "s" : ""}
+                </span>
               </div>
 
               <div className="relative max-w-xs">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none">🔍</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none">
+                  🔍
+                </span>
+                {/*Add "!mt-0" for icon alignment - 07-08-2026 */}
                 <input
                   type="text"
                   value={offerSearch}
                   onChange={(e) => setOfferSearch(e.target.value)}
                   placeholder="Search name or email…"
-                  className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 bg-white placeholder-gray-400"
+                  className="!mt-0 w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 bg-white placeholder-gray-400"
                 />
                 {offerSearch && (
-                  <button onClick={() => setOfferSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs">✕</button>
+                  <button
+                    onClick={() => setOfferSearch("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs"
+                  >
+                    ✕
+                  </button>
                 )}
               </div>
 
@@ -1588,67 +2146,100 @@ export const ShortlistedTable = ({ candidates, internshipId, internshipTitle = "
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {isLoading ? (
-                    Array.from({ length: 3 }).map((_, i) => <SkeletonRow key={i} cols={6} />)
+                    Array.from({ length: 3 }).map((_, i) => (
+                      <SkeletonRow key={i} cols={6} />
+                    ))
                   ) : offerItems.filter((item) => {
-                    if (!offerSearch.trim()) return true;
-                    const q = offerSearch.trim().toLowerCase();
-                    return (item?.studentId?.name || "").toLowerCase().includes(q) ||
-                      (item?.studentId?.email || "").toLowerCase().includes(q);
-                  }).length === 0 ? (
-                    <EmptyState icon="📬" message="No matching candidates" sub="Try a different search" />
-                  ) : (
-                    offerItems.filter((item) => {
                       if (!offerSearch.trim()) return true;
                       const q = offerSearch.trim().toLowerCase();
-                      return (item?.studentId?.name || "").toLowerCase().includes(q) ||
-                        (item?.studentId?.email || "").toLowerCase().includes(q);
-                    }).map((item, idx) => {
-                      const sid = String(item?.studentId?._id);
-                      const offerStatus = offerStatuses[sid] || "Not Sent";
                       return (
-                        <tr key={item._id} className="hover:bg-gray-50 transition-colors">
-                          <Td className="text-gray-400 text-xs">{idx + 1}</Td>
-                          <Td>
-                            <div className="flex items-center gap-2.5">
-                              <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
-                                <span className="text-green-600 text-xs font-bold">
-                                  {(item.studentId?.name || "?").charAt(0).toUpperCase()}
+                        (item?.studentId?.name || "")
+                          .toLowerCase()
+                          .includes(q) ||
+                        (item?.studentId?.email || "").toLowerCase().includes(q)
+                      );
+                    }).length === 0 ? (
+                    <EmptyState
+                      icon="📬"
+                      message="No matching candidates"
+                      sub="Try a different search"
+                    />
+                  ) : (
+                    offerItems
+                      .filter((item) => {
+                        if (!offerSearch.trim()) return true;
+                        const q = offerSearch.trim().toLowerCase();
+                        return (
+                          (item?.studentId?.name || "")
+                            .toLowerCase()
+                            .includes(q) ||
+                          (item?.studentId?.email || "")
+                            .toLowerCase()
+                            .includes(q)
+                        );
+                      })
+                      .map((item, idx) => {
+                        const sid = String(item?.studentId?._id);
+                        const offerStatus = offerStatuses[sid] || "Not Sent";
+                        return (
+                          <tr
+                            key={item._id}
+                            className="hover:bg-gray-50 transition-colors"
+                          >
+                            <Td className="text-gray-400 text-xs">{idx + 1}</Td>
+                            <Td>
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                                  <span className="text-green-600 text-xs font-bold">
+                                    {(item.studentId?.name || "?")
+                                      .charAt(0)
+                                      .toUpperCase()}
+                                  </span>
+                                </div>
+                                <span className="font-medium text-gray-800">
+                                  {item.studentId?.name}
                                 </span>
                               </div>
-                              <span className="font-medium text-gray-800">{item.studentId?.name}</span>
-                            </div>
-                          </Td>
-                          <Td className="text-gray-500">{item.studentId?.email}</Td>
-                          <Td>
-                            <StatusPill label="Passed" cls="bg-green-100 text-green-800 border-green-200" />
-                          </Td>
-                          <Td>{renderOfferStatusPill(sid)}</Td>
-                          <Td>
-                            {offerStatus === "Not Sent" ? (
-                              <button
-                                onClick={() => handleSendOfferClick({
-                                  student_id: sid,
-                                  name: item.studentId?.name,
-                                  email: item.studentId?.email,
-                                  resumeUrl: item?.resumeUrl,
-                                })}
-                                className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition active:scale-95"
-                              >
-                                Send Offer
-                              </button>
-                            ) : (
-                              <span className="text-xs text-gray-400 italic">{getOfferStatusText(offerStatus)}</span>
-                            )}
-                          </Td>
-                        </tr>
-                      );
-                    })
+                            </Td>
+                            <Td className="text-gray-500">
+                              {item.studentId?.email}
+                            </Td>
+                            <Td>
+                              <StatusPill
+                                label="Passed"
+                                cls="bg-green-100 text-green-800 border-green-200"
+                              />
+                            </Td>
+                            <Td>{renderOfferStatusPill(sid)}</Td>
+                            <Td>
+                              {offerStatus === "Not Sent" ? (
+                                <button
+                                  onClick={() =>
+                                    handleSendOfferClick({
+                                      student_id: sid,
+                                      name: item.studentId?.name,
+                                      email: item.studentId?.email,
+                                      resumeUrl: item?.resumeUrl,
+                                    })
+                                  }
+                                  className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition active:scale-95"
+                                >
+                                  Send Offer
+                                </button>
+                              ) : (
+                                <span className="text-xs text-gray-400 italic">
+                                  {getOfferStatusText(offerStatus)}
+                                </span>
+                              )}
+                            </Td>
+                          </tr>
+                        );
+                      })
                   )}
                 </tbody>
               </TableWrapper>
             </div>
           )}
-
         </> /* end !isInlinePanel */
       )}
 
@@ -1681,7 +2272,8 @@ export const ShortlistedTable = ({ candidates, internshipId, internshipTitle = "
               ← Back
             </button>
             <h3 className="text-base font-bold text-gray-900">
-              Send Offers to {selectedStudents.length} Student{selectedStudents.length !== 1 ? "s" : ""}
+              Send Offers to {selectedStudents.length} Student
+              {selectedStudents.length !== 1 ? "s" : ""}
             </h3>
           </div>
           <BulkSendOffer
@@ -1705,27 +2297,58 @@ export const ShortlistedTable = ({ candidates, internshipId, internshipTitle = "
             >
               ← Back
             </button>
-            <h3 className="text-base font-bold text-gray-900">Schedule Interview</h3>
+            <h3 className="text-base font-bold text-gray-900">
+              Schedule Interview
+            </h3>
           </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Date & Time</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              Date & Time
+            </label>
             <input
               type="datetime-local"
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
               value={scheduleForm.scheduledAt}
-              onChange={(e) => setScheduleForm((p) => ({ ...p, scheduledAt: e.target.value }))}
+              onChange={(e) =>
+                setScheduleForm((p) => ({ ...p, scheduledAt: e.target.value }))
+              }
             />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Duration (minutes)</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              Duration (minutes)
+            </label>
             <input
               type="number"
               min={15}
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
               value={scheduleForm.durationMinutes}
-              onChange={(e) => setScheduleForm((p) => ({ ...p, durationMinutes: Number(e.target.value) }))}
+              onChange={(e) =>
+                setScheduleForm((p) => ({
+                  ...p,
+                  durationMinutes: Number(e.target.value),
+                }))
+              }
             />
           </div>
+          {googleConnected && (
+            <p className="text-sm text-green-600 font-medium">
+              ✅ Google Calendar connected! You can now click confirm to schedule.
+            </p>
+          )}
+          {googleAuthUrl && (
+            <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-2">
+              <p className="text-sm text-blue-800 mb-3">
+                Your Google Calendar connection has expired. You must reconnect it to automatically generate Google Meet links.
+              </p>
+              <button
+                onClick={() => window.open(googleAuthUrl, "skillnaav-google-calendar", "width=520,height=700")}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl transition"
+              >
+                Connect Google Calendar
+              </button>
+            </div>
+          )}
           <button
             onClick={() => handleScheduleInterview(scheduleTarget)}
             disabled={isScheduling}
@@ -1733,9 +2356,24 @@ export const ShortlistedTable = ({ candidates, internshipId, internshipTitle = "
           >
             {isScheduling ? (
               <>
-                <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                <svg
+                  className="animate-spin h-5 w-5 text-white"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
                 </svg>
                 Scheduling...
               </>

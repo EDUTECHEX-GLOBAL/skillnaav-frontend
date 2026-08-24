@@ -26,6 +26,14 @@ const dedupeById = (arr = []) => {
 };
 
 const Recommendations = () => {
+  const userInfo = useMemo(() => {
+    try {
+      return JSON.parse(localStorage.getItem("studentInfo")) || JSON.parse(localStorage.getItem("userInfo"));
+    } catch (e) {
+      return null;
+    }
+  }, []);
+
   const [jobs, setJobs]           = useState([]);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState(null);
@@ -219,11 +227,32 @@ const Recommendations = () => {
   return (
     <div className="p-6 font-[Poppins]">
       {/* Header */}
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Recommended Internships</h2>
-        <p className="text-sm text-gray-500 mt-1">
-          {jobs.length} internship{jobs.length !== 1 ? "s" : ""} matched to your profile
-        </p>
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Recommended Internships</h2>
+          <p className="text-sm text-gray-500 mt-1">
+            {jobs.length} internship{jobs.length !== 1 ? "s" : ""} matched to your profile
+          </p>
+        </div>
+
+        {userInfo && (userInfo.desiredField || (userInfo.interests && userInfo.interests.length > 0)) && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-gray-400 font-medium uppercase tracking-wider">Your Profile Matches:</span>
+            {userInfo.desiredField && (
+              <span className="px-3 py-1 bg-indigo-50 text-indigo-700 text-xs font-semibold rounded-full border border-indigo-100 shadow-sm">
+                {userInfo.desiredField}
+              </span>
+            )}
+            {userInfo.interests && userInfo.interests.map((interest, idx) => (
+              <span 
+                key={`int-${idx}`} 
+                className="px-3 py-1 bg-purple-50 text-purple-700 text-xs font-semibold rounded-full border border-purple-100 shadow-sm"
+              >
+                {interest}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* AI badge — only shown when Claude actually returned match reasons */}

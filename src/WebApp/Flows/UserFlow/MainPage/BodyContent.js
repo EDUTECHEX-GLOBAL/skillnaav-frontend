@@ -21,6 +21,7 @@ import Neurotechnology from "./Sectors/Neurotechnology";
 import PrecisionAgriculture from "./Sectors/PrecisionAgriculture";
 import AdvancedRobotics from "./Sectors/AdvancedRobotics";
 import RenewableEnergy from "./Sectors/RenewableEnergy";
+import ArchitectureBuiltEnvironment from "./Sectors/ArchitectureBuiltEnvironment";
 import Recommendations from "./Recommendations";
 import StudentAssessment from "./StudentAssessment";
 import UserAttendance from "./UserAttendance";
@@ -116,6 +117,9 @@ const BodyContent = () => {
       break;
     case "renewable-energy":
       content = <RenewableEnergy />;
+      break;
+    case "architecture-built-environment":
+      content = <ArchitectureBuiltEnvironment />;
       break;
     default:
       content = <div>Select a tab</div>;

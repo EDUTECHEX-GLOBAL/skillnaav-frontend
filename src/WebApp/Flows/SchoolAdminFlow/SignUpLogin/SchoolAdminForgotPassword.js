@@ -2,17 +2,36 @@ import React, { useEffect, useRef, useState } from "react";
 import axios from "../../../../api/axiosInstance";
 
 const OTP_EXPIRY_SECONDS = 300;
+const OTP_RESEND_COOLDOWN_SECONDS = 60; //1 minute -- 18-08-2026
 
 const EyeIcon = ({ open }) =>
   open ? (
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
-      fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
       <circle cx="12" cy="12" r="3" />
     </svg>
   ) : (
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
-      fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
       <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
       <line x1="1" y1="1" x2="23" y2="23" />
@@ -20,32 +39,68 @@ const EyeIcon = ({ open }) =>
   );
 
 const CheckCircleIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-    fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
     <polyline points="22 4 12 14.01 9 11.01" />
   </svg>
 );
 
 const MailIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
-    fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
     <polyline points="22,6 12,13 2,6" />
   </svg>
 );
 
 const LockIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
-    fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
     <path d="M7 11V7a5 5 0 0 1 10 0v4" />
   </svg>
 );
 
 const ShieldIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
-    fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
   </svg>
 );
@@ -83,7 +138,14 @@ const PasswordStrengthBar = ({ password }) => {
           />
         ))}
       </div>
-      <p style={{ fontSize: "11px", color: colors[score], fontWeight: "500", margin: 0 }}>
+      <p
+        style={{
+          fontSize: "11px",
+          color: colors[score],
+          fontWeight: "500",
+          margin: 0,
+        }}
+      >
         {labels[score]}
       </p>
     </div>
@@ -102,11 +164,15 @@ const SchoolAdminForgotPassword = ({ onClose }) => {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
+  //18-08-2026
+  const [resendCooldown, setResendCooldown] = useState(0);
   const [canResend, setCanResend] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const otpRefs = useRef([]);
   const timerRef = useRef(null);
+  //18-08-2026
+  const resendTimerRef = useRef(null);
 
   const isValidPassword = (password) => {
     const passwordRegex =
@@ -114,26 +180,67 @@ const SchoolAdminForgotPassword = ({ onClose }) => {
     return passwordRegex.test(password);
   };
 
+  // const startTimer = () => {
+  //   setTimeLeft(OTP_EXPIRY_SECONDS);
+  //   setCanResend(false);
+
+  //   if (timerRef.current) clearInterval(timerRef.current);
+
+  //   timerRef.current = setInterval(() => {
+  //     setTimeLeft((prev) => {
+  //       if (prev <= 1) {
+  //         clearInterval(timerRef.current);
+  //         setCanResend(true);
+  //         return 0;
+  //       }
+  //       return prev - 1;
+  //     });
+  //   }, 1000);
+  // };
+
+  //18-08-2026
   const startTimer = () => {
     setTimeLeft(OTP_EXPIRY_SECONDS);
-    setCanResend(false);
 
-    if (timerRef.current) clearInterval(timerRef.current);
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
 
     timerRef.current = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timerRef.current);
+          return 0;
+        }
+
+        return prev - 1;
+      });
+    }, 1000);
+
+    setResendCooldown(OTP_RESEND_COOLDOWN_SECONDS);
+    setCanResend(false);
+
+    if (resendTimerRef.current) {
+      clearInterval(resendTimerRef.current);
+    }
+
+    resendTimerRef.current = setInterval(() => {
+      setResendCooldown((prev) => {
+        if (prev <= 1) {
+          clearInterval(resendTimerRef.current);
           setCanResend(true);
           return 0;
         }
+
         return prev - 1;
       });
     }, 1000);
   };
 
   const formatTime = (secs) => {
-    const m = Math.floor(secs / 60).toString().padStart(2, "0");
+    const m = Math.floor(secs / 60)
+      .toString()
+      .padStart(2, "0");
     const s = (secs % 60).toString().padStart(2, "0");
     return `${m}:${s}`;
   };
@@ -161,7 +268,10 @@ const SchoolAdminForgotPassword = ({ onClose }) => {
 
   const handleOtpPaste = (e) => {
     e.preventDefault();
-    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    const pasted = e.clipboardData
+      .getData("text")
+      .replace(/\D/g, "")
+      .slice(0, 6);
     const updated = pasted.split("").concat(Array(6).fill("")).slice(0, 6);
     setOtpDigits(updated);
     setOtp(updated.join(""));
@@ -212,7 +322,7 @@ const SchoolAdminForgotPassword = ({ onClose }) => {
     }
   };
 
-  const handleContinueFromOtp = (e) => {
+  const handleContinueFromOtp = async (e) => {
     e.preventDefault();
     setMessage("");
     setError("");
@@ -222,7 +332,24 @@ const SchoolAdminForgotPassword = ({ onClose }) => {
       return;
     }
 
-    setStep(3);
+    // setStep(3);
+    //Add this below for otp verification in step-2 -- 19-08-2026
+    setIsLoading(true);
+
+    try {
+      const response = await axios.post("/api/school-admin/verify-reset-otp", {
+        email: email.trim(),
+        otp: otp.trim(),
+      });
+
+      //setMessage(response.data.message || "OTP verified successfully.");
+
+      setStep(3);
+    } catch (err) {
+      setError(err.response?.data?.message || "Invalid or expired OTP.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleResetPassword = async (e) => {
@@ -237,7 +364,7 @@ const SchoolAdminForgotPassword = ({ onClose }) => {
 
     if (!isValidPassword(newPassword)) {
       setError(
-        "Password must be at least 8 characters with uppercase, lowercase, number, and special character."
+        "Password must be at least 8 characters with uppercase, lowercase, number, and special character.",
       );
       return;
     }
@@ -251,7 +378,9 @@ const SchoolAdminForgotPassword = ({ onClose }) => {
         newPassword,
       });
 
-      setMessage(response.data.message || "Password has been successfully updated.");
+      setMessage(
+        response.data.message || "Password has been successfully updated.",
+      );
 
       if (timerRef.current) clearInterval(timerRef.current);
 
@@ -269,6 +398,10 @@ const SchoolAdminForgotPassword = ({ onClose }) => {
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
+      //18-08-2026
+      if (resendTimerRef.current) {
+        clearInterval(resendTimerRef.current);
+      }
     };
   }, []);
 
@@ -355,7 +488,14 @@ const SchoolAdminForgotPassword = ({ onClose }) => {
       `}</style>
 
       <div style={{ animation: "fadeSlideIn 0.3s ease" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            marginBottom: "4px",
+          }}
+        >
           <div
             style={{
               width: "38px",
@@ -372,22 +512,46 @@ const SchoolAdminForgotPassword = ({ onClose }) => {
             {icon}
           </div>
           <div>
-            <h2 style={{ margin: 0, fontSize: "18px", fontWeight: "700", color: "#111827", lineHeight: 1.2 }}>
+            <h2
+              style={{
+                margin: 0,
+                fontSize: "18px",
+                fontWeight: "700",
+                color: "#111827",
+                lineHeight: 1.2,
+              }}
+            >
               {title}
             </h2>
-            <p style={{ margin: "3px 0 0", fontSize: "12.5px", color: "#6b7280", lineHeight: 1.4 }}>
+            <p
+              style={{
+                margin: "3px 0 0",
+                fontSize: "12.5px",
+                color: "#6b7280",
+                lineHeight: 1.4,
+              }}
+            >
               {subtitle}
             </p>
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: "6px", marginTop: "16px", marginBottom: "20px", alignItems: "center" }}>
+        <div
+          style={{
+            display: "flex",
+            gap: "6px",
+            marginTop: "16px",
+            marginBottom: "20px",
+            alignItems: "center",
+          }}
+        >
           {[1, 2, 3].map((s) => (
             <div
               key={s}
               className="fp-step-dot"
               style={{
-                backgroundColor: s === step ? "#2563eb" : s < step ? "#93c5fd" : "#e5e7eb",
+                backgroundColor:
+                  s === step ? "#2563eb" : s < step ? "#93c5fd" : "#e5e7eb",
                 width: s === step ? "20px" : "8px",
                 borderRadius: s === step ? "4px" : "50%",
               }}
@@ -434,9 +598,20 @@ const SchoolAdminForgotPassword = ({ onClose }) => {
         )}
 
         {step === 1 && (
-          <form onSubmit={handleRequestOtp} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+          <form
+            onSubmit={handleRequestOtp}
+            style={{ display: "flex", flexDirection: "column", gap: "14px" }}
+          >
             <div>
-              <label style={{ display: "block", fontSize: "13px", fontWeight: "600", color: "#374151", marginBottom: "6px" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "13px",
+                  fontWeight: "600",
+                  color: "#374151",
+                  marginBottom: "6px",
+                }}
+              >
                 Email address
               </label>
               <input
@@ -450,19 +625,42 @@ const SchoolAdminForgotPassword = ({ onClose }) => {
               />
             </div>
 
-            <button type="submit" disabled={isLoading} className="fp-btn-primary" style={btnBase}>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="fp-btn-primary"
+              style={btnBase}
+            >
               {isLoading ? "Sending…" : "Send verification code"}
             </button>
           </form>
         )}
 
         {step === 2 && (
-          <form onSubmit={handleContinueFromOtp} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+          <form
+            onSubmit={handleContinueFromOtp}
+            style={{ display: "flex", flexDirection: "column", gap: "16px" }}
+          >
             <div>
-              <label style={{ display: "block", fontSize: "13px", fontWeight: "600", color: "#374151", marginBottom: "10px" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "13px",
+                  fontWeight: "600",
+                  color: "#374151",
+                  marginBottom: "10px",
+                }}
+              >
                 Verification code
               </label>
-              <div style={{ display: "flex", gap: "8px", justifyContent: "center" }} onPaste={handleOtpPaste}>
+              <div
+                style={{
+                  display: "flex",
+                  gap: "8px",
+                  justifyContent: "center",
+                }}
+                onPaste={handleOtpPaste}
+              >
                 {otpDigits.map((digit, i) => (
                   <input
                     key={i}
@@ -477,6 +675,7 @@ const SchoolAdminForgotPassword = ({ onClose }) => {
                     style={{
                       width: "44px",
                       height: "52px",
+                      padding: "0px", //Add this for alignment 18-08-2026
                       textAlign: "center",
                       fontSize: "20px",
                       fontWeight: "700",
@@ -493,7 +692,13 @@ const SchoolAdminForgotPassword = ({ onClose }) => {
               </div>
             </div>
 
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
               {timeLeft > 0 ? (
                 <p style={{ margin: 0, fontSize: "13px", color: "#6b7280" }}>
                   Code expires in{" "}
@@ -508,7 +713,9 @@ const SchoolAdminForgotPassword = ({ onClose }) => {
                   </span>
                 </p>
               ) : (
-                <p style={{ margin: 0, fontSize: "13px", color: "#ef4444" }}>Code expired</p>
+                <p style={{ margin: 0, fontSize: "13px", color: "#ef4444" }}>
+                  Code expired
+                </p>
               )}
 
               <button
@@ -526,12 +733,21 @@ const SchoolAdminForgotPassword = ({ onClose }) => {
                   fontFamily: "inherit",
                 }}
               >
-                Resend code
+                {/*18-08-2026 replace "Resend Code" with below one */}
+                {canResend
+                  ? "Resend code"
+                  : `Resend in ${formatTime(resendCooldown)}`}
               </button>
             </div>
 
-            <button type="submit" disabled={isLoading || otp.length < 6} className="fp-btn-primary" style={btnBase}>
-              Continue
+            <button
+              type="submit"
+              disabled={isLoading || otp.length < 6}
+              className="fp-btn-primary"
+              style={btnBase}
+            >
+              {/* Continue */}
+              {isLoading ? "Verifying…" : "Verify OTP"}
             </button>
 
             <button
@@ -554,9 +770,20 @@ const SchoolAdminForgotPassword = ({ onClose }) => {
         )}
 
         {step === 3 && (
-          <form onSubmit={handleResetPassword} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+          <form
+            onSubmit={handleResetPassword}
+            style={{ display: "flex", flexDirection: "column", gap: "14px" }}
+          >
             <div>
-              <label style={{ display: "block", fontSize: "13px", fontWeight: "600", color: "#374151", marginBottom: "6px" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "13px",
+                  fontWeight: "600",
+                  color: "#374151",
+                  marginBottom: "6px",
+                }}
+              >
                 New password
               </label>
               <div style={{ position: "relative" }}>
@@ -585,7 +812,9 @@ const SchoolAdminForgotPassword = ({ onClose }) => {
                     padding: "2px",
                     display: "flex",
                   }}
-                  aria-label={showNewPassword ? "Hide password" : "Show password"}
+                  aria-label={
+                    showNewPassword ? "Hide password" : "Show password"
+                  }
                 >
                   <EyeIcon open={showNewPassword} />
                 </button>
@@ -594,7 +823,15 @@ const SchoolAdminForgotPassword = ({ onClose }) => {
             </div>
 
             <div>
-              <label style={{ display: "block", fontSize: "13px", fontWeight: "600", color: "#374151", marginBottom: "6px" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "13px",
+                  fontWeight: "600",
+                  color: "#374151",
+                  marginBottom: "6px",
+                }}
+              >
                 Confirm password
               </label>
               <div style={{ position: "relative" }}>
@@ -608,7 +845,10 @@ const SchoolAdminForgotPassword = ({ onClose }) => {
                   style={{
                     ...inputBase,
                     paddingRight: "44px",
-                    borderColor: confirmPassword && confirmPassword !== newPassword ? "#fca5a5" : undefined,
+                    borderColor:
+                      confirmPassword && confirmPassword !== newPassword
+                        ? "#fca5a5"
+                        : undefined,
                   }}
                 />
                 <button
@@ -627,14 +867,22 @@ const SchoolAdminForgotPassword = ({ onClose }) => {
                     padding: "2px",
                     display: "flex",
                   }}
-                  aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                  aria-label={
+                    showConfirmPassword ? "Hide password" : "Show password"
+                  }
                 >
                   <EyeIcon open={showConfirmPassword} />
                 </button>
               </div>
 
               {confirmPassword && confirmPassword !== newPassword && (
-                <p style={{ fontSize: "12px", color: "#ef4444", margin: "4px 0 0" }}>
+                <p
+                  style={{
+                    fontSize: "12px",
+                    color: "#ef4444",
+                    margin: "4px 0 0",
+                  }}
+                >
                   Passwords don't match
                 </p>
               )}
@@ -655,8 +903,21 @@ const SchoolAdminForgotPassword = ({ onClose }) => {
               )}
             </div>
 
-            <div style={{ background: "#f9fafb", borderRadius: "10px", padding: "10px 12px" }}>
-              <p style={{ margin: "0 0 6px", fontSize: "12px", fontWeight: "600", color: "#6b7280" }}>
+            <div
+              style={{
+                background: "#f9fafb",
+                borderRadius: "10px",
+                padding: "10px 12px",
+              }}
+            >
+              <p
+                style={{
+                  margin: "0 0 6px",
+                  fontSize: "12px",
+                  fontWeight: "600",
+                  color: "#6b7280",
+                }}
+              >
                 Password must include:
               </p>
 
@@ -665,9 +926,20 @@ const SchoolAdminForgotPassword = ({ onClose }) => {
                 { label: "Uppercase letter", test: /[A-Z]/.test(newPassword) },
                 { label: "Lowercase letter", test: /[a-z]/.test(newPassword) },
                 { label: "Number", test: /\d/.test(newPassword) },
-                { label: "Special character (@$!%?&)", test: /[@$!%?&]/.test(newPassword) },
+                {
+                  label: "Special character (@$!%?&)",
+                  test: /[@$!%?&]/.test(newPassword),
+                },
               ].map(({ label, test }) => (
-                <div key={label} style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "3px" }}>
+                <div
+                  key={label}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    marginBottom: "3px",
+                  }}
+                >
                   <div
                     style={{
                       width: "14px",
@@ -680,18 +952,33 @@ const SchoolAdminForgotPassword = ({ onClose }) => {
                       justifyContent: "center",
                     }}
                   >
-                    <span style={{ fontSize: "9px", color: test ? "#16a34a" : "#9ca3af" }}>
+                    <span
+                      style={{
+                        fontSize: "9px",
+                        color: test ? "#16a34a" : "#9ca3af",
+                      }}
+                    >
                       {test ? "✓" : "·"}
                     </span>
                   </div>
-                  <span style={{ fontSize: "12px", color: test ? "#374151" : "#9ca3af" }}>
+                  <span
+                    style={{
+                      fontSize: "12px",
+                      color: test ? "#374151" : "#9ca3af",
+                    }}
+                  >
                     {label}
                   </span>
                 </div>
               ))}
             </div>
 
-            <button type="submit" disabled={isLoading} className="fp-btn-primary" style={btnBase}>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="fp-btn-primary"
+              style={btnBase}
+            >
               {isLoading ? "Updating…" : "Reset password"}
             </button>
 
@@ -726,10 +1013,19 @@ const SchoolAdminForgotPassword = ({ onClose }) => {
             }}
           >
             <div style={{ fontSize: "32px", marginBottom: "8px" }}>🎉</div>
-            <p style={{ margin: "0 0 4px", fontWeight: "700", color: "#15803d", fontSize: "15px" }}>
+            <p
+              style={{
+                margin: "0 0 4px",
+                fontWeight: "700",
+                color: "#15803d",
+                fontSize: "15px",
+              }}
+            >
               Password updated!
             </p>
-            <p style={{ margin: "0 0 12px", fontSize: "13px", color: "#6b7280" }}>
+            <p
+              style={{ margin: "0 0 12px", fontSize: "13px", color: "#6b7280" }}
+            >
               Redirecting you to login…
             </p>
           </div>

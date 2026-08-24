@@ -2,7 +2,12 @@
 import React, { useEffect, useState } from "react";
 import axios from "../../../../api/axiosInstance";
 import { motion, AnimatePresence } from "framer-motion";
-import { AiOutlineSearch, AiOutlineClose, AiOutlineLeft, AiOutlineRight } from "react-icons/ai";
+import {
+  AiOutlineSearch,
+  AiOutlineClose,
+  AiOutlineLeft,
+  AiOutlineRight,
+} from "react-icons/ai";
 import { HiOutlineCurrencyDollar } from "react-icons/hi";
 import UserCard from "./UserCard";
 import InternshipPaymentCard from "./InternshipPaymentCard";
@@ -10,13 +15,13 @@ import InternshipPaymentCard from "./InternshipPaymentCard";
 const PAGE_SIZE = 6; // cards per page — tweak as needed
 
 const InternshipPayments = () => {
-  const [internships, setInternships]               = useState([]);
-  const [loading, setLoading]                       = useState(true);
-  const [selectedPayments, setSelectedPayments]     = useState([]);
+  const [internships, setInternships] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedPayments, setSelectedPayments] = useState([]);
   const [selectedInternship, setSelectedInternship] = useState(null);
-  const [search, setSearch]                         = useState("");
-  const [selectedUser, setSelectedUser]             = useState(null);
-  const [userLoading, setUserLoading]               = useState(false);
+  const [search, setSearch] = useState("");
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [userLoading, setUserLoading] = useState(false);
 
   // ── Pagination state ────────────────────────────────────────────────────────
   const [currentPage, setCurrentPage] = useState(1);
@@ -26,17 +31,30 @@ const InternshipPayments = () => {
       try {
         const { data } = await axios.get("/api/interns");
         const paidInternships = data.filter(
-          (i) => i.internshipType === "PAID" || i?.compensationDetails?.type === "PAID"
+          (i) =>
+            i.internshipType === "PAID" ||
+            i?.compensationDetails?.type === "PAID",
         );
         const enrichedInternships = await Promise.all(
           paidInternships.map(async (i) => {
             try {
-              const res = await axios.get(`/api/internship/payments/admin/internship/${i._id}`);
-              return { ...i, paymentSummary: res.data?.data || { totalPayments: 0, totalAmount: 0 } };
+              const res = await axios.get(
+                `/api/internship/payments/admin/internship/${i._id}`,
+              );
+              return {
+                ...i,
+                paymentSummary: res.data?.data || {
+                  totalPayments: 0,
+                  totalAmount: 0,
+                },
+              };
             } catch {
-              return { ...i, paymentSummary: { totalPayments: 0, totalAmount: 0 } };
+              return {
+                ...i,
+                paymentSummary: { totalPayments: 0, totalAmount: 0 },
+              };
             }
-          })
+          }),
         );
         setInternships(enrichedInternships);
       } catch (err) {
@@ -55,7 +73,9 @@ const InternshipPayments = () => {
 
   const handleViewPayments = async (internship) => {
     try {
-      const res = await axios.get(`/api/internship/payments/${internship._id}/payments`);
+      const res = await axios.get(
+        `/api/internship/payments/${internship._id}/payments`,
+      );
       setSelectedPayments(res.data.payments || []);
       setSelectedInternship(internship);
       setSearch("");
@@ -82,17 +102,26 @@ const InternshipPayments = () => {
   const filteredPayments = selectedPayments.filter(
     (p) =>
       p.studentId?.name?.toLowerCase().includes(search.toLowerCase()) ||
-      p.studentId?.email?.toLowerCase().includes(search.toLowerCase())
+      p.studentId?.email?.toLowerCase().includes(search.toLowerCase()),
   );
 
-  const totalRevenue  = internships.reduce((acc, i) => acc + (i.paymentSummary?.totalAmount  || 0), 0);
-  const totalStudents = internships.reduce((acc, i) => acc + (i.paymentSummary?.totalPayments || 0), 0);
+  const totalRevenue = internships.reduce(
+    (acc, i) => acc + (i.paymentSummary?.totalAmount || 0),
+    0,
+  );
+  const totalStudents = internships.reduce(
+    (acc, i) => acc + (i.paymentSummary?.totalPayments || 0),
+    0,
+  );
 
   // ── Pagination calculations ─────────────────────────────────────────────────
-  const totalPages   = Math.max(1, Math.ceil(internships.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(internships.length / PAGE_SIZE));
   const safeCurrentPage = Math.min(currentPage, totalPages);
-  const startIndex   = (safeCurrentPage - 1) * PAGE_SIZE;
-  const pagedInternships = internships.slice(startIndex, startIndex + PAGE_SIZE);
+  const startIndex = (safeCurrentPage - 1) * PAGE_SIZE;
+  const pagedInternships = internships.slice(
+    startIndex,
+    startIndex + PAGE_SIZE,
+  );
 
   const goToPage = (page) => {
     setCurrentPage(Math.min(Math.max(1, page), totalPages));
@@ -148,27 +177,47 @@ const InternshipPayments = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-5xl mx-auto px-6 py-8">
-
         {/* Page header */}
         <div className="flex items-center gap-3 mb-7">
           <div className="w-9 h-9 bg-emerald-700 rounded-lg flex items-center justify-center flex-shrink-0">
             <HiOutlineCurrencyDollar className="text-white text-lg" />
           </div>
           <div>
-            <h1 className="text-lg font-semibold text-gray-900 leading-tight">Paid Internships</h1>
-            <p className="text-xs text-gray-500 mt-0.5">{internships.length} programs · payment overview</p>
+            <h1 className="text-lg font-semibold text-gray-900 leading-tight">
+              Paid Internships
+            </h1>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {internships.length} programs · payment overview
+            </p>
           </div>
         </div>
 
         {/* KPI row */}
         <div className="grid grid-cols-3 gap-3 mb-7">
           {[
-            { label: "Programs",        value: internships.length,                 color: "text-gray-900" },
-            { label: "Total Disbursed", value: `$${totalRevenue.toLocaleString()}`, color: "text-emerald-700" },
-            { label: "Students Paid",   value: totalStudents,                      color: "text-gray-900" },
+            {
+              label: "Programs",
+              value: internships.length,
+              color: "text-gray-900",
+            },
+            {
+              label: "Total Disbursed",
+              value: `$${totalRevenue.toLocaleString()}`,
+              color: "text-emerald-700 break-words", // Add the "break-words" for revenue alignment in mobile view - 06-08-2026
+            },
+            {
+              label: "Students Paid",
+              value: totalStudents,
+              color: "text-gray-900",
+            },
           ].map(({ label, value, color }) => (
-            <div key={label} className="bg-white border border-gray-200 rounded-lg p-4">
-              <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-1.5">{label}</p>
+            <div
+              key={label}
+              className="bg-white border border-gray-200 rounded-lg p-4"
+            >
+              <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-1.5">
+                {label}
+              </p>
               <p className={`text-xl font-semibold ${color}`}>{value}</p>
             </div>
           ))}
@@ -232,7 +281,9 @@ const InternshipPayments = () => {
                           : "bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                       }`}
                       aria-label={`Go to page ${item}`}
-                      aria-current={safeCurrentPage === item ? "page" : undefined}
+                      aria-current={
+                        safeCurrentPage === item ? "page" : undefined
+                      }
                     >
                       {item}
                     </button>
@@ -287,8 +338,12 @@ const InternshipPayments = () => {
                     <HiOutlineCurrencyDollar className="text-white text-sm" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-gray-900 leading-tight">{selectedInternship.jobTitle}</p>
-                    <p className="text-xs text-gray-500">{selectedInternship.companyName}</p>
+                    <p className="text-sm font-medium text-gray-900 leading-tight">
+                      {selectedInternship.jobTitle}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {selectedInternship.companyName}
+                    </p>
                   </div>
                 </div>
                 <button
@@ -302,12 +357,27 @@ const InternshipPayments = () => {
               {/* Stats bar */}
               <div className="grid grid-cols-3 divide-x divide-gray-100 border-b border-gray-200 flex-shrink-0">
                 {[
-                  { label: "Students",   value: selectedInternship.paymentSummary?.totalPayments || 0,                                 cls: "text-gray-900" },
-                  { label: "Total paid", value: `$${(selectedInternship.paymentSummary?.totalAmount || 0).toLocaleString()}`,           cls: "text-emerald-700" },
-                  { label: "Showing",    value: filteredPayments.length,                                                               cls: "text-gray-900" },
+                  {
+                    label: "Students",
+                    value:
+                      selectedInternship.paymentSummary?.totalPayments || 0,
+                    cls: "text-gray-900",
+                  },
+                  {
+                    label: "Total paid",
+                    value: `$${(selectedInternship.paymentSummary?.totalAmount || 0).toLocaleString()}`,
+                    cls: "text-emerald-700",
+                  },
+                  {
+                    label: "Showing",
+                    value: filteredPayments.length,
+                    cls: "text-gray-900",
+                  },
                 ].map(({ label, value, cls }) => (
                   <div key={label} className="px-4 py-2.5">
-                    <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-1">{label}</p>
+                    <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-1">
+                      {label}
+                    </p>
                     <p className={`text-sm font-semibold ${cls}`}>{value}</p>
                   </div>
                 ))}
@@ -317,12 +387,13 @@ const InternshipPayments = () => {
               <div className="px-4 py-2.5 border-b border-gray-100 flex-shrink-0">
                 <div className="relative">
                   <AiOutlineSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
+                  {/*Add the "!mt-0" for alignment - 06-08-2026 */}
                   <input
                     type="text"
                     placeholder="Search by name or email…"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="w-full pl-8 pr-3 py-2 text-xs border border-gray-200 rounded-lg bg-gray-50 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition"
+                    className="!mt-0 w-full pl-8 pr-3 py-2 text-xs border border-gray-200 rounded-lg bg-gray-50 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition"
                   />
                 </div>
               </div>
@@ -338,14 +409,23 @@ const InternshipPayments = () => {
                       {search ? "No results found" : "No payments yet"}
                     </p>
                     <p className="text-xs text-gray-400 mt-1">
-                      {search ? "Try a different search term" : "Payments will appear here once processed"}
+                      {search
+                        ? "Try a different search term"
+                        : "Payments will appear here once processed"}
                     </p>
                   </div>
                 ) : (
                   filteredPayments.map((p, index) => {
-                    const initial = p.studentId?.name?.charAt(0)?.toUpperCase() || "U";
-                    const colors  = ["bg-emerald-600", "bg-teal-600", "bg-violet-600", "bg-blue-600", "bg-orange-500"];
-                    const color   = colors[index % colors.length];
+                    const initial =
+                      p.studentId?.name?.charAt(0)?.toUpperCase() || "U";
+                    const colors = [
+                      "bg-emerald-600",
+                      "bg-teal-600",
+                      "bg-violet-600",
+                      "bg-blue-600",
+                      "bg-orange-500",
+                    ];
+                    const color = colors[index % colors.length];
                     return (
                       <motion.div
                         key={p._id}
@@ -355,26 +435,41 @@ const InternshipPayments = () => {
                         onClick={() => handleViewUser(p.studentId)}
                         className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 cursor-pointer group transition-colors"
                       >
-                        <div className={`w-8 h-8 rounded-lg ${color} flex items-center justify-center text-white text-xs font-medium flex-shrink-0`}>
+                        <div
+                          className={`w-8 h-8 rounded-lg ${color} flex items-center justify-center text-white text-xs font-medium flex-shrink-0`}
+                        >
                           {initial}
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-medium text-gray-900 truncate group-hover:text-emerald-700 transition-colors">
                             {p.studentId?.name}
                           </p>
-                          <p className="text-[11px] text-gray-500 truncate">{p.studentId?.email}</p>
-                        </div>
-                        <div className="text-right flex-shrink-0">
-                          <p className="text-xs font-semibold text-gray-900">${p.amount.toLocaleString()}</p>
-                          <p className="text-[10px] text-gray-400 mt-0.5">
-                            {new Date(p.completedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                          <p className="text-[11px] text-gray-500 truncate">
+                            {p.studentId?.email}
                           </p>
                         </div>
-                        <span className={`flex-shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded border ${
-                          p.status === "COMPLETED"
-                            ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-                            : "bg-red-50 text-red-800 border-red-200"
-                        }`}>
+                        <div className="text-right flex-shrink-0">
+                          <p className="text-xs font-semibold text-gray-900">
+                            ${p.amount.toLocaleString()}
+                          </p>
+                          <p className="text-[10px] text-gray-400 mt-0.5">
+                            {new Date(p.completedAt).toLocaleDateString(
+                              "en-US",
+                              {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              },
+                            )}
+                          </p>
+                        </div>
+                        <span
+                          className={`flex-shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded border ${
+                            p.status === "COMPLETED"
+                              ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                              : "bg-red-50 text-red-800 border-red-200"
+                          }`}
+                        >
                           {p.status}
                         </span>
                       </motion.div>

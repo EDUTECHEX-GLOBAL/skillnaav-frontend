@@ -57,7 +57,7 @@ const PartnerManagement = () => {
       result = result.filter(
         (p) =>
           p.universityName?.toLowerCase().includes(q) ||
-          p.email?.toLowerCase().includes(q)
+          p.email?.toLowerCase().includes(q),
       );
     }
 
@@ -69,10 +69,7 @@ const PartnerManagement = () => {
   const totalPages = Math.ceil(filteredPartners.length / itemsPerPage);
   const indexOfLast = currentPage * itemsPerPage;
   const indexOfFirst = indexOfLast - itemsPerPage;
-  const currentPartners = filteredPartners.slice(
-    indexOfFirst,
-    indexOfLast
-  );
+  const currentPartners = filteredPartners.slice(indexOfFirst, indexOfLast);
 
   const getPaginationItems = () => {
     if (totalPages <= 7) {
@@ -113,8 +110,7 @@ const PartnerManagement = () => {
     partner.profileImage !== "undefined" &&
     partner.profileImage.trim() !== "";
 
-  const getAvatarInitial = (name) =>
-    name?.charAt(0)?.toUpperCase() || "P";
+  const getAvatarInitial = (name) => name?.charAt(0)?.toUpperCase() || "P";
 
   const getAvatarColor = (name) => {
     const colors = [
@@ -141,7 +137,8 @@ const PartnerManagement = () => {
     }
   };
 
-  const nextPage = () => setCurrentPage((page) => Math.min(page + 1, totalPages));
+  const nextPage = () =>
+    setCurrentPage((page) => Math.min(page + 1, totalPages));
   const prevPage = () => setCurrentPage((page) => Math.max(page - 1, 1));
 
   // ---------------- ACTIONS ----------------
@@ -151,7 +148,7 @@ const PartnerManagement = () => {
 
     try {
       await axios.patch(
-        `/api/partners/${confirmAction.type}/${confirmAction.partnerId}`
+        `/api/partners/${confirmAction.type}/${confirmAction.partnerId}`,
       );
 
       setPartners((prev) =>
@@ -160,12 +157,10 @@ const PartnerManagement = () => {
             ? {
                 ...p,
                 status:
-                  confirmAction.type === "approve"
-                    ? "Approved"
-                    : "Rejected",
+                  confirmAction.type === "approve" ? "Approved" : "Rejected",
               }
-            : p
-        )
+            : p,
+        ),
       );
     } catch (err) {
       console.error(err);
@@ -185,13 +180,9 @@ const PartnerManagement = () => {
     doc.text(
       `Institution ID: ${selectedPartner.institutionId || "N/A"}`,
       20,
-      55
+      55,
     );
-    doc.text(
-      `Status: ${selectedPartner.status || "Pending"}`,
-      20,
-      65
-    );
+    doc.text(`Status: ${selectedPartner.status || "Pending"}`, 20, 65);
 
     doc.save(`${selectedPartner.universityName}_Partner.pdf`);
   };
@@ -215,7 +206,9 @@ const PartnerManagement = () => {
           <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <AiOutlineCloseCircle className="text-2xl text-red-600" />
           </div>
-          <h2 className="text-xl font-bold text-gray-900 font-poppins mb-2">Error Loading Data</h2>
+          <h2 className="text-xl font-bold text-gray-900 font-poppins mb-2">
+            Error Loading Data
+          </h2>
           <p className="text-gray-600 font-poppins">{error}</p>
         </div>
       </div>
@@ -234,17 +227,26 @@ const PartnerManagement = () => {
           <p className="text-gray-600 mt-2 font-poppins">
             Review and manage partner onboarding requests
           </p>
-          
+
           {/* STATS */}
           <div className="flex flex-wrap gap-4 mt-6">
             <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
-              <p className="text-sm text-gray-600 font-poppins">Total Partners</p>
-              <p className="text-2xl font-bold text-gray-900 font-poppins">{partners.length}</p>
+              <p className="text-sm text-gray-600 font-poppins">
+                Total Partners
+              </p>
+              <p className="text-2xl font-bold text-gray-900 font-poppins">
+                {partners.length}
+              </p>
             </div>
             <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
-              <p className="text-sm text-gray-600 font-poppins">Pending Review</p>
+              <p className="text-sm text-gray-600 font-poppins">
+                Pending Review
+              </p>
               <p className="text-2xl font-bold text-amber-600 font-poppins">
-                {partners.filter(p => !p.status || p.status === "Pending").length}
+                {
+                  partners.filter((p) => !p.status || p.status === "Pending")
+                    .length
+                }
               </p>
             </div>
           </div>
@@ -254,6 +256,7 @@ const PartnerManagement = () => {
         <div className="mb-8">
           <div className="relative max-w-xl">
             <AiOutlineSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 text-xl" />
+            {/*Add the "!mt-0" style for the alignment - 05-08-2026 */}
             <input
               type="text"
               name="partner_search_query"
@@ -261,7 +264,7 @@ const PartnerManagement = () => {
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search..."
               autoComplete="on"
-              className="w-full pl-12 pr-4 py-3.5 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-poppins placeholder-gray-500 truncate"
+              className="!mt-0 w-full pl-12 pr-4 py-3.5 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-poppins placeholder-gray-500 truncate"
             />
           </div>
         </div>
@@ -288,7 +291,7 @@ const PartnerManagement = () => {
                     ) : (
                       <div
                         className={`w-14 h-14 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-md ${getAvatarColor(
-                          partner.name
+                          partner.name,
                         )}`}
                       >
                         {getAvatarInitial(partner.universityName)}
@@ -305,19 +308,23 @@ const PartnerManagement = () => {
                       <AiOutlineMail className="flex-shrink-0" />
                       <span className="truncate">{partner.email}</span>
                     </p>
-                    
+
                     {/* Status */}
                     <div className="mt-3">
                       <span
                         className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(
-                          partner.status
+                          partner.status,
                         )} font-poppins`}
                       >
-                        <div className={`w-2 h-2 rounded-full mr-2 ${
-                          partner.status === "Approved" ? "bg-emerald-500" :
-                          partner.status === "Rejected" ? "bg-rose-500" :
-                          "bg-amber-500"
-                        }`}></div>
+                        <div
+                          className={`w-2 h-2 rounded-full mr-2 ${
+                            partner.status === "Approved"
+                              ? "bg-emerald-500"
+                              : partner.status === "Rejected"
+                                ? "bg-rose-500"
+                                : "bg-amber-500"
+                          }`}
+                        ></div>
                         {partner.status || "Pending Review"}
                       </span>
                     </div>
@@ -392,7 +399,9 @@ const PartnerManagement = () => {
               No partners found
             </h3>
             <p className="text-gray-600 font-poppins">
-              {searchQuery ? "Try adjusting your search" : "No partner applications available"}
+              {searchQuery
+                ? "Try adjusting your search"
+                : "No partner applications available"}
             </p>
           </div>
         )}
@@ -473,9 +482,11 @@ const PartnerManagement = () => {
       {/* DETAILS MODAL */}
       {isModalOpen && selectedPartner && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-hidden shadow-2xl animate-fadeIn">
+          {/*Remove overflow-hidden add "flex flex-col" for scrolling purpose in mobile view - 05-08-2026*/}
+          <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] flex flex-col shadow-2xl animate-fadeIn">
             {/* Modal Header */}
-            <div className="p-6 border-b border-gray-200">
+            {/*Add the flex-shrink-0 for fixed position in scrolling in the mobile view - 05-08-2026 */}
+            <div className="p-6 border-b border-gray-200 flex-shrink-0">
               <div className="flex items-center justify-between">
                 <h3 className="text-xl font-bold text-gray-900 font-poppins">
                   Partner Details
@@ -490,7 +501,8 @@ const PartnerManagement = () => {
             </div>
 
             {/* Modal Content */}
-            <div className="overflow-y-auto p-6 space-y-6">
+            {/*Add the flex-1 for scrolling the content in mobile view - 05-06-2026 */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
               {/* Avatar & Name */}
               <div className="text-center">
                 {hasProfileImage(selectedPartner) ? (
@@ -502,19 +514,19 @@ const PartnerManagement = () => {
                 ) : (
                   <div
                     className={`w-24 h-24 rounded-2xl flex items-center justify-center text-white text-3xl font-bold mx-auto shadow-lg ${getAvatarColor(
-                      selectedPartner.name
+                      selectedPartner.name,
                     )}`}
                   >
                     {getAvatarInitial(selectedPartner.universityName)}
                   </div>
                 )}
-                
+
                 <h3 className="text-2xl font-bold mt-4 text-gray-900 font-poppins">
                   {selectedPartner.universityName}
                 </h3>
                 <span
                   className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium mt-2 ${getStatusColor(
-                    selectedPartner.status
+                    selectedPartner.status,
                   )} font-poppins`}
                 >
                   {selectedPartner.status || "Pending Review"}
@@ -526,15 +538,21 @@ const PartnerManagement = () => {
                 <div className="bg-gray-50 rounded-xl p-4">
                   <div className="flex items-center gap-3 text-gray-600 mb-1">
                     <AiOutlineMail className="text-lg" />
-                    <span className="text-sm font-medium font-poppins">Email Address</span>
+                    <span className="text-sm font-medium font-poppins">
+                      Email Address
+                    </span>
                   </div>
-                  <p className="text-gray-900 font-poppins pl-8">{selectedPartner.email}</p>
+                  <p className="text-gray-900 font-poppins pl-8">
+                    {selectedPartner.email}
+                  </p>
                 </div>
 
                 <div className="bg-gray-50 rounded-xl p-4">
                   <div className="flex items-center gap-3 text-gray-600 mb-1">
                     <AiOutlineIdcard className="text-lg" />
-                    <span className="text-sm font-medium font-poppins">Institution ID</span>
+                    <span className="text-sm font-medium font-poppins">
+                      Institution ID
+                    </span>
                   </div>
                   <p className="text-gray-900 font-poppins pl-8">
                     {selectedPartner.institutionId || "Not provided"}
@@ -544,7 +562,8 @@ const PartnerManagement = () => {
             </div>
 
             {/* Modal Footer */}
-            <div className="border-t border-gray-200 p-6 bg-gray-50">
+            {/*Add the flex-shrink-0 for fixed position in scrolling in the mobile view - 05-08-2026  */}
+            <div className="border-t border-gray-200 p-6 bg-gray-50  flex-shrink-0">
               <div className="flex gap-3">
                 <button
                   onClick={downloadPDF}
@@ -570,23 +589,28 @@ const PartnerManagement = () => {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-sm w-full shadow-2xl animate-fadeIn">
             <div className="p-8 text-center">
-              <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 ${
-                confirmAction.type === "approve" ? "bg-emerald-100" : "bg-rose-100"
-              }`}>
+              <div
+                className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 ${
+                  confirmAction.type === "approve"
+                    ? "bg-emerald-100"
+                    : "bg-rose-100"
+                }`}
+              >
                 {confirmAction.type === "approve" ? (
                   <AiOutlineCheck className="text-3xl text-emerald-600" />
                 ) : (
                   <AiOutlineCloseCircle className="text-3xl text-rose-600" />
                 )}
               </div>
-              
+
               <h3 className="text-xl font-bold text-gray-900 mb-3 font-poppins">
-                Confirm {confirmAction.type === "approve" ? "Approval" : "Rejection"}
+                Confirm{" "}
+                {confirmAction.type === "approve" ? "Approval" : "Rejection"}
               </h3>
-              
+
               <p className="text-gray-600 mb-8 font-poppins">
-                Are you sure you want to {confirmAction.type} this partner application?
-                This action cannot be undone.
+                Are you sure you want to {confirmAction.type} this partner
+                application? This action cannot be undone.
               </p>
 
               <div className="flex gap-3">
@@ -608,7 +632,7 @@ const PartnerManagement = () => {
                     "Yes, Continue"
                   )}
                 </button>
-                
+
                 <button
                   onClick={() => setConfirmAction(null)}
                   className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 py-3 rounded-xl font-medium transition-all font-poppins"

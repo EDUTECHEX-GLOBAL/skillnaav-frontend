@@ -1,11 +1,40 @@
 import React, { useMemo } from "react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+} from "recharts";
 import useIsMobileChart from "./useIsMobileChart";
 
+const formatMonthLabel = (value) => {
+  if (!value) return "";
+
+  const [year, month] = value.split("-");
+
+  return new Date(year, month - 1).toLocaleString("default", {
+    month: "short",
+    year: "numeric",
+  });
+};
 const RevenueChart = ({ data }) => {
   const isMobile = useIsMobileChart();
   const isCompactRevenueLayout = useIsMobileChart(1100);
-  const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#7C3AED", "#14B8A6", "#94A3B8"];
+  const COLORS = [
+    "#0088FE",
+    "#00C49F",
+    "#FFBB28",
+    "#FF8042",
+    "#7C3AED",
+    "#14B8A6",
+    "#94A3B8",
+  ];
 
   const pieData = useMemo(() => {
     const normalizedData = (Array.isArray(data) ? data : [])
@@ -84,28 +113,45 @@ const RevenueChart = ({ data }) => {
 
   return (
     <div className="bg-white p-4 sm:p-6 rounded-lg shadow-md">
-      <h3 className="text-lg sm:text-xl font-semibold mb-4 text-center">Revenue Analysis</h3>
+      <h3 className="text-lg sm:text-xl font-semibold mb-4 text-center">
+        Revenue Analysis
+      </h3>
 
       {/* Bar Chart for Revenue Trend */}
       <ResponsiveContainer width="100%" height={isMobile ? 240 : 300}>
-        <BarChart data={data} margin={{ top: 10, right: 12, left: isMobile ? -12 : 0, bottom: isMobile ? 16 : 0 }}>
+        <BarChart
+          data={data}
+          margin={{
+            top: 10,
+            right: 12,
+            left: isMobile ? -12 : 0,
+            bottom: isMobile ? 16 : 0,
+          }}
+        >
           <XAxis
             dataKey="month"
+            tickFormatter={formatMonthLabel}
             tick={{ fontSize: isMobile ? 10 : 12 }}
             minTickGap={isMobile ? 20 : 8}
             angle={isMobile ? -20 : 0}
             textAnchor={isMobile ? "end" : "middle"}
             height={isMobile ? 44 : 30}
           />
-          <YAxis width={isMobile ? 28 : 40} tick={{ fontSize: isMobile ? 10 : 12 }} />
-          <Tooltip />
+          <YAxis
+            width={isMobile ? 28 : 40}
+            tick={{ fontSize: isMobile ? 10 : 12 }}
+          />
+          <Tooltip labelFormatter={formatMonthLabel} />
           <Bar dataKey="revenue" fill="#8884d8" barSize={isMobile ? 28 : 50} />
         </BarChart>
       </ResponsiveContainer>
 
       {/* Pie Chart for Revenue Distribution */}
       <div className="mt-6 sm:mt-8">
-        <ResponsiveContainer width="100%" height={isCompactRevenueLayout ? 320 : 360}>
+        <ResponsiveContainer
+          width="100%"
+          height={isCompactRevenueLayout ? 320 : 360}
+        >
           <PieChart>
             <Pie
               data={pieData}
@@ -120,7 +166,10 @@ const RevenueChart = ({ data }) => {
               labelLine={false}
             >
               {pieData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                <Cell
+                  key={`cell-${index}`}
+                  fill={COLORS[index % COLORS.length]}
+                />
               ))}
             </Pie>
             <Tooltip />

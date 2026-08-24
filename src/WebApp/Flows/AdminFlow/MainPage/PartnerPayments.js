@@ -1,5 +1,14 @@
-import React, { useEffect, useState, useRef, useCallback, useMemo } from "react";
-import { HiOutlineChevronLeft, HiOutlineChevronRight as HiOutlineChevronRightPag } from "react-icons/hi";
+import React, {
+  useEffect,
+  useState,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
+import {
+  HiOutlineChevronLeft,
+  HiOutlineChevronRight as HiOutlineChevronRightPag,
+} from "react-icons/hi";
 import axios from "../../../../api/axiosInstance";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -29,7 +38,8 @@ const PAGE_SIZE = 20; // partners per page
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const getAvatarColor = (name = "") => {
   let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  for (let i = 0; i < name.length; i++)
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 };
 
@@ -58,11 +68,15 @@ const SkeletonCard = () => (
 
 const StatTile = ({ label, value, icon: Icon, accent, loading }) => (
   <div className="bg-white border border-gray-200 rounded-xl p-5 flex flex-col gap-3">
-    <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${accent}`}>
+    <div
+      className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${accent}`}
+    >
       <Icon className="text-white text-base" />
     </div>
     <div>
-      <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-1">{label}</p>
+      <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-1">
+        {label}
+      </p>
       {loading ? (
         <div className="h-7 w-24 bg-gray-200 rounded animate-pulse" />
       ) : (
@@ -74,7 +88,7 @@ const StatTile = ({ label, value, icon: Icon, accent, loading }) => (
 
 // Memoized so re-renders from parent state don't repaint all 100+ rows
 const PartnerItem = React.memo(({ partner, isSelected, onClick }) => {
-  const initial  = (partner.name || "P").charAt(0).toUpperCase();
+  const initial = (partner.name || "P").charAt(0).toUpperCase();
   const avatarBg = getAvatarColor(partner.name);
   return (
     <div
@@ -85,21 +99,29 @@ const PartnerItem = React.memo(({ partner, isSelected, onClick }) => {
           : "bg-white border-gray-200 hover:border-gray-300 hover:shadow-sm"
       }`}
     >
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white text-sm font-semibold flex-shrink-0 ${avatarBg}`}>
+      <div
+        className={`w-10 h-10 rounded-xl flex items-center justify-center text-white text-sm font-semibold flex-shrink-0 ${avatarBg}`}
+      >
         {initial}
       </div>
       <div className="flex-1 min-w-0">
-        <p className={`text-sm font-medium truncate ${isSelected ? "text-emerald-900" : "text-gray-900"}`}>
+        <p
+          className={`text-sm font-medium truncate ${isSelected ? "text-emerald-900" : "text-gray-900"}`}
+        >
           {partner.name}
         </p>
         <p className="text-[11px] text-gray-500 truncate">{partner.email}</p>
         {partner.universityName && (
-          <p className="text-[10px] text-gray-400 truncate mt-0.5">{partner.universityName}</p>
+          <p className="text-[10px] text-gray-400 truncate mt-0.5">
+            {partner.universityName}
+          </p>
         )}
       </div>
       <HiOutlineChevronRight
         className={`flex-shrink-0 text-base transition-colors ${
-          isSelected ? "text-emerald-600" : "text-gray-300 group-hover:text-gray-400"
+          isSelected
+            ? "text-emerald-600"
+            : "text-gray-300 group-hover:text-gray-400"
         }`}
       />
     </div>
@@ -108,13 +130,13 @@ const PartnerItem = React.memo(({ partner, isSelected, onClick }) => {
 
 // ── Main component ────────────────────────────────────────────────────────────
 const PartnerPayments = () => {
-  const [partners, setPartners]               = useState([]);
-  const [loading, setLoading]                 = useState(true);
-  const [error, setError]                     = useState("");
-  const [search, setSearch]                   = useState("");
+  const [partners, setPartners] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
   const [selectedPartner, setSelectedPartner] = useState(null);
-  const [paymentSummary, setPaymentSummary]   = useState(null);
-  const [summaryLoading, setSummaryLoading]   = useState(false);
+  const [paymentSummary, setPaymentSummary] = useState(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -136,7 +158,9 @@ const PartnerPayments = () => {
     }
   }, []);
 
-  useEffect(() => { fetchPartners(); }, [fetchPartners]);
+  useEffect(() => {
+    fetchPartners();
+  }, [fetchPartners]);
 
   // ── Reset to page 1 on search change ────────────────────────────────────────
   useEffect(() => {
@@ -152,7 +176,7 @@ const PartnerPayments = () => {
       (p) =>
         p.name?.toLowerCase().includes(q) ||
         p.email?.toLowerCase().includes(q) ||
-        p.universityName?.toLowerCase().includes(q)
+        p.universityName?.toLowerCase().includes(q),
     );
   }, [partners, debouncedSearch]);
 
@@ -181,7 +205,7 @@ const PartnerPayments = () => {
     setPaymentSummary(null);
     try {
       const { data } = await axios.get(
-        `/api/internship/payments/admin/partner/${partner._id}`
+        `/api/internship/payments/admin/partner/${partner._id}`,
       );
       setPaymentSummary(data.data);
     } catch (err) {
@@ -199,13 +223,15 @@ const PartnerPayments = () => {
         <div className="flex items-center gap-4 p-5 border-b border-gray-100">
           <div
             className={`w-12 h-12 rounded-xl flex items-center justify-center text-white text-lg font-semibold flex-shrink-0 ${getAvatarColor(
-              selectedPartner.name
+              selectedPartner.name,
             )}`}
           >
             {(selectedPartner.name || "P").charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
-            <h2 className="text-base font-semibold text-gray-900 truncate">{selectedPartner.name}</h2>
+            <h2 className="text-base font-semibold text-gray-900 truncate">
+              {selectedPartner.name}
+            </h2>
             <p className="text-xs text-gray-500 truncate flex items-center gap-1 mt-0.5">
               <HiOutlineMail className="flex-shrink-0" />
               {selectedPartner.email}
@@ -257,7 +283,9 @@ const PartnerPayments = () => {
           </div>
           <div className="h-10 bg-gray-200 rounded-xl mb-5 animate-pulse" />
           <div className="grid gap-3">
-            {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
+            {Array.from({ length: 6 }).map((_, i) => (
+              <SkeletonCard key={i} />
+            ))}
           </div>
         </div>
       </div>
@@ -267,7 +295,6 @@ const PartnerPayments = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
-
         {/* Page header */}
         <div className="flex items-center justify-between mb-7">
           <div className="flex items-center gap-3">
@@ -275,7 +302,9 @@ const PartnerPayments = () => {
               <AiOutlineBank className="text-white text-lg" />
             </div>
             <div>
-              <h1 className="text-lg font-semibold text-gray-900 leading-tight">Partner Payments</h1>
+              <h1 className="text-lg font-semibold text-gray-900 leading-tight">
+                Partner Payments
+              </h1>
               <p className="text-xs text-gray-500 mt-0.5">
                 {partners.length} partners · payment overview
               </p>
@@ -293,11 +322,24 @@ const PartnerPayments = () => {
         {/* KPI row */}
         <div className="grid grid-cols-2 gap-3 mb-7">
           {[
-            { label: "Total Partners",   value: partners.length,            color: "text-gray-900" },
-            { label: "Filtered Results", value: filteredPartners.length,    color: "text-emerald-700" },
+            {
+              label: "Total Partners",
+              value: partners.length,
+              color: "text-gray-900",
+            },
+            {
+              label: "Filtered Results",
+              value: filteredPartners.length,
+              color: "text-emerald-700",
+            },
           ].map(({ label, value, color }) => (
-            <div key={label} className="bg-white border border-gray-200 rounded-lg p-4">
-              <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-1.5">{label}</p>
+            <div
+              key={label}
+              className="bg-white border border-gray-200 rounded-lg p-4"
+            >
+              <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-1.5">
+                {label}
+              </p>
               <p className={`text-xl font-semibold ${color}`}>{value}</p>
             </div>
           ))}
@@ -306,6 +348,7 @@ const PartnerPayments = () => {
         {/* Search */}
         <div className="relative mb-3">
           <HiOutlineSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
+          {/*Add the "!mt-0" for alignment - 06-08-2026 */}
           <input
             type="text"
             name="payment_search_query"
@@ -313,7 +356,7 @@ const PartnerPayments = () => {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             autoComplete="on"
-            className="w-full pl-9 pr-9 py-2.5 text-sm border border-gray-200 rounded-xl bg-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition truncate"
+            className="!mt-0 w-full pl-9 pr-9 py-2.5 text-sm border border-gray-200 rounded-xl bg-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition truncate"
           />
           {search && (
             <button
@@ -328,36 +371,46 @@ const PartnerPayments = () => {
         {/* Search result label */}
         {debouncedSearch && (
           <p className="text-xs text-gray-500 mb-4">
-            <span className="font-medium text-gray-700">{filteredPartners.length}</span> result
+            <span className="font-medium text-gray-700">
+              {filteredPartners.length}
+            </span>{" "}
+            result
             {filteredPartners.length !== 1 ? "s" : ""} for{" "}
-            <span className="font-medium text-gray-700">"{debouncedSearch}"</span>
+            <span className="font-medium text-gray-700">
+              "{debouncedSearch}"
+            </span>
           </p>
         )}
         {!debouncedSearch && <div className="mb-4" />}
 
         {/* Two-column layout */}
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
-
           {/* ── Partner list ─────────────────────────────────────────────────── */}
           <div className="lg:col-span-2">
             {error ? (
               <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700 flex items-center justify-between gap-3">
                 <span>{error}</span>
-                <button onClick={fetchPartners} className="text-xs font-medium underline hover:no-underline">
+                <button
+                  onClick={fetchPartners}
+                  className="text-xs font-medium underline hover:no-underline"
+                >
                   Retry
                 </button>
               </div>
             ) : filteredPartners.length === 0 ? (
               <div className="bg-white border border-gray-200 rounded-xl px-4 py-10 text-center">
                 <p className="text-sm text-gray-500">No partners found</p>
-                <p className="text-xs text-gray-400 mt-1">Try adjusting your search</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  Try adjusting your search
+                </p>
               </div>
             ) : (
               <>
                 {/* Page info */}
                 {filteredPartners.length > PAGE_SIZE && (
                   <p className="text-[10px] text-gray-400 mb-2 text-right pr-1">
-                    Page {currentPage} of {totalPages} · {filteredPartners.length} partners
+                    Page {currentPage} of {totalPages} ·{" "}
+                    {filteredPartners.length} partners
                   </p>
                 )}
 
@@ -394,10 +447,11 @@ const PartnerPayments = () => {
 
                     <div className="flex items-center gap-1">
                       {Array.from({ length: totalPages }, (_, i) => i + 1)
-                        .filter((p) =>
-                          p === 1 ||
-                          p === totalPages ||
-                          Math.abs(p - currentPage) <= 1
+                        .filter(
+                          (p) =>
+                            p === 1 ||
+                            p === totalPages ||
+                            Math.abs(p - currentPage) <= 1,
                         )
                         .reduce((acc, p, idx, arr) => {
                           if (idx > 0 && p - arr[idx - 1] > 1) {
@@ -408,7 +462,12 @@ const PartnerPayments = () => {
                         }, [])
                         .map((p, idx) =>
                           p === "..." ? (
-                            <span key={`ellipsis-${idx}`} className="px-1 text-xs text-gray-400">…</span>
+                            <span
+                              key={`ellipsis-${idx}`}
+                              className="px-1 text-xs text-gray-400"
+                            >
+                              …
+                            </span>
                           ) : (
                             <button
                               key={p}
@@ -421,7 +480,7 @@ const PartnerPayments = () => {
                             >
                               {p}
                             </button>
-                          )
+                          ),
                         )}
                     </div>
 
@@ -464,7 +523,9 @@ const PartnerPayments = () => {
                   <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center mb-1">
                     <AiOutlineBank className="text-gray-400 text-xl" />
                   </div>
-                  <p className="text-sm font-medium text-gray-500">Select a partner</p>
+                  <p className="text-sm font-medium text-gray-500">
+                    Select a partner
+                  </p>
                   <p className="text-xs text-gray-400">
                     Click any partner to view their payment summary
                   </p>
@@ -497,7 +558,6 @@ const PartnerPayments = () => {
               <div className="flex justify-center pt-3 pb-1">
                 <div className="w-10 h-1 rounded-full bg-gray-300" />
               </div>
-
               <div className="flex items-center justify-between px-5 pt-2 pb-0">
                 <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Payment Summary
@@ -509,7 +569,6 @@ const PartnerPayments = () => {
                   <HiOutlineX size={14} />
                 </button>
               </div>
-
               <div className="h-0.5 w-full bg-emerald-600 mt-3" />
               <SummaryContent />
               <div className="h-8" /> {/* iOS safe area */}

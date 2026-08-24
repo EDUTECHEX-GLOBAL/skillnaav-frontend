@@ -13,7 +13,8 @@ import OfferTemplateManager from "./OfferTemplateManager";
 import CustomInternshipCertificateManager from "./CustomInternshipCertificateManager";
 import StipendDetails from "./StipendDetails";
 import InstructureManagement from "./InstructureManagement";
-import InternshipPayments from "./InternshipPayments"; // ✅ New
+import InternshipPayments from "./InternshipPayments";
+import MockInterviewResults from "./MockInterviewResults";
 import Bin from "./Bin";
 
 const BodyContent = () => {
@@ -61,9 +62,11 @@ const BodyContent = () => {
     case "stipend-details":
       content = <StipendDetails />;
       break;
-    // ✅ New — Payments received for paid internships
     case "internship-payments":
       content = <InternshipPayments />;
+      break;
+    case "mock-interviews":
+      content = <MockInterviewResults />;
       break;
     case "bin":
       content = <Bin />;

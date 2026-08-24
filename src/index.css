@@ -49,6 +49,16 @@ textarea {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+/*Add this style for the export csv in the internship payments details modal - 04-08-2026 */
+.export-btn-internship {
+  height: 40px;
+}
+
+@media (min-width: 640px) {
+  .export-btn-internship {
+    height: 100px;
+  }
+}
 
 /* ── Toast z-index ───────────────────────────────────────────────────────────── */
 .Toastify__toast-container {

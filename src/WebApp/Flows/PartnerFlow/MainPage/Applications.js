@@ -37,7 +37,8 @@ const getDefaultCloseScheduleModalState = () => ({
   internshipId: null,
   step: "confirm",
   title: "Close Internship Schedule",
-  message: "Are you sure that you want to close the current internship schedule?",
+  message:
+    "Are you sure that you want to close the current internship schedule?",
   confirmLabel: "Yes",
   cancelLabel: "No",
   hideConfirm: false,
@@ -52,13 +53,24 @@ const getDefaultCloseScheduleModalState = () => ({
 // ─── Type badge ───────────────────────────────────────────────────────────────
 const TypeBadge = ({ type }) => {
   const cfg = {
-    PAID: { cls: "bg-emerald-100 text-emerald-700 border-emerald-200", label: "Paid" },
-    STIPEND: { cls: "bg-blue-100 text-blue-700 border-blue-200", label: "Stipend" },
+    PAID: {
+      cls: "bg-emerald-100 text-emerald-700 border-emerald-200",
+      label: "Paid",
+    },
+    STIPEND: {
+      cls: "bg-blue-100 text-blue-700 border-blue-200",
+      label: "Stipend",
+    },
     FREE: { cls: "bg-gray-100 text-gray-500 border-gray-200", label: "Free" },
-  }[(type || "").toUpperCase()] || { cls: "bg-gray-100 text-gray-500 border-gray-200", label: type };
+  }[(type || "").toUpperCase()] || {
+    cls: "bg-gray-100 text-gray-500 border-gray-200",
+    label: type,
+  };
 
   return (
-    <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${cfg.cls}`}>
+    <span
+      className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${cfg.cls}`}
+    >
       {cfg.label}
     </span>
   );
@@ -107,16 +119,25 @@ const InternshipList = () => {
   });
 
   const [scheduleFormOpen, setScheduleFormOpen] = useState(false);
-  const [selectedInternshipForSchedule, setSelectedInternshipForSchedule] = useState(null);
+  const [selectedInternshipForSchedule, setSelectedInternshipForSchedule] =
+    useState(null);
   const [atsModalOpen, setAtsModalOpen] = useState(false);
   const [atsThreshold, setAtsThreshold] = useState(30);
-  const [pendingShortlistInternship, setPendingShortlistInternship] = useState(null);
-  const [closeScheduleModal, setCloseScheduleModal] = useState(getDefaultCloseScheduleModalState);
+  const [pendingShortlistInternship, setPendingShortlistInternship] =
+    useState(null);
+  const [closeScheduleModal, setCloseScheduleModal] = useState(
+    getDefaultCloseScheduleModalState,
+  );
   const [scheduleViewerOpen, setScheduleViewerOpen] = useState(false);
-  const [selectedInternshipForView, setSelectedInternshipForView] = useState(null);
+  const [selectedInternshipForView, setSelectedInternshipForView] =
+    useState(null);
   const [attendanceDashboardOpen, setAttendanceDashboardOpen] = useState(false);
-  const [selectedInternshipForAttendance, setSelectedInternshipForAttendance] = useState(null);
-  const [timeSlotsModal, setTimeSlotsModal] = useState({ open: false, internshipId: null });
+  const [selectedInternshipForAttendance, setSelectedInternshipForAttendance] =
+    useState(null);
+  const [timeSlotsModal, setTimeSlotsModal] = useState({
+    open: false,
+    internshipId: null,
+  });
 
   // ─── Filter state ────────────────────────────────────────────────────────────
   const [filterType, setFilterType] = useState("All Types");
@@ -124,45 +145,56 @@ const InternshipList = () => {
   const [filterLevel, setFilterLevel] = useState("All Levels");
 
   // ─── Fetch internships ───────────────────────────────────────────────────────
-  const fetchInternships = useCallback(async (pid, pageNum = 1, query = "", isInitialLoad = false, type = "All Types", mode = "All Modes", level = "All Levels") => {
-    if (!pid) return;
-    if (isInitialLoad) setLoading(true);
-    else setIsSearching(true);
-    if (pageNum > 1) setLoadingMore(true);
-    setError(null);
+  const fetchInternships = useCallback(
+    async (
+      pid,
+      pageNum = 1,
+      query = "",
+      isInitialLoad = false,
+      type = "All Types",
+      mode = "All Modes",
+      level = "All Levels",
+    ) => {
+      if (!pid) return;
+      if (isInitialLoad) setLoading(true);
+      else setIsSearching(true);
+      if (pageNum > 1) setLoadingMore(true);
+      setError(null);
 
-    try {
-      const params = { page: pageNum, limit: 6 };
-      if (query.trim()) params.search = query.trim();
-      if (type !== "All Types") params.internshipType = type.toUpperCase();
-      if (mode !== "All Modes") params.internshipMode = mode.toUpperCase();
-      if (level !== "All Levels") params.classification = level;
+      try {
+        const params = { page: pageNum, limit: 6 };
+        if (query.trim()) params.search = query.trim();
+        if (type !== "All Types") params.internshipType = type.toUpperCase();
+        if (mode !== "All Modes") params.internshipMode = mode.toUpperCase();
+        if (level !== "All Levels") params.classification = level;
 
-      const response = await axios.get(`/api/interns/partner/${pid}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        params,
-      });
+        const response = await axios.get(`/api/interns/partner/${pid}`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+          params,
+        });
 
-      setInternships(response.data.data || []);
-      setPage(pageNum);
-      setTotalPages(Number(response.data.totalPages) || 1);
-      setTotalCount(Number(response.data.total) || 0);
-      setHasMore(pageNum < (Number(response.data.totalPages) || 1));
-      setDebouncedQuery(query || "");
-    } catch (err) {
-      console.error("Error fetching internships:", err);
-      if (isInitialLoad || pageNum === 1) {
-        setInternships([]);
-        setError("Failed to load internships. Please try again.");
-      } else {
-        toast.error("Failed to load page. Please try again.");
+        setInternships(response.data.data || []);
+        setPage(pageNum);
+        setTotalPages(Number(response.data.totalPages) || 1);
+        setTotalCount(Number(response.data.total) || 0);
+        setHasMore(pageNum < (Number(response.data.totalPages) || 1));
+        setDebouncedQuery(query || "");
+      } catch (err) {
+        console.error("Error fetching internships:", err);
+        if (isInitialLoad || pageNum === 1) {
+          setInternships([]);
+          setError("Failed to load internships. Please try again.");
+        } else {
+          toast.error("Failed to load page. Please try again.");
+        }
+      } finally {
+        setLoading(false);
+        setIsSearching(false);
+        setLoadingMore(false);
       }
-    } finally {
-      setLoading(false);
-      setIsSearching(false);
-      setLoadingMore(false);
-    }
-  }, []);
+    },
+    [],
+  );
 
   useEffect(() => {
     const fetchPartnerData = async () => {
@@ -200,59 +232,64 @@ const InternshipList = () => {
     };
   }, []);
 
-  const fetchCloseScheduleTemplates = useCallback(async (partnerId) => {
-    if (!partnerId) return [];
+  const fetchCloseScheduleTemplates = useCallback(
+    async (partnerId) => {
+      if (!partnerId) return [];
 
-    const cached = getCachedCloseScheduleTemplates(partnerId);
-    if (cached.loaded) {
-      return cached.items;
-    }
-
-    if (
-      closeScheduleTemplatesRequestRef.current.partnerId === partnerId &&
-      closeScheduleTemplatesRequestRef.current.promise
-    ) {
-      return closeScheduleTemplatesRequestRef.current.promise;
-    }
-
-    const requestPromise = axios
-      .get(`/api/custom-internship-certificates/${partnerId}`)
-      .then((response) => {
-        const items = Array.isArray(response.data?.items)
-          ? response.data.items.filter(item => item.status === 'Approved')
-          : [];
-
-        closeScheduleTemplatesCacheRef.current = {
-          partnerId,
-          items,
-          loaded: true,
-        };
-
-        return items;
-      });
-
-    closeScheduleTemplatesRequestRef.current = {
-      partnerId,
-      promise: requestPromise,
-    };
-
-    try {
-      return await requestPromise;
-    } finally {
-      if (closeScheduleTemplatesRequestRef.current.promise === requestPromise) {
-        closeScheduleTemplatesRequestRef.current = {
-          partnerId: null,
-          promise: null,
-        };
+      const cached = getCachedCloseScheduleTemplates(partnerId);
+      if (cached.loaded) {
+        return cached.items;
       }
-    }
-  }, [getCachedCloseScheduleTemplates]);
+
+      if (
+        closeScheduleTemplatesRequestRef.current.partnerId === partnerId &&
+        closeScheduleTemplatesRequestRef.current.promise
+      ) {
+        return closeScheduleTemplatesRequestRef.current.promise;
+      }
+
+      const requestPromise = axios
+        .get(`/api/custom-internship-certificates/${partnerId}`)
+        .then((response) => {
+          const items = Array.isArray(response.data?.items)
+            ? response.data.items.filter((item) => item.status === "Approved")
+            : [];
+
+          closeScheduleTemplatesCacheRef.current = {
+            partnerId,
+            items,
+            loaded: true,
+          };
+
+          return items;
+        });
+
+      closeScheduleTemplatesRequestRef.current = {
+        partnerId,
+        promise: requestPromise,
+      };
+
+      try {
+        return await requestPromise;
+      } finally {
+        if (
+          closeScheduleTemplatesRequestRef.current.promise === requestPromise
+        ) {
+          closeScheduleTemplatesRequestRef.current = {
+            partnerId: null,
+            promise: null,
+          };
+        }
+      }
+    },
+    [getCachedCloseScheduleTemplates],
+  );
 
   useEffect(() => {
     const partnerId = partnerData?._id || localStorage.getItem("partnerId");
     if (!partnerId) return;
 
-    fetchCloseScheduleTemplates(partnerId).catch(() => { });
+    fetchCloseScheduleTemplates(partnerId).catch(() => {});
   }, [partnerData, fetchCloseScheduleTemplates]);
 
   const handleSearchChange = (e) => {
@@ -272,7 +309,8 @@ const InternshipList = () => {
         open: true,
         internshipId: null,
         title: "Schedule Is Closed",
-        message: "Cannot open applications because the internship schedule is already closed.",
+        message:
+          "Cannot open applications because the internship schedule is already closed.",
         confirmLabel: "Yes",
         cancelLabel: "OK",
         hideConfirm: true,
@@ -282,25 +320,34 @@ const InternshipList = () => {
 
     try {
       setInternships((prev) =>
-        prev.map((i) => i._id === internshipId ? { ...i, applicationOpen: newStatus } : i)
+        prev.map((i) =>
+          i._id === internshipId ? { ...i, applicationOpen: newStatus } : i,
+        ),
       );
       await axios.put(
         `/api/interns/${internshipId}`,
         { applicationOpen: newStatus },
-        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+        {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        },
       );
       toast.success(`Applications are now ${newStatus ? "open" : "closed"}.`);
     } catch {
       toast.error("Failed to update. Please try again.");
       setInternships((prev) =>
-        prev.map((i) => i._id === internshipId ? { ...i, applicationOpen: !newStatus } : i)
+        prev.map((i) =>
+          i._id === internshipId ? { ...i, applicationOpen: !newStatus } : i,
+        ),
       );
     }
   };
 
   const hasPremiumAccess = () => {
     const plan = partnerData?.planType?.trim().toLowerCase();
-    return partnerData?.isPremium && (plan === "premium basic" || plan === "premium plus");
+    return (
+      partnerData?.isPremium &&
+      (plan === "premium basic" || plan === "premium plus")
+    );
   };
 
   const hasFullPremiumAccess = () => {
@@ -318,7 +365,9 @@ const InternshipList = () => {
   };
 
   const getPricingBucketFromInternship = (internship) => {
-    const raw = String(internship?.internshipType || "").trim().toUpperCase();
+    const raw = String(internship?.internshipType || "")
+      .trim()
+      .toUpperCase();
     if (raw === "PAID") return "paid";
     if (raw === "STIPEND") return "stipend";
     return "free";
@@ -331,11 +380,20 @@ const InternshipList = () => {
     }
     try {
       setLoadingApplications((prev) => ({ ...prev, [internshipId]: true }));
-      setModalData({ open: true, internshipId, type: "applications", loading: true });
-      const { data } = await axios.get(`/api/applications/internship/${internshipId}`);
+      setModalData({
+        open: true,
+        internshipId,
+        type: "applications",
+        loading: true,
+      });
+      const { data } = await axios.get(
+        `/api/applications/internship/${internshipId}`,
+      );
       setApplications((prev) => ({
         ...prev,
-        [internshipId]: Array.isArray(data.applications) ? data.applications : [],
+        [internshipId]: Array.isArray(data.applications)
+          ? data.applications
+          : [],
       }));
     } catch (err) {
       setApplications((prev) => ({ ...prev, [internshipId]: [] }));
@@ -360,12 +418,19 @@ const InternshipList = () => {
   const handleShortlist = async (id, description, skills, threshold) => {
     setAtsModalOpen(false);
     setLoadingShortlist(true);
-    setModalData({ open: true, internshipId: id, type: "shortlisted", loading: true });
+    setModalData({
+      open: true,
+      internshipId: id,
+      type: "shortlisted",
+      loading: true,
+    });
     try {
       let resumes = [];
       if (!applications[id]?.length) {
         const { data } = await axios.get(`/api/applications/internship/${id}`);
-        const fetched = Array.isArray(data.applications) ? data.applications : [];
+        const fetched = Array.isArray(data.applications)
+          ? data.applications
+          : [];
         setApplications((prev) => ({ ...prev, [id]: fetched }));
         resumes = fetched.map((s) => s.resumeUrl).filter(Boolean);
       } else {
@@ -377,10 +442,20 @@ const InternshipList = () => {
       resumes.forEach((url) => formData.append("resumes", url));
       formData.append("internship_id", id);
       formData.append("ats_threshold", String(threshold ?? 30));
-      const { data } = await axios.post(`${AI_API}/partner/shortlist`, formData, {
-        headers: { "Content-Type": "multipart/form-data", Authorization: `Bearer ${localStorage.getItem("token")}` },
-      });
-      setShortlistedCandidates((prev) => ({ ...prev, [id]: data.shortlisted_candidates || [] }));
+      const { data } = await axios.post(
+        `${AI_API}/partner/shortlist`,
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        },
+      );
+      setShortlistedCandidates((prev) => ({
+        ...prev,
+        [id]: data.shortlisted_candidates || [],
+      }));
       toast.success(`Candidates shortlisted (ATS ≥ ${threshold ?? 30}%)!`);
     } catch {
       toast.error("Shortlisting failed. Please try again.");
@@ -392,16 +467,29 @@ const InternshipList = () => {
 
   const showShortlisted = async (internshipId) => {
     if (!hasPremiumAccess()) {
-      toast.error("Upgrade to Premium Basic or higher to view shortlisted candidates");
+      toast.error(
+        "Upgrade to Premium Basic or higher to view shortlisted candidates",
+      );
       return;
     }
     setLoadingShortlist(true);
-    setModalData({ open: true, internshipId, type: "shortlisted", loading: true });
+    setModalData({
+      open: true,
+      internshipId,
+      type: "shortlisted",
+      loading: true,
+    });
     try {
-      const { data } = await axios.get(`${AI_API}/partner/shortlisted/${internshipId}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      });
-      setShortlistedCandidates((prev) => ({ ...prev, [internshipId]: data.shortlisted_candidates }));
+      const { data } = await axios.get(
+        `${AI_API}/partner/shortlisted/${internshipId}`,
+        {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        },
+      );
+      setShortlistedCandidates((prev) => ({
+        ...prev,
+        [internshipId]: data.shortlisted_candidates,
+      }));
     } catch {
       toast.error("Failed to load shortlisted candidates.");
     } finally {
@@ -416,7 +504,9 @@ const InternshipList = () => {
       setApplications((prev) => {
         const updated = { ...prev };
         Object.keys(updated).forEach((key) => {
-          updated[key] = updated[key].map((s) => s._id === studentId ? { ...s, status } : s);
+          updated[key] = updated[key].map((s) =>
+            s._id === studentId ? { ...s, status } : s,
+          );
         });
         return updated;
       });
@@ -426,7 +516,10 @@ const InternshipList = () => {
   };
 
   const handleSchedule = (internship) => {
-    if (!hasFullPremiumAccess()) { toast.error("Upgrade to Premium Plus to schedule interviews"); return; }
+    if (!hasFullPremiumAccess()) {
+      toast.error("Upgrade to Premium Plus to schedule interviews");
+      return;
+    }
     setSelectedInternshipForSchedule({
       _id: internship._id,
       internshipMode: internship.internshipMode || "",
@@ -436,7 +529,10 @@ const InternshipList = () => {
   };
 
   const openScheduleViewer = (internshipId) => {
-    if (!hasPremiumAccess()) { toast.error("Upgrade to Premium Basic or higher to view schedules"); return; }
+    if (!hasPremiumAccess()) {
+      toast.error("Upgrade to Premium Basic or higher to view schedules");
+      return;
+    }
     setSelectedInternshipForView(internshipId);
     setScheduleViewerOpen(true);
   };
@@ -447,7 +543,10 @@ const InternshipList = () => {
   };
 
   const openTimeSlotsSelected = (internshipId) => {
-    if (!hasFullPremiumAccess()) { toast.error("Upgrade to Premium Plus to view accepted students"); return; }
+    if (!hasFullPremiumAccess()) {
+      toast.error("Upgrade to Premium Plus to view accepted students");
+      return;
+    }
     setTimeSlotsModal({ open: true, internshipId });
   };
 
@@ -469,7 +568,8 @@ const InternshipList = () => {
       open: true,
       internshipId: null,
       title: "Internship Schedule Required",
-      message: "First create the internship schedule, then only you can close the internship schedule.",
+      message:
+        "First create the internship schedule, then only you can close the internship schedule.",
       confirmLabel: "Yes",
       cancelLabel: "OK",
       hideConfirm: true,
@@ -495,7 +595,8 @@ const InternshipList = () => {
       open: true,
       internshipId: null,
       title: "Applications Are Still Open",
-      message: "Please close the applications (toggle set to Closed) before you can close the schedule.",
+      message:
+        "Please close the applications (toggle set to Closed) before you can close the schedule.",
       confirmLabel: "Yes",
       cancelLabel: "OK",
       hideConfirm: true,
@@ -511,7 +612,9 @@ const InternshipList = () => {
     const partnerId = partnerData?._id || localStorage.getItem("partnerId");
 
     if (!internshipId || !partnerId) {
-      toast.error("Partner profile is not available. Please refresh and try again.");
+      toast.error(
+        "Partner profile is not available. Please refresh and try again.",
+      );
       return;
     }
 
@@ -556,7 +659,7 @@ const InternshipList = () => {
     } catch (err) {
       console.error(
         "Error fetching certificate templates for close schedule:",
-        err
+        err,
       );
       setCloseScheduleModal((prev) => ({
         ...prev,
@@ -574,7 +677,9 @@ const InternshipList = () => {
     const partnerId = partnerData?._id || localStorage.getItem("partnerId");
 
     if (!partnerId) {
-      toast.error("Partner profile is not available. Please refresh and try again.");
+      toast.error(
+        "Partner profile is not available. Please refresh and try again.",
+      );
       return;
     }
 
@@ -585,7 +690,7 @@ const InternshipList = () => {
     }
 
     try {
-      const response = await axios.get('/api/schedule/get-schedule', {
+      const response = await axios.get("/api/schedule/get-schedule", {
         params: { internshipId, partnerId },
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
@@ -596,15 +701,17 @@ const InternshipList = () => {
       }
 
       const hasCreatedSchedule =
-        (Array.isArray(response.data?.timetable) && response.data.timetable.length > 0) ||
-        (Array.isArray(response.data?.batches) && response.data.batches.length > 0);
+        (Array.isArray(response.data?.timetable) &&
+          response.data.timetable.length > 0) ||
+        (Array.isArray(response.data?.batches) &&
+          response.data.batches.length > 0);
 
       if (!hasCreatedSchedule) {
         openCreateScheduleRequiredPopup();
         return;
       }
 
-      fetchCloseScheduleTemplates(partnerId).catch(() => { });
+      fetchCloseScheduleTemplates(partnerId).catch(() => {});
       openCloseScheduleConfirmation(internshipId);
     } catch (err) {
       if (err.response?.status === 404) {
@@ -614,17 +721,22 @@ const InternshipList = () => {
 
       toast.error(
         err.response?.data?.error ||
-        err.response?.data?.message ||
-        "Failed to verify internship schedule"
+          err.response?.data?.message ||
+          "Failed to verify internship schedule",
       );
     }
   };
 
-  const handleConfirmClose = async (internshipId, selectedTemplateId = null) => {
+  const handleConfirmClose = async (
+    internshipId,
+    selectedTemplateId = null,
+  ) => {
     const partnerId = partnerData?._id || localStorage.getItem("partnerId");
 
     if (!internshipId || !partnerId) {
-      toast.error("Partner profile is not available. Please refresh and try again.");
+      toast.error(
+        "Partner profile is not available. Please refresh and try again.",
+      );
       return;
     }
 
@@ -634,18 +746,24 @@ const InternshipList = () => {
         isSubmitting: true,
       }));
 
-      await axios.put('/api/schedule/close', {
-        internshipId,
-        partnerId,
-        certificateTemplateId: selectedTemplateId || undefined,
-      }, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-      });
+      await axios.put(
+        "/api/schedule/close",
+        {
+          internshipId,
+          partnerId,
+          certificateTemplateId: selectedTemplateId || undefined,
+        },
+        {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        },
+      );
 
       toast.success("Schedule closed permanently!");
       resetCloseScheduleModal();
-      setInternships(prev =>
-        prev.map(i => i._id === internshipId ? { ...i, isScheduleClosed: true } : i)
+      setInternships((prev) =>
+        prev.map((i) =>
+          i._id === internshipId ? { ...i, isScheduleClosed: true } : i,
+        ),
       );
     } catch (err) {
       if (err.response?.data?.error === "Schedule is already closed") {
@@ -666,7 +784,7 @@ const InternshipList = () => {
     if (closeScheduleModal.step === "templates") {
       await handleConfirmClose(
         closeScheduleModal.internshipId,
-        closeScheduleModal.selectedTemplateId
+        closeScheduleModal.selectedTemplateId,
       );
       return;
     }
@@ -680,19 +798,19 @@ const InternshipList = () => {
     const filteredTemplates = closeScheduleModal.templates.filter((item) =>
       item.name
         ?.toLowerCase()
-        .includes(closeScheduleModal.templateSearchQuery.trim().toLowerCase())
+        .includes(closeScheduleModal.templateSearchQuery.trim().toLowerCase()),
     );
     const totalTemplatePages = Math.max(
       1,
-      Math.ceil(filteredTemplates.length / CLOSE_SCHEDULE_TEMPLATES_PER_PAGE)
+      Math.ceil(filteredTemplates.length / CLOSE_SCHEDULE_TEMPLATES_PER_PAGE),
     );
     const activeTemplatePage = Math.min(
       closeScheduleModal.templatePage,
-      totalTemplatePages
+      totalTemplatePages,
     );
     const paginatedTemplates = filteredTemplates.slice(
       (activeTemplatePage - 1) * CLOSE_SCHEDULE_TEMPLATES_PER_PAGE,
-      activeTemplatePage * CLOSE_SCHEDULE_TEMPLATES_PER_PAGE
+      activeTemplatePage * CLOSE_SCHEDULE_TEMPLATES_PER_PAGE,
     );
 
     if (closeScheduleModal.isLoadingTemplates) {
@@ -785,10 +903,11 @@ const InternshipList = () => {
                         selectedTemplateId: item._id,
                       }))
                     }
-                    className={`overflow-hidden rounded-2xl border bg-white text-left shadow-sm transition ${isSelected
-                      ? "border-blue-500 ring-2 ring-blue-100"
-                      : "border-gray-200 hover:border-blue-300 hover:shadow-md"
-                      }`}
+                    className={`overflow-hidden rounded-2xl border bg-white text-left shadow-sm transition ${
+                      isSelected
+                        ? "border-blue-500 ring-2 ring-blue-100"
+                        : "border-gray-200 hover:border-blue-300 hover:shadow-md"
+                    }`}
                     style={{
                       contain: "layout paint",
                       contentVisibility: "auto",
@@ -827,10 +946,14 @@ const InternshipList = () => {
             {totalTemplatePages > 1 && (
               <div className="mt-6 flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-sm font-semibold text-gray-500">
-                  Showing {(activeTemplatePage - 1) * CLOSE_SCHEDULE_TEMPLATES_PER_PAGE + 1}-
+                  Showing{" "}
+                  {(activeTemplatePage - 1) *
+                    CLOSE_SCHEDULE_TEMPLATES_PER_PAGE +
+                    1}
+                  -
                   {Math.min(
                     activeTemplatePage * CLOSE_SCHEDULE_TEMPLATES_PER_PAGE,
-                    filteredTemplates.length
+                    filteredTemplates.length,
                   )}{" "}
                   of {filteredTemplates.length} designs
                 </p>
@@ -852,7 +975,7 @@ const InternshipList = () => {
 
                   {Array.from(
                     { length: totalTemplatePages },
-                    (_, index) => index + 1
+                    (_, index) => index + 1,
                   ).map((pageNumber) => (
                     <button
                       key={pageNumber}
@@ -863,10 +986,11 @@ const InternshipList = () => {
                           templatePage: pageNumber,
                         }))
                       }
-                      className={`min-w-10 rounded-xl border px-3 py-2 text-sm font-semibold transition ${activeTemplatePage === pageNumber
-                        ? "border-blue-500 bg-blue-600 text-white"
-                        : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
-                        }`}
+                      className={`min-w-10 rounded-xl border px-3 py-2 text-sm font-semibold transition ${
+                        activeTemplatePage === pageNumber
+                          ? "border-blue-500 bg-blue-600 text-white"
+                          : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                      }`}
                     >
                       {pageNumber}
                     </button>
@@ -879,7 +1003,7 @@ const InternshipList = () => {
                         ...prev,
                         templatePage: Math.min(
                           activeTemplatePage + 1,
-                          totalTemplatePages
+                          totalTemplatePages,
                         ),
                       }))
                     }
@@ -897,7 +1021,13 @@ const InternshipList = () => {
     );
   };
 
-  const closeModal = () => setModalData({ open: false, internshipId: null, type: null, loading: false });
+  const closeModal = () =>
+    setModalData({
+      open: false,
+      internshipId: null,
+      type: null,
+      loading: false,
+    });
 
   // ─── Premium lock ────────────────────────────────────────────────────────────
   const showPremiumLock = (featureName, requiredPlan = "Premium Basic") => (
@@ -921,7 +1051,9 @@ const InternshipList = () => {
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
         <div className="flex flex-col items-center p-8 bg-white rounded-2xl shadow-xl gap-4">
           <div className="w-14 h-14 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-lg font-semibold text-gray-800">Loading internships...</p>
+          <p className="text-lg font-semibold text-gray-800">
+            Loading internships...
+          </p>
           <p className="text-sm text-gray-400">Please wait a moment.</p>
         </div>
       </div>
@@ -931,8 +1063,10 @@ const InternshipList = () => {
     return (
       <div className="flex flex-col items-center justify-center min-h-[40vh] gap-4">
         <p className="text-red-500 font-medium">{error}</p>
-        <button onClick={() => window.location.reload()}
-          className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-semibold">
+        <button
+          onClick={() => window.location.reload()}
+          className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-semibold"
+        >
           Retry
         </button>
       </div>
@@ -941,29 +1075,41 @@ const InternshipList = () => {
   // ─── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="font-poppins max-w-5xl mx-auto px-4 py-6">
-
       {/* ── Page Header ── */}
       <div className="flex justify-between items-center mb-6">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">My Internships</h2>
-          <p className="text-sm text-gray-400 mt-0.5">Manage your posted internships and candidates</p>
+          <p className="text-sm text-gray-400 mt-0.5">
+            Manage your posted internships and candidates
+          </p>
         </div>
         {partnerData && (
-          <div className={`px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 ${partnerData.isPremium
-            ? partnerData.planType === "Premium Plus"
-              ? "bg-purple-100 text-purple-700"
-              : "bg-blue-100 text-blue-700"
-            : "bg-gray-100 text-gray-600"
-            }`}>
+          <div
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 ${
+              partnerData.isPremium
+                ? partnerData.planType === "Premium Plus"
+                  ? "bg-purple-100 text-purple-700"
+                  : "bg-blue-100 text-blue-700"
+                : "bg-gray-100 text-gray-600"
+            }`}
+          >
             {partnerData.isPremium && (
-              <FontAwesomeIcon icon={faCrown} className={
-                partnerData.planType === "Premium Plus" ? "text-purple-500" : "text-blue-500"
-              } />
+              <FontAwesomeIcon
+                icon={faCrown}
+                className={
+                  partnerData.planType === "Premium Plus"
+                    ? "text-purple-500"
+                    : "text-blue-500"
+                }
+              />
             )}
-            {partnerData.planType === "Freemium" ? "Free Plan" : partnerData.planType}
+            {partnerData.planType === "Freemium"
+              ? "Free Plan"
+              : partnerData.planType}
             {partnerData.premiumExpiration && partnerData.isPremium && (
               <span className="opacity-60 ml-1">
-                · Expires {new Date(partnerData.premiumExpiration).toLocaleDateString()}
+                · Expires{" "}
+                {new Date(partnerData.premiumExpiration).toLocaleDateString()}
               </span>
             )}
           </div>
@@ -973,14 +1119,17 @@ const InternshipList = () => {
       {/* ── Search + count ── */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-5 p-3 bg-gray-50 rounded-xl border border-gray-100">
         <div className="relative flex-1">
-          <FontAwesomeIcon icon={faSearch}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none" />
+          <FontAwesomeIcon
+            icon={faSearch}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none"
+          />
+          {/*Add the "!mt-0" style to the input for alignment - 04-08-2026 */}
           <input
             type="text"
             value={searchQuery}
             onChange={handleSearchChange}
             placeholder="Search by title, company, location…"
-            className="w-full pl-9 pr-9 py-2 text-sm rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white placeholder-gray-400 transition"
+            className="!mt-0 w-full pl-9 pr-9 py-2 text-sm rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white placeholder-gray-400 transition"
           />
           {isSearching && (
             <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -989,7 +1138,12 @@ const InternshipList = () => {
           )}
           {!isSearching && searchQuery && (
             <button
-              onClick={() => { setSearchQuery(""); clearTimeout(debounceRef.current); if (partnerIdRef.current) fetchInternships(partnerIdRef.current, 1, ""); }}
+              onClick={() => {
+                setSearchQuery("");
+                clearTimeout(debounceRef.current);
+                if (partnerIdRef.current)
+                  fetchInternships(partnerIdRef.current, 1, "");
+              }}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition"
             >
               <FontAwesomeIcon icon={faTimes} className="text-xs" />
@@ -1001,12 +1155,24 @@ const InternshipList = () => {
           {totalCount > 0 ? (
             <span>
               <span className="font-semibold text-gray-800">{totalCount}</span>
-              {" internship"}{totalCount !== 1 ? "s" : ""}
-              {debouncedQuery && <span className="text-gray-400"> for "<em>{debouncedQuery}</em>"</span>}
-              {totalPages > 1 && <span className="text-gray-400 text-xs ml-1.5">· Page {page} of {totalPages}</span>}
+              {" internship"}
+              {totalCount !== 1 ? "s" : ""}
+              {debouncedQuery && (
+                <span className="text-gray-400">
+                  {" "}
+                  for "<em>{debouncedQuery}</em>"
+                </span>
+              )}
+              {totalPages > 1 && (
+                <span className="text-gray-400 text-xs ml-1.5">
+                  · Page {page} of {totalPages}
+                </span>
+              )}
             </span>
           ) : debouncedQuery ? (
-            <span className="text-gray-400">No results for "<em>{debouncedQuery}</em>"</span>
+            <span className="text-gray-400">
+              No results for "<em>{debouncedQuery}</em>"
+            </span>
           ) : (
             <span className="text-gray-400">No internships posted yet</span>
           )}
@@ -1021,7 +1187,16 @@ const InternshipList = () => {
             value={filterType}
             onChange={(e) => {
               setFilterType(e.target.value);
-              if (partnerIdRef.current) fetchInternships(partnerIdRef.current, 1, debouncedQuery, false, e.target.value, filterMode, filterLevel);
+              if (partnerIdRef.current)
+                fetchInternships(
+                  partnerIdRef.current,
+                  1,
+                  debouncedQuery,
+                  false,
+                  e.target.value,
+                  filterMode,
+                  filterLevel,
+                );
             }}
             className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition cursor-pointer"
           >
@@ -1037,7 +1212,16 @@ const InternshipList = () => {
             value={filterMode}
             onChange={(e) => {
               setFilterMode(e.target.value);
-              if (partnerIdRef.current) fetchInternships(partnerIdRef.current, 1, debouncedQuery, false, filterType, e.target.value, filterLevel);
+              if (partnerIdRef.current)
+                fetchInternships(
+                  partnerIdRef.current,
+                  1,
+                  debouncedQuery,
+                  false,
+                  filterType,
+                  e.target.value,
+                  filterLevel,
+                );
             }}
             className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition cursor-pointer"
           >
@@ -1053,7 +1237,16 @@ const InternshipList = () => {
             value={filterLevel}
             onChange={(e) => {
               setFilterLevel(e.target.value);
-              if (partnerIdRef.current) fetchInternships(partnerIdRef.current, 1, debouncedQuery, false, filterType, filterMode, e.target.value);
+              if (partnerIdRef.current)
+                fetchInternships(
+                  partnerIdRef.current,
+                  1,
+                  debouncedQuery,
+                  false,
+                  filterType,
+                  filterMode,
+                  e.target.value,
+                );
             }}
             className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition cursor-pointer"
           >
@@ -1069,10 +1262,17 @@ const InternshipList = () => {
       {internships.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-gray-400 gap-3">
           <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center">
-            <FontAwesomeIcon icon={faBriefcase} className="text-2xl text-gray-300" />
+            <FontAwesomeIcon
+              icon={faBriefcase}
+              className="text-2xl text-gray-300"
+            />
           </div>
-          <p className="text-base font-medium text-gray-500">No internships posted yet</p>
-          <p className="text-sm text-gray-400">Post an internship to see candidates here</p>
+          <p className="text-base font-medium text-gray-500">
+            No internships posted yet
+          </p>
+          <p className="text-sm text-gray-400">
+            Post an internship to see candidates here
+          </p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -1086,13 +1286,15 @@ const InternshipList = () => {
                     ? `Student Pays: ${internship.compensationDetails?.amount} ${internship.compensationDetails?.currency}`
                     : "N/A";
 
-            const isPaidInternship = (internship?.internshipType || "").toUpperCase() === "PAID";
+            const isPaidInternship =
+              (internship?.internshipType || "").toUpperCase() === "PAID";
 
             const quals = Array.isArray(internship.qualifications)
               ? internship.qualifications
               : internship.qualifications
-                ?.match(/[A-Z]?[^.!?]*[.!?]*/g)
-                ?.map((s) => s.trim()).filter(Boolean) || [];
+                  ?.match(/[A-Z]?[^.!?]*[.!?]*/g)
+                  ?.map((s) => s.trim())
+                  .filter(Boolean) || [];
 
             const showAllQuals = qualExpanded[internship._id];
             const visibleQuals = showAllQuals ? quals : quals.slice(0, 3);
@@ -1109,17 +1311,25 @@ const InternshipList = () => {
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-12 h-12 rounded-xl overflow-hidden bg-gray-100 border border-gray-200 flex-shrink-0">
                       {internship.imgUrl ? (
-                        <img src={internship.imgUrl} alt={internship.companyName}
-                          className="w-full h-full object-cover" />
+                        <img
+                          src={internship.imgUrl}
+                          alt={internship.companyName}
+                          className="w-full h-full object-cover"
+                        />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                          <FontAwesomeIcon icon={faBriefcase} className="text-gray-400 text-lg" />
+                          <FontAwesomeIcon
+                            icon={faBriefcase}
+                            className="text-gray-400 text-lg"
+                          />
                         </div>
                       )}
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="text-base font-bold text-gray-900 truncate">{internship.jobTitle}</h3>
+                        <h3 className="text-base font-bold text-gray-900 truncate">
+                          {internship.jobTitle}
+                        </h3>
                         <TypeBadge type={internship.internshipType} />
                       </div>
                       <p className="text-xs text-gray-400 mt-0.5">
@@ -1136,22 +1346,42 @@ const InternshipList = () => {
                   {/* Toggle */}
                   <div className="flex items-center gap-2.5 flex-shrink-0">
                     <button
-                      onClick={() => toggleApplicationOpen(internship._id, !internship.applicationOpen)}
+                      onClick={() =>
+                        toggleApplicationOpen(
+                          internship._id,
+                          !internship.applicationOpen,
+                        )
+                      }
                       className="relative flex-shrink-0"
-                      title={internship.applicationOpen ? "Close applications" : "Open applications"}
+                      title={
+                        internship.applicationOpen
+                          ? "Close applications"
+                          : "Open applications"
+                      }
                     >
-                      <div className={`w-12 h-6 rounded-full transition-colors duration-300 ${internship.applicationOpen
-                        ? "bg-gradient-to-r from-teal-400 to-cyan-500"
-                        : "bg-gradient-to-r from-red-400 to-pink-500"
-                        }`}>
-                        <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-300 ${internship.applicationOpen ? "translate-x-6" : "translate-x-0.5"
-                          }`} />
+                      <div
+                        className={`w-12 h-6 rounded-full transition-colors duration-300 ${
+                          internship.applicationOpen
+                            ? "bg-gradient-to-r from-teal-400 to-cyan-500"
+                            : "bg-gradient-to-r from-red-400 to-pink-500"
+                        }`}
+                      >
+                        <div
+                          className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-300 ${
+                            internship.applicationOpen
+                              ? "translate-x-6"
+                              : "translate-x-0.5"
+                          }`}
+                        />
                       </div>
                     </button>
-                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${internship.applicationOpen
-                      ? "bg-teal-50 text-teal-700 border border-teal-200"
-                      : "bg-red-50 text-red-600 border border-red-200"
-                      }`}>
+                    <span
+                      className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+                        internship.applicationOpen
+                          ? "bg-teal-50 text-teal-700 border border-teal-200"
+                          : "bg-red-50 text-red-600 border border-red-200"
+                      }`}
+                    >
                       {internship.applicationOpen ? "Open" : "Closed"}
                     </span>
                   </div>
@@ -1164,24 +1394,42 @@ const InternshipList = () => {
                 <div className="px-5 py-3 space-y-1.5">
                   <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-gray-500">
                     <span className="flex items-center gap-1.5">
-                      <FontAwesomeIcon icon={faMapMarkerAlt} className="text-gray-400" />
+                      <FontAwesomeIcon
+                        icon={faMapMarkerAlt}
+                        className="text-gray-400"
+                      />
                       {internship.location || "—"}
                     </span>
                     <span className="flex items-center gap-1.5">
-                      <FontAwesomeIcon icon={faClock} className="text-gray-400" />
+                      <FontAwesomeIcon
+                        icon={faClock}
+                        className="text-gray-400"
+                      />
                       {internship.startDate
-                        ? new Date(internship.startDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+                        ? new Date(internship.startDate).toLocaleDateString(
+                            "en-GB",
+                            { day: "2-digit", month: "short", year: "numeric" },
+                          )
                         : "—"}
                       {" – "}
                       {internship.endDateOrDuration
                         ? (() => {
-                          const d = new Date(internship.endDateOrDuration);
-                          return isNaN(d) ? internship.endDateOrDuration : d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
-                        })()
+                            const d = new Date(internship.endDateOrDuration);
+                            return isNaN(d)
+                              ? internship.endDateOrDuration
+                              : d.toLocaleDateString("en-GB", {
+                                  day: "2-digit",
+                                  month: "short",
+                                  year: "numeric",
+                                });
+                          })()
                         : "—"}
                     </span>
                     <span className="flex items-center gap-1.5">
-                      <FontAwesomeIcon icon={faDollarSign} className="text-gray-400" />
+                      <FontAwesomeIcon
+                        icon={faDollarSign}
+                        className="text-gray-400"
+                      />
                       {compensationText}
                     </span>
                   </div>
@@ -1189,19 +1437,40 @@ const InternshipList = () => {
 
                 {/* ── Description ── */}
                 <div className="px-5 pb-3">
-                  <p className="text-xs font-semibold text-gray-700 mb-1">Description</p>
-                  <p className={`text-xs text-gray-500 leading-relaxed ${!isDescExpanded ? "line-clamp-2" : ""}`}>
+                  <p className="text-xs font-semibold text-gray-700 mb-1">
+                    Description
+                  </p>
+                  <p
+                    className={`text-xs text-gray-500 leading-relaxed ${!isDescExpanded ? "line-clamp-2" : ""}`}
+                  >
                     {internship.jobDescription || "No description provided."}
                   </p>
                   {internship.jobDescription?.length > 140 && (
                     <button
-                      onClick={() => setDescExpanded((prev) => ({ ...prev, [internship._id]: !prev[internship._id] }))}
+                      onClick={() =>
+                        setDescExpanded((prev) => ({
+                          ...prev,
+                          [internship._id]: !prev[internship._id],
+                        }))
+                      }
                       className="mt-1 text-xs text-blue-500 hover:text-blue-700 font-medium flex items-center gap-1 transition"
                     >
                       {isDescExpanded ? (
-                        <><FontAwesomeIcon icon={faChevronUp} className="text-[10px]" /> Show less</>
+                        <>
+                          <FontAwesomeIcon
+                            icon={faChevronUp}
+                            className="text-[10px]"
+                          />{" "}
+                          Show less
+                        </>
                       ) : (
-                        <><FontAwesomeIcon icon={faChevronDown} className="text-[10px]" /> Read more</>
+                        <>
+                          <FontAwesomeIcon
+                            icon={faChevronDown}
+                            className="text-[10px]"
+                          />{" "}
+                          Read more
+                        </>
                       )}
                     </button>
                   )}
@@ -1210,20 +1479,31 @@ const InternshipList = () => {
                 {/* ── Qualifications ── */}
                 {quals.length > 0 && (
                   <div className="px-5 pb-4">
-                    <p className="text-xs font-semibold text-gray-700 mb-1.5">Qualifications</p>
+                    <p className="text-xs font-semibold text-gray-700 mb-1.5">
+                      Qualifications
+                    </p>
                     <div className="flex flex-wrap gap-1.5">
                       {visibleQuals.map((q, i) => (
-                        <span key={i}
-                          className="text-[11px] bg-indigo-50 text-indigo-600 border border-indigo-100 px-2.5 py-0.5 rounded-full">
+                        <span
+                          key={i}
+                          className="text-[11px] bg-indigo-50 text-indigo-600 border border-indigo-100 px-2.5 py-0.5 rounded-full"
+                        >
                           {q}
                         </span>
                       ))}
                       {quals.length > 3 && (
                         <button
-                          onClick={() => setQualExpanded((prev) => ({ ...prev, [internship._id]: !prev[internship._id] }))}
+                          onClick={() =>
+                            setQualExpanded((prev) => ({
+                              ...prev,
+                              [internship._id]: !prev[internship._id],
+                            }))
+                          }
                           className="text-[11px] text-blue-500 hover:text-blue-700 font-semibold self-center transition"
                         >
-                          {showAllQuals ? "Show less" : `+${quals.length - 3} more`}
+                          {showAllQuals
+                            ? "Show less"
+                            : `+${quals.length - 3} more`}
                         </button>
                       )}
                     </div>
@@ -1236,48 +1516,62 @@ const InternshipList = () => {
                     <button
                       onClick={() => fetchApplications(internship._id)}
                       disabled={loadingApplications[internship._id]}
-                      className={`flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-xs font-semibold rounded-lg shadow hover:from-blue-600 hover:to-indigo-700 transition active:scale-95 ${loadingApplications[internship._id] ? "opacity-60 cursor-not-allowed" : ""
-                        }`}
+                      className={`flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-xs font-semibold rounded-lg shadow hover:from-blue-600 hover:to-indigo-700 transition active:scale-95 ${
+                        loadingApplications[internship._id]
+                          ? "opacity-60 cursor-not-allowed"
+                          : ""
+                      }`}
                     >
                       <FontAwesomeIcon icon={faEye} />
-                      {loadingApplications[internship._id] ? "Loading..." : "View Applications"}
+                      {loadingApplications[internship._id]
+                        ? "Loading..."
+                        : "View Applications"}
                     </button>
-                  ) : showPremiumLock("View Applications", "Premium Basic")}
+                  ) : (
+                    showPremiumLock("View Applications", "Premium Basic")
+                  )}
 
                   {hasPremiumAccess() || hasFullPremiumAccess() ? (
                     <button
                       onClick={() => openAtsModal(internship)}
                       disabled={loadingShortlist}
-                      className={`flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs font-semibold rounded-lg shadow hover:from-emerald-600 hover:to-teal-600 transition active:scale-95 ${loadingShortlist ? "opacity-60 cursor-not-allowed" : ""
-                        }`}
+                      className={`flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs font-semibold rounded-lg shadow hover:from-emerald-600 hover:to-teal-600 transition active:scale-95 ${
+                        loadingShortlist ? "opacity-60 cursor-not-allowed" : ""
+                      }`}
                     >
                       <FontAwesomeIcon icon={faStar} />
                       {loadingShortlist ? "Shortlisting..." : "Shortlist"}
                     </button>
-                  ) : showPremiumLock("Shortlist", "Premium Basic")}
+                  ) : (
+                    showPremiumLock("Shortlist", "Premium Basic")
+                  )}
 
                   {hasPremiumAccess() || hasFullPremiumAccess() ? (
                     <button
                       onClick={() => showShortlisted(internship._id)}
                       disabled={loadingShortlist}
-                      className={`flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-purple-500 to-violet-600 text-white text-xs font-semibold rounded-lg shadow hover:from-purple-600 hover:to-violet-700 transition active:scale-95 ${loadingShortlist ? "opacity-60 cursor-not-allowed" : ""
-                        }`}
+                      className={`flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-purple-500 to-violet-600 text-white text-xs font-semibold rounded-lg shadow hover:from-purple-600 hover:to-violet-700 transition active:scale-95 ${
+                        loadingShortlist ? "opacity-60 cursor-not-allowed" : ""
+                      }`}
                     >
                       <FontAwesomeIcon icon={faDownload} />
                       {loadingShortlist ? "Loading..." : "Shortlisted Resumes"}
                     </button>
-                  ) : showPremiumLock("Shortlisted Resumes", "Premium Basic")}
+                  ) : (
+                    showPremiumLock("Shortlisted Resumes", "Premium Basic")
+                  )}
 
-                  {isPaidInternship && (
-                    hasFullPremiumAccess() ? (
+                  {isPaidInternship &&
+                    (hasFullPremiumAccess() ? (
                       <button
                         onClick={() => openTimeSlotsSelected(internship._id)}
                         className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-slate-600 to-gray-700 text-white text-xs font-semibold rounded-lg shadow hover:from-slate-700 hover:to-gray-800 transition active:scale-95"
                       >
                         <FontAwesomeIcon icon={faCalendarAlt} /> Time Slots
                       </button>
-                    ) : showPremiumLock("Time Slots Selected", "Premium Plus")
-                  )}
+                    ) : (
+                      showPremiumLock("Time Slots Selected", "Premium Plus")
+                    ))}
 
                   {hasFullPremiumAccess() ? (
                     <>
@@ -1294,16 +1588,21 @@ const InternshipList = () => {
                             onClick={() => openScheduleViewer(internship._id)}
                             className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-cyan-500 to-sky-500 text-white text-xs font-semibold rounded-lg shadow hover:from-cyan-600 hover:to-sky-600 transition active:scale-95"
                           >
-                            <FontAwesomeIcon icon={faCalendarAlt} /> View Schedule
+                            <FontAwesomeIcon icon={faCalendarAlt} /> View
+                            Schedule
                           </button>
                           <button
-                            onClick={() => openAttendanceDashboard(internship._id)}
+                            onClick={() =>
+                              openAttendanceDashboard(internship._id)
+                            }
                             className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-teal-500 to-emerald-500 text-white text-xs font-semibold rounded-lg shadow hover:from-teal-600 hover:to-emerald-600 transition active:scale-95"
                           >
                             <FontAwesomeIcon icon={faUserCheck} /> Attendance
                           </button>
                         </>
-                      ) : showPremiumLock("View Schedule", "Premium Basic")}
+                      ) : (
+                        showPremiumLock("View Schedule", "Premium Basic")
+                      )}
 
                       <button
                         onClick={() => handleCloseScheduleClick(internship._id)}
@@ -1312,7 +1611,9 @@ const InternshipList = () => {
                         <FontAwesomeIcon icon={faTimes} /> Close Schedule
                       </button>
                     </>
-                  ) : showPremiumLock("Schedule", "Premium Plus")}
+                  ) : (
+                    showPremiumLock("Schedule", "Premium Plus")
+                  )}
                 </div>
               </div>
             );
@@ -1324,27 +1625,40 @@ const InternshipList = () => {
       {totalPages > 1 && (
         <div className="flex justify-center items-center gap-2 mt-8 flex-wrap">
           <button
-            onClick={() => fetchInternships(partnerIdRef.current, page - 1, debouncedQuery)}
+            onClick={() =>
+              fetchInternships(partnerIdRef.current, page - 1, debouncedQuery)
+            }
             disabled={page === 1 || loadingMore}
             className="px-4 py-2 rounded-lg border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
           >
             ← Prev
           </button>
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
-            <button
-              key={pageNum}
-              onClick={() => fetchInternships(partnerIdRef.current, pageNum, debouncedQuery)}
-              disabled={loadingMore}
-              className={`w-9 h-9 rounded-lg text-sm font-semibold transition ${pageNum === page
-                ? "bg-blue-600 text-white shadow"
-                : "border border-gray-200 text-gray-600 hover:bg-gray-50"
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+            (pageNum) => (
+              <button
+                key={pageNum}
+                onClick={() =>
+                  fetchInternships(
+                    partnerIdRef.current,
+                    pageNum,
+                    debouncedQuery,
+                  )
+                }
+                disabled={loadingMore}
+                className={`w-9 h-9 rounded-lg text-sm font-semibold transition ${
+                  pageNum === page
+                    ? "bg-blue-600 text-white shadow"
+                    : "border border-gray-200 text-gray-600 hover:bg-gray-50"
                 }`}
-            >
-              {pageNum}
-            </button>
-          ))}
+              >
+                {pageNum}
+              </button>
+            ),
+          )}
           <button
-            onClick={() => fetchInternships(partnerIdRef.current, page + 1, debouncedQuery)}
+            onClick={() =>
+              fetchInternships(partnerIdRef.current, page + 1, debouncedQuery)
+            }
             disabled={!hasMore || loadingMore}
             className="px-4 py-2 rounded-lg border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
           >
@@ -1357,14 +1671,22 @@ const InternshipList = () => {
       <Modal
         isOpen={modalData.open}
         onClose={closeModal}
-        title={modalData.type === "applications" ? "Applications" : "Shortlisted Candidates"}
+        title={
+          modalData.type === "applications"
+            ? "Applications"
+            : "Shortlisted Candidates"
+        }
         isLoading={modalData.loading}
         preventBackdropClose={true}
       >
-        {modalData.type === "applications" && !modalData.loading && (
-          (applications[modalData.internshipId] || []).length === 0 ? (
+        {modalData.type === "applications" &&
+          !modalData.loading &&
+          ((applications[modalData.internshipId] || []).length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 gap-3 text-gray-400">
-              <FontAwesomeIcon icon={faEye} className="text-3xl text-gray-200" />
+              <FontAwesomeIcon
+                icon={faEye}
+                className="text-3xl text-gray-200"
+              />
               <p className="text-sm font-medium">No applications yet</p>
             </div>
           ) : (
@@ -1372,28 +1694,39 @@ const InternshipList = () => {
               applications={applications[modalData.internshipId]}
               onStatusUpdate={updateApplicationStatus}
             />
-          )
-        )}
-        {modalData.type === "shortlisted" && !modalData.loading && (
-          (shortlistedCandidates[modalData.internshipId] || []).length === 0 ? (
+          ))}
+        {modalData.type === "shortlisted" &&
+          !modalData.loading &&
+          ((shortlistedCandidates[modalData.internshipId] || []).length ===
+          0 ? (
             <div className="flex flex-col items-center justify-center py-16 gap-3 text-gray-400">
-              <FontAwesomeIcon icon={faStar} className="text-3xl text-gray-200" />
-              <p className="text-sm font-medium">No candidates shortlisted yet</p>
+              <FontAwesomeIcon
+                icon={faStar}
+                className="text-3xl text-gray-200"
+              />
+              <p className="text-sm font-medium">
+                No candidates shortlisted yet
+              </p>
             </div>
           ) : (
             <ShortlistedTable
               candidates={shortlistedCandidates[modalData.internshipId]}
               internshipId={modalData.internshipId}
-              internshipTitle={internships.find(i => i._id === modalData.internshipId)?.jobTitle || "Internship"}
+              internshipTitle={
+                internships.find((i) => i._id === modalData.internshipId)
+                  ?.jobTitle || "Internship"
+              }
             />
-          )
-        )}
+          ))}
       </Modal>
 
       {/* ── Schedule Form Modal ── */}
       <Modal
         isOpen={scheduleFormOpen}
-        onClose={() => { setScheduleFormOpen(false); setSelectedInternshipForSchedule(null); }}
+        onClose={() => {
+          setScheduleFormOpen(false);
+          setSelectedInternshipForSchedule(null);
+        }}
         title="Create Internship Schedule"
       >
         {selectedInternshipForSchedule?._id && (
@@ -1401,7 +1734,10 @@ const InternshipList = () => {
             internshipId={selectedInternshipForSchedule._id}
             initialInternshipMode={selectedInternshipForSchedule.internshipMode}
             initialPricingBucket={selectedInternshipForSchedule.pricingBucket}
-            onClose={() => { setScheduleFormOpen(false); setSelectedInternshipForSchedule(null); }}
+            onClose={() => {
+              setScheduleFormOpen(false);
+              setSelectedInternshipForSchedule(null);
+            }}
           />
         )}
       </Modal>
@@ -1412,7 +1748,9 @@ const InternshipList = () => {
         onClose={() => setTimeSlotsModal({ open: false, internshipId: null })}
         title="Time Slots Selected"
       >
-        {timeSlotsModal.internshipId && <TimeSlotsSelected internshipId={timeSlotsModal.internshipId} />}
+        {timeSlotsModal.internshipId && (
+          <TimeSlotsSelected internshipId={timeSlotsModal.internshipId} />
+        )}
       </Modal>
 
       <ConfirmCloseSchedule
@@ -1435,11 +1773,9 @@ const InternshipList = () => {
         confirmDisabled={
           closeScheduleModal.isLoadingTemplates ||
           closeScheduleModal.isSubmitting ||
-          (
-            closeScheduleModal.step === "templates" &&
+          (closeScheduleModal.step === "templates" &&
             closeScheduleModal.templates.length > 0 &&
-            !closeScheduleModal.selectedTemplateId
-          )
+            !closeScheduleModal.selectedTemplateId)
         }
         disableCancel={closeScheduleModal.isSubmitting}
         dialogClassName={
@@ -1453,7 +1789,10 @@ const InternshipList = () => {
 
       <InternshipScheduleViewer
         isOpen={scheduleViewerOpen}
-        onClose={() => { setScheduleViewerOpen(false); setSelectedInternshipForView(null); }}
+        onClose={() => {
+          setScheduleViewerOpen(false);
+          setSelectedInternshipForView(null);
+        }}
         internshipId={selectedInternshipForView}
         partnerId={partnerData?._id || localStorage.getItem("partnerId")}
       />
@@ -1472,17 +1811,21 @@ const InternshipList = () => {
       {atsModalOpen && pendingShortlistInternship && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4">
           <div className="bg-white rounded-2xl border border-gray-100 w-full max-w-sm p-6 space-y-5">
-
             {/* Header */}
             <div className="flex items-start justify-between">
               <div>
-                <h3 className="text-base font-medium text-gray-900">Set ATS threshold</h3>
+                <h3 className="text-base font-medium text-gray-900">
+                  Set ATS threshold
+                </h3>
                 <p className="text-xs text-gray-400 mt-1 leading-relaxed">
                   Only resumes at or above this score will be shortlisted.
                 </p>
               </div>
               <button
-                onClick={() => { setAtsModalOpen(false); setPendingShortlistInternship(null); }}
+                onClick={() => {
+                  setAtsModalOpen(false);
+                  setPendingShortlistInternship(null);
+                }}
                 className="text-gray-300 hover:text-gray-500 transition text-xl leading-none mt-[-2px]"
               >
                 ×
@@ -1492,13 +1835,31 @@ const InternshipList = () => {
             {/* Internship pill */}
             <div className="flex items-center gap-2.5 bg-gray-50 rounded-xl px-3.5 py-2.5 border border-gray-100">
               <div className="w-7 h-7 rounded-md bg-blue-50 flex items-center justify-center flex-shrink-0">
-                <svg className="w-3.5 h-3.5 text-blue-500" fill="none" viewBox="0 0 16 16">
-                  <rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.5" />
-                  <path d="M5 8h6M5 5.5h6M5 10.5h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                <svg
+                  className="w-3.5 h-3.5 text-blue-500"
+                  fill="none"
+                  viewBox="0 0 16 16"
+                >
+                  <rect
+                    x="2"
+                    y="2"
+                    width="12"
+                    height="12"
+                    rx="2"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                  />
+                  <path
+                    d="M5 8h6M5 5.5h6M5 10.5h4"
+                    stroke="currentColor"
+                    strokeWidth="1.2"
+                    strokeLinecap="round"
+                  />
                 </svg>
               </div>
               <span className="text-sm text-gray-600 font-medium truncate">
-                {pendingShortlistInternship.jobTitle} — {pendingShortlistInternship.companyName}
+                {pendingShortlistInternship.jobTitle} —{" "}
+                {pendingShortlistInternship.companyName}
               </span>
             </div>
 
@@ -1510,7 +1871,9 @@ const InternshipList = () => {
                   <span className="text-xl font-medium text-emerald-700 min-w-[36px] text-right leading-none">
                     {atsThreshold}
                   </span>
-                  <span className="text-sm font-medium text-emerald-600">%</span>
+                  <span className="text-sm font-medium text-emerald-600">
+                    %
+                  </span>
                 </div>
               </div>
 
@@ -1532,14 +1895,24 @@ const InternshipList = () => {
             </div>
 
             {/* Hint badge */}
-            <div className={`flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 border text-xs font-medium ${atsThreshold >= 70
-              ? "bg-green-50 border-green-100 text-green-700"
-              : atsThreshold >= 40
-                ? "bg-amber-50 border-amber-100 text-amber-700"
-                : "bg-blue-50 border-blue-100 text-blue-600"
-              }`}>
-              <div className={`w-2 h-2 rounded-full flex-shrink-0 ${atsThreshold >= 70 ? "bg-green-500" : atsThreshold >= 40 ? "bg-amber-500" : "bg-blue-400"
-                }`} />
+            <div
+              className={`flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 border text-xs font-medium ${
+                atsThreshold >= 70
+                  ? "bg-green-50 border-green-100 text-green-700"
+                  : atsThreshold >= 40
+                    ? "bg-amber-50 border-amber-100 text-amber-700"
+                    : "bg-blue-50 border-blue-100 text-blue-600"
+              }`}
+            >
+              <div
+                className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                  atsThreshold >= 70
+                    ? "bg-green-500"
+                    : atsThreshold >= 40
+                      ? "bg-amber-500"
+                      : "bg-blue-400"
+                }`}
+              />
               {atsThreshold >= 70
                 ? "Strict — only highly relevant resumes will pass"
                 : atsThreshold >= 40
@@ -1550,7 +1923,10 @@ const InternshipList = () => {
             {/* Actions */}
             <div className="grid grid-cols-2 gap-2.5 pt-1">
               <button
-                onClick={() => { setAtsModalOpen(false); setPendingShortlistInternship(null); }}
+                onClick={() => {
+                  setAtsModalOpen(false);
+                  setPendingShortlistInternship(null);
+                }}
                 className="py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition"
               >
                 Cancel
@@ -1561,7 +1937,7 @@ const InternshipList = () => {
                     pendingShortlistInternship._id,
                     pendingShortlistInternship.jobDescription,
                     pendingShortlistInternship.qualifications || [],
-                    atsThreshold
+                    atsThreshold,
                   )
                 }
                 className="py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium transition active:scale-95 flex items-center justify-center gap-2"
@@ -1570,7 +1946,6 @@ const InternshipList = () => {
                 Shortlist
               </button>
             </div>
-
           </div>
         </div>
       )}

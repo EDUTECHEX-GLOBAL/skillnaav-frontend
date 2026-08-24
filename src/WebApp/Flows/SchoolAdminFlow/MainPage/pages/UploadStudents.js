@@ -30,16 +30,16 @@ function UploadOverlay({ modal, onClose }) {
     { key: "parsing", label: "CSV file parsed" },
     { key: "validating", label: "Student records validated" },
     { key: "generating", label: "Generating credentials" },
-    { key: "emailing", label: "Emails sent to students" },
+    { key: "emailing", label: (generated === 0 && isDone) ? "No emails sent (no new students)" : "Emails sent to students" },
   ];
 
   return (
     <>
       <div
-        className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-md"
+        className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-md p-4"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="w-full max-w-lg rounded-3xl bg-white p-8 shadow-2xl">
+        <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-6 md:p-8 shadow-2xl">
           <div className="mb-6 flex items-center gap-4">
             <div
               className={`flex h-14 w-14 items-center justify-center rounded-full ${
@@ -64,12 +64,12 @@ function UploadOverlay({ modal, onClose }) {
             <div>
               <h2 className="text-xl font-bold text-slate-900">
                 {isDone
-                  ? "All Credentials Generated"
+                  ? (generated > 0 ? "All Credentials Generated" : "Upload Complete")
                   : "Generating Credentials..."}
               </h2>
               <p className="mt-1 text-sm text-slate-500">
                 {isDone
-                  ? `${total} students processed successfully.`
+                  ? (generated > 0 ? `${generated} students processed successfully.` : "No new students were created.")
                   : "Please do not close or refresh the page."}
               </p>
             </div>
@@ -355,7 +355,7 @@ const UploadStudents = () => {
             generated: res.data.generated ?? total,
           }));
 
-          setUploadStatus(`✅ ${res.data.message}`);
+          setUploadStatus(`${res.data.statusIcon || "✅"} ${res.data.message}`);
           setIsUploading(false);
         } catch (err) {
           console.error(err.response?.data || err.message);
@@ -399,6 +399,8 @@ const UploadStudents = () => {
   // ───────────────────────────────────────────────────────────
   const statusClasses = uploadStatus.includes("✅")
     ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+    : uploadStatus.includes("⚠️")
+    ? "border-amber-200 bg-amber-50 text-amber-700"
     : uploadStatus.includes("❌") || uploadStatus.includes("❗")
     ? "border-rose-200 bg-rose-50 text-rose-700"
     : "border-slate-200 bg-slate-50 text-slate-700";

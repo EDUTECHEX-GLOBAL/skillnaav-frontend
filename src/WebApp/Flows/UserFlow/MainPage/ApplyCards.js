@@ -10,6 +10,7 @@ import {
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faClock } from "@fortawesome/free-solid-svg-icons";
 import { format } from "date-fns";
+import { toast } from "react-toastify";
 import SkillAnalysis from "./SkillnaavAnalysis";
 import ProctoredAssessment from "./AssessmentModal";
 
@@ -240,6 +241,7 @@ const ApplyCards = ({ job, onBack }) => {
   const [existingTickets, setExistingTickets] = useState([]);
   const [checkingTicket, setCheckingTicket] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [resumeToDelete, setResumeToDelete] = useState(null);
   const dropdownRef = useRef(null);
   const visibleCount = 2;
 
@@ -368,8 +370,8 @@ const ApplyCards = ({ job, onBack }) => {
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     ];
 
-    if (!allowedTypes.includes(file.type)) return alert("Only PDF, DOC and DOCX files are allowed.");
-    if (file.size > 5 * 1024 * 1024) return alert("File size should not exceed 5MB.");
+    if (!allowedTypes.includes(file.type)) return toast.error("Only PDF, DOC and DOCX files are allowed.");
+    if (file.size > 5 * 1024 * 1024) return toast.error("File size should not exceed 5MB.");
 
     setResume(file);
     setSelectedResumeUrl(null);
@@ -383,7 +385,7 @@ const ApplyCards = ({ job, onBack }) => {
     const token = getUserToken();
 
     if (!studentId || !token) {
-      alert("Session expired. Please log in again.");
+      toast.error("Session expired. Please log in again.");
       return;
     }
 
@@ -402,8 +404,8 @@ const ApplyCards = ({ job, onBack }) => {
         }
       }
 
-      if (!studentAssessment) {
-        alert("You must generate and complete the assessment before applying.");
+      if (planType !== "Premium Plus" && planType !== "Premium Basic") {
+        toast.error("You must generate and complete the assessment before applying.");
         return;
       }
 
@@ -417,8 +419,8 @@ const ApplyCards = ({ job, onBack }) => {
         submission = null;
       }
 
-      if (!submission || submission.fitStatus !== "fit") {
-        alert("You must pass the assessment to apply.");
+      if (!submission || submission.score < job.passingScore) {
+        toast.error("You must pass the assessment to apply.");
         return;
       }
     }
@@ -468,8 +470,11 @@ const ApplyCards = ({ job, onBack }) => {
       }
     } catch (error) {
       const { status, data } = error.response || {};
-      if (status === 403 || data?.message?.includes("already applied")) setIsApplied(true);
-      else alert(data?.message || "Something went wrong.");
+      if (status === 403 || data?.message?.includes("already applied")) {
+        toast.error("Please login to apply");
+      } else {
+        toast.error(data?.message || "Something went wrong.");
+      }
     } finally {
       setIsUploading(false);
     }
@@ -477,7 +482,7 @@ const ApplyCards = ({ job, onBack }) => {
 
   const handleSkillAnalysis = () => {
     if (!job?.jobDescription || !job?.qualifications?.length) {
-      alert("Job details are incomplete for skill analysis.");
+      toast.error("Job details are incomplete for skill analysis.");
       return;
     }
     setShowSkillAnalysis(true);
@@ -486,10 +491,10 @@ const ApplyCards = ({ job, onBack }) => {
   const handleGenerateAssessment = async () => {
     const userInfo = parseStoredJson("studentInfo", "userInfo");
     const studentId = userInfo?._id;
-    if (!studentId) return alert("Please log in first.");
+    if (!studentId) return toast.error("Please log in first.");
 
     if (assessment) {
-      alert("You already have an assessment for this internship!");
+      toast.error("You already have an assessment for this internship!");
       return;
     }
 
@@ -500,27 +505,27 @@ const ApplyCards = ({ job, onBack }) => {
         studentId,
       });
       setAssessment(response.data.assessment);
-      alert("AI Assessment generated successfully!");
+      toast.success("AI Assessment generated successfully!");
     } catch (error) {
       console.error("Failed to fetch assessment:", error);
-      alert("Failed to generate assessment. Please try again later.");
+      toast.error("Failed to generate assessment. Please try again later.");
     } finally {
       setLoadingAssessment(false);
     }
   };
 
   const handleDeleteResume = async (resumeId) => {
-    if (!window.confirm("Are you sure you want to delete this resume?")) return;
-
     const deletedResume = existingResumes.find((item) => item._id === resumeId);
     try {
       await axios.delete(`/api/resumes/${resumeId}`);
       setExistingResumes((prev) => prev.filter((item) => item._id !== resumeId));
       if (deletedResume?.fileUrl === selectedResumeUrl) setSelectedResumeUrl(null);
-      alert("Resume deleted successfully");
+      toast.success("Resume deleted successfully");
     } catch (error) {
       console.error(error);
-      alert("Failed to delete resume");
+      toast.error("Failed to delete resume");
+    } finally {
+      setResumeToDelete(null);
     }
   };
 
@@ -586,21 +591,25 @@ const ApplyCards = ({ job, onBack }) => {
             <div className="flex items-center text-gray-500 mt-2 text-sm md:text-base">
               <p className="flex items-center">
                 <FontAwesomeIcon icon={faClock} className="mr-2" />
-                {format(new Date(job.startDate), "dd MMM yyyy")} -{" "}
-                {job.endDateOrDuration ? format(new Date(job.endDateOrDuration), "dd MMM yyyy") : "-"}
+                {isNaN(Date.parse(job.startDate)) ? (job.startDate || "Date unknown") : format(new Date(job.startDate), "dd MMM yyyy")} -{" "}
+                {(job.endDateOrDuration || job.duration) ? (isNaN(Date.parse(job.endDateOrDuration || job.duration)) ? (job.endDateOrDuration || job.duration) : format(new Date(job.endDateOrDuration || job.duration), "dd MMM yyyy")) : "-"}
               </p>
             </div>
 
             <div className="flex items-center text-gray-500 mt-2 text-sm md:text-base">
               <FaDollarSign className="mr-2" />
               <p>
-                {job.internshipType === "STIPEND"
-                  ? `${job.compensationDetails?.amount} ${job.compensationDetails?.currency} per ${job.compensationDetails?.frequency?.toLowerCase()}`
+                {job.compensationDetails?.pdfExtractedCompensation
+                  ? job.compensationDetails.pdfExtractedCompensation
+                  : job.internshipType === "STIPEND"
+                  ? `${job.compensationDetails?.amount || "—"} ${job.compensationDetails?.currency || ""}${
+                      job.compensationDetails?.frequency ? ` per ${job.compensationDetails.frequency.toLowerCase()}` : ""
+                    }`.trim()
                   : job.internshipType === "FREE"
-                    ? "Unpaid / Free"
-                    : job.internshipType === "PAID"
-                      ? `Student Pays: ${job.compensationDetails?.amount} ${job.compensationDetails?.currency}`
-                      : "N/A"}
+                  ? "Unpaid / Free"
+                  : job.internshipType === "PAID"
+                  ? `Student Pays: ${job.compensationDetails?.amount || "—"} ${job.compensationDetails?.currency || ""}`.trim()
+                  : "N/A"}
               </p>
             </div>
 
@@ -643,7 +652,7 @@ const ApplyCards = ({ job, onBack }) => {
                               className="text-red-500 hover:text-red-700 ml-3"
                               onClick={(event) => {
                                 event.stopPropagation();
-                                handleDeleteResume(item._id);
+                                setResumeToDelete(item._id);
                               }}
                             >
                               <FaTrash />
@@ -915,6 +924,31 @@ const ApplyCards = ({ job, onBack }) => {
           </div>
         )}
 
+        {resumeToDelete && (
+          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+            <div className="bg-white p-6 rounded-lg shadow-lg max-w-sm w-full text-center">
+              <h2 className="text-xl font-semibold text-gray-800">Delete Resume</h2>
+              <p className="text-gray-600 mt-2 mb-6">
+                Are you sure you want to delete this resume? This action cannot be undone.
+              </p>
+              <div className="flex justify-center gap-4">
+                <button
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-100"
+                  onClick={() => setResumeToDelete(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                  onClick={() => handleDeleteResume(resumeToDelete)}
+                >
+                  Confirm Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {showSkillAnalysis && (
           <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
             <div className="bg-white rounded-lg shadow-lg max-w-3xl w-full overflow-hidden">
@@ -945,10 +979,11 @@ const ApplyCards = ({ job, onBack }) => {
 
       <div className="mt-6">
         <h3 className="text-lg md:text-xl font-semibold text-gray-800 mb-2">Contact Information</h3>
-        <p className="text-gray-600">
-          {job.contactInfo?.name || "Not provided"}, {job.contactInfo?.email || "Not provided"},{" "}
-          {job.contactInfo?.phone || "Not provided"}
-        </p>
+          <div className="bg-gray-50 border rounded-lg p-3 md:p-4 text-sm md:text-base text-gray-700">
+            {job.contactInfo?.name || "Not provided"}
+            {job.contactInfo?.email ? `, ${job.contactInfo.email}` : ""}
+            {job.contactInfo?.phone ? `, ${job.contactInfo.phone}` : ""}
+          </div>
       </div>
 
       {showAssessmentModal && assessment && (

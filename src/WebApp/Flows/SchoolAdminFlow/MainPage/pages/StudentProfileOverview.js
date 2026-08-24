@@ -1,12 +1,25 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import axios from '../../../../../api/axiosInstance';
-import { Search, Loader2, AlertTriangle, CheckCircle2, Eye, ChevronDown, ChevronUp, User } from 'lucide-react';
-import StudentProfileDetailModal from './StudentProfileDetailModal';
+import React, { useEffect, useState, useCallback } from "react";
+import axios from "../../../../../api/axiosInstance";
+import {
+  Search,
+  Loader2,
+  AlertTriangle,
+  CheckCircle2,
+  Eye,
+  ChevronDown,
+  ChevronUp,
+  User,
+} from "lucide-react";
+import StudentProfileDetailModal from "./StudentProfileDetailModal";
 
 // ─── Shared image helper (same logic as in StudentProfileDetailModal) ─────────
 function imageIsFilled(val) {
-  if (!val || typeof val !== 'string' || val.trim() === '') return false;
-  return val.startsWith('data:image') || val.startsWith('http') || val.startsWith('/');
+  if (!val || typeof val !== "string" || val.trim() === "") return false;
+  return (
+    val.startsWith("data:image") ||
+    val.startsWith("http") ||
+    val.startsWith("/")
+  );
 }
 
 // ─── Avatar — renders image or initial/icon fallback ─────────────────────────
@@ -28,30 +41,37 @@ function StudentAvatar({ src, name }) {
   // Show first letter of name if available, otherwise a User icon
   return (
     <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0">
-      {name?.[0]
-        ? <span className="text-xs font-bold uppercase">{name[0]}</span>
-        : <User size={14} />
-      }
+      {name?.[0] ? (
+        <span className="text-xs font-bold uppercase">{name[0]}</span>
+      ) : (
+        <User size={14} />
+      )}
     </div>
   );
 }
 
 // ─── Completion ring SVG ──────────────────────────────────────────────────────
 function CompletionRing({ pct }) {
-  const r    = 16;
+  const r = 16;
   const circ = 2 * Math.PI * r;
   const offset = circ * (1 - pct / 100);
-  const color =
-    pct >= 80 ? '#16a34a'
-    : pct >= 50 ? '#d97706'
-    : '#dc2626';
+  const color = pct >= 80 ? "#16a34a" : pct >= 50 ? "#d97706" : "#dc2626";
 
   return (
     <div className="flex items-center gap-2">
       <svg width="40" height="40" viewBox="0 0 40 40">
-        <circle cx="20" cy="20" r={r} fill="none" stroke="#e5e7eb" strokeWidth="4" />
         <circle
-          cx="20" cy="20" r={r}
+          cx="20"
+          cy="20"
+          r={r}
+          fill="none"
+          stroke="#e5e7eb"
+          strokeWidth="4"
+        />
+        <circle
+          cx="20"
+          cy="20"
+          r={r}
           fill="none"
           stroke={color}
           strokeWidth="4"
@@ -59,30 +79,43 @@ function CompletionRing({ pct }) {
           strokeDasharray={circ}
           strokeDashoffset={offset}
           transform="rotate(-90 20 20)"
-          style={{ transition: 'stroke-dashoffset 0.5s ease, stroke 0.4s ease' }}
+          style={{
+            transition: "stroke-dashoffset 0.5s ease, stroke 0.4s ease",
+          }}
         />
-        <text x="20" y="20" textAnchor="middle" dominantBaseline="central"
-          fontSize="9" fontWeight="700" fill={color}>
+        <text
+          x="20"
+          y="20"
+          textAnchor="middle"
+          dominantBaseline="central"
+          fontSize="9"
+          fontWeight="700"
+          fill={color}
+        >
           {pct}%
         </text>
       </svg>
-      <div className="text-sm font-semibold" style={{ color }}>{pct}%</div>
+      <div className="text-sm font-semibold" style={{ color }}>
+        {pct}%
+      </div>
     </div>
   );
 }
 
 // ─── Completion badge ─────────────────────────────────────────────────────────
 function CompletionBadge({ pct }) {
-  if (pct >= 80) return (
-    <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">
-      <CheckCircle2 size={11} /> On track
-    </span>
-  );
-  if (pct >= 50) return (
-    <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
-      <AlertTriangle size={11} /> Needs push
-    </span>
-  );
+  if (pct >= 80)
+    return (
+      <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">
+        <CheckCircle2 size={11} /> On track
+      </span>
+    );
+  if (pct >= 50)
+    return (
+      <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+        <AlertTriangle size={11} /> Needs push
+      </span>
+    );
   return (
     <span className="inline-flex items-center gap-1 text-xs font-medium text-red-700 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">
       <AlertTriangle size={11} /> Stalled
@@ -94,7 +127,12 @@ function CompletionBadge({ pct }) {
 const getPageNumbers = (current, total) => {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
   const pages = new Set([1, total]);
-  for (let i = Math.max(2, current - 2); i <= Math.min(total - 1, current + 2); i++) pages.add(i);
+  for (
+    let i = Math.max(2, current - 2);
+    i <= Math.min(total - 1, current + 2);
+    i++
+  )
+    pages.add(i);
   const sorted = [...pages].sort((a, b) => a - b);
   const result = [];
   let prev = 0;
@@ -108,14 +146,14 @@ const getPageNumbers = (current, total) => {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 const StudentProfileOverview = () => {
-  const [students, setStudents]               = useState([]);
-  const [loading, setLoading]                 = useState(true);
-  const [search, setSearch]                   = useState('');
-  const [filter, setFilter]                   = useState('all');
-  const [sortKey, setSortKey]                 = useState('completion');
-  const [sortAsc, setSortAsc]                 = useState(true);
+  const [students, setStudents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("all");
+  const [sortKey, setSortKey] = useState("completion");
+  const [sortAsc, setSortAsc] = useState(true);
   const [selectedStudent, setSelectedStudent] = useState(null);
-  
+
   // Pagination state
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 20;
@@ -126,41 +164,52 @@ const StudentProfileOverview = () => {
   }, [search, filter, sortKey, sortAsc]);
 
   const fetchOverview = useCallback(async () => {
-    const token = localStorage.getItem('schoolAdminToken');
+    const token = localStorage.getItem("schoolAdminToken");
     if (!token) return;
     setLoading(true);
     try {
-      const res = await axios.get('/api/school-admin/students/profile-overview', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await axios.get(
+        "/api/school-admin/students/profile-overview",
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
       setStudents(res.data);
     } catch (err) {
-      console.error('Profile overview fetch error:', err.response?.data || err.message);
+      console.error(
+        "Profile overview fetch error:",
+        err.response?.data || err.message,
+      );
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { fetchOverview(); }, [fetchOverview]);
+  useEffect(() => {
+    fetchOverview();
+  }, [fetchOverview]);
 
   // ── Filter + sort ──────────────────────────────────────────────────────────
   const filtered = students
-    .filter(s => {
+    .filter((s) => {
       const matchSearch =
         s.name?.toLowerCase().includes(search.toLowerCase()) ||
         s.email?.toLowerCase().includes(search.toLowerCase());
       const matchFilter =
-        filter === 'all'       ? true
-        : filter === 'stalled'   ? s.completion < 60
-        : filter === 'on-track'  ? s.completion >= 80
-        : true;
+        filter === "all"
+          ? true
+          : filter === "stalled"
+            ? s.completion < 60
+            : filter === "on-track"
+              ? s.completion >= 80
+              : true;
       return matchSearch && matchFilter;
     })
     .sort((a, b) => {
-      const av = sortKey === 'name' ? (a.name ?? '') : a.completion;
-      const bv = sortKey === 'name' ? (b.name ?? '') : b.completion;
+      const av = sortKey === "name" ? (a.name ?? "") : a.completion;
+      const bv = sortKey === "name" ? (b.name ?? "") : b.completion;
       if (av < bv) return sortAsc ? -1 : 1;
-      if (av > bv) return sortAsc ? 1  : -1;
+      if (av > bv) return sortAsc ? 1 : -1;
       return 0;
     });
 
@@ -168,40 +217,69 @@ const StudentProfileOverview = () => {
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const handleSort = (key) => {
-    if (sortKey === key) setSortAsc(prev => !prev);
-    else { setSortKey(key); setSortAsc(true); }
+    if (sortKey === key) setSortAsc((prev) => !prev);
+    else {
+      setSortKey(key);
+      setSortAsc(true);
+    }
   };
 
   const SortIcon = ({ col }) =>
-    sortKey === col
-      ? (sortAsc ? <ChevronUp size={14} /> : <ChevronDown size={14} />)
-      : <ChevronDown size={14} className="opacity-30" />;
+    sortKey === col ? (
+      sortAsc ? (
+        <ChevronUp size={14} />
+      ) : (
+        <ChevronDown size={14} />
+      )
+    ) : (
+      <ChevronDown size={14} className="opacity-30" />
+    );
 
   // ── Aggregate stats ────────────────────────────────────────────────────────
   const avgCompletion = students.length
-    ? Math.round(students.reduce((sum, x) => sum + x.completion, 0) / students.length)
+    ? Math.round(
+        students.reduce((sum, x) => sum + x.completion, 0) / students.length,
+      )
     : 0;
-  const stalledCount   = students.filter(s => s.completion < 60).length;
-  const completedCount = students.filter(s => s.completion >= 80).length;
+  const stalledCount = students.filter((s) => s.completion < 60).length;
+  const completedCount = students.filter((s) => s.completion >= 80).length;
 
   return (
     <div className="p-8 bg-white rounded-xl shadow-md font-poppins">
-
       {/* ── Header ── */}
       <div className="flex justify-between items-start mb-6 flex-wrap gap-4">
         <div>
-          <h2 className="text-2xl font-semibold text-blue-600">Profile Completion</h2>
-          <p className="text-sm text-gray-500 mt-1">Monitor and support students with incomplete profiles.</p>
+          <h2 className="text-2xl font-semibold text-blue-600">
+            Profile Completion
+          </h2>
+          <p className="text-sm text-gray-500 mt-1">
+            Monitor and support students with incomplete profiles.
+          </p>
         </div>
 
         {/* Quick stats */}
         <div className="flex gap-3 flex-wrap">
           {[
-            { label: 'Avg Completion', value: `${avgCompletion}%`, color: 'text-blue-600 bg-blue-50 border-blue-200' },
-            { label: 'On Track',       value: completedCount,       color: 'text-green-700 bg-green-50 border-green-200' },
-            { label: 'Stalled',        value: stalledCount,         color: 'text-red-700 bg-red-50 border-red-200' },
-          ].map(s => (
-            <div key={s.label} className={`border rounded-lg px-4 py-2 text-center ${s.color}`}>
+            {
+              label: "Avg Completion",
+              value: `${avgCompletion}%`,
+              color: "text-blue-600 bg-blue-50 border-blue-200",
+            },
+            {
+              label: "On Track",
+              value: completedCount,
+              color: "text-green-700 bg-green-50 border-green-200",
+            },
+            {
+              label: "Stalled",
+              value: stalledCount,
+              color: "text-red-700 bg-red-50 border-red-200",
+            },
+          ].map((s) => (
+            <div
+              key={s.label}
+              className={`border rounded-lg px-4 py-2 text-center ${s.color}`}
+            >
               <div className="text-xl font-bold">{s.value}</div>
               <div className="text-xs mt-0.5">{s.label}</div>
             </div>
@@ -212,26 +290,36 @@ const StudentProfileOverview = () => {
       {/* ── Search + filter bar ── */}
       <div className="flex gap-3 mb-5 flex-wrap">
         <div className="relative flex-1 min-w-[200px]">
+          {/*Add "!mt-0" for alignment - 05-08-2026 */}
           <input
             type="text"
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name or email"
-            className="w-full pl-4 pr-10 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            className="!mt-0 w-full pl-4 pr-10 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
           />
-          <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-400 pointer-events-none" />
+          <Search
+            size={16}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-400 pointer-events-none"
+          />
         </div>
 
         <div className="flex gap-1 border border-gray-200 rounded-lg overflow-hidden text-sm">
-          {['all', 'stalled', 'on-track'].map(f => (
+          {["all", "stalled", "on-track"].map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
               className={`px-4 py-2 font-medium transition-colors capitalize ${
-                filter === f ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+                filter === f
+                  ? "bg-blue-600 text-white"
+                  : "bg-white text-gray-600 hover:bg-gray-50"
               }`}
             >
-              {f === 'all' ? 'All' : f === 'stalled' ? '⚠ Stalled' : '✓ On Track'}
+              {f === "all"
+                ? "All"
+                : f === "stalled"
+                  ? "⚠ Stalled"
+                  : "✓ On Track"}
             </button>
           ))}
         </div>
@@ -243,13 +331,19 @@ const StudentProfileOverview = () => {
           <thead className="bg-pink-100 text-gray-700 text-base font-medium">
             <tr>
               <th className="px-6 py-4 border-r border-blue-200">
-                <button className="flex items-center gap-1" onClick={() => handleSort('name')}>
+                <button
+                  className="flex items-center gap-1"
+                  onClick={() => handleSort("name")}
+                >
                   Student <SortIcon col="name" />
                 </button>
               </th>
               <th className="px-6 py-4 border-r border-blue-200">Email</th>
               <th className="px-6 py-4 border-r border-blue-200">
-                <button className="flex items-center gap-1" onClick={() => handleSort('completion')}>
+                <button
+                  className="flex items-center gap-1"
+                  onClick={() => handleSort("completion")}
+                >
                   Completion <SortIcon col="completion" />
                 </button>
               </th>
@@ -275,13 +369,20 @@ const StudentProfileOverview = () => {
               </tr>
             ) : (
               paginated.map((student) => (
-                <tr key={student._id} className="bg-white border-t border-blue-100 hover:bg-blue-50 transition-colors">
-
+                <tr
+                  key={student._id}
+                  className="bg-white border-t border-blue-100 hover:bg-blue-50 transition-colors"
+                >
                   {/* Name + avatar */}
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <StudentAvatar src={student.profileImage} name={student.name} />
-                      <span className="font-medium text-gray-800">{student.name || '—'}</span>
+                      <StudentAvatar
+                        src={student.profileImage}
+                        name={student.name}
+                      />
+                      <span className="font-medium text-gray-800">
+                        {student.name || "—"}
+                      </span>
                     </div>
                   </td>
 
@@ -324,14 +425,30 @@ const StudentProfileOverview = () => {
               disabled={page === 1}
               className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-slate-50 text-slate-500 hover:bg-slate-100 disabled:text-slate-400 disabled:bg-slate-50/50"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2.5}
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M15 19l-7-7 7-7"
+                />
+              </svg>
               Previous
             </button>
 
             {/* Windowed page numbers */}
             {getPageNumbers(page, totalPages).map((p, i) =>
               p === "..." ? (
-                <div key={`ellipsis-${i}`} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-50 text-slate-400 text-sm font-semibold select-none">
+                <div
+                  key={`ellipsis-${i}`}
+                  className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-50 text-slate-400 text-sm font-semibold select-none"
+                >
                   ...
                 </div>
               ) : (
@@ -346,7 +463,7 @@ const StudentProfileOverview = () => {
                 >
                   {p}
                 </button>
-              )
+              ),
             )}
 
             {/* Next */}
@@ -356,7 +473,20 @@ const StudentProfileOverview = () => {
               className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-slate-50 text-slate-700 hover:bg-slate-100 disabled:text-slate-400 disabled:bg-slate-50/50"
             >
               Next
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2.5}
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M9 5l7 7-7 7"
+                />
+              </svg>
             </button>
           </div>
         </div>

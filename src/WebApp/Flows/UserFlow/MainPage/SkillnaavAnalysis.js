@@ -16,10 +16,10 @@ const SkillAnalysis = ({ job, onClose }) => {
   const [step, setStep] = useState(1);
   const [file, setFile] = useState(null);
   const [jobDescription, setJobDescription] = useState(
-    job?.jobDescription || ""
+    job?.jobDescription || "",
   );
   const [requiredSkills, setRequiredSkills] = useState(
-    job?.qualifications?.join(", ") || ""
+    job?.qualifications?.join(", ") || "",
   );
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef(null);
@@ -72,7 +72,10 @@ const SkillAnalysis = ({ job, onClose }) => {
       if (job) {
         setMessages((prev) => [
           ...prev,
-          { sender: "ai", text: "✅ Resume received! Analyzing your skills..." },
+          {
+            sender: "ai",
+            text: "✅ Resume received! Analyzing your skills...",
+          },
         ]);
         analyzeSkills(uploadedFile);
       } else {
@@ -159,25 +162,21 @@ const SkillAnalysis = ({ job, onClose }) => {
       formData.append("file", fileToUpload);
       formData.append(
         "job_description",
-        job ? job.jobDescription : jobDescription
+        job ? job.jobDescription : jobDescription,
       );
       formData.append(
         "required_skills",
-        job ? job.qualifications.join(", ") : requiredSkills
+        job ? job.qualifications.join(", ") : requiredSkills,
       );
 
       // ✅ SECURITY: Goes through Node backend → Python internally.
       // Auth header uses whichever token is present (student or partner).
-      const response = await axios.post(
-        "/api/ai/analyze-skills",
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-            Authorization: `Bearer ${getToken()}`,
-          },
-        }
-      );
+      const response = await axios.post("/api/ai/analyze-skills", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+          Authorization: `Bearer ${getToken()}`,
+        },
+      });
 
       const {
         readiness_score,
@@ -236,7 +235,7 @@ const SkillAnalysis = ({ job, onClose }) => {
                     (quiz) =>
                       `📝 **${quiz.question}**\n${quiz.options
                         .map((option) => option)
-                        .join("\n")}\n**Answer:** ${quiz.answer}`
+                        .join("\n")}\n**Answer:** ${quiz.answer}`,
                   )
                   .join("\n\n")
               : "❌ **No quizzes available.**"
@@ -260,8 +259,10 @@ const SkillAnalysis = ({ job, onClose }) => {
 
   /* ───────── UI ───────── */
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-6">
-      <div className="relative w-full max-w-3xl bg-white shadow-lg rounded-lg overflow-hidden">
+    // Remove "items-center justify-center min-h-screen bg-gray-100 p-6" add "w-full h-full" for remove the extra back white background - 07-08-2026
+    <div className="flex flex-col items-center w-full h-full">
+      {/*Remove max-w-3xl - 07-08-2026 */}
+      <div className="relative w-full bg-white shadow-lg rounded-lg overflow-hidden">
         {/* Header with Close Button */}
         <div className="bg-blue-600 p-6 relative">
           <h2 className="text-2xl font-bold text-white">

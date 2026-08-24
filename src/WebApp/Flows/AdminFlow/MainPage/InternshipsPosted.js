@@ -52,19 +52,21 @@ const InternshipDetails = ({ internship, onClose }) => (
               internship.adminStatus === "approved" || internship.adminApproved
                 ? "bg-emerald-100 text-emerald-800"
                 : internship.adminStatus === "rejected"
-                ? "bg-red-100 text-red-800"
-                : internship.adminStatus === "in_review" || internship.adminReviewed
-                ? "bg-yellow-100 text-yellow-800"
-                : "bg-orange-100 text-orange-800"
+                  ? "bg-red-100 text-red-800"
+                  : internship.adminStatus === "in_review" ||
+                      internship.adminReviewed
+                    ? "bg-yellow-100 text-yellow-800"
+                    : "bg-orange-100 text-orange-800"
             }`}
           >
             {internship.adminStatus === "approved" || internship.adminApproved
               ? "Approved"
               : internship.adminStatus === "rejected"
-              ? "Rejected"
-              : internship.adminStatus === "in_review" || internship.adminReviewed
-              ? "In Review"
-              : "Pending"}
+                ? "Rejected"
+                : internship.adminStatus === "in_review" ||
+                    internship.adminReviewed
+                  ? "In Review"
+                  : "Pending"}
           </span>
         </div>
         <div className="mt-6 flex items-start gap-6">
@@ -74,7 +76,9 @@ const InternshipDetails = ({ internship, onClose }) => (
             className="w-20 h-20 rounded-2xl object-cover shadow-2xl ring-4 ring-white/50"
           />
           <div>
-            <h1 className="text-3xl font-black text-gray-900 mb-2">{internship.jobTitle}</h1>
+            <h1 className="text-3xl font-black text-gray-900 mb-2">
+              {internship.jobTitle}
+            </h1>
             <p className="text-2xl text-gray-700">{internship.companyName}</p>
           </div>
         </div>
@@ -88,7 +92,9 @@ const InternshipDetails = ({ internship, onClose }) => (
               <FaMapMarkerAlt className="w-6 h-6 text-blue-600" />
               <div>
                 <p className="text-sm font-medium text-gray-600">Location</p>
-                <p className="text-xl font-bold text-gray-900">{internship.location}</p>
+                <p className="text-xl font-bold text-gray-900">
+                  {internship.location}
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-emerald-50 to-green-50 rounded-2xl">
@@ -97,7 +103,10 @@ const InternshipDetails = ({ internship, onClose }) => (
                 <p className="text-sm font-medium text-gray-600">Duration</p>
                 <p className="text-xl font-bold text-gray-900">
                   {format(new Date(internship.startDate), "dd MMM yyyy")} –{" "}
-                  {format(new Date(internship.endDateOrDuration), "dd MMM yyyy")}
+                  {format(
+                    new Date(internship.endDateOrDuration),
+                    "dd MMM yyyy",
+                  )}
                 </p>
               </div>
             </div>
@@ -106,7 +115,9 @@ const InternshipDetails = ({ internship, onClose }) => (
                 <div className="flex items-center gap-3">
                   <FaDollarSign className="w-8 h-8 bg-gradient-to-br from-yellow-400 to-orange-500 text-white rounded-xl p-2" />
                   <div>
-                    <p className="text-sm font-medium text-gray-600">Compensation</p>
+                    <p className="text-sm font-medium text-gray-600">
+                      Compensation
+                    </p>
                     <p className="text-2xl font-bold text-gray-900">
                       {internship.compensationDetails?.amount}{" "}
                       {internship.compensationDetails?.currency}
@@ -122,10 +133,15 @@ const InternshipDetails = ({ internship, onClose }) => (
 
           <div className="space-y-6">
             <div>
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Skills Required</h3>
+              <h3 className="text-xl font-bold text-gray-900 mb-4">
+                Skills Required
+              </h3>
               <div className="flex flex-wrap gap-2">
                 {internship.qualifications?.map((skill, i) => (
-                  <span key={i} className="px-4 py-2 bg-purple-100 text-purple-800 rounded-full text-sm font-medium">
+                  <span
+                    key={i}
+                    className="px-4 py-2 bg-purple-100 text-purple-800 rounded-full text-sm font-medium"
+                  >
                     {skill}
                   </span>
                 ))}
@@ -133,9 +149,13 @@ const InternshipDetails = ({ internship, onClose }) => (
             </div>
             <div className="p-5 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-2xl">
               <div className="flex items-center gap-3">
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl font-bold ${
-                  internship.internshipMode === "ONLINE" ? "bg-blue-500 text-white" : "bg-emerald-500 text-white"
-                }`}>
+                <div
+                  className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl font-bold ${
+                    internship.internshipMode === "ONLINE"
+                      ? "bg-blue-500 text-white"
+                      : "bg-emerald-500 text-white"
+                  }`}
+                >
                   {internship.internshipMode === "ONLINE" ? "PC" : "🏢"}
                 </div>
                 <div>
@@ -151,7 +171,9 @@ const InternshipDetails = ({ internship, onClose }) => (
 
         {internship.jobDescription && (
           <div className="mt-8">
-            <h3 className="text-2xl font-bold text-gray-900 mb-6">About the Internship</h3>
+            <h3 className="text-2xl font-bold text-gray-900 mb-6">
+              About the Internship
+            </h3>
             <p className="text-lg text-gray-700 leading-relaxed whitespace-pre-wrap">
               {internship.jobDescription}
             </p>
@@ -166,46 +188,53 @@ const InternshipDetails = ({ internship, onClose }) => (
 const PartnerManagement = () => {
   const [internships, setInternships] = useState([]);
 
+  //page loading - 05-08-2026
+  const [loading, setLoading] = useState(true);
   // Chat modal
   const [chatInternship, setChatInternship] = useState(null);
-  const [isChatOpen,     setIsChatOpen]     = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   // Detail overlay
   const [detailInternship, setDetailInternship] = useState(null);
 
   // Approve modal
-  const [isApproveModalOpen,  setIsApproveModalOpen]  = useState(false);
+  const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
   const [internshipToApprove, setInternshipToApprove] = useState(null);
-  const [isApproving,         setIsApproving]         = useState(false);
+  const [isApproving, setIsApproving] = useState(false);
 
   // Reject modal
-  const [isRejectModalOpen,  setIsRejectModalOpen]  = useState(false);
+  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
   const [internshipToReject, setInternshipToReject] = useState(null);
-  const [rejectComment,      setRejectComment]      = useState("");
-  const [isRejecting,        setIsRejecting]        = useState(false);
+  const [rejectComment, setRejectComment] = useState("");
+  const [isRejecting, setIsRejecting] = useState(false);
 
   // Delete modal
-  const [isDeleteModalOpen,  setIsDeleteModalOpen]  = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [internshipToDelete, setInternshipToDelete] = useState(null);
-  const [isDeleting,         setIsDeleting]         = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Per-card inline action loading  { [id]: "approve" | "reject" | "delete" | "chat" }
   const [cardLoading, setCardLoading] = useState({});
 
   // Filters / pagination
   const [statusFilter, setStatusFilter] = useState("ALL");
-  const [searchQuery,  setSearchQuery]  = useState("");
-  const [currentPage,  setCurrentPage]  = useState(1);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
 
   // ── Fetch ────────────────────────────────────────────────────────────────
   useEffect(() => {
     const load = async () => {
+      //05-08-2026
+      setLoading(true);
       try {
         const res = await axios.get("/api/interns");
         setInternships(res.data || []);
       } catch (err) {
         console.error("fetchInternships:", err);
+      } finally {
+        //add finally for page loading - 05-08-2026
+        setLoading(false);
       }
     };
     load();
@@ -215,12 +244,19 @@ const PartnerManagement = () => {
     const openTargetChat = (targetId) => {
       if (!targetId || internships.length === 0) return;
 
-      const target = internships.find((item) => String(item._id) === String(targetId));
+      const target = internships.find(
+        (item) => String(item._id) === String(targetId),
+      );
       if (!target) return;
 
       setStatusFilter("ALL");
       setSearchQuery("");
-      setCurrentPage(Math.max(1, Math.ceil((internships.indexOf(target) + 1) / ITEMS_PER_PAGE)));
+      setCurrentPage(
+        Math.max(
+          1,
+          Math.ceil((internships.indexOf(target) + 1) / ITEMS_PER_PAGE),
+        ),
+      );
       setChatInternship(target);
       setIsChatOpen(true);
       sessionStorage.removeItem("adminOpenChatInternshipId");
@@ -233,7 +269,11 @@ const PartnerManagement = () => {
     };
 
     window.addEventListener("adminOpenInternshipChat", handleOpenChatEvent);
-    return () => window.removeEventListener("adminOpenInternshipChat", handleOpenChatEvent);
+    return () =>
+      window.removeEventListener(
+        "adminOpenInternshipChat",
+        handleOpenChatEvent,
+      );
   }, [internships]);
 
   // ── Helpers ──────────────────────────────────────────────────────────────
@@ -247,7 +287,11 @@ const PartnerManagement = () => {
   const setCardAction = (id, action) =>
     setCardLoading((prev) => ({ ...prev, [id]: action }));
   const clearCardAction = (id) =>
-    setCardLoading((prev) => { const n = { ...prev }; delete n[id]; return n; });
+    setCardLoading((prev) => {
+      const n = { ...prev };
+      delete n[id];
+      return n;
+    });
 
   // ── Approve ───────────────────────────────────────────────────────────────
   const handleApproveClick = (internship) => {
@@ -260,13 +304,20 @@ const PartnerManagement = () => {
     setIsApproving(true);
     setCardAction(internshipToApprove._id, "approve");
     try {
-      await axios.patch(`/api/interns/${internshipToApprove._id}/approve`, { status: "approved" });
+      await axios.patch(`/api/interns/${internshipToApprove._id}/approve`, {
+        status: "approved",
+      });
       setInternships((prev) =>
         prev.map((i) =>
           i._id === internshipToApprove._id
-            ? { ...i, adminStatus: "approved", adminApproved: true, adminReviewed: true }
-            : i
-        )
+            ? {
+                ...i,
+                adminStatus: "approved",
+                adminApproved: true,
+                adminReviewed: true,
+              }
+            : i,
+        ),
       );
       setIsApproveModalOpen(false);
       setInternshipToApprove(null);
@@ -297,9 +348,15 @@ const PartnerManagement = () => {
       setInternships((prev) =>
         prev.map((i) =>
           i._id === internshipToReject._id
-            ? { ...i, adminStatus: "rejected", adminApproved: false, adminReviewed: true, rejectionReason: rejectComment }
-            : i
-        )
+            ? {
+                ...i,
+                adminStatus: "rejected",
+                adminApproved: false,
+                adminReviewed: true,
+                rejectionReason: rejectComment,
+              }
+            : i,
+        ),
       );
       setIsRejectModalOpen(false);
       setInternshipToReject(null);
@@ -325,7 +382,9 @@ const PartnerManagement = () => {
     setCardAction(internshipToDelete._id, "delete");
     try {
       await axios.delete(`/api/interns/${internshipToDelete._id}`);
-      setInternships((prev) => prev.filter((i) => i._id !== internshipToDelete._id));
+      setInternships((prev) =>
+        prev.filter((i) => i._id !== internshipToDelete._id),
+      );
       setIsDeleteModalOpen(false);
       setInternshipToDelete(null);
     } catch (err) {
@@ -352,14 +411,24 @@ const PartnerManagement = () => {
     setInternships((prev) =>
       prev.map((i) =>
         i._id === internshipId
-          ? { ...i, adminReviewed: true, adminStatus: i.adminStatus === "pending" ? "in_review" : i.adminStatus }
-          : i
-      )
+          ? {
+              ...i,
+              adminReviewed: true,
+              adminStatus:
+                i.adminStatus === "pending" ? "in_review" : i.adminStatus,
+            }
+          : i,
+      ),
     );
     setChatInternship((prev) =>
       prev?._id === internshipId
-        ? { ...prev, adminReviewed: true, adminStatus: prev.adminStatus === "pending" ? "in_review" : prev.adminStatus }
-        : prev
+        ? {
+            ...prev,
+            adminReviewed: true,
+            adminStatus:
+              prev.adminStatus === "pending" ? "in_review" : prev.adminStatus,
+          }
+        : prev,
     );
   };
 
@@ -383,41 +452,71 @@ const PartnerManagement = () => {
 
       const s = getStatus(i);
       const matchesStatus =
-        statusFilter === "ALL"     ||
-        (statusFilter === "APPROVED" && s === "approved")  ||
-        (statusFilter === "REJECTED" && s === "rejected")  ||
-        (statusFilter === "PENDING"  && s === "pending")   ||
+        statusFilter === "ALL" ||
+        (statusFilter === "APPROVED" && s === "approved") ||
+        (statusFilter === "REJECTED" && s === "rejected") ||
+        (statusFilter === "PENDING" && s === "pending") ||
         (statusFilter === "REVIEWED" && s === "in_review");
 
       return matchesSearch && matchesStatus;
     });
 
     const stats = {
-      total:    internships.length,
+      total: internships.length,
       approved: internships.filter((i) => getStatus(i) === "approved").length,
       rejected: internships.filter((i) => getStatus(i) === "rejected").length,
-      pending:  internships.filter((i) => getStatus(i) === "pending").length,
+      pending: internships.filter((i) => getStatus(i) === "pending").length,
       reviewed: internships.filter((i) => getStatus(i) === "in_review").length,
     };
 
     return { stats, filteredInternships: filtered };
   }, [internships, searchQuery, statusFilter]);
 
-  const totalPages   = Math.ceil(filteredInternships.length / ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(filteredInternships.length / ITEMS_PER_PAGE);
   const currentItems = filteredInternships.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
+    currentPage * ITEMS_PER_PAGE,
   );
 
   const getPaginationItems = () => {
-    if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
+    if (totalPages <= 7)
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
     if (currentPage <= 4) return [1, 2, 3, 4, 5, "ellipsis-right", totalPages];
-    if (currentPage >= totalPages - 3) return [1, "ellipsis-left", totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
-    return [1, "ellipsis-left", currentPage - 1, currentPage, currentPage + 1, "ellipsis-right", totalPages];
+    if (currentPage >= totalPages - 3)
+      return [
+        1,
+        "ellipsis-left",
+        totalPages - 4,
+        totalPages - 3,
+        totalPages - 2,
+        totalPages - 1,
+        totalPages,
+      ];
+    return [
+      1,
+      "ellipsis-left",
+      currentPage - 1,
+      currentPage,
+      currentPage + 1,
+      "ellipsis-right",
+      totalPages,
+    ];
   };
 
   const nextPage = () => setCurrentPage((p) => Math.min(p + 1, totalPages));
   const prevPage = () => setCurrentPage((p) => Math.max(p - 1, 1));
+
+  // add this function for page loading - 05-08-2026
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-[80vh]">
+        <div className="flex flex-col items-center gap-4">
+          <FaSpinner className="text-4xl text-indigo-600 animate-spin" />
+          <p className="text-gray-600 font-medium">Loading internships...</p>
+        </div>
+      </div>
+    );
+  }
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -429,17 +528,47 @@ const PartnerManagement = () => {
       {/* Status Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         {[
-          { key: "ALL",      label: "Total",     count: stats.total,    color: "bg-gray-100 text-gray-800"    },
-          { key: "APPROVED", label: "Approved",  count: stats.approved, color: "bg-green-100 text-green-800"  },
-          { key: "PENDING",  label: "Pending",   count: stats.pending,  color: "bg-orange-100 text-orange-800" },
-          { key: "REJECTED", label: "Rejected",  count: stats.rejected, color: "bg-red-100 text-red-800"      },
-          { key: "REVIEWED", label: "In Review", count: stats.reviewed, color: "bg-purple-100 text-purple-800" },
+          {
+            key: "ALL",
+            label: "Total",
+            count: stats.total,
+            color: "bg-gray-100 text-gray-800",
+          },
+          {
+            key: "APPROVED",
+            label: "Approved",
+            count: stats.approved,
+            color: "bg-green-100 text-green-800",
+          },
+          {
+            key: "PENDING",
+            label: "Pending",
+            count: stats.pending,
+            color: "bg-orange-100 text-orange-800",
+          },
+          {
+            key: "REJECTED",
+            label: "Rejected",
+            count: stats.rejected,
+            color: "bg-red-100 text-red-800",
+          },
+          {
+            key: "REVIEWED",
+            label: "In Review",
+            count: stats.reviewed,
+            color: "bg-purple-100 text-purple-800",
+          },
         ].map((item) => (
           <button
             key={item.key}
-            onClick={() => { setStatusFilter(item.key); setCurrentPage(1); }}
+            onClick={() => {
+              setStatusFilter(item.key);
+              setCurrentPage(1);
+            }}
             className={`p-4 rounded-2xl shadow-sm border transition-all text-left ${item.color} ${
-              statusFilter === item.key ? "ring-2 ring-offset-2 ring-indigo-500 scale-[1.02]" : "hover:shadow-md"
+              statusFilter === item.key
+                ? "ring-2 ring-offset-2 ring-indigo-500 scale-[1.02]"
+                : "hover:shadow-md"
             }`}
           >
             <p className="text-sm font-medium">{item.label}</p>
@@ -454,7 +583,10 @@ const PartnerManagement = () => {
           type="text"
           placeholder="Search by organisation, role, or company…"
           value={searchQuery}
-          onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+          onChange={(e) => {
+            setSearchQuery(e.target.value);
+            setCurrentPage(1);
+          }}
           className="p-3 border rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-indigo-400"
         />
       </div>
@@ -463,7 +595,8 @@ const PartnerManagement = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6 mb-8">
         {currentItems.map((internship, index) => {
           const activeAction = cardLoading[internship._id]; // "approve" | "reject" | "delete" | undefined
-          const isApproved   = internship.adminStatus === "approved" || internship.adminApproved;
+          const isApproved =
+            internship.adminStatus === "approved" || internship.adminApproved;
 
           return (
             <motion.div
@@ -480,21 +613,23 @@ const PartnerManagement = () => {
                   <Spinner size="w-8 h-8" />
                   <span className="text-sm font-semibold text-gray-600 capitalize">
                     {activeAction === "approve" && "Approving…"}
-                    {activeAction === "reject"  && "Rejecting…"}
-                    {activeAction === "delete"  && "Deleting…"}
+                    {activeAction === "reject" && "Rejecting…"}
+                    {activeAction === "delete" && "Deleting…"}
                   </span>
                 </div>
               )}
 
               {/* Badges */}
               <div className="absolute top-3 right-3 z-10 flex flex-col gap-1">
-                <span className={`px-2.5 py-1 text-xs font-bold rounded-full shadow-sm ${
-                  internship.internshipType === "PAID"
-                    ? "bg-red-100 text-red-700"
-                    : internship.internshipType === "STIPEND"
-                    ? "bg-blue-100 text-blue-700"
-                    : "bg-green-100 text-green-700"
-                }`}>
+                <span
+                  className={`px-2.5 py-1 text-xs font-bold rounded-full shadow-sm ${
+                    internship.internshipType === "PAID"
+                      ? "bg-red-100 text-red-700"
+                      : internship.internshipType === "STIPEND"
+                        ? "bg-blue-100 text-blue-700"
+                        : "bg-green-100 text-green-700"
+                  }`}
+                >
                   {internship.internshipType}
                 </span>
                 <button
@@ -523,9 +658,15 @@ const PartnerManagement = () => {
                     <h3 className="text-lg font-bold text-gray-900 line-clamp-1 group-hover:text-purple-700">
                       {internship.jobTitle}
                     </h3>
-                    <p className="text-sm text-gray-600 line-clamp-1">{internship.companyName}</p>
-                    <p className="text-xs text-gray-500 mt-1">{calculatePostedTime(internship.createdAt)}</p>
-                    <p className="text-[11px] text-gray-400 mt-0.5 whitespace-nowrap">ID: {internship._id}</p>
+                    <p className="text-sm text-gray-600 line-clamp-1">
+                      {internship.companyName}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {calculatePostedTime(internship.createdAt)}
+                    </p>
+                    <p className="text-[11px] text-gray-400 mt-0.5 whitespace-nowrap">
+                      ID: {internship._id}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -536,7 +677,9 @@ const PartnerManagement = () => {
                   <FaMapMarkerAlt className="w-4 h-4 shrink-0" />
                   <span className="truncate">{internship.location}</span>
                   <span className="ml-auto text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full shrink-0">
-                    {internship.internshipMode === "ONLINE" ? "Online" : "Offline"}
+                    {internship.internshipMode === "ONLINE"
+                      ? "Online"
+                      : "Offline"}
                   </span>
                 </div>
 
@@ -544,7 +687,10 @@ const PartnerManagement = () => {
                   <FaClock className="w-4 h-4 shrink-0" />
                   <span>
                     {format(new Date(internship.startDate), "dd MMM")} –{" "}
-                    {format(new Date(internship.endDateOrDuration), "dd MMM yyyy")}
+                    {format(
+                      new Date(internship.endDateOrDuration),
+                      "dd MMM yyyy",
+                    )}
                   </span>
                 </div>
 
@@ -554,14 +700,17 @@ const PartnerManagement = () => {
                     {internship.internshipType === "STIPEND"
                       ? `${internship.compensationDetails?.amount} ${internship.compensationDetails?.currency}/mo`
                       : internship.internshipType === "PAID"
-                      ? `Student Pays: ${internship.compensationDetails?.amount}`
-                      : "Free"}
+                        ? `Student Pays: ${internship.compensationDetails?.amount}`
+                        : "Free"}
                   </span>
                 </div>
 
                 <div className="flex flex-wrap gap-2 pt-1">
                   {internship.qualifications?.slice(0, 2).map((skill, i) => (
-                    <span key={i} className="text-xs bg-gray-100 text-gray-800 px-2.5 py-1 rounded-full">
+                    <span
+                      key={i}
+                      className="text-xs bg-gray-100 text-gray-800 px-2.5 py-1 rounded-full"
+                    >
                       {skill}
                     </span>
                   ))}
@@ -582,13 +731,21 @@ const PartnerManagement = () => {
                       isApproved
                         ? "bg-green-500 cursor-default opacity-90"
                         : activeAction === "approve"
-                        ? "bg-emerald-400 cursor-not-allowed"
-                        : "bg-emerald-500 hover:bg-emerald-600 hover:shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
+                          ? "bg-emerald-400 cursor-not-allowed"
+                          : "bg-emerald-500 hover:bg-emerald-600 hover:shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
                     }`}
                     onClick={() => handleApproveClick(internship)}
                     disabled={isApproved || !!activeAction}
                   >
-                    {activeAction === "approve" ? <><Spinner /> Approving…</> : isApproved ? "Approved ✓" : "Approve"}
+                    {activeAction === "approve" ? (
+                      <>
+                        <Spinner /> Approving…
+                      </>
+                    ) : isApproved ? (
+                      "Approved ✓"
+                    ) : (
+                      "Approve"
+                    )}
                   </button>
 
                   {/* Review / Chat */}
@@ -610,7 +767,13 @@ const PartnerManagement = () => {
                     onClick={() => handleRejectClick(internship)}
                     disabled={!!activeAction}
                   >
-                    {activeAction === "reject" ? <><Spinner /> Rejecting…</> : "Reject"}
+                    {activeAction === "reject" ? (
+                      <>
+                        <Spinner /> Rejecting…
+                      </>
+                    ) : (
+                      "Reject"
+                    )}
                   </button>
 
                   {/* Delete */}
@@ -619,7 +782,13 @@ const PartnerManagement = () => {
                     onClick={() => handleDeleteClick(internship)}
                     disabled={!!activeAction}
                   >
-                    {activeAction === "delete" ? <><Spinner /></> : "Delete"}
+                    {activeAction === "delete" ? (
+                      <>
+                        <Spinner />
+                      </>
+                    ) : (
+                      "Delete"
+                    )}
                   </button>
                 </div>
 
@@ -722,17 +891,26 @@ const PartnerManagement = () => {
       {/* Delete */}
       <Modal
         isOpen={isDeleteModalOpen}
-        onRequestClose={() => { if (!isDeleting) { setIsDeleteModalOpen(false); setInternshipToDelete(null); } }}
+        onRequestClose={() => {
+          if (!isDeleting) {
+            setIsDeleteModalOpen(false);
+            setInternshipToDelete(null);
+          }
+        }}
         overlayClassName="fixed inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm z-[999]"
         className="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full mx-4 outline-none font-poppins"
       >
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">Confirm Deletion</h2>
+        <h2 className="text-2xl font-bold text-gray-900 mb-4">
+          Confirm Deletion
+        </h2>
         {internshipToDelete && (
           <div>
             <p className="text-gray-700 mb-6 leading-relaxed">
               Are you sure you want to{" "}
-              <span className="font-semibold text-red-600">permanently delete</span> the internship "
-              <strong>{internshipToDelete.jobTitle}</strong>" at{" "}
+              <span className="font-semibold text-red-600">
+                permanently delete
+              </span>{" "}
+              the internship "<strong>{internshipToDelete.jobTitle}</strong>" at{" "}
               <strong>{internshipToDelete.companyName}</strong>?
             </p>
             <div className="flex gap-3 mt-6">
@@ -742,13 +920,18 @@ const PartnerManagement = () => {
                 className="flex-1 bg-red-600 text-white py-3 px-6 rounded-xl font-semibold hover:bg-red-700 transition-all shadow-md disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isDeleting ? (
-                  <><Spinner /> Deleting…</>
+                  <>
+                    <Spinner /> Deleting…
+                  </>
                 ) : (
                   "Delete Internship"
                 )}
               </button>
               <button
-                onClick={() => { setIsDeleteModalOpen(false); setInternshipToDelete(null); }}
+                onClick={() => {
+                  setIsDeleteModalOpen(false);
+                  setInternshipToDelete(null);
+                }}
                 disabled={isDeleting}
                 className="flex-1 bg-gray-200 text-gray-800 py-3 px-6 rounded-xl font-semibold hover:bg-gray-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -762,17 +945,24 @@ const PartnerManagement = () => {
       {/* Approve */}
       <Modal
         isOpen={isApproveModalOpen}
-        onRequestClose={() => { if (!isApproving) { setIsApproveModalOpen(false); setInternshipToApprove(null); } }}
+        onRequestClose={() => {
+          if (!isApproving) {
+            setIsApproveModalOpen(false);
+            setInternshipToApprove(null);
+          }
+        }}
         overlayClassName="fixed inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm z-[999]"
         className="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full mx-4 outline-none font-poppins"
       >
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">Approve Internship</h2>
+        <h2 className="text-2xl font-bold text-gray-900 mb-4">
+          Approve Internship
+        </h2>
         {internshipToApprove && (
           <div>
             <p className="text-gray-700 mb-6 leading-relaxed">
               Are you sure you want to{" "}
-              <span className="font-semibold text-green-600">approve</span> the internship "
-              <strong>{internshipToApprove.jobTitle}</strong>" at{" "}
+              <span className="font-semibold text-green-600">approve</span> the
+              internship "<strong>{internshipToApprove.jobTitle}</strong>" at{" "}
               <strong>{internshipToApprove.companyName}</strong>?
             </p>
             <div className="flex gap-3">
@@ -782,13 +972,18 @@ const PartnerManagement = () => {
                 className="flex-1 bg-emerald-600 text-white py-3 px-6 rounded-xl font-semibold hover:bg-emerald-700 transition-all shadow-md disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isApproving ? (
-                  <><Spinner /> Approving…</>
+                  <>
+                    <Spinner /> Approving…
+                  </>
                 ) : (
                   "Yes, Approve"
                 )}
               </button>
               <button
-                onClick={() => { setIsApproveModalOpen(false); setInternshipToApprove(null); }}
+                onClick={() => {
+                  setIsApproveModalOpen(false);
+                  setInternshipToApprove(null);
+                }}
                 disabled={isApproving}
                 className="flex-1 bg-gray-200 text-gray-800 py-3 px-6 rounded-xl font-semibold hover:bg-gray-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -802,15 +997,24 @@ const PartnerManagement = () => {
       {/* Reject */}
       <Modal
         isOpen={isRejectModalOpen}
-        onRequestClose={() => { if (!isRejecting) { setIsRejectModalOpen(false); setInternshipToReject(null); setRejectComment(""); } }}
+        onRequestClose={() => {
+          if (!isRejecting) {
+            setIsRejectModalOpen(false);
+            setInternshipToReject(null);
+            setRejectComment("");
+          }
+        }}
         overlayClassName="fixed inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm z-[999]"
         className="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full mx-4 outline-none font-poppins"
       >
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">Reject Internship</h2>
+        <h2 className="text-2xl font-bold text-gray-900 mb-4">
+          Reject Internship
+        </h2>
         {internshipToReject && (
           <div>
             <p className="text-gray-700 mb-6 leading-relaxed">
-              You're about to reject "<strong>{internshipToReject.jobTitle}</strong>" at{" "}
+              You're about to reject "
+              <strong>{internshipToReject.jobTitle}</strong>" at{" "}
               <strong>{internshipToReject.companyName}</strong>.
             </p>
             <textarea
@@ -828,13 +1032,19 @@ const PartnerManagement = () => {
                 className="flex-1 bg-red-600 text-white py-3 px-6 rounded-xl font-semibold hover:bg-red-700 transition-all shadow-md disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isRejecting ? (
-                  <><Spinner /> Rejecting…</>
+                  <>
+                    <Spinner /> Rejecting…
+                  </>
                 ) : (
                   "Confirm Rejection"
                 )}
               </button>
               <button
-                onClick={() => { setIsRejectModalOpen(false); setInternshipToReject(null); setRejectComment(""); }}
+                onClick={() => {
+                  setIsRejectModalOpen(false);
+                  setInternshipToReject(null);
+                  setRejectComment("");
+                }}
                 disabled={isRejecting}
                 className="flex-1 bg-gray-200 text-gray-800 py-3 px-6 rounded-xl font-semibold hover:bg-gray-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >

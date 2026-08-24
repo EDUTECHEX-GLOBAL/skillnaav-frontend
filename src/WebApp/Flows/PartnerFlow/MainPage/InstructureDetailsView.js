@@ -11,7 +11,6 @@ import {
   faShieldAlt,
   faClock,
   faDollarSign,
-  faClipboardList,
   faExclamationTriangle,
   faTrash,
   faExternalLinkAlt,
@@ -383,17 +382,13 @@ export default function InstructureDetailsView({
                   label="Current / Recent Organization"
                   value={item.organization}
                 />
-                <DetailField
-                  label="Teaching Specializations"
-                  value={join(item.specializations)}
-                  span={3}
-                />
+
                 <DetailField
                   label="Skills / Technologies"
                   value={join(item.skills)}
                   span={3}
                 />
-                <DetailField label="Languages" value={join(item.languages)} span={2} />
+                <DetailField label="Spoken Languages" value={join(item.languages)} span={2} />
                 <DetailField label="Teaching Mode" value={item.teachingMode} />
                 <DetailField label="Short Bio / Summary" value={item.bio} span={3} />
               </FormSection>

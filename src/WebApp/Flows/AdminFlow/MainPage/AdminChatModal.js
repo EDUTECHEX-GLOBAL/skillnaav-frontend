@@ -5,12 +5,7 @@
 //               POST /api/chats/upload  (multipart, field = "file")
 //               DELETE /api/chats/:messageId  (body: { requesterId })
 // ─────────────────────────────────────────────────────────────────────────────
-import React, {
-  useEffect,
-  useRef,
-  useState,
-  useCallback,
-} from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import Modal from "react-modal";
 import { io as ioClient } from "socket.io-client";
 import axios from "../../../../api/axiosInstance"; // ← adjust if needed
@@ -29,9 +24,9 @@ import { IoSend } from "react-icons/io5";
 Modal.setAppElement("#root");
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const POLL_INTERVAL_MS  = 3000;
+const POLL_INTERVAL_MS = 3000;
 const MESSAGES_PER_PAGE = 20;
-const MAX_FILE_BYTES    = 10 * 1024 * 1024; // 10 MB
+const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const getAdminInfo = () => {
@@ -56,15 +51,20 @@ const formatDate = (ts) => {
   const today = new Date();
   const yesterday = new Date(today);
   yesterday.setDate(today.getDate() - 1);
-  if (d.toDateString() === today.toDateString())     return "Today";
+  if (d.toDateString() === today.toDateString()) return "Today";
   if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
-  return d.toLocaleDateString([], { day: "2-digit", month: "short", year: "numeric" });
+  return d.toLocaleDateString([], {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 };
 
 // ─── File icon helper ─────────────────────────────────────────────────────────
 const FileIcon = ({ type }) => {
   if (!type) return <FaFileAlt className="w-5 h-5 text-gray-500" />;
-  if (type.includes("pdf"))  return <FaFilePdf  className="w-5 h-5 text-red-500" />;
+  if (type.includes("pdf"))
+    return <FaFilePdf className="w-5 h-5 text-red-500" />;
   if (type.includes("word") || type.includes("doc"))
     return <FaFileWord className="w-5 h-5 text-blue-600" />;
   return <FaFileAlt className="w-5 h-5 text-gray-500" />;
@@ -78,14 +78,19 @@ const MessageBubble = ({ message, isOwn, onDelete, adminId }) => {
   const hasFile = !!message.fileUrl;
 
   return (
-    <div className={`flex mb-3 group ${isOwn ? "justify-end" : "justify-start"}`}>
-      <div className={`relative max-w-[70%] ${isOwn ? "items-end" : "items-start"} flex flex-col`}>
+    <div
+      className={`flex mb-3 group ${isOwn ? "justify-end" : "justify-start"}`}
+    >
+      <div
+        className={`relative max-w-[70%] ${isOwn ? "items-end" : "items-start"} flex flex-col`}
+      >
         {/* Bubble */}
         <div
           className={`px-4 py-3 rounded-2xl shadow-sm text-sm leading-relaxed
-            ${isOwn
-              ? "bg-gradient-to-br from-indigo-500 to-blue-600 text-white rounded-br-sm"
-              : "bg-white text-gray-800 border border-gray-200 rounded-bl-sm"
+            ${
+              isOwn
+                ? "bg-gradient-to-br from-indigo-500 to-blue-600 text-white rounded-br-sm"
+                : "bg-white text-gray-800 border border-gray-200 rounded-bl-sm"
             }
             ${message.isDeleted ? "opacity-60 italic" : ""}
           `}
@@ -96,7 +101,9 @@ const MessageBubble = ({ message, isOwn, onDelete, adminId }) => {
             <>
               {/* File attachment */}
               {hasFile && (
-                <div className={`mb-2 rounded-xl overflow-hidden border relative group/img ${isOwn ? "border-white/30" : "border-gray-200"}`}>
+                <div
+                  className={`mb-2 rounded-xl overflow-hidden border relative group/img ${isOwn ? "border-white/30" : "border-gray-200"}`}
+                >
                   {isImage ? (
                     <>
                       {/* Clicking the image opens/downloads it */}
@@ -126,14 +133,20 @@ const MessageBubble = ({ message, isOwn, onDelete, adminId }) => {
                       </a>
                     </>
                   ) : (
-                    <div className={`flex items-center gap-3 px-3 py-2 ${isOwn ? "bg-white/15" : "bg-gray-50"}`}>
+                    <div
+                      className={`flex items-center gap-3 px-3 py-2 ${isOwn ? "bg-white/15" : "bg-gray-50"}`}
+                    >
                       <FileIcon type={message.fileType} />
                       <div className="flex-1 min-w-0">
-                        <p className={`text-xs font-semibold truncate ${isOwn ? "text-white" : "text-gray-700"}`}>
+                        <p
+                          className={`text-xs font-semibold truncate ${isOwn ? "text-white" : "text-gray-700"}`}
+                        >
                           {message.fileName}
                         </p>
                         {message.fileSize && (
-                          <p className={`text-xs ${isOwn ? "text-blue-100" : "text-gray-500"}`}>
+                          <p
+                            className={`text-xs ${isOwn ? "text-blue-100" : "text-gray-500"}`}
+                          >
                             {message.fileSize}
                           </p>
                         )}
@@ -153,48 +166,58 @@ const MessageBubble = ({ message, isOwn, onDelete, adminId }) => {
               )}
 
               {/* Text */}
-              {message.message && !message.message.startsWith("Sent a file:") && (
-                <p className="whitespace-pre-wrap break-words">{message.message}</p>
-              )}
+              {message.message &&
+                !message.message.startsWith("Sent a file:") && (
+                  <p className="whitespace-pre-wrap break-words">
+                    {message.message}
+                  </p>
+                )}
             </>
           )}
 
           {/* Timestamp */}
-          <p className={`text-[10px] mt-1.5 text-right ${isOwn ? "text-blue-100" : "text-gray-400"}`}>
+          <p
+            className={`text-[10px] mt-1.5 text-right ${isOwn ? "text-blue-100" : "text-gray-400"}`}
+          >
             {formatTime(message.timestamp || message.createdAt)}
           </p>
         </div>
 
         {/* Delete button (own messages only, not already deleted) */}
-        {isOwn && !message.isDeleted && !message._id?.toString().includes("optimistic") && (
-          <div className="mt-1 opacity-0 group-hover:opacity-100 transition-opacity flex justify-end">
-            {confirmDelete ? (
-              <div className="flex gap-1 items-center text-xs">
-                <span className="text-gray-500 mr-1">Delete?</span>
+        {isOwn &&
+          !message.isDeleted &&
+          !message._id?.toString().includes("optimistic") && (
+            <div className="mt-1 opacity-0 group-hover:opacity-100 transition-opacity flex justify-end">
+              {confirmDelete ? (
+                <div className="flex gap-1 items-center text-xs">
+                  <span className="text-gray-500 mr-1">Delete?</span>
+                  <button
+                    onClick={() => {
+                      onDelete(message._id);
+                      setConfirmDelete(false);
+                    }}
+                    className="px-2 py-0.5 bg-red-500 text-white rounded-full hover:bg-red-600"
+                  >
+                    Yes
+                  </button>
+                  <button
+                    onClick={() => setConfirmDelete(false)}
+                    className="px-2 py-0.5 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300"
+                  >
+                    No
+                  </button>
+                </div>
+              ) : (
                 <button
-                  onClick={() => { onDelete(message._id); setConfirmDelete(false); }}
-                  className="px-2 py-0.5 bg-red-500 text-white rounded-full hover:bg-red-600"
+                  onClick={() => setConfirmDelete(true)}
+                  className="p-1 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all"
+                  title="Delete message"
                 >
-                  Yes
+                  <FaTrash className="w-3 h-3" />
                 </button>
-                <button
-                  onClick={() => setConfirmDelete(false)}
-                  className="px-2 py-0.5 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300"
-                >
-                  No
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => setConfirmDelete(true)}
-                className="p-1 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all"
-                title="Delete message"
-              >
-                <FaTrash className="w-3 h-3" />
-              </button>
-            )}
-          </div>
-        )}
+              )}
+            </div>
+          )}
       </div>
     </div>
   );
@@ -215,12 +238,19 @@ const UploadPreview = ({ file, onRemove, uploading }) => {
   const previewUrl = isImage ? URL.createObjectURL(file) : null;
   return (
     <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-xl px-3 py-2 text-sm max-w-xs">
-      {isImage
-        ? <img src={previewUrl} alt="preview" className="w-8 h-8 object-cover rounded-lg" />
-        : <FileIcon type={file.type} />
-      }
+      {isImage ? (
+        <img
+          src={previewUrl}
+          alt="preview"
+          className="w-8 h-8 object-cover rounded-lg"
+        />
+      ) : (
+        <FileIcon type={file.type} />
+      )}
       <div className="flex-1 min-w-0">
-        <p className="text-xs font-semibold text-gray-700 truncate">{file.name}</p>
+        <p className="text-xs font-semibold text-gray-700 truncate">
+          {file.name}
+        </p>
         {uploading && (
           <div className="w-full h-1 mt-1 bg-gray-200 rounded-full overflow-hidden">
             <div className="h-full bg-blue-500 rounded-full animate-pulse w-2/3" />
@@ -228,7 +258,10 @@ const UploadPreview = ({ file, onRemove, uploading }) => {
         )}
       </div>
       {!uploading && (
-        <button onClick={onRemove} className="p-1 hover:bg-blue-100 rounded-full text-gray-500">
+        <button
+          onClick={onRemove}
+          className="p-1 hover:bg-blue-100 rounded-full text-gray-500"
+        >
           <FaTimes className="w-3 h-3" />
         </button>
       )}
@@ -250,26 +283,26 @@ const AdminChatModal = ({ isOpen, internship, onClose, onReviewedUpdate }) => {
   const adminId = getAdminId();
 
   // ── State ──────────────────────────────────────────────────────────────────
-  const [messages,    setMessages]    = useState([]);
-  const [newMessage,  setNewMessage]  = useState("");
-  const [chatError,   setChatError]   = useState(null);
-  const [sending,     setSending]     = useState(false);
-  const [uploading,   setUploading]   = useState(false);
-  const [pendingFile, setPendingFile] = useState(null);   // File object before upload
+  const [messages, setMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState("");
+  const [chatError, setChatError] = useState(null);
+  const [sending, setSending] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [pendingFile, setPendingFile] = useState(null); // File object before upload
   const [uploadedMeta, setUploadedMeta] = useState(null); // { fileUrl, fileName, fileType, fileSize }
-  const [page,        setPage]        = useState(1);
-  const [totalPages,  setTotalPages]  = useState(1);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
 
   const messagesEndRef = useRef(null);
-  const inputRef       = useRef(null);
-  const fileInputRef   = useRef(null);
-  const pollerRef      = useRef(null);
+  const inputRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const pollerRef = useRef(null);
 
   // ── Helpers ────────────────────────────────────────────────────────────────
   const scrollToBottom = useCallback(
     () => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }),
-    []
+    [],
   );
 
   // ── Fetch messages ─────────────────────────────────────────────────────────
@@ -277,27 +310,33 @@ const AdminChatModal = ({ isOpen, internship, onClose, onReviewedUpdate }) => {
     async (silent = false) => {
       if (!internship?._id) return;
       try {
-        const res = await axios.get(
-          `/api/chats/internship/${internship._id}`,
-          { params: { page: 1, limit: MESSAGES_PER_PAGE, t: Date.now() } }
-        );
+        const res = await axios.get(`/api/chats/internship/${internship._id}`, {
+          params: { page: 1, limit: MESSAGES_PER_PAGE, t: Date.now() },
+        });
         const data = res.data?.data || [];
         setTotalPages(res.data?.totalPages || 1);
 
-        if (!silent) setChatError(data.length === 0 ? "No messages yet. Be the first to say something!" : null);
+        if (!silent)
+          setChatError(
+            data.length === 0
+              ? "No messages yet. Be the first to say something!"
+              : null,
+          );
         setMessages(data);
         if (isOpen && adminId) {
-          axios.patch("/api/chats/read", {
-            internshipId: internship._id,
-            readerId: adminId,
-          }).catch((err) => console.error("markAdminConversationRead:", err));
+          axios
+            .patch("/api/chats/read", {
+              internshipId: internship._id,
+              readerId: adminId,
+            })
+            .catch((err) => console.error("markAdminConversationRead:", err));
         }
       } catch (err) {
         if (!silent) setChatError("Failed to load messages.");
         console.error("fetchMessages:", err);
       }
     },
-    [internship?._id, isOpen, adminId]
+    [internship?._id, isOpen, adminId],
   );
 
   const markConversationRead = useCallback(async () => {
@@ -318,10 +357,9 @@ const AdminChatModal = ({ isOpen, internship, onClose, onReviewedUpdate }) => {
     const nextPage = page + 1;
     setLoadingMore(true);
     try {
-      const res = await axios.get(
-        `/api/chats/internship/${internship._id}`,
-        { params: { page: nextPage, limit: MESSAGES_PER_PAGE } }
-      );
+      const res = await axios.get(`/api/chats/internship/${internship._id}`, {
+        params: { page: nextPage, limit: MESSAGES_PER_PAGE },
+      });
       const older = res.data?.data || [];
       setMessages((prev) => [...older, ...prev]);
       setPage(nextPage);
@@ -346,7 +384,10 @@ const AdminChatModal = ({ isOpen, internship, onClose, onReviewedUpdate }) => {
     markConversationRead();
 
     // Polling
-    pollerRef.current = setInterval(() => fetchMessages(true), POLL_INTERVAL_MS);
+    pollerRef.current = setInterval(
+      () => fetchMessages(true),
+      POLL_INTERVAL_MS,
+    );
     return () => clearInterval(pollerRef.current);
   }, [isOpen, internship?._id, fetchMessages, markConversationRead]);
 
@@ -360,7 +401,8 @@ const AdminChatModal = ({ isOpen, internship, onClose, onReviewedUpdate }) => {
   useEffect(() => {
     if (!isOpen || !internship?._id || !adminId) return;
 
-    const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || "http://localhost:5000";
+    const SOCKET_URL =
+      process.env.REACT_APP_SOCKET_URL || "http://localhost:5000";
     const socket = ioClient(SOCKET_URL, { withCredentials: true });
 
     const joinRooms = () => {
@@ -375,13 +417,15 @@ const AdminChatModal = ({ isOpen, internship, onClose, onReviewedUpdate }) => {
       setMessages((prev) =>
         prev.some((item) => String(item._id) === String(message._id))
           ? prev
-          : [...prev, message]
+          : [...prev, message],
       );
 
-      axios.patch("/api/chats/read", {
-        internshipId: internship._id,
-        readerId: adminId,
-      }).catch((err) => console.error("markAdminConversationRead:", err));
+      axios
+        .patch("/api/chats/read", {
+          internshipId: internship._id,
+          readerId: adminId,
+        })
+        .catch((err) => console.error("markAdminConversationRead:", err));
     };
 
     const handleMessageDeleted = ({ messageId }) => {
@@ -389,8 +433,8 @@ const AdminChatModal = ({ isOpen, internship, onClose, onReviewedUpdate }) => {
         prev.map((item) =>
           String(item._id) === String(messageId)
             ? { ...item, isDeleted: true, deletedAt: new Date().toISOString() }
-            : item
-        )
+            : item,
+        ),
       );
     };
 
@@ -474,20 +518,25 @@ const AdminChatModal = ({ isOpen, internship, onClose, onReviewedUpdate }) => {
     let fileMeta = uploadedMeta;
     if (pendingFile && !uploadedMeta) {
       fileMeta = await uploadFile();
-      if (!fileMeta) { setSending(false); return; }
+      if (!fileMeta) {
+        setSending(false);
+        return;
+      }
     }
 
     // Optimistic message
     const optimistic = {
       _id: `optimistic-${Date.now()}`,
-      sender:    adminId,
-      receiver:  internship.partnerId,
+      sender: adminId,
+      receiver: internship.partnerId,
       internship: internship._id,
-      message:   messageText || (fileMeta?.fileName ? `Sent a file: ${fileMeta.fileName}` : ""),
-      fileUrl:   fileMeta?.fileUrl   || null,
-      fileName:  fileMeta?.fileName  || null,
-      fileType:  fileMeta?.fileType  || null,
-      fileSize:  fileMeta?.fileSize  || null,
+      message:
+        messageText ||
+        (fileMeta?.fileName ? `Sent a file: ${fileMeta.fileName}` : ""),
+      fileUrl: fileMeta?.fileUrl || null,
+      fileName: fileMeta?.fileName || null,
+      fileType: fileMeta?.fileType || null,
+      fileSize: fileMeta?.fileSize || null,
       timestamp: new Date().toISOString(),
       createdAt: new Date().toISOString(),
     };
@@ -500,9 +549,9 @@ const AdminChatModal = ({ isOpen, internship, onClose, onReviewedUpdate }) => {
       // Body matches ChatController.sendMessage expectations
       const payload = {
         internshipId: internship._id,
-        senderId:     adminId,
-        partnerId:    internship.partnerId,   // required when admin sends
-        message:      messageText,
+        senderId: adminId,
+        partnerId: internship.partnerId, // required when admin sends
+        message: messageText,
         ...(fileMeta || {}),
       };
 
@@ -510,7 +559,7 @@ const AdminChatModal = ({ isOpen, internship, onClose, onReviewedUpdate }) => {
 
       // Replace optimistic with real doc
       setMessages((prev) =>
-        prev.map((m) => (m._id === optimistic._id ? res.data : m))
+        prev.map((m) => (m._id === optimistic._id ? res.data : m)),
       );
 
       // Mark internship as reviewed (first admin message)
@@ -518,7 +567,9 @@ const AdminChatModal = ({ isOpen, internship, onClose, onReviewedUpdate }) => {
         try {
           await axios.post(`/api/interns/${internship._id}/review`);
           onReviewedUpdate?.(internship._id);
-        } catch { /* non-critical */ }
+        } catch {
+          /* non-critical */
+        }
       }
     } catch (err) {
       console.error("handleSend:", err);
@@ -537,8 +588,10 @@ const AdminChatModal = ({ isOpen, internship, onClose, onReviewedUpdate }) => {
     // Optimistic
     setMessages((prev) =>
       prev.map((m) =>
-        m._id === messageId ? { ...m, isDeleted: true, deletedAt: new Date() } : m
-      )
+        m._id === messageId
+          ? { ...m, isDeleted: true, deletedAt: new Date() }
+          : m,
+      ),
     );
     try {
       await axios.delete(`/api/chats/${messageId}`, {
@@ -549,8 +602,8 @@ const AdminChatModal = ({ isOpen, internship, onClose, onReviewedUpdate }) => {
       // Revert
       setMessages((prev) =>
         prev.map((m) =>
-          m._id === messageId ? { ...m, isDeleted: false, deletedAt: null } : m
-        )
+          m._id === messageId ? { ...m, isDeleted: false, deletedAt: null } : m,
+        ),
       );
       setChatError("Failed to delete message.");
     }
@@ -592,7 +645,9 @@ const AdminChatModal = ({ isOpen, internship, onClose, onReviewedUpdate }) => {
             <h2 className="font-bold text-base leading-tight truncate">
               {internship?.jobTitle}
             </h2>
-            <p className="text-blue-100 text-xs truncate">{internship?.companyName}</p>
+            <p className="text-blue-100 text-xs truncate">
+              {internship?.companyName}
+            </p>
           </div>
         </div>
         <button
@@ -625,7 +680,8 @@ const AdminChatModal = ({ isOpen, internship, onClose, onReviewedUpdate }) => {
               <FaCommentDots className="w-8 h-8 text-indigo-500" />
             </div>
             <p className="text-gray-500 text-sm max-w-xs">
-              {chatError || "No messages yet. Start the conversation to review this internship."}
+              {chatError ||
+                "No messages yet. Start the conversation to review this internship."}
             </p>
           </div>
         ) : (
@@ -641,7 +697,7 @@ const AdminChatModal = ({ isOpen, internship, onClose, onReviewedUpdate }) => {
                   onDelete={handleDelete}
                   adminId={adminId}
                 />
-              )
+              ),
             )}
             <div ref={messagesEndRef} />
           </>
@@ -686,6 +742,7 @@ const AdminChatModal = ({ isOpen, internship, onClose, onReviewedUpdate }) => {
           />
 
           {/* Textarea */}
+          {/*Add the "sm:h-12" for the message - 05-08-2026 */}
           <textarea
             ref={inputRef}
             placeholder="Type your message…"
@@ -694,7 +751,7 @@ const AdminChatModal = ({ isOpen, internship, onClose, onReviewedUpdate }) => {
             onKeyDown={handleKeyDown}
             rows={1}
             disabled={sending || uploading}
-            className="flex-1 resize-none px-4 py-2.5 border border-gray-300 rounded-xl text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition-all disabled:bg-gray-50"
+            className="flex-1 sm:h-12 resize-none px-4 py-2.5 border border-gray-300 rounded-xl text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition-all disabled:bg-gray-50"
           />
 
           {/* Send button */}
@@ -717,10 +774,14 @@ const AdminChatModal = ({ isOpen, internship, onClose, onReviewedUpdate }) => {
         </div>
 
         <p className="text-center text-[10px] text-gray-400 mt-2">
-          <kbd className="px-1.5 py-0.5 bg-gray-100 rounded text-gray-500">Enter</kbd> to send
-          &nbsp;·&nbsp;
-          <kbd className="px-1.5 py-0.5 bg-gray-100 rounded text-gray-500">Shift+Enter</kbd> for new line
-          &nbsp;·&nbsp; Max file size 10 MB
+          <kbd className="px-1.5 py-0.5 bg-gray-100 rounded text-gray-500">
+            Enter
+          </kbd>{" "}
+          to send &nbsp;·&nbsp;
+          <kbd className="px-1.5 py-0.5 bg-gray-100 rounded text-gray-500">
+            Shift+Enter
+          </kbd>{" "}
+          for new line &nbsp;·&nbsp; Max file size 10 MB
         </p>
       </div>
     </Modal>

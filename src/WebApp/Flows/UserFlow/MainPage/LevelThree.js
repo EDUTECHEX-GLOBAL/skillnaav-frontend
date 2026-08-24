@@ -2,7 +2,11 @@ import React, { useState, useEffect } from "react";
 import axios from "../../../../api/axiosInstance";
 import PropTypes from "prop-types";
 
-const LevelThree = ({ profileData, setCreateLevelThree, handleProfileData }) => {
+const LevelThree = ({
+  profileData,
+  setCreateLevelThree,
+  handleProfileData,
+}) => {
   // State initialization
   const [loading, setLoading] = useState(true);
   const [allQuestions, setAllQuestions] = useState([]);
@@ -35,13 +39,17 @@ const LevelThree = ({ profileData, setCreateLevelThree, handleProfileData }) => 
           ? questionsResponse.data
           : [];
 
-        setAllQuestions(validQuestions.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
+        setAllQuestions(
+          validQuestions.sort(
+            (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
+          ),
+        );
 
         // Fetch responses if user exists
         if (profileData?._id) {
           try {
             const responsesResponse = await axios.get(
-              `/api/personality/responses?userId=${profileData._id}`
+              `/api/personality/responses?userId=${profileData._id}`,
             );
 
             const validResponses = Array.isArray(responsesResponse?.data)
@@ -49,7 +57,7 @@ const LevelThree = ({ profileData, setCreateLevelThree, handleProfileData }) => 
               : [];
 
             const answersMap = {};
-            validResponses.forEach(item => {
+            validResponses.forEach((item) => {
               if (item?.questionId?._id) {
                 answersMap[item.questionId._id] = {
                   response: item.response,
@@ -65,15 +73,19 @@ const LevelThree = ({ profileData, setCreateLevelThree, handleProfileData }) => 
             if (validResponses.length > 0) {
               try {
                 const personalityRes = await axios.get(
-                  `/api/personality/calculate?userId=${profileData._id}`
+                  `/api/personality/calculate?userId=${profileData._id}`,
                 );
 
                 // Transform backend response to ensure consistent format
                 const backendData = personalityRes?.data || {};
                 const transformedResults = {
-                  hollandCode: backendData.personality || backendData.hollandCode || '',
-                  dominantTraits: backendData.personality?.split('') || backendData.dominantTraits || [],
-                  scores: backendData.scores || {}
+                  hollandCode:
+                    backendData.personality || backendData.hollandCode || "",
+                  dominantTraits:
+                    backendData.personality?.split("") ||
+                    backendData.dominantTraits ||
+                    [],
+                  scores: backendData.scores || {},
                 };
 
                 setPersonalityResults(transformedResults);
@@ -100,11 +112,11 @@ const LevelThree = ({ profileData, setCreateLevelThree, handleProfileData }) => 
   // Helper functions
   const getPointsFromResponse = (response) => {
     const map = {
-      "Dislike": 1,
+      Dislike: 1,
       "Slightly Dislike": 2,
-      "Neutral": 3,
+      Neutral: 3,
       "Slightly Enjoy": 4,
-      "Enjoy": 5,
+      Enjoy: 5,
     };
     return map[response] || 3;
   };
@@ -135,7 +147,7 @@ const LevelThree = ({ profileData, setCreateLevelThree, handleProfileData }) => 
 
   // Event handlers
   const handleAnswerChange = (questionId, answerIndex) => {
-    setSelectedAnswers(prev => ({
+    setSelectedAnswers((prev) => ({
       ...prev,
       [questionId]: {
         ...prev[questionId],
@@ -150,7 +162,7 @@ const LevelThree = ({ profileData, setCreateLevelThree, handleProfileData }) => 
       setError(null);
 
       // Prepare responses
-      const responses = allQuestions.map(question => ({
+      const responses = allQuestions.map((question) => ({
         questionId: question._id,
         userId: profileData._id,
         response: selectedAnswers[question._id]?.response || "Neutral",
@@ -175,7 +187,7 @@ const LevelThree = ({ profileData, setCreateLevelThree, handleProfileData }) => 
       // Save to backend
       await axios.post("/api/personality/responses/bulk", {
         responses,
-        userId: profileData._id
+        userId: profileData._id,
       });
 
       // Set results
@@ -195,7 +207,7 @@ const LevelThree = ({ profileData, setCreateLevelThree, handleProfileData }) => 
 
   // Derived values
   const totalAnswered = Object.values(selectedAnswers).filter(
-    answer => answer?.response
+    (answer) => answer?.response,
   ).length;
 
   // Render
@@ -251,8 +263,9 @@ const ResultsView = ({ results, getTraitFullName, getTraitDescription }) => {
     <div className="mt-8 p-6 bg-white rounded-lg shadow">
       <h3 className="text-2xl font-bold text-center mb-6">
         Your Holland Code:
-        <span className="ml-2 px-4 py-2 bg-blue-600 text-white rounded">
-          {results?.hollandCode || 'Unknown'}
+        {/* Change the px-4 to px-1.5 & py-2 to py-0.5 - 04-08-2026*/}
+        <span className="ml-2 px-1.5 py-0.5 bg-blue-600 text-white rounded">
+          {results?.hollandCode || "Unknown"}
         </span>
       </h3>
 
@@ -261,12 +274,13 @@ const ResultsView = ({ results, getTraitFullName, getTraitDescription }) => {
           {dominantTraits.map((trait, index) => (
             <div
               key={`${trait}-${index}`}
-              className={`p-4 border-l-4 ${index === 0
+              className={`p-4 border-l-4 ${
+                index === 0
                   ? "border-blue-500 bg-blue-50"
                   : index === 1
                     ? "border-purple-500 bg-purple-50"
                     : "border-green-500 bg-green-50"
-                }`}
+              }`}
             >
               <h4 className="font-bold text-lg">
                 {getTraitFullName(trait)} ({trait})
@@ -274,9 +288,7 @@ const ResultsView = ({ results, getTraitFullName, getTraitDescription }) => {
               <p className="text-sm text-gray-600 mt-1">
                 {getTraitDescription(trait)}
               </p>
-              <p className="mt-2 font-medium">
-                Score: {scores[trait] || 0}
-              </p>
+              <p className="mt-2 font-medium">Score: {scores[trait] || 0}</p>
             </div>
           ))}
         </div>
@@ -307,25 +319,21 @@ const TestView = ({
   handleAnswerChange,
   handleSubmit,
   submitLoading,
-  setCreateLevelThree
+  setCreateLevelThree,
 }) => (
   <>
     <div className="bg-gray-100 rounded-lg p-6 mb-6">
-      <h3 className="text-xl font-semibold mb-3 text-center">
-        How to Answer:
-      </h3>
+      <h3 className="text-xl font-semibold mb-3 text-center">How to Answer:</h3>
       <p className="mb-4">
         For each activity, select how much you would enjoy doing it:
       </p>
       <div className="flex justify-center space-x-6">
-        {answerOptions.map(option => (
+        {answerOptions.map((option) => (
           <div key={option} className="text-center">
             <div className="w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold shadow-md mx-auto">
               {option}
             </div>
-            <span className="text-xs mt-1 block">
-              {answerMapping[option]}
-            </span>
+            <span className="text-xs mt-1 block">{answerMapping[option]}</span>
           </div>
         ))}
       </div>
@@ -336,26 +344,28 @@ const TestView = ({
     </h3>
 
     <div className="space-y-4">
-      {allQuestions.map(question => (
-        <div key={question._id} className="bg-white rounded-lg shadow-md p-5 border-l-4 border-blue-500">
-          <h4 className="text-lg font-semibold mb-4">
-            {question.question}
-          </h4>
+      {allQuestions.map((question) => (
+        <div
+          key={question._id}
+          className="bg-white rounded-lg shadow-md p-5 border-l-4 border-blue-500"
+        >
+          <h4 className="text-lg font-semibold mb-4">{question.question}</h4>
           <div className="flex flex-wrap md:flex-nowrap justify-start gap-3 mt-2">
             {answerOptions.map((option) => (
               <div
                 key={option}
                 onClick={() => handleAnswerChange(question._id, option)}
-                className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center font-semibold cursor-pointer transition duration-150 ${selectedAnswers[question._id]?.response === answerMapping[option]
+                className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center font-semibold cursor-pointer transition duration-150 ${
+                  selectedAnswers[question._id]?.response ===
+                  answerMapping[option]
                     ? "bg-blue-600 text-white ring-2 ring-blue-400"
                     : "bg-gray-100 hover:bg-gray-200 text-gray-800"
-                  }`}
+                }`}
               >
                 {option}
               </div>
             ))}
           </div>
-
         </div>
       ))}
     </div>
@@ -370,10 +380,11 @@ const TestView = ({
       <button
         onClick={handleSubmit}
         disabled={totalAnswered !== allQuestions.length || submitLoading}
-        className={`px-6 py-2 rounded-md font-semibold min-w-[180px] transition ${totalAnswered !== allQuestions.length || submitLoading
+        className={`px-6 py-2 rounded-md font-semibold min-w-[180px] transition ${
+          totalAnswered !== allQuestions.length || submitLoading
             ? "bg-gray-300 cursor-not-allowed"
             : "bg-blue-600 text-white hover:bg-blue-700"
-          }`}
+        }`}
       >
         {submitLoading ? (
           <div className="flex justify-center">

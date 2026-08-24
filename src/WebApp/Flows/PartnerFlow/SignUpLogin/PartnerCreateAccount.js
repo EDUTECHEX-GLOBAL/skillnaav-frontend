@@ -38,6 +38,7 @@ const PartnerSignUpFlow = () => {
   const [errorMessage, setErrorMessage] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   // 🔥 NEW: Track whether the partner came via Google signup
   const [isGoogleSignup, setIsGoogleSignup] = useState(false);
@@ -225,6 +226,15 @@ const PartnerSignUpFlow = () => {
     }
   };
 
+  const showRegistrationSuccess = () => {
+    setShowSuccessModal(true);
+  };
+
+  const handleSuccessModalClose = () => {
+    setShowSuccessModal(false);
+    navigate("/partner/login");
+  };
+
   const handleStep2Submit = async (values, { setSubmitting }) => {
     setErrorMessage("");
 
@@ -273,8 +283,7 @@ const PartnerSignUpFlow = () => {
         }));
         localStorage.setItem("loginTime", Date.now().toString());
 
-        alert("Registration successful! Redirecting to login.");
-        navigate("/partner/login");
+        showRegistrationSuccess();
 
       } else {
         // Normal signup path — call register endpoint with all fields
@@ -290,8 +299,7 @@ const PartnerSignUpFlow = () => {
         );
 
         if (response.status === 201) {
-          alert("Registration successful! Redirecting to login.");
-          navigate("/partner/login");
+          showRegistrationSuccess();
         }
       }
     } catch (error) {
@@ -512,6 +520,33 @@ const PartnerSignUpFlow = () => {
 
   return (
     <div className="flex flex-col lg:flex-row min-h-screen font-poppins">
+      {showSuccessModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="registration-success-title"
+        >
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-2xl text-green-600">
+              ✓
+            </div>
+            <h2 id="registration-success-title" className="mt-4 text-xl font-semibold text-gray-900">
+              Registration successful!
+            </h2>
+            <p className="mt-2 text-gray-600">
+              Your account has been created. You will now be redirected to login.
+            </p>
+            <button
+              type="button"
+              onClick={handleSuccessModalClose}
+              className="mt-6 w-full rounded-lg bg-purple-600 px-4 py-3 font-semibold text-white transition hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-offset-2"
+            >
+              Continue to Login
+            </button>
+          </div>
+        </div>
+      )}
       {/* Image Side */}
       <div className="hidden md:flex md:w-full lg:w-1/2 items-center justify-center">
         <img src={partner2Image} alt="Create Account" className="w-full h-full object-contain max-w-[830px] max-h-[900px] p-6 ml-6 shadow-lg" />

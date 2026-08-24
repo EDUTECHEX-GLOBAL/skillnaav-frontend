@@ -23,6 +23,7 @@ export default function InternshipScheduleViewer({
     const [loading, setLoading] = useState(false);
     const [schedule, setSchedule] = useState(null);
     const [error, setError] = useState(null);
+    const [mockInterviews, setMockInterviews] = useState([]);
 
     const [selectedLocation, setSelectedLocation] = useState(null);
     const [selectedSummary, setSelectedSummary] = useState(null);
@@ -63,7 +64,21 @@ export default function InternshipScheduleViewer({
                     params: { internshipId, partnerId },
                     headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
                 });
-                if (!cancelled) setSchedule(res.data);
+                
+                let miData = [];
+                try {
+                    const miRes = await axios.get(`/api/mock-interviews/internship/${internshipId}`, {
+                        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+                    });
+                    miData = miRes.data;
+                } catch (miErr) {
+                    console.error("Failed to fetch mock interviews", miErr);
+                }
+
+                if (!cancelled) {
+                    setSchedule(res.data);
+                    setMockInterviews(miData || []);
+                }
             } catch (err) {
                 console.error("Failed to fetch schedule:", err);
                 if (!cancelled) {
@@ -114,13 +129,13 @@ export default function InternshipScheduleViewer({
                 });
             }
         }
-    }, [isOpen, schedule]);
+    }, [isOpen, schedule, displayTimetable]);
 
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl relative p-6">
+        <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4 sm:p-6">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl relative p-6 max-h-[90vh] overflow-y-auto custom-scrollbar flex flex-col">
                 <button
                     onClick={onClose}
                     className="absolute top-3 right-3 text-gray-500 hover:text-gray-700 text-2xl"
@@ -270,10 +285,15 @@ export default function InternshipScheduleViewer({
                                                                 instructor: session.instructor || "",
                                                             })
                                                         }
-                                                        className="text-indigo-600 hover:underline text-xs font-medium"
+                                                        className="text-indigo-600 hover:underline text-xs font-medium block mx-auto"
                                                     >
                                                         View Summary
                                                     </button>
+                                                    {session.mockInterview?.enabled && (
+                                                        <span className="mt-2 block bg-indigo-100 text-indigo-800 text-[10px] px-2 py-1 rounded font-semibold border border-indigo-200">
+                                                            Mock Interview
+                                                        </span>
+                                                    )}
                                                 </td>
                                                 <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap text-center">
                                                     {isOnline ? (
@@ -362,14 +382,55 @@ export default function InternshipScheduleViewer({
                                     <tr>
                                         <td
                                             colSpan="6"
-                                            className="text-center text-sm text-gray-500 py-4"
+                                            className="px-4 py-8 text-center text-gray-500 italic"
                                         >
-                                            Create the Internship Schedule first and you will get the Internship Schedule here.
+                                            Internship schedule coming soon.
                                         </td>
                                     </tr>
                                 )}
                             </tbody>
                         </table>
+
+                        {/* Mock Interviews Display */}
+                        {schedule && mockInterviews.length > 0 && (
+                            <div className="mt-8 px-2">
+                                <h3 className="text-md font-semibold text-gray-800 mb-4 flex items-center border-b pb-2">
+                                   <span className="text-xl mr-2">🎯</span> Scheduled Mock Interviews
+                                </h3>
+                                <div className="space-y-4">
+                                   {mockInterviews.map((mi, idx) => (
+                                      <div key={idx} className="bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-100 rounded-xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center shadow-sm hover:shadow-md transition-shadow">
+                                         <div className="mb-3 md:mb-0">
+                                            <p className="text-lg font-bold text-indigo-900">{`Mock Interview ${idx + 1}`}</p>
+                                            <div className="flex items-center gap-3 mt-1 text-sm font-medium text-indigo-700 bg-white/60 w-max px-3 py-1 rounded-full shadow-sm border border-indigo-50">
+                                                <span className="flex items-center"><FontAwesomeIcon icon={faCalendarAlt} className="mr-1.5" /> {isValid(parseISO(mi.date)) ? format(parseISO(mi.date), "dd MMM yyyy") : mi.date}</span>
+                                                <span className="text-indigo-300">|</span>
+                                                <span className="flex items-center"><FontAwesomeIcon icon={faClock} className="mr-1.5" /> {mi.startTime} - {mi.endTime}</span>
+                                            </div>
+                                            <p className="text-sm text-gray-700 mt-3 font-medium bg-white/50 px-3 py-1 rounded-md inline-block">
+                                                <span className="text-gray-500 mr-1">Type:</span> <span className="text-gray-800">{mi.interviewType}</span>
+                                                {mi.interviewer && (
+                                                    <span className="ml-3 border-l pl-3 border-gray-300">
+                                                        <span className="text-gray-500 mr-1">Interviewer:</span> <span className="text-gray-800">{mi.interviewer}</span>
+                                                    </span>
+                                                )}
+                                            </p>
+                                         </div>
+                                         <div className="text-right flex flex-col items-end w-full md:w-auto">
+                                            <span className="inline-flex items-center px-4 py-1.5 bg-white text-indigo-700 border-2 border-indigo-100 rounded-full text-xs font-bold shadow-sm uppercase tracking-wide">
+                                               {mi.status}
+                                            </span>
+                                            {mi.meetingLink && (
+                                                <a href={normalizeUrl(mi.meetingLink)} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center text-indigo-600 hover:text-indigo-800 hover:bg-indigo-100/50 px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors">
+                                                   <FontAwesomeIcon icon={faLink} className="mr-2" /> Join Meeting Link
+                                                </a>
+                                            )}
+                                         </div>
+                                      </div>
+                                   ))}
+                                </div>
+                            </div>
+                        )}
                         </div>
                     </div>
                 )}

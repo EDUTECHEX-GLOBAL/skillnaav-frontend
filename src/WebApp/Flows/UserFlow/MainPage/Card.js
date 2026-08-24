@@ -8,7 +8,7 @@ const jobCache = {
   data: [],
   page: 1,
   hasMore: true,
-  timestamp: null
+  timestamp: null,
 };
 
 const CACHE_DURATION = 60000;
@@ -17,30 +17,33 @@ const JobCard = ({
   jobs: externalJobs,
   searchTerm = "",
   onViewDetails,
-  isRecommendation = false,   // NEW: true when rendered inside Recommendations.jsx
+  isRecommendation = false, // NEW: true when rendered inside Recommendations.jsx
 }) => {
   const { savedJobs, saveJob, removeJob, handleSelectTab } = useTabContext();
-  const [, setIsPremium]        = useState(false);
+  const [, setIsPremium] = useState(false);
   const [planType, setPlanType] = useState("Freemium");
   const [showSavedJobPopup, setShowSavedJobPopup] = useState(false);
 
   const isRecommendationMode = Array.isArray(externalJobs);
 
-  const [jobs, setJobs]       = useState(externalJobs || jobCache.data || []);
-  const [page, setPage]       = useState(jobCache.page || 1);
-  const [, setHasMore]        = useState(jobCache.hasMore !== false);
+  const [jobs, setJobs] = useState(externalJobs || jobCache.data || []);
+  const [page, setPage] = useState(jobCache.page || 1);
+  const [, setHasMore] = useState(jobCache.hasMore !== false);
   const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState(null);
-  const loadMoreRef           = useRef(null);
-  const loadingRef            = useRef(false);
-  const hasMoreRef            = useRef(jobCache.hasMore !== false);
+  const [error, setError] = useState(null);
+  const loadMoreRef = useRef(null);
+  const loadingRef = useRef(false);
+  const hasMoreRef = useRef(jobCache.hasMore !== false);
 
   const getSavedLimitByPlan = (plan) => {
     switch (plan) {
-      case "Premium Plus":  return Infinity;
-      case "Premium Basic": return 25;
+      case "Premium Plus":
+        return Infinity;
+      case "Premium Basic":
+        return 25;
       case "Freemium":
-      default:              return 3;
+      default:
+        return 3;
     }
   };
 
@@ -57,51 +60,60 @@ const JobCard = ({
   /* ----------------------------------
      FETCH APPROVED JOBS (HOME PAGE)
   ---------------------------------- */
-  const fetchJobs = useCallback(async (pageNumber = 1) => {
-    if (loadingRef.current || (pageNumber !== 1 && !hasMoreRef.current) || isRecommendationMode) {
-      return;
-    }
-
-    try {
-      loadingRef.current = true;
-      setLoading(true);
-
+  const fetchJobs = useCallback(
+    async (pageNumber = 1) => {
       if (
-        pageNumber === 1 &&
-        jobCache.timestamp &&
-        Date.now() - jobCache.timestamp < CACHE_DURATION
+        loadingRef.current ||
+        (pageNumber !== 1 && !hasMoreRef.current) ||
+        isRecommendationMode
       ) {
-        setJobs(jobCache.data);
-        setPage(jobCache.page);
-        setHasMore(jobCache.hasMore);
-        hasMoreRef.current = jobCache.hasMore;
-        loadingRef.current = false;
-        setLoading(false);
         return;
       }
 
-      const res = await axios.get(`/api/interns/approved?page=${pageNumber}&limit=6`);
-      const { data, hasMore: more } = res.data;
+      try {
+        loadingRef.current = true;
+        setLoading(true);
 
-      setJobs(prev => {
-        const updated = pageNumber === 1 ? data : [...prev, ...data];
-        jobCache.data      = updated;
-        jobCache.page      = pageNumber;
-        jobCache.hasMore   = more;
-        jobCache.timestamp = Date.now();
-        return updated;
-      });
+        if (
+          pageNumber === 1 &&
+          jobCache.timestamp &&
+          Date.now() - jobCache.timestamp < CACHE_DURATION
+        ) {
+          setJobs(jobCache.data);
+          setPage(jobCache.page);
+          setHasMore(jobCache.hasMore);
+          hasMoreRef.current = jobCache.hasMore;
+          loadingRef.current = false;
+          setLoading(false);
+          return;
+        }
 
-      hasMoreRef.current = more;
-      setHasMore(more);
-      setPage(pageNumber);
-    } catch {
-      setError("Failed to load jobs.");
-    } finally {
-      loadingRef.current = false;
-      setLoading(false);
-    }
-  }, [isRecommendationMode]);
+        const res = await axios.get(
+          `/api/interns/approved?page=${pageNumber}&limit=6`,
+        );
+        const { data, hasMore: more } = res.data;
+
+        setJobs((prev) => {
+          const updated = pageNumber === 1 ? data : [...prev, ...data];
+          jobCache.data = updated;
+          jobCache.page = pageNumber;
+          jobCache.hasMore = more;
+          jobCache.timestamp = Date.now();
+          return updated;
+        });
+
+        hasMoreRef.current = more;
+        setHasMore(more);
+        setPage(pageNumber);
+      } catch {
+        setError("Failed to load jobs.");
+      } finally {
+        loadingRef.current = false;
+        setLoading(false);
+      }
+    },
+    [isRecommendationMode],
+  );
 
   /* ----------------------------------
      INITIAL LOAD (ONLY HOME PAGE)
@@ -129,7 +141,7 @@ const JobCard = ({
           fetchJobs(page + 1);
         }
       },
-      { threshold: 0.8 }
+      { threshold: 0.8 },
     );
 
     observer.observe(loadMoreRef.current);
@@ -144,13 +156,17 @@ const JobCard = ({
       (savedJob) =>
         savedJob.jobId?._id === jobId ||
         savedJob.jobId === jobId ||
-        savedJob._id === jobId
+        savedJob._id === jobId,
     );
 
   const toggleSaveJob = async (job) => {
     try {
       const savedLimit = getSavedLimitByPlan(planType);
-      if (!isJobSaved(job._id) && savedJobs.length >= savedLimit && savedLimit !== Infinity) {
+      if (
+        !isJobSaved(job._id) &&
+        savedJobs.length >= savedLimit &&
+        savedLimit !== Infinity
+      ) {
         setShowSavedJobPopup(true);
         return;
       }
@@ -181,13 +197,15 @@ const JobCard = ({
   }, []);
 
   const filteredJobs = jobs.filter((job) =>
-    job.jobTitle?.toLowerCase().includes(searchTerm.toLowerCase())
+    job.jobTitle?.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   if (error) return <p>{error}</p>;
 
   const calculatePostedTime = (date) => {
-    const diff = Math.floor((new Date() - new Date(date)) / (1000 * 60 * 60 * 24));
+    const diff = Math.floor(
+      (new Date() - new Date(date)) / (1000 * 60 * 60 * 24),
+    );
     if (diff === 0) return "Today";
     if (diff === 1) return "Yesterday";
     return `${diff}d ago`;
@@ -236,16 +254,24 @@ const JobCard = ({
                     src={job.imgUrl}
                     alt="Company Logo"
                     className="w-10 h-10 rounded-full object-cover flex-shrink-0"
-                    onError={(e) => { e.target.onerror = null; e.target.src = "/favicon-512x469.png"; }}
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = "/favicon-512x469.png";
+                    }}
                   />
                   <div className="flex-grow min-w-0 pr-16">
-                    <h5 className="text-base font-semibold text-gray-900 truncate">{job.jobTitle}</h5>
+                    <h5 className="text-base font-semibold text-gray-900 truncate">
+                      {job.jobTitle}
+                    </h5>
                     <div className="flex items-center text-sm text-gray-400">
                       <span className="truncate">{job.companyName}</span>
                       <span className="mx-1">·</span>
-                      <span className="whitespace-nowrap">{calculatePostedTime(job.createdAt)}</span>
+                      <span className="whitespace-nowrap">
+                        {calculatePostedTime(job.createdAt)}
+                      </span>
                     </div>
-                    <p className="text-xs text-gray-400 mt-1 whitespace-nowrap">
+                    {/*Remove "whitespace-nowrap" add "break-all" for alignment in tabs - 07-08-2026*/}
+                    <p className="text-xs text-gray-400 mt-1 break-all">
                       ID: {job._id}
                     </p>
                   </div>
@@ -259,26 +285,33 @@ const JobCard = ({
                   </p>
                   <p className="flex items-center text-sm text-gray-500">
                     <FaClock className="mr-2 text-gray-400 flex-shrink-0" />
-                    {job.startDate ? new Date(job.startDate).toLocaleDateString() : "—"}
+                    {job.startDate
+                      ? new Date(job.startDate).toLocaleDateString()
+                      : "—"}
                     {" – "}
-                    {job.endDateOrDuration ? new Date(job.endDateOrDuration).toLocaleDateString() : "—"}
+                    {job.endDateOrDuration
+                      ? new Date(job.endDateOrDuration).toLocaleDateString()
+                      : "—"}
                   </p>
                   <p className="flex items-center text-sm text-gray-500">
                     <FaDollarSign className="mr-2 text-gray-400 flex-shrink-0" />
                     {job.internshipType === "STIPEND"
                       ? `${job.compensationDetails?.amount} ${job.compensationDetails?.currency}`
                       : job.internshipType === "FREE"
-                      ? "Unpaid / Free"
-                      : job.internshipType === "PAID"
-                      ? `Student Pays: ${job.compensationDetails?.amount} ${job.compensationDetails?.currency}`
-                      : "N/A"}
+                        ? "Unpaid / Free"
+                        : job.internshipType === "PAID"
+                          ? `Student Pays: ${job.compensationDetails?.amount} ${job.compensationDetails?.currency}`
+                          : "N/A"}
                   </p>
                 </div>
 
                 {/* ── Skill tags ── */}
                 <div className="flex flex-wrap gap-1.5">
                   {job.qualifications?.slice(0, 3).map((q, i) => (
-                    <span key={i} className="text-xs bg-gray-100 text-gray-700 py-1 px-2.5 rounded-full">
+                    <span
+                      key={i}
+                      className="text-xs bg-gray-100 text-gray-700 py-1 px-2.5 rounded-full"
+                    >
                       {q}
                     </span>
                   ))}
@@ -292,7 +325,9 @@ const JobCard = ({
                 {/* ── AI match reason (only present in recommendation mode + Claude returned one) ── */}
                 {isRecommendation && job.match_reason && (
                   <div className="flex items-start gap-2 bg-purple-50 border border-purple-100 rounded-lg px-3 py-2.5">
-                    <span className="text-purple-400 text-xs mt-0.5 flex-shrink-0">✦</span>
+                    <span className="text-purple-400 text-xs mt-0.5 flex-shrink-0">
+                      ✦
+                    </span>
                     <p className="text-xs text-purple-700 leading-relaxed">
                       {job.match_reason}
                     </p>
@@ -322,7 +357,9 @@ const JobCard = ({
       {showSavedJobPopup && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
           <div className="bg-white p-6 rounded-xl shadow-xl max-w-sm w-full text-center">
-            <h2 className="text-lg font-semibold text-gray-800">Saved Jobs Limit Reached</h2>
+            <h2 className="text-lg font-semibold text-gray-800">
+              Saved Jobs Limit Reached
+            </h2>
             <p className="text-gray-500 mt-2 text-sm">
               You have reached the maximum of{" "}
               {getSavedLimitByPlan(planType) === Infinity
@@ -353,9 +390,14 @@ const JobCard = ({
 
       {/* Infinite scroll trigger (home page only) */}
       {!isRecommendationMode && (
-        <div ref={loadMoreRef} className="h-10 flex justify-center items-center">
+        <div
+          ref={loadMoreRef}
+          className="h-10 flex justify-center items-center"
+        >
           {loading && (
-            <span className="text-gray-400 text-sm">Loading more internships…</span>
+            <span className="text-gray-400 text-sm">
+              Loading more internships…
+            </span>
           )}
         </div>
       )}

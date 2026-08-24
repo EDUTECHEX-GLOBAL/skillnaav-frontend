@@ -34,7 +34,7 @@ const SchoolAdminLogin = () => {
 
       if (!data.isApproved) {
         setErrorMessage(
-          "Your account is not yet approved by the platform administrator."
+          "Your account is not yet approved by the platform administrator.",
         );
         return;
       }
@@ -48,7 +48,7 @@ const SchoolAdminLogin = () => {
     } catch (error) {
       console.error("Login error:", error.response || error.message);
       setErrorMessage(
-        error.response?.data?.message || "Something went wrong during login."
+        error.response?.data?.message || "Something went wrong during login.",
       );
     } finally {
       setLoading(false);
@@ -98,9 +98,10 @@ const SchoolAdminLogin = () => {
               onChange={handleChange}
               required
             />
+            {/*Remove "-translate-y-1/2" for eye icon alignment - 05-08-2026*/}
             <button
               type="button"
-              className="absolute top-1/2 right-3 -translate-y-1/2 text-gray-500"
+              className="absolute top-1/2 right-3 text-gray-500"
               onClick={() => setShowPassword(!showPassword)}
             >
               {showPassword ? <FiEyeOff size={20} /> : <FiEye size={20} />}
@@ -138,30 +139,41 @@ const SchoolAdminLogin = () => {
               onSuccess={async (credentialResponse) => {
                 try {
                   const idToken = credentialResponse.credential;
-                  const { data } = await axios.post("/api/school-admin/google-auth", { idToken });
+                  const { data } = await axios.post(
+                    "/api/school-admin/google-auth",
+                    { idToken },
+                  );
 
                   // ✅ Added: check approval for Google login too, but allow profile completion
                   if (!data.isApproved && !data.needsProfileCompletion) {
                     setErrorMessage(
-                      "Your account is not yet approved by the platform administrator."
+                      "Your account is not yet approved by the platform administrator.",
                     );
                     return;
                   }
 
                   localStorage.setItem("schoolAdminToken", data.token);
                   localStorage.setItem("schoolAdminId", data._id);
-                  localStorage.setItem("schoolAdminProfile", JSON.stringify(data));
+                  localStorage.setItem(
+                    "schoolAdminProfile",
+                    JSON.stringify(data),
+                  );
                   localStorage.setItem("loginTime", Date.now());
 
                   if (data.needsProfileCompletion) {
-                    navigate("/schooladmin/profile", { state: { isGoogleUser: true } });
+                    navigate("/schooladmin/profile", {
+                      state: { isGoogleUser: true },
+                    });
                   } else {
                     navigate("/schooladmin/dashboard");
                   }
                 } catch (error) {
-                  console.error("Google login error:", error.response || error.message);
+                  console.error(
+                    "Google login error:",
+                    error.response || error.message,
+                  );
                   setErrorMessage(
-                    error.response?.data?.message || "Google login failed."
+                    error.response?.data?.message || "Google login failed.",
                   );
                 }
               }}

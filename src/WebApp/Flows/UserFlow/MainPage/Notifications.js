@@ -19,7 +19,9 @@ const Notifications = ({ onNavigate }) => {
     const fetchNotifications = async () => {
       try {
         setLoading(true);
-        const userInfo = (JSON.parse(localStorage.getItem("studentInfo")) || JSON.parse(localStorage.getItem("userInfo")));
+        const userInfo =
+          JSON.parse(localStorage.getItem("studentInfo")) ||
+          JSON.parse(localStorage.getItem("userInfo"));
         const studentId = userInfo?._id;
         if (!studentId) {
           setError("Unable to identify user");
@@ -31,7 +33,7 @@ const Notifications = ({ onNavigate }) => {
             (data.notifications || []).map((n) => ({
               ...n,
               isRead: Boolean(n.read || n.isRead),
-            }))
+            })),
           );
         } else {
           setError("Failed to fetch notifications");
@@ -59,7 +61,7 @@ const Notifications = ({ onNavigate }) => {
   const dispatchOpenTab = useCallback((tab, delayed = false) => {
     const fire = () =>
       window.dispatchEvent(
-        new CustomEvent("openTab", { detail: { tab, fromNotification: true } })
+        new CustomEvent("openTab", { detail: { tab, fromNotification: true } }),
       );
     if (delayed) {
       // Wait for the target page component to mount before firing the event
@@ -104,7 +106,9 @@ const Notifications = ({ onNavigate }) => {
         // ── 2a. Legacy assessment deep-link  /student/assessments/:id ──────
         //    Old notifications stored this path. Navigate to Applications tab
         //    so the student can start the assessment from their card themselves.
-        const assessmentMatch = link.match(/\/student\/assessments\/([a-f0-9]{24})/i);
+        const assessmentMatch = link.match(
+          /\/student\/assessments\/([a-f0-9]{24})/i,
+        );
         if (assessmentMatch) {
           navigate("/user-main-page?openTab=applications");
           dispatchOpenTab("applications", true);
@@ -135,8 +139,13 @@ const Notifications = ({ onNavigate }) => {
       // ── 4. Named tab shorthand  e.g. "recommendations", "offers", "assessment"
       //    Plain strings with no slash/protocol — treat directly as tab names.
       const knownTabs = [
-        "recommendations", "offers", "profile",
-        "interviews", "placements", "assessment", "applications",
+        "recommendations",
+        "offers",
+        "profile",
+        "interviews",
+        "placements",
+        "assessment",
+        "applications",
       ];
       if (knownTabs.some((t) => link.toLowerCase().includes(t))) {
         const matched = knownTabs.find((t) => link.toLowerCase().includes(t));
@@ -167,13 +176,13 @@ const Notifications = ({ onNavigate }) => {
       // ── 6. Fallback: let the browser handle it ─────────────────────────────
       window.location.href = link;
     },
-    [navigate, dispatchOpenTab]
+    [navigate, dispatchOpenTab],
   );
 
   // ── Mark single as read ────────────────────────────────────────────────────
   const markOneRead = useCallback(async (id) => {
     setNotifications((prev) =>
-      prev.map((n) => (n._id === id ? { ...n, isRead: true } : n))
+      prev.map((n) => (n._id === id ? { ...n, isRead: true } : n)),
     );
     try {
       await axios.put(`/api/notifications/read/${id}`);
@@ -186,7 +195,9 @@ const Notifications = ({ onNavigate }) => {
   const markAllRead = async () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
     try {
-      const userInfo = (JSON.parse(localStorage.getItem("studentInfo")) || JSON.parse(localStorage.getItem("userInfo")));
+      const userInfo =
+        JSON.parse(localStorage.getItem("studentInfo")) ||
+        JSON.parse(localStorage.getItem("userInfo"));
       const studentId = userInfo?._id;
       await axios.put(`/api/notifications/read-all`, { studentId });
     } catch (err) {
@@ -206,7 +217,9 @@ const Notifications = ({ onNavigate }) => {
     e?.stopPropagation();
     try {
       await axios.delete(`/api/notifications/${notification._id}`);
-      setNotifications((prev) => prev.filter((n) => n._id !== notification._id));
+      setNotifications((prev) =>
+        prev.filter((n) => n._id !== notification._id),
+      );
       setOpenMenuId(null);
     } catch (err) {
       console.error("Error deleting notification:", err);
@@ -294,10 +307,10 @@ const Notifications = ({ onNavigate }) => {
             Recent updates, offers and recommendations
           </p>
         </div>
-
+        {/* change the style to decrease the size of the button in mobile view gap-2 to gap-1 text-sm to text-xs sm:text-sm px-3 py-1 to px-2 sm:px-3 py-1 sm:py-2* - 06-08-2026 */}
         <button
           onClick={markAllRead}
-          className="inline-flex items-center gap-2 text-sm bg-white border border-gray-200 px-3 py-1 rounded-lg shadow-sm hover:shadow-md transition-shadow"
+          className="inline-flex items-center gap-1 text-xs sm:text-sm bg-white border border-gray-200 px-2 sm:px-3 py-1 sm:py-2 rounded-lg shadow-sm hover:shadow-md transition-shadow"
           aria-label="Mark all as read"
         >
           <ArrowPathIcon className="w-4 h-4" />
@@ -316,7 +329,9 @@ const Notifications = ({ onNavigate }) => {
       ) : notifications.length === 0 ? (
         <div className="text-center py-16">
           <CheckCircleIcon className="w-10 h-10 text-green-400 mx-auto mb-3" />
-          <p className="text-gray-500 text-sm">You're all caught up — no notifications.</p>
+          <p className="text-gray-500 text-sm">
+            You're all caught up — no notifications.
+          </p>
         </div>
       ) : (
         <ul className="space-y-4">
@@ -342,13 +357,17 @@ const Notifications = ({ onNavigate }) => {
               {/* Body */}
               <div className="flex-1 min-w-0 pr-8">
                 {notification.title && (
-                  <p className={`text-base font-semibold ${notification.isRead ? "text-gray-800" : "text-gray-900"}`}>
+                  <p
+                    className={`text-base font-semibold ${notification.isRead ? "text-gray-800" : "text-gray-900"}`}
+                  >
                     {notification.title}
                   </p>
                 )}
                 <p
                   className={`text-sm ${
-                    notification.isRead ? "text-gray-700" : "text-blue-900 font-medium"
+                    notification.isRead
+                      ? "text-gray-700"
+                      : "text-blue-900 font-medium"
                   } ${notification.title ? "mt-1" : ""}`}
                 >
                   {notification.message}
@@ -380,7 +399,7 @@ const Notifications = ({ onNavigate }) => {
                 <button
                   onClick={() =>
                     setOpenMenuId((prev) =>
-                      prev === notification._id ? null : notification._id
+                      prev === notification._id ? null : notification._id,
                     )
                   }
                   className="text-gray-400 hover:text-gray-700 p-1 rounded transition-colors"
@@ -410,7 +429,7 @@ const Notifications = ({ onNavigate }) => {
                           onClick={() => {
                             handleDownload(
                               notification.link,
-                              downloadFilename(notification.type)
+                              downloadFilename(notification.type),
                             );
                             setOpenMenuId(null);
                           }}

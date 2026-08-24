@@ -1,9 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import {
-  TextField,
-  IconButton,
-  InputAdornment,
-} from "@mui/material";
+import { TextField, IconButton, InputAdornment } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import ClearIcon from "@mui/icons-material/Clear";
 import axios from "../../../../api/axiosInstance";
@@ -18,27 +14,27 @@ const FILTER_GROUPS = [
     key: "internshipType",
     label: "Type",
     options: [
-      { value: "FREE",    label: "Free" },
+      { value: "FREE", label: "Free" },
       { value: "STIPEND", label: "Stipend" },
-      { value: "PAID",    label: "Paid" },
+      { value: "PAID", label: "Paid" },
     ],
   },
   {
     key: "internshipMode",
     label: "Mode",
     options: [
-      { value: "ONLINE",  label: "Online" },
+      { value: "ONLINE", label: "Online" },
       { value: "OFFLINE", label: "Offline" },
-      { value: "HYBRID",  label: "Hybrid" },
+      { value: "HYBRID", label: "Hybrid" },
     ],
   },
   {
     key: "classification",
     label: "Level",
     options: [
-      { value: "Basic",        label: "Basic" },
+      { value: "Basic", label: "Basic" },
       { value: "Intermediate", label: "Intermediate" },
-      { value: "Advanced",     label: "Advanced" },
+      { value: "Advanced", label: "Advanced" },
     ],
   },
 ];
@@ -77,8 +73,8 @@ const SearchBar = () => {
   const hasMoreRef = useRef(true);
 
   const MAX_LIMITS = {
-    "Free": 5,
-    "Freemium": 5,
+    Free: 5,
+    Freemium: 5,
     "Premium Basic": 25,
     "Premium Plus": Infinity,
   };
@@ -87,29 +83,37 @@ const SearchBar = () => {
 
   // ── Filter helpers ────────────────────────────────────────────────────────
   const clearAllFilters = () =>
-    setActiveFilters({ internshipType: null, internshipMode: null, classification: null });
+    setActiveFilters({
+      internshipType: null,
+      internshipMode: null,
+      classification: null,
+    });
 
   const hasActiveFilters = Object.values(activeFilters).some(Boolean);
 
   // ── Plan helpers ──────────────────────────────────────────────────────────
   const getSavedLimitByPlan = (plan) => {
     switch (plan) {
-      case "Premium Plus":  return Infinity;
-      case "Premium Basic": return 25;
+      case "Premium Plus":
+        return Infinity;
+      case "Premium Basic":
+        return 25;
       case "Freemium":
-      default:              return 3;
+      default:
+        return 3;
     }
   };
 
   // ── Data fetching ─────────────────────────────────────────────────────────
   const fetchJobData = useCallback(async (pageNumber = 1, searchQuery = "") => {
     try {
-      if (loadingJobsRef.current || (pageNumber !== 1 && !hasMoreRef.current)) return;
+      if (loadingJobsRef.current || (pageNumber !== 1 && !hasMoreRef.current))
+        return;
       loadingJobsRef.current = true;
       setLoadingJobs(true);
 
       const response = await axios.get(
-        `/api/interns/approved?page=${pageNumber}&limit=6&search=${encodeURIComponent(searchQuery)}`
+        `/api/interns/approved?page=${pageNumber}&limit=6&search=${encodeURIComponent(searchQuery)}`,
       );
       const { data, hasMore: more } = response.data;
 
@@ -143,12 +147,15 @@ const SearchBar = () => {
           {};
         if (userInfo._id) {
           const { data: countData } = await axios.get(
-            `/api/applications/count/${userInfo._id}`
+            `/api/applications/count/${userInfo._id}`,
           );
           setApplicationCount(countData.count);
         }
       } catch (error) {
-        console.error("Error fetching user profile or application count:", error);
+        console.error(
+          "Error fetching user profile or application count:",
+          error,
+        );
       }
     };
 
@@ -165,11 +172,15 @@ const SearchBar = () => {
     const observer = new IntersectionObserver(
       (entries) => {
         const firstEntry = entries[0];
-        if (firstEntry.isIntersecting && hasMoreRef.current && !loadingJobsRef.current) {
+        if (
+          firstEntry.isIntersecting &&
+          hasMoreRef.current &&
+          !loadingJobsRef.current
+        ) {
           fetchJobData(page + 1, debouncedSearchTerm);
         }
       },
-      { threshold: 0.8 }
+      { threshold: 0.8 },
     );
     observer.observe(loadMoreRef.current);
     return () => observer.disconnect();
@@ -184,7 +195,7 @@ const SearchBar = () => {
       if (!userInfo) return;
 
       const { data: checkData } = await axios.get(
-        `/api/applications/check-applied/${userInfo._id}/${job._id}`
+        `/api/applications/check-applied/${userInfo._id}/${job._id}`,
       );
 
       if (checkData.isApplied) {
@@ -195,7 +206,7 @@ const SearchBar = () => {
       }
 
       const { data: countData } = await axios.get(
-        `/api/applications/count/${userInfo._id}`
+        `/api/applications/count/${userInfo._id}`,
       );
       setApplicationCount(countData.count);
 
@@ -225,7 +236,9 @@ const SearchBar = () => {
 
   const calculatePostedTime = (date) => {
     if (!date) return "—";
-    const diff = Math.floor((new Date() - new Date(date)) / (1000 * 60 * 60 * 24));
+    const diff = Math.floor(
+      (new Date() - new Date(date)) / (1000 * 60 * 60 * 24),
+    );
     if (diff === 0) return "Today";
     if (diff === 1) return "Yesterday";
     return `${diff}d ago`;
@@ -236,13 +249,17 @@ const SearchBar = () => {
       (savedJob) =>
         savedJob.jobId?._id === jobId ||
         savedJob.jobId === jobId ||
-        savedJob._id === jobId
+        savedJob._id === jobId,
     );
 
   const toggleSaveJob = async (job) => {
     try {
       const savedLimit = getSavedLimitByPlan(planType);
-      if (!isJobSaved(job._id) && savedJobs?.length >= savedLimit && savedLimit !== Infinity) {
+      if (
+        !isJobSaved(job._id) &&
+        savedJobs?.length >= savedLimit &&
+        savedLimit !== Infinity
+      ) {
         setShowSavedJobPopup(true);
         return;
       }
@@ -265,7 +282,7 @@ const SearchBar = () => {
       job._id?.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesTags = Object.entries(activeFilters).every(
-      ([key, val]) => !val || job[key] === val
+      ([key, val]) => !val || job[key] === val,
     );
 
     return matchesSearch && matchesTags;
@@ -306,7 +323,9 @@ const SearchBar = () => {
             <div className="flex flex-wrap gap-3 pt-1">
               {FILTER_GROUPS.map((group) => (
                 <div key={group.key} className="flex flex-col gap-1">
-                  <label className="text-xs text-gray-500 font-medium">{group.label}</label>
+                  <label className="text-xs text-gray-500 font-medium">
+                    {group.label}
+                  </label>
                   <select
                     value={activeFilters[group.key] ?? ""}
                     onChange={(e) =>
@@ -341,15 +360,26 @@ const SearchBar = () => {
           {/* Job cards */}
           <div className="py-2 lg:py-4">
             <section className="py-2 px-0">
-              <h2 className="text-2xl md:text-3xl font-bold mb-2">Search Results</h2>
+              <h2 className="text-2xl md:text-3xl font-bold mb-2">
+                Search Results
+              </h2>
               <p className="text-gray-600 mb-4">
                 Showing internships and jobs matching your query
               </p>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
-                {filteredJobs.length > 0 ? (
+                {/* {filteredJobs.length > 0 ? ( */}
+                {/*comment the above condition add the below condition for correct loading effect while searching - 07-08-2026 */}
+                {loadingJobs && filteredJobs.length === 0 ? (
+                  <div className="col-span-full text-center py-10">
+                    <p className="text-gray-500">Searching internships...</p>
+                  </div>
+                ) : filteredJobs.length > 0 ? (
                   filteredJobs.map((job) => (
-                    <div key={job._id} className="relative border rounded-lg p-6 shadow-sm">
+                    <div
+                      key={job._id}
+                      className="relative border rounded-lg p-6 shadow-sm"
+                    >
                       <div className="absolute top-2 right-2 flex items-center gap-2">
                         {job.internshipType && (
                           <span
@@ -357,10 +387,10 @@ const SearchBar = () => {
                               job.internshipType === "FREE"
                                 ? "bg-green-100 text-green-700"
                                 : job.internshipType === "STIPEND"
-                                ? "bg-blue-100 text-blue-700"
-                                : job.internshipType === "PAID"
-                                ? "bg-red-100 text-red-700"
-                                : ""
+                                  ? "bg-blue-100 text-blue-700"
+                                  : job.internshipType === "PAID"
+                                    ? "bg-red-100 text-red-700"
+                                    : ""
                             }`}
                           >
                             {job.internshipType}
@@ -373,7 +403,9 @@ const SearchBar = () => {
                               ? "text-red-500"
                               : "text-gray-500 hover:text-red-500"
                           }`}
-                          aria-label={isJobSaved(job._id) ? "Unsave job" : "Save job"}
+                          aria-label={
+                            isJobSaved(job._id) ? "Unsave job" : "Save job"
+                          }
                         >
                           <FaHeart />
                         </button>
@@ -393,13 +425,25 @@ const SearchBar = () => {
                           }}
                         />
                         <div className="flex-1 min-w-0 pr-12">
-                          <h3 className="text-lg md:text-xl font-semibold truncate" title={job.jobTitle}>{job.jobTitle}</h3>
+                          <h3
+                            className="text-lg md:text-xl font-semibold truncate"
+                            title={job.jobTitle}
+                          >
+                            {job.jobTitle}
+                          </h3>
                           <div className="flex items-center text-gray-600">
-                            <span className="truncate" title={job.companyName}>{job.companyName}</span>
+                            <span className="truncate" title={job.companyName}>
+                              {job.companyName}
+                            </span>
                             <span className="mx-1">•</span>
-                            <span className="whitespace-nowrap">{calculatePostedTime(job.createdAt)}</span>
+                            <span className="whitespace-nowrap">
+                              {calculatePostedTime(job.createdAt)}
+                            </span>
                           </div>
-                          <p className="text-xs text-gray-400 mt-1 whitespace-nowrap">ID: {job._id}</p>
+                          {/*Remove "whitespace-nowrap" add "break-all" for alignment in tabs - 07-08-2026*/}
+                          <p className="text-xs text-gray-400 mt-1 break-all">
+                            ID: {job._id}
+                          </p>
                         </div>
                       </div>
 
@@ -410,9 +454,15 @@ const SearchBar = () => {
                         </p>
                         <p className="flex items-center mt-2 text-sm md:text-base">
                           <FaClock className="mr-2" />
-                          {job.startDate ? format(new Date(job.startDate), "dd MMM yyyy") : "—"} –{" "}
+                          {job.startDate
+                            ? format(new Date(job.startDate), "dd MMM yyyy")
+                            : "—"}{" "}
+                          –{" "}
                           {job.endDateOrDuration
-                            ? format(new Date(job.endDateOrDuration), "dd MMM yyyy")
+                            ? format(
+                                new Date(job.endDateOrDuration),
+                                "dd MMM yyyy",
+                              )
                             : "—"}
                         </p>
                         <div className="flex items-center gap-2 text-gray-600 text-sm md:text-base leading-none mt-2">
@@ -421,10 +471,10 @@ const SearchBar = () => {
                             {job.internshipType === "STIPEND"
                               ? `${job.compensationDetails?.amount} ${job.compensationDetails?.currency}`
                               : job.internshipType === "FREE"
-                              ? "Unpaid / Free"
-                              : job.internshipType === "PAID"
-                              ? `Student Pays: ${job.compensationDetails?.amount} ${job.compensationDetails?.currency}`
-                              : "N/A"}
+                                ? "Unpaid / Free"
+                                : job.internshipType === "PAID"
+                                  ? `Student Pays: ${job.compensationDetails?.amount} ${job.compensationDetails?.currency}`
+                                  : "N/A"}
                           </span>
                         </div>
                         <p className="flex items-center mt-2 text-sm md:text-base">
@@ -432,8 +482,8 @@ const SearchBar = () => {
                             {job.internshipMode === "ONLINE"
                               ? "Online"
                               : job.internshipMode === "OFFLINE"
-                              ? "Offline"
-                              : "Hybrid"}
+                                ? "Offline"
+                                : "Hybrid"}
                           </span>
                         </p>
                       </div>
@@ -441,19 +491,22 @@ const SearchBar = () => {
                       <div className="flex items-center justify-between">
                         <div className="flex flex-wrap gap-2">
                           {job.qualifications &&
-                            job.qualifications.slice(0, 2).map((qualification, i) => (
-                              <span
-                                key={i}
-                                className="text-sm md:text-base bg-gray-200 text-gray-800 py-1 px-3 rounded-full"
-                              >
-                                {qualification}
+                            job.qualifications
+                              .slice(0, 2)
+                              .map((qualification, i) => (
+                                <span
+                                  key={i}
+                                  className="text-sm md:text-base bg-gray-200 text-gray-800 py-1 px-3 rounded-full"
+                                >
+                                  {qualification}
+                                </span>
+                              ))}
+                          {job.qualifications &&
+                            job.qualifications.length > 2 && (
+                              <span className="text-sm md:text-base bg-gray-100 text-gray-700 py-1 px-3 rounded-full">
+                                +{job.qualifications.length - 2}
                               </span>
-                            ))}
-                          {job.qualifications && job.qualifications.length > 2 && (
-                            <span className="text-sm md:text-base bg-gray-100 text-gray-700 py-1 px-3 rounded-full">
-                              +{job.qualifications.length - 2}
-                            </span>
-                          )}
+                            )}
                         </div>
                         <button
                           className="text-purple-600 hover:underline text-sm md:text-base"
@@ -465,16 +518,30 @@ const SearchBar = () => {
                     </div>
                   ))
                 ) : (
-                  <p className="text-center text-gray-500 col-span-full">No jobs found</p>
+                  <p className="text-center text-gray-500 col-span-full">
+                    {/* Add style to this text - 07-08-2026*/}
+                    <p className="text-gray-500">No jobs found</p>
+                  </p>
                 )}
               </div>
             </section>
           </div>
 
           {/* Load-more sentinel — inside list branch only, so observer stops when detail is shown */}
-          <div ref={loadMoreRef} className="h-10 flex justify-center items-center">
-            {loadingJobs && (
-              <span className="text-gray-500 text-sm">Loading more internships…</span>
+          <div
+            ref={loadMoreRef}
+            className="h-10 flex justify-center items-center"
+          >
+            {/* {loadingJobs && (
+              <span className="text-gray-500 text-sm">
+                Loading more internships…
+              </span>
+            )} */}
+            {/*Add this for correct functionality while searching the internships - 07-08-2026 */}
+            {loadingJobs && filteredJobs.length > 0 && hasMoreRef.current && (
+              <span className="text-gray-500 text-sm">
+                Loading more internships...
+              </span>
             )}
           </div>
         </>
@@ -484,11 +551,16 @@ const SearchBar = () => {
       {showLimitPopup && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
           <div className="bg-white p-6 rounded-lg shadow-lg max-w-sm text-center">
-            <h2 className="text-xl font-semibold text-gray-800">Application Limit Reached</h2>
+            <h2 className="text-xl font-semibold text-gray-800">
+              Application Limit Reached
+            </h2>
             <p className="text-gray-600 mt-2">
-              You have reached the maximum of {MAX_LIMITS[planType] || 5} applications allowed under your plan ({planType}).
+              You have reached the maximum of {MAX_LIMITS[planType] || 5}{" "}
+              applications allowed under your plan ({planType}).
             </p>
-            <p className="text-gray-600 mt-1">Upgrade your account to apply for more jobs.</p>
+            <p className="text-gray-600 mt-1">
+              Upgrade your account to apply for more jobs.
+            </p>
             <div className="flex justify-between mt-4">
               <button
                 className="bg-gray-400 text-white px-4 py-2 rounded-md hover:bg-gray-500"
@@ -514,7 +586,9 @@ const SearchBar = () => {
       {showSavedJobPopup && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
           <div className="bg-white p-6 rounded-lg shadow-lg max-w-sm text-center">
-            <h2 className="text-xl font-semibold text-gray-800">Saved Jobs Limit Reached</h2>
+            <h2 className="text-xl font-semibold text-gray-800">
+              Saved Jobs Limit Reached
+            </h2>
             <p className="text-gray-600 mt-2">
               You have reached the maximum of{" "}
               {getSavedLimitByPlan(planType) === Infinity

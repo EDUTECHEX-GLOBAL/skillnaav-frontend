@@ -30,6 +30,7 @@ const VALID_TABS = new Set([
   "precision-agriculture",
   "advanced-robotics",
   "renewable-energy",
+  "architecture-built-environment",
 ]);
 
 const TAB_ROUTE_SEGMENTS = {
@@ -57,6 +58,7 @@ const TAB_ROUTE_SEGMENTS = {
   "precision-agriculture": "precision-agriculture",
   "advanced-robotics": "advanced-robotics",
   "renewable-energy": "renewable-energy",
+  "architecture-built-environment": "architecture-built-environment",
 };
 
 const normalizePath = (path = "") => {

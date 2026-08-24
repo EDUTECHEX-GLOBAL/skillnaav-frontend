@@ -20,6 +20,7 @@ import {
   faPen,
   faTrash,
   faCloudUploadAlt,
+  faSpinner,
   faClock,
   faDollarSign,
   faClipboardList,
@@ -37,43 +38,37 @@ const labelCls =
 
 const sectionThemes = {
   "Personal & Contact": {
-    wrap:
-      "rounded-3xl border border-slate-200/80 bg-gradient-to-br from-white via-sky-50/30 to-indigo-50/40 p-5 shadow-sm shadow-slate-200/60",
+    wrap: "rounded-3xl border border-slate-200/80 bg-gradient-to-br from-white via-sky-50/30 to-indigo-50/40 p-5 shadow-sm shadow-slate-200/60",
     title:
       "text-xs font-bold text-sky-700 uppercase tracking-widest flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-gradient-to-r after:from-sky-300 after:via-indigo-200 after:to-transparent",
     icon: "text-sky-500 text-[10px]",
   },
   "Professional & Teaching": {
-    wrap:
-      "rounded-3xl border border-slate-200/80 bg-gradient-to-br from-white via-violet-50/25 to-fuchsia-50/35 p-5 shadow-sm shadow-slate-200/60",
+    wrap: "rounded-3xl border border-slate-200/80 bg-gradient-to-br from-white via-violet-50/25 to-fuchsia-50/35 p-5 shadow-sm shadow-slate-200/60",
     title:
       "text-xs font-bold text-violet-700 uppercase tracking-widest flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-gradient-to-r after:from-violet-300 after:via-fuchsia-200 after:to-transparent",
     icon: "text-violet-500 text-[10px]",
   },
   Availability: {
-    wrap:
-      "rounded-3xl border border-slate-200/80 bg-gradient-to-br from-white via-cyan-50/25 to-blue-50/35 p-5 shadow-sm shadow-slate-200/60",
+    wrap: "rounded-3xl border border-slate-200/80 bg-gradient-to-br from-white via-cyan-50/25 to-blue-50/35 p-5 shadow-sm shadow-slate-200/60",
     title:
       "text-xs font-bold text-cyan-700 uppercase tracking-widest flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-gradient-to-r after:from-cyan-300 after:via-blue-200 after:to-transparent",
     icon: "text-cyan-500 text-[10px]",
   },
   "Compensation / Payout": {
-    wrap:
-      "rounded-3xl border border-slate-200/80 bg-gradient-to-br from-white via-emerald-50/25 to-teal-50/35 p-5 shadow-sm shadow-slate-200/60",
+    wrap: "rounded-3xl border border-slate-200/80 bg-gradient-to-br from-white via-emerald-50/25 to-teal-50/35 p-5 shadow-sm shadow-slate-200/60",
     title:
       "text-xs font-bold text-emerald-700 uppercase tracking-widest flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-gradient-to-r after:from-emerald-300 after:via-teal-200 after:to-transparent",
     icon: "text-emerald-500 text-[10px]",
   },
   "Compliance & Documents": {
-    wrap:
-      "rounded-3xl border border-slate-200/80 bg-gradient-to-br from-white via-amber-50/25 to-orange-50/35 p-5 shadow-sm shadow-slate-200/60",
+    wrap: "rounded-3xl border border-slate-200/80 bg-gradient-to-br from-white via-amber-50/25 to-orange-50/35 p-5 shadow-sm shadow-slate-200/60",
     title:
       "text-xs font-bold text-amber-700 uppercase tracking-widest flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-gradient-to-r after:from-amber-300 after:via-orange-200 after:to-transparent",
     icon: "text-amber-500 text-[10px]",
   },
   Assignment: {
-    wrap:
-      "rounded-3xl border border-slate-200/80 bg-gradient-to-br from-white via-rose-50/20 to-pink-50/30 p-5 shadow-sm shadow-slate-200/60",
+    wrap: "rounded-3xl border border-slate-200/80 bg-gradient-to-br from-white via-rose-50/20 to-pink-50/30 p-5 shadow-sm shadow-slate-200/60",
     title:
       "text-xs font-bold text-rose-700 uppercase tracking-widest flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-gradient-to-r after:from-rose-300 after:via-pink-200 after:to-transparent",
     icon: "text-rose-500 text-[10px]",
@@ -81,8 +76,7 @@ const sectionThemes = {
 };
 
 const defaultSectionTheme = {
-  wrap:
-    "rounded-3xl border border-slate-200/80 bg-gradient-to-br from-white via-slate-50 to-indigo-50/20 p-5 shadow-sm shadow-slate-200/60",
+  wrap: "rounded-3xl border border-slate-200/80 bg-gradient-to-br from-white via-slate-50 to-indigo-50/20 p-5 shadow-sm shadow-slate-200/60",
   title:
     "text-xs font-bold text-indigo-700 uppercase tracking-widest flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-gradient-to-r after:from-indigo-300 after:to-transparent",
   icon: "text-indigo-500 text-[10px]",
@@ -243,7 +237,9 @@ const FormSection = ({ title, icon, children }) => {
 
 /* ─── field wrapper ─── */
 const Field = ({ label, required, span = 1, children }) => (
-  <div className={span === 2 ? "md:col-span-2" : span === 3 ? "md:col-span-3" : ""}>
+  <div
+    className={`flex flex-col justify-end h-full ${span === 2 ? "md:col-span-2" : span === 3 ? "md:col-span-3" : ""}`}
+  >
     <label className={labelCls}>
       {label} {required && <span className="text-rose-500">*</span>}
     </label>
@@ -269,7 +265,11 @@ const InstructureManagement = () => {
   const [qualification, setQualification] = useState("");
   const [teachingMode, setTeachingMode] = useState("");
   const [backgroundCheck, setBackgroundCheck] = useState("");
-  const [photoPreview, setPhotoPreview] = useState({ open: false, src: "", alt: "" });
+  const [photoPreview, setPhotoPreview] = useState({
+    open: false,
+    src: "",
+    alt: "",
+  });
   const [otpOpen, setOtpOpen] = useState(false);
   const [availStart, setAvailStart] = useState("");
   const [availEnd, setAvailEnd] = useState("");
@@ -280,6 +280,7 @@ const InstructureManagement = () => {
   const [openMenuId, setOpenMenuId] = useState(null);
   const [portalTarget, setPortalTarget] = useState(null);
   const [isAssigning, setIsAssigning] = useState(false);
+  const [isExtracting, setIsExtracting] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const [assignPopup, setAssignPopup] = useState({
@@ -316,17 +317,26 @@ const InstructureManagement = () => {
     return a || (i?.email?.[0] || "?").toUpperCase();
   };
 
-  const openPhoto = (src, alt = "") => setPhotoPreview({ open: true, src, alt });
+  const openPhoto = (src, alt = "") =>
+    setPhotoPreview({ open: true, src, alt });
   const closePhoto = () => setPhotoPreview({ open: false, src: "", alt: "" });
 
-  const addPrefSlot = () => setPrefSlots((prev) => [...prev, { start: "", end: "" }]);
+  const addPrefSlot = () =>
+    setPrefSlots((prev) => [...prev, { start: "", end: "" }]);
   const updatePrefSlot = (idx, field, value) =>
-    setPrefSlots((prev) => prev.map((s, i) => (i === idx ? { ...s, [field]: value } : s)));
-  const removePrefSlot = (idx) => setPrefSlots((prev) => prev.filter((_, i) => i !== idx));
+    setPrefSlots((prev) =>
+      prev.map((s, i) => (i === idx ? { ...s, [field]: value } : s)),
+    );
+  const removePrefSlot = (idx) =>
+    setPrefSlots((prev) => prev.filter((_, i) => i !== idx));
 
   useEffect(() => {
     if (country === "Canada") {
-      if (!["EFT (CA Bank)", "Interac e-Transfer", "PayPal"].includes(payoutMethod))
+      if (
+        !["EFT (CA Bank)", "Interac e-Transfer", "PayPal"].includes(
+          payoutMethod,
+        )
+      )
         setPayoutMethod("EFT (CA Bank)");
     } else if (country === "United States") {
       if (!["ACH (US Bank)", "Zelle", "PayPal"].includes(payoutMethod))
@@ -344,7 +354,12 @@ const InstructureManagement = () => {
         });
         const raw = Array.isArray(data)
           ? data
-          : data?.items || data?.data || data?.results || data?.docs || data?.instructors || [];
+          : data?.items ||
+            data?.data ||
+            data?.results ||
+            data?.docs ||
+            data?.instructors ||
+            [];
         const items = Array.isArray(raw)
           ? raw
           : raw?.items || raw?.results || raw?.docs || raw?.instructors || [];
@@ -390,8 +405,10 @@ const InstructureManagement = () => {
   const stateList = country === "Canada" ? CA_PROVINCES : US_STATES;
   const stateLabel = country === "Canada" ? "Province / Territory" : "State";
   const postalLabel = country === "Canada" ? "Postal Code" : "ZIP Code";
-  const phonePlaceholder = country === "Canada" ? "+1 (416) 555-1234" : "+1 (555) 555-1234";
-  const cityPlaceholder = country === "Canada" ? "e.g., Toronto" : "e.g., San Jose";
+  const phonePlaceholder =
+    country === "Canada" ? "+1 (416) 555-1234" : "+1 (555) 555-1234";
+  const cityPlaceholder =
+    country === "Canada" ? "e.g., Toronto" : "e.g., San Jose";
   const address1Placeholder = "Street address, suite, unit";
 
   const payIdPlaceholder =
@@ -412,11 +429,71 @@ const InstructureManagement = () => {
     return data;
   }
 
+  const handleResumeAutofill = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setIsExtracting(true);
+    const formData = new FormData();
+    formData.append("resume", file);
+
+    try {
+      const res = await axios.post('/api/resume/parse', formData);
+      const data = res.data;
+      
+      const form = formRef.current;
+      if (!form) return;
+
+      if (data.name) {
+        const parts = data.name.trim().split(/\s+/);
+        if (form.elements['firstName']) form.elements['firstName'].value = parts[0] || '';
+        if (form.elements['lastName']) form.elements['lastName'].value = parts.slice(1).join(' ') || '';
+      }
+      if (data.email && form.elements['email']) form.elements['email'].value = data.email;
+      if (data.phone && form.elements['phone']) form.elements['phone'].value = data.phone;
+      if (data.linkedin && form.elements['linkedIn']) form.elements['linkedIn'].value = data.linkedin;
+      if (data.portfolio && form.elements['portfolio']) form.elements['portfolio'].value = data.portfolio;
+      if (data.summary && form.elements['bio']) form.elements['bio'].value = data.summary;
+      
+      if (data.education && data.education.length > 0) {
+        const edu = data.education[0];
+        if (form.elements['major'] && edu.degree) form.elements['major'].value = edu.degree;
+      }
+      
+      if (data.skills && Array.isArray(data.skills)) {
+        const skillsStr = data.skills.join(', ');
+        if (form.elements['skills']) form.elements['skills'].value = skillsStr;
+      }
+      
+      if (data.languages && Array.isArray(data.languages)) {
+        const spokenLangs = data.languages
+          .map((l) => (typeof l === 'object' ? l.language : l))
+          .filter(Boolean);
+        if (form.elements['languages'] && spokenLangs.length > 0) {
+          form.elements['languages'].value = spokenLangs.join(', ');
+        }
+      }
+      
+      // Auto-attach the uploaded file to the required Resume/CV file input field
+      if (form.elements['resume']) {
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(file);
+        form.elements['resume'].files = dataTransfer.files;
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to parse resume automatically. Please fill manually.");
+    } finally {
+      setIsExtracting(false);
+      e.target.value = null;
+    }
+  };
+
   const handleSubmit = async (e) => {
     setSubmitting(true);
     const form = e.currentTarget;
     [...form.querySelectorAll('input[name="availableDays"]')].forEach((el) =>
-      el.setCustomValidity("")
+      el.setCustomValidity(""),
     );
     if (!form.checkValidity()) {
       form.reportValidity();
@@ -429,7 +506,9 @@ const InstructureManagement = () => {
       const fd = new FormData(e.target);
       const availableDays = fd.getAll("availableDays");
       if (availableDays.length === 0) {
-        const firstBox = e.currentTarget.querySelector('input[name="availableDays"]');
+        const firstBox = e.currentTarget.querySelector(
+          'input[name="availableDays"]',
+        );
         if (firstBox) {
           firstBox.setCustomValidity("Select at least one weekday.");
           firstBox.reportValidity();
@@ -459,7 +538,9 @@ const InstructureManagement = () => {
         const s = cleanedSlots[i];
         if (!(s.start < s.end)) {
           const endEl = prefEndRefs.current[i];
-          endEl?.setCustomValidity("End Time must be after Start Time for this slot.");
+          endEl?.setCustomValidity(
+            "End Time must be after Start Time for this slot.",
+          );
           endEl?.reportValidity();
           setSubmitting(false);
           return;
@@ -467,7 +548,7 @@ const InstructureManagement = () => {
         if (start && s.start < start) {
           const stEl = prefStartRefs.current[i];
           stEl?.setCustomValidity(
-            `Slot ${i + 1}: Start must be on or after overall Start (${start}).`
+            `Slot ${i + 1}: Start must be on or after overall Start (${start}).`,
           );
           stEl?.reportValidity();
           setSubmitting(false);
@@ -476,7 +557,7 @@ const InstructureManagement = () => {
         if (end && s.end > end) {
           const enEl = prefEndRefs.current[i];
           enEl?.setCustomValidity(
-            `Slot ${i + 1}: End must be on or before overall End (${end}).`
+            `Slot ${i + 1}: End must be on or before overall End (${end}).`,
           );
           enEl?.reportValidity();
           setSubmitting(false);
@@ -484,11 +565,15 @@ const InstructureManagement = () => {
         }
       }
 
-      const sortedSlots = [...cleanedSlots].sort((a, b) => a.start.localeCompare(b.start));
+      const sortedSlots = [...cleanedSlots].sort((a, b) =>
+        a.start.localeCompare(b.start),
+      );
       for (let i = 1; i < sortedSlots.length; i++) {
         if (sortedSlots[i].start < sortedSlots[i - 1].end) {
           const laterStart = sortedSlots[i].start;
-          const laterIdx = cleanedSlots.findIndex((s) => s.start === laterStart);
+          const laterIdx = cleanedSlots.findIndex(
+            (s) => s.start === laterStart,
+          );
           const laterEl = prefStartRefs.current[laterIdx];
           laterEl?.setCustomValidity("Preferable Time Slots cannot overlap.");
           laterEl?.reportValidity();
@@ -520,10 +605,7 @@ const InstructureManagement = () => {
           ? Number(fd.get("experienceYears"))
           : null,
         organization: fd.get("organization"),
-        specializations: (fd.get("specializations") || "")
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean),
+
         skills: (fd.get("skills") || "")
           .split(",")
           .map((s) => s.trim())
@@ -540,7 +622,9 @@ const InstructureManagement = () => {
         timezone: fd.get("timezone"),
         preferableSlots: cleanedSlots,
         rateType: fd.get("rateType"),
-        expectedRate: fd.get("expectedRate") ? Number(fd.get("expectedRate")) : null,
+        expectedRate: fd.get("expectedRate")
+          ? Number(fd.get("expectedRate"))
+          : null,
         currency: fd.get("currency"),
         payoutMethod: fd.get("payoutMethod"),
         payoutIdentifier: fd.get("payoutIdentifier"),
@@ -554,7 +638,7 @@ const InstructureManagement = () => {
       const formData = new FormData();
       formData.append(
         "payload",
-        new Blob([JSON.stringify(payload)], { type: "application/json" })
+        new Blob([JSON.stringify(payload)], { type: "application/json" }),
       );
       formData.append("resume", resume);
       if (photo instanceof File && photo.size) formData.append("photo", photo);
@@ -570,7 +654,7 @@ const InstructureManagement = () => {
         await axios.post(
           "/api/instructors/otp/start",
           { email },
-          { headers: authHeaders() }
+          { headers: authHeaders() },
         );
         setPendingFormData(formData);
         setOtpEmail(email);
@@ -594,7 +678,7 @@ const InstructureManagement = () => {
       const { data } = await axios.post(
         "/api/instructors/auto-assign",
         {},
-        { headers: authHeaders() }
+        { headers: authHeaders() },
       );
 
       setIsAssigning(false);
@@ -618,7 +702,8 @@ const InstructureManagement = () => {
         error:
           err?.response?.status === 401
             ? "Session expired. Please log in again."
-            : err?.response?.data?.message || "Assign Instructor failed. Check server logs.",
+            : err?.response?.data?.message ||
+              "Assign Instructor failed. Check server logs.",
       });
     }
   };
@@ -639,12 +724,12 @@ const InstructureManagement = () => {
 
   const totalPages = Math.max(
     1,
-    Math.ceil(filteredInstructors.length / INSTRUCTORS_PER_PAGE)
+    Math.ceil(filteredInstructors.length / INSTRUCTORS_PER_PAGE),
   );
   const hasMore = page < totalPages;
   const paginatedInstructors = filteredInstructors.slice(
     (page - 1) * INSTRUCTORS_PER_PAGE,
-    page * INSTRUCTORS_PER_PAGE
+    page * INSTRUCTORS_PER_PAGE,
   );
 
   useEffect(() => {
@@ -682,7 +767,8 @@ const InstructureManagement = () => {
                 setRateType("");
                 setCurrency("");
                 setBackgroundCheck("");
-                { setIsAddOpen(true); setCurrentStep(1); }
+                setIsAddOpen(true);
+                setCurrentStep(1);
               }}
               className="w-full min-w-0 justify-center inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 text-white text-xs sm:text-sm font-semibold whitespace-nowrap shadow-lg shadow-violet-200/70 hover:from-indigo-700 hover:via-violet-700 hover:to-fuchsia-700 active:scale-[0.98] transition-all duration-150"
             >
@@ -705,18 +791,20 @@ const InstructureManagement = () => {
         {/* ── Auto-Assign Status Card ── */}
         {assignStatus.open && (
           <div
-            className={`rounded-[28px] border overflow-hidden shadow-sm shadow-slate-200/60 ${assignStatus.type === "success"
+            className={`rounded-[28px] border overflow-hidden shadow-sm shadow-slate-200/60 ${
+              assignStatus.type === "success"
                 ? "bg-white border-slate-200/70"
                 : "bg-rose-50/70 border-rose-200/70"
-              }`}
+            }`}
           >
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 px-4 sm:px-7 py-4 sm:py-5 border-b border-slate-100 bg-white/70">
               <div className="flex items-start gap-3 min-w-0 flex-1">
                 <div
-                  className={`w-11 h-11 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center flex-shrink-0 ${assignStatus.type === "success"
+                  className={`w-11 h-11 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center flex-shrink-0 ${
+                    assignStatus.type === "success"
                       ? "bg-gradient-to-br from-amber-50 to-orange-50 text-amber-600"
                       : "bg-gradient-to-br from-rose-100 to-orange-50 text-rose-600"
-                    }`}
+                  }`}
                 >
                   <FontAwesomeIcon icon={faUserCheck} className="text-sm" />
                 </div>
@@ -727,8 +815,9 @@ const InstructureManagement = () => {
                   </h3>
                   <p className="text-sm text-slate-500 mt-0.5 break-words">
                     {assignStatus.type === "success"
-                      ? `Assigned ${assignStatus.made} session${assignStatus.made === 1 ? "" : "s"
-                      } successfully.`
+                      ? `Assigned ${assignStatus.made} session${
+                          assignStatus.made === 1 ? "" : "s"
+                        } successfully.`
                       : assignStatus.error}
                   </p>
                 </div>
@@ -772,7 +861,8 @@ const InstructureManagement = () => {
                           </div>
 
                           <div className="mt-3 inline-flex max-w-full items-center px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-600 border border-indigo-100">
-                            {updatedCount} session{updatedCount === 1 ? "" : "s"} updated
+                            {updatedCount} session
+                            {updatedCount === 1 ? "" : "s"} updated
                           </div>
                         </div>
                       );
@@ -780,7 +870,8 @@ const InstructureManagement = () => {
                   </div>
                 ) : (
                   <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-5 text-sm text-slate-500">
-                    Auto-assign completed, but there are no assignment rows to display.
+                    Auto-assign completed, but there are no assignment rows to
+                    display.
                   </div>
                 )}
               </div>
@@ -797,13 +888,16 @@ const InstructureManagement = () => {
             autoDeletePrompt={Boolean(viewing?.__askDelete)}
             confirmOnly={Boolean(viewing?.__confirmOnly)}
             onDeleted={(id) =>
-              setInstructors((prev) => prev.filter((x) => (x._id || x.id) !== id))
+              setInstructors((prev) =>
+                prev.filter((x) => (x._id || x.id) !== id),
+              )
             }
           />
         )}
 
         {/* ═══ ADD INSTRUCTOR MODAL ═══ */}
-        {isAddOpen && portalTarget &&
+        {isAddOpen &&
+          portalTarget &&
           createPortal(
             <div
               className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/45 backdrop-blur-[3px]"
@@ -812,7 +906,7 @@ const InstructureManagement = () => {
             >
               <div className="bg-white w-full max-w-4xl max-h-[92vh] rounded-[28px] shadow-[0_25px_60px_-15px_rgba(15,23,42,0.35)] flex flex-col overflow-hidden border border-slate-200/70">
                 {/* Header */}
-                <div className="sticky top-0 z-10 flex items-center justify-between px-7 py-4 border-b border-slate-100 bg-white/95 backdrop-blur-sm">
+                <div className="sticky top-0 z-10 flex items-center justify-between px-4 sm:px-7 py-4 border-b border-slate-100 bg-white/95 backdrop-blur-sm">
                   <div>
                     <h2 className="text-lg font-bold text-slate-900">
                       Register New Instructor
@@ -825,7 +919,7 @@ const InstructureManagement = () => {
                   <button
                     type="button"
                     onClick={() => setIsAddOpen(false)}
-                    className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+                    className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors shrink-0"
                   >
                     <FontAwesomeIcon icon={faTimes} />
                   </button>
@@ -833,8 +927,8 @@ const InstructureManagement = () => {
 
                 {/* Body */}
                 {/* ── Stepper ── */}
-                <div className="px-7 py-4 border-b border-slate-100 bg-slate-50/50">
-                  <div className="flex items-center justify-between max-w-2xl mx-auto overflow-x-auto no-scrollbar">
+                <div className="px-4 sm:px-7 py-4 border-b border-slate-100 bg-slate-50/50">
+                  <div className="flex items-start justify-between max-w-2xl mx-auto overflow-x-auto no-scrollbar pb-1">
                     {[
                       { step: 1, label: 'Personal' },
                       { step: 2, label: 'Professional' },
@@ -842,8 +936,8 @@ const InstructureManagement = () => {
                       { step: 4, label: 'Compensation' },
                       { step: 5, label: 'Compliance' }
                     ].map((s, idx) => (
-                      <div key={s.step} className="flex items-center">
-                        <div className="flex flex-col items-center gap-1.5 shrink-0">
+                      <div key={s.step} className={`flex items-start ${idx < 4 ? 'flex-1' : ''}`}>
+                        <div className="flex flex-col items-center gap-1.5 shrink-0 w-[4.5rem]">
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
                             currentStep === s.step
                               ? 'bg-violet-600 text-white shadow-md shadow-violet-200'
@@ -853,23 +947,51 @@ const InstructureManagement = () => {
                           }`}>
                             {currentStep > s.step ? '✓' : s.step}
                           </div>
-                          <span className={`text-[10px] uppercase tracking-wider font-semibold ${currentStep === s.step ? 'text-violet-700' : 'text-slate-400'}`}>
+                          <span className={`text-[10px] uppercase tracking-wider font-semibold text-center ${currentStep === s.step ? 'text-violet-700' : 'text-slate-400'}`}>
                             {s.label}
                           </span>
                         </div>
-                        {idx < 5 && (
-                          <div className={`w-8 sm:w-16 h-0.5 mx-2 rounded-full shrink-0 ${currentStep > s.step ? 'bg-emerald-400' : 'bg-slate-200'}`} />
+                        {idx < 4 && (
+                          <div className={`flex-1 h-0.5 mt-[15px] mx-1 sm:mx-2 rounded-full ${currentStep > s.step ? 'bg-emerald-400' : 'bg-slate-200'}`} />
                         )}
                       </div>
                     ))}
                   </div>
                 </div>
                 
-                <div className="p-7 overflow-y-auto flex-1 min-h-0 bg-gradient-to-b from-slate-50/70 via-white to-slate-50/60" id="wizard-scroll-container">
+                <div className="p-4 sm:p-7 overflow-y-auto flex-1 min-h-0 bg-gradient-to-b from-slate-50/70 via-white to-slate-50/60" id="wizard-scroll-container">
                   <form onSubmit={handleSubmit} className="space-y-7" ref={formRef}>
                     {/* ── Personal & Contact ── */}
                     <div className={currentStep === 1 ? 'block animate-fade-in' : 'hidden'}>
                       <FormSection title="Personal & Contact" icon={faEnvelope}>
+                        {/* Autofill from Resume */}
+                        <div className="col-span-1 md:col-span-3 mb-4 bg-violet-50/50 rounded-2xl border border-violet-100 p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+                          <div>
+                            <h4 className="text-sm font-bold text-violet-900 flex items-center gap-2">
+                              <FontAwesomeIcon icon={faCloudUploadAlt} className="text-violet-500" />
+                              Autofill from Resume
+                            </h4>
+                            <p className="text-xs text-violet-600/80 mt-1">Upload a PDF or DOCX file to automatically populate these fields.</p>
+                          </div>
+                          <label className={`relative inline-block ${isExtracting ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}`}>
+                            <input 
+                              type="file" 
+                              accept=".pdf,.doc,.docx"
+                              onChange={handleResumeAutofill}
+                              disabled={isExtracting}
+                              className="sr-only"
+                            />
+                            <div className="px-4 py-2 rounded-xl bg-violet-600 text-white text-xs font-semibold shadow-md shadow-violet-200 hover:bg-violet-700 transition-all flex items-center gap-2 whitespace-nowrap">
+                              {isExtracting ? (
+                                <>
+                                  <FontAwesomeIcon icon={faSpinner} spin />
+                                  Parsing...
+                                </>
+                              ) : "Choose File"}
+                            </div>
+                          </label>
+                        </div>
+
                       <Field label="First Name" required>
                         <input
                           name="firstName"
@@ -926,8 +1048,10 @@ const InstructureManagement = () => {
                             setStateProv("");
                             if (cityRef.current) cityRef.current.value = "";
                             if (postalRef.current) postalRef.current.value = "";
-                            if (address1Ref.current) address1Ref.current.value = "";
-                            if (address2Ref.current) address2Ref.current.value = "";
+                            if (address1Ref.current)
+                              address1Ref.current.value = "";
+                            if (address2Ref.current)
+                              address2Ref.current.value = "";
                           }}
                         >
                           <option value="" disabled={country !== ""}>
@@ -974,7 +1098,9 @@ const InstructureManagement = () => {
                           required
                           ref={postalRef}
                           className={inputCls}
-                          placeholder={country === "Canada" ? "M5V 3L9" : "95113"}
+                          placeholder={
+                            country === "Canada" ? "M5V 3L9" : "95113"
+                          }
                         />
                       </Field>
 
@@ -1039,25 +1165,18 @@ const InstructureManagement = () => {
                         />
                       </Field>
 
-                      <Field label="Teaching Specializations" required span={3}>
-                        <input
-                          name="specializations"
-                          required
-                          className={inputCls}
-                          placeholder="e.g., React, Data Structures, Python (comma-separated)"
-                        />
-                      </Field>
 
-                      <Field label="Skills / Technologies" required span={3}>
+
+                      <Field label="Skills / Technologies" required>
                         <input
                           name="skills"
                           required
                           className={inputCls}
-                          placeholder="e.g., MongoDB, Node.js, AWS (comma-separated)"
+                          placeholder="e.g., MongoDB, Node.js"
                         />
                       </Field>
 
-                      <Field label="Languages" required span={2}>
+                      <Field label="Spoken Languages" required>
                         <input
                           name="languages"
                           required
@@ -1108,7 +1227,10 @@ const InstructureManagement = () => {
                           className="mt-2 grid grid-cols-4 sm:grid-cols-7 gap-2"
                         >
                           {dayOpts.map((d) => (
-                            <label key={d} className="relative block cursor-pointer">
+                            <label
+                              key={d}
+                              className="relative block cursor-pointer"
+                            >
                               <input
                                 type="checkbox"
                                 name="availableDays"
@@ -1118,13 +1240,15 @@ const InstructureManagement = () => {
                                   const formEl = e.currentTarget.form;
                                   if (!formEl) return;
                                   const boxes = formEl.querySelectorAll(
-                                    'input[name="availableDays"]'
+                                    'input[name="availableDays"]',
                                   );
-                                  const anyChecked = Array.from(boxes).some((b) => b.checked);
+                                  const anyChecked = Array.from(boxes).some(
+                                    (b) => b.checked,
+                                  );
                                   boxes.forEach((b) => b.setCustomValidity(""));
                                   if (!anyChecked)
                                     e.currentTarget.setCustomValidity(
-                                      "Select at least one weekday."
+                                      "Select at least one weekday.",
                                     );
                                 }}
                               />
@@ -1149,10 +1273,10 @@ const InstructureManagement = () => {
                             setAvailStart(e.target.value);
                             startRef.current?.setCustomValidity("");
                             (prefStartRefs.current || []).forEach((el) =>
-                              el?.setCustomValidity("")
+                              el?.setCustomValidity(""),
                             );
                             (prefEndRefs.current || []).forEach((el) =>
-                              el?.setCustomValidity("")
+                              el?.setCustomValidity(""),
                             );
                           }}
                         />
@@ -1171,10 +1295,10 @@ const InstructureManagement = () => {
                             setAvailEnd(e.target.value);
                             endRef.current?.setCustomValidity("");
                             (prefStartRefs.current || []).forEach((el) =>
-                              el?.setCustomValidity("")
+                              el?.setCustomValidity(""),
                             );
                             (prefEndRefs.current || []).forEach((el) =>
-                              el?.setCustomValidity("")
+                              el?.setCustomValidity(""),
                             );
                           }}
                         />
@@ -1213,8 +1337,11 @@ const InstructureManagement = () => {
                             disabled={!availStart || !availEnd}
                             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-cyan-50 to-blue-50 text-blue-700 text-xs font-semibold border border-cyan-100 hover:from-cyan-100 hover:to-blue-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                           >
-                            <FontAwesomeIcon icon={faPlus} className="text-[10px]" /> Add
-                            Slot
+                            <FontAwesomeIcon
+                              icon={faPlus}
+                              className="text-[10px]"
+                            />{" "}
+                            Add Slot
                           </button>
                         </div>
 
@@ -1225,8 +1352,8 @@ const InstructureManagement = () => {
                         <div className="mt-3 space-y-3">
                           {prefSlots.length === 0 ? (
                             <div className="text-xs text-slate-500 italic py-3 text-center border border-dashed border-cyan-200 bg-white/70 rounded-xl">
-                              No preferable slots added. Set times above, then click "Add
-                              Slot."
+                              No preferable slots added. Set times above, then
+                              click "Add Slot."
                             </div>
                           ) : (
                             prefSlots.map((s, idx) => (
@@ -1235,33 +1362,57 @@ const InstructureManagement = () => {
                                 className="grid grid-cols-1 md:grid-cols-7 gap-3 items-end bg-gradient-to-r from-white to-cyan-50/50 rounded-2xl p-3 border border-cyan-100 shadow-sm"
                               >
                                 <div className="md:col-span-3">
-                                  <label className={labelCls}>Slot {idx + 1}: Start</label>
+                                  <label className={labelCls}>
+                                    Slot {idx + 1}: Start
+                                  </label>
                                   <input
                                     type="time"
                                     value={s.start}
                                     onChange={(e) => {
-                                      prefStartRefs.current[idx]?.setCustomValidity("");
-                                      prefEndRefs.current[idx]?.setCustomValidity("");
-                                      updatePrefSlot(idx, "start", e.target.value);
+                                      prefStartRefs.current[
+                                        idx
+                                      ]?.setCustomValidity("");
+                                      prefEndRefs.current[
+                                        idx
+                                      ]?.setCustomValidity("");
+                                      updatePrefSlot(
+                                        idx,
+                                        "start",
+                                        e.target.value,
+                                      );
                                     }}
                                     className={inputCls}
-                                    ref={(el) => (prefStartRefs.current[idx] = el)}
+                                    ref={(el) =>
+                                      (prefStartRefs.current[idx] = el)
+                                    }
                                     step="60"
                                   />
                                 </div>
 
                                 <div className="md:col-span-3">
-                                  <label className={labelCls}>Slot {idx + 1}: End</label>
+                                  <label className={labelCls}>
+                                    Slot {idx + 1}: End
+                                  </label>
                                   <input
                                     type="time"
                                     value={s.end}
                                     onChange={(e) => {
-                                      prefEndRefs.current[idx]?.setCustomValidity("");
-                                      prefStartRefs.current[idx]?.setCustomValidity("");
-                                      updatePrefSlot(idx, "end", e.target.value);
+                                      prefEndRefs.current[
+                                        idx
+                                      ]?.setCustomValidity("");
+                                      prefStartRefs.current[
+                                        idx
+                                      ]?.setCustomValidity("");
+                                      updatePrefSlot(
+                                        idx,
+                                        "end",
+                                        e.target.value,
+                                      );
                                     }}
                                     className={inputCls}
-                                    ref={(el) => (prefEndRefs.current[idx] = el)}
+                                    ref={(el) =>
+                                      (prefEndRefs.current[idx] = el)
+                                    }
                                     step="60"
                                   />
                                 </div>
@@ -1335,7 +1486,9 @@ const InstructureManagement = () => {
                           className={inputCls}
                           value={payoutMethod}
                           onChange={(e) => setPayoutMethod(e.target.value)}
-                          disabled={country !== "United States" && country !== "Canada"}
+                          disabled={
+                            country !== "United States" && country !== "Canada"
+                          }
                         >
                           <option value="" disabled>
                             {country ? "Select" : "Select country first"}
@@ -1527,99 +1680,112 @@ const InstructureManagement = () => {
                 </div>
               </div>
             </div>,
-            portalTarget
+            portalTarget,
           )}
 
         {/* ═══ OTP MODAL ═══ */}
-        {otpOpen && portalTarget && createPortal(
-          <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-slate-950/45 backdrop-blur-[3px]">
-            <div className="bg-white rounded-[28px] shadow-[0_25px_60px_-15px_rgba(15,23,42,0.35)] w-full max-w-sm p-7 border border-slate-200/70">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-100 via-violet-100 to-fuchsia-100 flex items-center justify-center mb-5 shadow-sm">
-                <FontAwesomeIcon icon={faEnvelope} className="text-violet-600 text-xl" />
-              </div>
+        {otpOpen &&
+          portalTarget &&
+          createPortal(
+            <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-slate-950/45 backdrop-blur-[3px]">
+              <div className="bg-white rounded-[28px] shadow-[0_25px_60px_-15px_rgba(15,23,42,0.35)] w-full max-w-sm p-7 border border-slate-200/70">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-100 via-violet-100 to-fuchsia-100 flex items-center justify-center mb-5 shadow-sm">
+                  <FontAwesomeIcon
+                    icon={faEnvelope}
+                    className="text-violet-600 text-xl"
+                  />
+                </div>
 
-              <h3 className="text-lg font-bold text-slate-900 mb-1">Verify Email</h3>
+                <h3 className="text-lg font-bold text-slate-900 mb-1">
+                  Verify Email
+                </h3>
 
-              <p className="text-sm text-slate-500 mb-5">
-                We sent a 6-digit code to{" "}
-                <span className="font-semibold text-slate-700">{otpEmail}</span>
-              </p>
+                <p className="text-sm text-slate-500 mb-5">
+                  We sent a 6-digit code to{" "}
+                  <span className="font-semibold text-slate-700">
+                    {otpEmail}
+                  </span>
+                </p>
 
-              <input
-                type="text"
-                inputMode="numeric"
-                maxLength={6}
-                placeholder="Enter 6-digit OTP"
-                value={otpCode}
-                onChange={(e) => {
-                  const v = e.target.value.replace(/\D/g, "").slice(0, 6);
-                  setOtpCode(v);
-                }}
-                className={`${inputCls} text-center text-lg tracking-[0.35em] font-bold mb-5`}
-              />
-
-              <div className="flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setOtpOpen(false)}
-                  className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium bg-white hover:bg-slate-50 transition-colors"
-                >
-                  Cancel
-                </button>
-
-                <button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      await axios.post(
-                        "/api/instructors/otp/verify",
-                        { email: otpEmail, otp: otpCode },
-                        { headers: authHeaders() }
-                      );
-                      const data = await createInstructorWithFormData(pendingFormData);
-                      const normalized = { id: data._id || data.id, ...data };
-                      setInstructors((prev) => [normalized, ...prev]);
-                      setIsAddOpen(false);
-                      setOtpOpen(false);
-                      setOtpCode("");
-                      setPendingFormData(null);
-                      setPrefSlots([]);
-                      alert("Instructor created successfully.");
-                    } catch (err) {
-                      console.error("Verify OTP or Create failed:", err);
-                      alert(err?.response?.data?.message || "Invalid OTP or create failed.");
-                    }
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  placeholder="Enter 6-digit OTP"
+                  value={otpCode}
+                  onChange={(e) => {
+                    const v = e.target.value.replace(/\D/g, "").slice(0, 6);
+                    setOtpCode(v);
                   }}
-                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-sm font-semibold hover:from-indigo-700 hover:to-violet-700 shadow-lg shadow-violet-200/70 transition-all"
-                >
-                  Verify &amp; Save
-                </button>
-              </div>
+                  className={`${inputCls} text-center text-lg tracking-[0.35em] font-bold mb-5`}
+                />
 
-              <div className="mt-4 text-center">
-                <button
-                  type="button"
-                  className="text-xs text-violet-700 font-medium hover:underline"
-                  onClick={async () => {
-                    try {
-                      await axios.post(
-                        "/api/instructors/otp/start",
-                        { email: otpEmail },
-                        { headers: authHeaders() }
-                      );
-                      alert("OTP resent.");
-                    } catch {
-                      alert("Failed to resend OTP.");
-                    }
-                  }}
-                >
-                  Didn't receive a code? Resend
-                </button>
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setOtpOpen(false)}
+                    className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium bg-white hover:bg-slate-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await axios.post(
+                          "/api/instructors/otp/verify",
+                          { email: otpEmail, otp: otpCode },
+                          { headers: authHeaders() },
+                        );
+                        const data =
+                          await createInstructorWithFormData(pendingFormData);
+                        const normalized = { id: data._id || data.id, ...data };
+                        setInstructors((prev) => [normalized, ...prev]);
+                        setIsAddOpen(false);
+                        setOtpOpen(false);
+                        setOtpCode("");
+                        setPendingFormData(null);
+                        setPrefSlots([]);
+                        alert("Instructor created successfully.");
+                      } catch (err) {
+                        console.error("Verify OTP or Create failed:", err);
+                        alert(
+                          err?.response?.data?.message ||
+                            "Invalid OTP or create failed.",
+                        );
+                      }
+                    }}
+                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-sm font-semibold hover:from-indigo-700 hover:to-violet-700 shadow-lg shadow-violet-200/70 transition-all"
+                  >
+                    Verify &amp; Save
+                  </button>
+                </div>
+
+                <div className="mt-4 text-center">
+                  <button
+                    type="button"
+                    className="text-xs text-violet-700 font-medium hover:underline"
+                    onClick={async () => {
+                      try {
+                        await axios.post(
+                          "/api/instructors/otp/start",
+                          { email: otpEmail },
+                          { headers: authHeaders() },
+                        );
+                        alert("OTP resent.");
+                      } catch {
+                        alert("Failed to resend OTP.");
+                      }
+                    }}
+                  >
+                    Didn't receive a code? Resend
+                  </button>
+                </div>
               </div>
-            </div>
-          </div>,
-          portalTarget
-        )}
+            </div>,
+            portalTarget,
+          )}
 
         {/* ═══ EDIT MODAL ═══ */}
         {editing && (
@@ -1635,8 +1801,8 @@ const InstructureManagement = () => {
               }
               setInstructors((prev) =>
                 prev.map((x) =>
-                  (x._id || x.id) === updatedId ? { ...x, ...updated } : x
-                )
+                  (x._id || x.id) === updatedId ? { ...x, ...updated } : x,
+                ),
               );
               setEditing(null);
               alert("Instructor updated successfully.");
@@ -1675,7 +1841,8 @@ const InstructureManagement = () => {
         )}
 
         {/* ═══ AUTO-ASSIGN STATUS POPUP ═══ */}
-        {assignPopup.open && portalTarget &&
+        {assignPopup.open &&
+          portalTarget &&
           createPortal(
             <div
               className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-slate-950/45 backdrop-blur-[3px]"
@@ -1686,13 +1853,16 @@ const InstructureManagement = () => {
                 <div className="flex items-center justify-between px-7 py-4 border-b border-slate-100 bg-white/95 backdrop-blur-sm">
                   <div className="flex items-center gap-3 min-w-0">
                     <div
-                      className={`w-12 h-12 rounded-2xl flex items-center justify-center ${assignPopup.type === "success"
-                        ? "bg-gradient-to-br from-amber-50 to-orange-50 text-amber-600"
-                        : "bg-gradient-to-br from-rose-100 to-orange-50 text-rose-600"
-                        }`}
+                      className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
+                        assignPopup.type === "success"
+                          ? "bg-gradient-to-br from-amber-50 to-orange-50 text-amber-600"
+                          : "bg-gradient-to-br from-rose-100 to-orange-50 text-rose-600"
+                      }`}
                     >
                       <FontAwesomeIcon
-                        icon={assignPopup.type === "success" ? faUserCheck : faTimes}
+                        icon={
+                          assignPopup.type === "success" ? faUserCheck : faTimes
+                        }
                         className="text-sm"
                       />
                     </div>
@@ -1705,8 +1875,9 @@ const InstructureManagement = () => {
                       </h3>
                       <p className="text-sm text-slate-500 mt-0.5">
                         {assignPopup.type === "success"
-                          ? `Assigned ${assignPopup.made} session${assignPopup.made === 1 ? "" : "s"
-                          }`
+                          ? `Assigned ${assignPopup.made} session${
+                              assignPopup.made === 1 ? "" : "s"
+                            }`
                           : assignPopup.error}
                       </p>
                     </div>
@@ -1760,7 +1931,8 @@ const InstructureManagement = () => {
                       </div>
                     ) : (
                       <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-5 text-sm text-slate-500">
-                        Auto-assign completed, but there are no assignment rows to display.
+                        Auto-assign completed, but there are no assignment rows
+                        to display.
                       </div>
                     )
                   ) : (
@@ -1789,22 +1961,25 @@ const InstructureManagement = () => {
                 </div>
               </div>
             </div>,
-            portalTarget
+            portalTarget,
           )}
 
         {/* ═══════════ INSTRUCTOR LIST ═══════════ */}
         <div className="bg-white rounded-[28px] shadow-[0_18px_45px_-18px_rgba(15,23,42,0.18)] border border-slate-200/70 flex flex-col overflow-hidden">
           {/* List header */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-6 py-5 border-b border-slate-100 bg-white/90">
-            <h2 className="text-base font-bold text-slate-900">Your Instructors</h2>
+            <h2 className="text-base font-bold text-slate-900">
+              Your Instructors
+            </h2>
 
             <div className="relative w-full max-w-xs">
               <FontAwesomeIcon
                 icon={faSearch}
                 className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"
               />
+              {/*Add the "!mt-0" style for alignment - 04-08-2026 */}
               <input
-                className={`${inputCls} pl-10 !h-10 !rounded-xl bg-slate-50 border-slate-200`}
+                className={`${inputCls} !mt-0 pl-10 !h-10 !rounded-xl bg-slate-50 border-slate-200`}
                 placeholder="Search by name, email, skills..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -1817,12 +1992,17 @@ const InstructureManagement = () => {
             {loading ? (
               <div className="flex flex-col items-center justify-center py-20 text-center">
                 <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
-                <p className="text-sm font-semibold text-slate-600">Loading instructors...</p>
+                <p className="text-sm font-semibold text-slate-600">
+                  Loading instructors...
+                </p>
               </div>
             ) : filteredInstructors.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 text-center">
                 <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
-                  <FontAwesomeIcon icon={faSearch} className="text-slate-300 text-xl" />
+                  <FontAwesomeIcon
+                    icon={faSearch}
+                    className="text-slate-300 text-xl"
+                  />
                 </div>
                 <p className="text-sm font-semibold text-slate-600">
                   No instructors found
@@ -1838,40 +2018,43 @@ const InstructureManagement = () => {
                   return (
                     <div
                       key={id}
-                      className="group relative rounded-2xl border border-slate-200/80 bg-gradient-to-r from-white via-white to-slate-50/60 p-5 flex items-center justify-between gap-5 hover:border-indigo-200 hover:shadow-lg hover:shadow-indigo-50/70 transition-all duration-200"
+                      className="group relative rounded-2xl border border-slate-200/80 bg-gradient-to-r from-white via-white to-slate-50/60 p-4 sm:p-5 flex items-start sm:items-center justify-between gap-3 sm:gap-5 hover:border-indigo-200 hover:shadow-lg hover:shadow-indigo-50/70 transition-all duration-200"
                     >
-                      <div className="flex items-center gap-4 min-w-0">
+                      <div className="flex items-start sm:items-center gap-3 sm:gap-4 min-w-0 flex-1">
                         {i?.photo?.url ? (
                           <img
                             src={i.photo.url}
                             alt={`${i.firstName || ""} ${i.lastName || ""}`}
-                            className="w-12 h-12 rounded-xl object-cover border-2 border-white shadow-md flex-shrink-0 cursor-zoom-in transition-transform hover:scale-105"
+                            className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl object-cover border-2 border-white shadow-md flex-shrink-0 cursor-zoom-in transition-transform hover:scale-105"
                             loading="lazy"
                             role="button"
                             tabIndex={0}
                             onClick={() =>
-                              openPhoto(i.photo.url, `${i.firstName || ""} ${i.lastName || ""}`)
+                              openPhoto(
+                                i.photo.url,
+                                `${i.firstName || ""} ${i.lastName || ""}`,
+                              )
                             }
                             onKeyDown={(e) => {
                               if (e.key === "Enter" || e.key === " ")
                                 openPhoto(
                                   i.photo.url,
-                                  `${i.firstName || ""} ${i.lastName || ""}`
+                                  `${i.firstName || ""} ${i.lastName || ""}`,
                                 );
                             }}
                           />
                         ) : (
-                          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 text-white flex items-center justify-center font-bold text-sm flex-shrink-0 shadow-md">
+                          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 text-white flex items-center justify-center font-bold text-sm flex-shrink-0 shadow-md">
                             {avatarInitials(i)}
                           </div>
                         )}
 
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1 mt-0.5 sm:mt-0">
                           <div className="font-bold text-slate-900 text-sm truncate">
                             {i.firstName} {i.lastName}
                           </div>
 
-                          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 text-xs text-slate-500 mt-0.5">
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 text-xs text-slate-500 mt-1 sm:mt-0.5">
                             {i.email && (
                               <span className="flex items-center gap-1 truncate">
                                 <FontAwesomeIcon
@@ -1903,16 +2086,17 @@ const InstructureManagement = () => {
                                 {sk}
                               </Badge>
                             ))}
-                            {((i.specializations?.length || 0) + (i.skills?.length || 0)) >
+                            {(i.specializations?.length || 0) +
+                              (i.skills?.length || 0) >
                               5 && (
-                                <Badge color="slate">
-                                  +
-                                  {(i.specializations?.length || 0) +
-                                    (i.skills?.length || 0) -
-                                    5}{" "}
-                                  more
-                                </Badge>
-                              )}
+                              <Badge color="slate">
+                                +
+                                {(i.specializations?.length || 0) +
+                                  (i.skills?.length || 0) -
+                                  5}{" "}
+                                more
+                              </Badge>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -1928,7 +2112,11 @@ const InstructureManagement = () => {
                             }}
                             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-indigo-600 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 transition-colors"
                           >
-                            <FontAwesomeIcon icon={faEye} className="text-[10px]" /> View
+                            <FontAwesomeIcon
+                              icon={faEye}
+                              className="text-[10px]"
+                            />{" "}
+                            View
                           </button>
 
                           <button
@@ -1940,18 +2128,30 @@ const InstructureManagement = () => {
                             }}
                             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-amber-600 bg-amber-50 border border-amber-100 hover:bg-amber-100 transition-colors"
                           >
-                            <FontAwesomeIcon icon={faPen} className="text-[10px]" /> Edit
+                            <FontAwesomeIcon
+                              icon={faPen}
+                              className="text-[10px]"
+                            />{" "}
+                            Edit
                           </button>
 
                           <button
                             type="button"
                             onClick={() => {
                               setIsAddOpen(false);
-                              setViewing({ ...i, __askDelete: true, __confirmOnly: true });
+                              setViewing({
+                                ...i,
+                                __askDelete: true,
+                                __confirmOnly: true,
+                              });
                             }}
                             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-rose-600 bg-rose-50 border border-rose-100 hover:bg-rose-100 transition-colors"
                           >
-                            <FontAwesomeIcon icon={faTrash} className="text-[10px]" /> Delete
+                            <FontAwesomeIcon
+                              icon={faTrash}
+                              className="text-[10px]"
+                            />{" "}
+                            Delete
                           </button>
                         </div>
 
@@ -2005,11 +2205,19 @@ const InstructureManagement = () => {
                                 onClick={() => {
                                   setOpenMenuId(null);
                                   setIsAddOpen(false);
-                                  setViewing({ ...i, __askDelete: true, __confirmOnly: true });
+                                  setViewing({
+                                    ...i,
+                                    __askDelete: true,
+                                    __confirmOnly: true,
+                                  });
                                 }}
                                 className="w-full text-left px-4 py-2 text-sm text-rose-600 hover:bg-rose-50 flex items-center gap-2"
                               >
-                                <FontAwesomeIcon icon={faTrash} className="text-xs" /> Delete
+                                <FontAwesomeIcon
+                                  icon={faTrash}
+                                  className="text-xs"
+                                />{" "}
+                                Delete
                               </button>
                             </div>
                           )}
@@ -2033,21 +2241,26 @@ const InstructureManagement = () => {
                 <FontAwesomeIcon icon={faChevronLeft} className="text-xs" />
               </button>
 
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
-                <button
-                  key={pageNum}
-                  onClick={() => setPage(pageNum)}
-                  className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-semibold transition-all duration-150 ${pageNum === page
-                    ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-lg shadow-violet-200/70"
-                    : "border border-slate-200 text-slate-600 hover:bg-slate-50"
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                (pageNum) => (
+                  <button
+                    key={pageNum}
+                    onClick={() => setPage(pageNum)}
+                    className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-semibold transition-all duration-150 ${
+                      pageNum === page
+                        ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-lg shadow-violet-200/70"
+                        : "border border-slate-200 text-slate-600 hover:bg-slate-50"
                     }`}
-                >
-                  {pageNum}
-                </button>
-              ))}
+                  >
+                    {pageNum}
+                  </button>
+                ),
+              )}
 
               <button
-                onClick={() => setPage((prev) => Math.min(prev + 1, totalPages))}
+                onClick={() =>
+                  setPage((prev) => Math.min(prev + 1, totalPages))
+                }
                 disabled={!hasMore}
                 className="w-10 h-10 rounded-xl flex items-center justify-center border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               >

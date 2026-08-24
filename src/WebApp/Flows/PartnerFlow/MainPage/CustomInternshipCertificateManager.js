@@ -23,8 +23,10 @@ import {
   ChevronRight,
   Palette,
   Clock,
+  Download,
 } from "lucide-react";
 import CertificateTemplate from "../../UserFlow/MainPage/CertificateTemplate";
+import skillnaavLogo from "../../../../assets/skillnav_logo_white.png";
 
 /* ─── animation helpers ─── */
 const fadeUp = {
@@ -70,7 +72,7 @@ const CustomInternshipCertificateManager = () => {
   const [activeTab, setActiveTab] = useState("upload"); // "upload" | "gallery"
   const [lightboxData, setLightboxData] = useState(null);
   const [lightboxLoaded, setLightboxLoaded] = useState(false);
-  
+
   useEffect(() => {
     if (!lightboxData) setLightboxLoaded(false);
   }, [lightboxData]);
@@ -109,7 +111,7 @@ const CustomInternshipCertificateManager = () => {
     try {
       setIsLoading(true);
       const response = await axios.get(
-        `/api/custom-internship-certificates/${partnerId}`
+        `/api/custom-internship-certificates/${partnerId}`,
       );
       setCertificateItems(response.data?.items || []);
     } catch (error) {
@@ -117,7 +119,7 @@ const CustomInternshipCertificateManager = () => {
       setCertificateItems([]);
       setMessage(
         error?.response?.data?.message ||
-        "Failed to load certificate templates."
+          "Failed to load certificate templates.",
       );
     } finally {
       setIsLoading(false);
@@ -125,7 +127,9 @@ const CustomInternshipCertificateManager = () => {
   };
 
   // eslint-disable-next-line
-  useEffect(() => { fetchCertificates(); }, [partnerId]);
+  useEffect(() => {
+    fetchCertificates();
+  }, [partnerId]);
 
   const handleImageChange = (e) => {
     const file = e.target.files?.[0];
@@ -160,9 +164,18 @@ const CustomInternshipCertificateManager = () => {
   };
 
   const handleAddCertificate = async () => {
-    if (!partnerId) { setMessage("Partner ID not found. Please login again."); return; }
-    if (!certificateName.trim()) { setMessage("Please enter a certificate name."); return; }
-    if (!selectedFile) { setMessage("Please upload a certificate image."); return; }
+    if (!partnerId) {
+      setMessage("Partner ID not found. Please login again.");
+      return;
+    }
+    if (!certificateName.trim()) {
+      setMessage("Please enter a certificate name.");
+      return;
+    }
+    if (!selectedFile) {
+      setMessage("Please upload a certificate image.");
+      return;
+    }
 
     // Capture values before form reset
     const capturedFile = selectedFile;
@@ -194,18 +207,20 @@ const CustomInternshipCertificateManager = () => {
 
       const response = await axios.post(
         "/api/custom-internship-certificates",
-        formData
+        formData,
       );
 
       const savedItem = response.data?.item;
       if (savedItem) {
         // Swap temp item with the real one from the server
         setCertificateItems((prev) =>
-          prev.map((item) => (item._id === tempId ? savedItem : item))
+          prev.map((item) => (item._id === tempId ? savedItem : item)),
         );
       } else {
         await fetchCertificates();
-        setCertificateItems((prev) => prev.filter((item) => item._id !== tempId));
+        setCertificateItems((prev) =>
+          prev.filter((item) => item._id !== tempId),
+        );
       }
       URL.revokeObjectURL(optimisticBlobUrl);
       setMessage("Certificate image added successfully.");
@@ -215,7 +230,8 @@ const CustomInternshipCertificateManager = () => {
       URL.revokeObjectURL(optimisticBlobUrl);
       console.error("Error saving certificate template:", error);
       setMessage(
-        error?.response?.data?.message || "Failed to save certificate template."
+        error?.response?.data?.message ||
+          "Failed to save certificate template.",
       );
     } finally {
       setIsSaving(false);
@@ -247,7 +263,7 @@ const CustomInternshipCertificateManager = () => {
     setCertificateItems((prev) => prev.filter((item) => item._id !== deleteId));
     try {
       await axios.delete(
-        `/api/custom-internship-certificates/${deleteId}?partnerId=${partnerId}`
+        `/api/custom-internship-certificates/${deleteId}?partnerId=${partnerId}`,
       );
       setMessage("Certificate image removed successfully.");
       setPendingDeleteItem(null);
@@ -256,7 +272,8 @@ const CustomInternshipCertificateManager = () => {
       setCertificateItems(previous);
       console.error("Error deleting certificate template:", error);
       setMessage(
-        error?.response?.data?.message || "Failed to delete certificate template."
+        error?.response?.data?.message ||
+          "Failed to delete certificate template.",
       );
     } finally {
       setIsDeleting(false);
@@ -266,13 +283,13 @@ const CustomInternshipCertificateManager = () => {
   const filteredItems = useMemo(() => {
     if (!searchQuery.trim()) return certificateItems;
     return certificateItems.filter((item) =>
-      item.name.toLowerCase().includes(searchQuery.toLowerCase())
+      item.name.toLowerCase().includes(searchQuery.toLowerCase()),
     );
   }, [certificateItems, searchQuery]);
 
   const totalGalleryPages = useMemo(
     () => Math.max(1, Math.ceil(filteredItems.length / DESIGNS_PER_PAGE)),
-    [filteredItems.length]
+    [filteredItems.length],
   );
 
   const paginatedItems = useMemo(() => {
@@ -313,7 +330,9 @@ const CustomInternshipCertificateManager = () => {
 
   const messageTone = useMemo(() => {
     const text = message.toLowerCase();
-    return text.includes("successfully") || text.includes("added") || text.includes("removed")
+    return text.includes("successfully") ||
+      text.includes("added") ||
+      text.includes("removed")
       ? "success"
       : "error";
   }, [message]);
@@ -380,25 +399,30 @@ const CustomInternshipCertificateManager = () => {
               >
                 <X size={20} strokeWidth={2.5} />
               </button>
-              
+
               <div className="w-full h-full relative overflow-hidden rounded-2xl shadow-2xl bg-white flex items-center justify-center">
                 {!lightboxLoaded && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-white z-20">
                     <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
-                    <p className="text-sm font-semibold text-slate-600">Loading design...</p>
+                    <p className="text-sm font-semibold text-slate-600">
+                      Loading design...
+                    </p>
                   </div>
                 )}
 
-                <img 
-                  src={lightboxData.imageUrl} 
-                  className="hidden" 
-                  onLoad={() => setLightboxLoaded(true)} 
-                  alt="preload" 
+                <img
+                  src={lightboxData.imageUrl}
+                  className="hidden"
+                  onLoad={() => setLightboxLoaded(true)}
+                  alt="preload"
                 />
 
-                <svg viewBox="0 0 1120 792" className={`w-full h-auto transition-opacity duration-300 ${lightboxLoaded ? 'opacity-100' : 'opacity-0'}`}>
+                <svg
+                  viewBox="0 0 1120 792"
+                  className={`w-full h-auto transition-opacity duration-300 ${lightboxLoaded ? "opacity-100" : "opacity-0"}`}
+                >
                   <foreignObject width="1120" height="792">
-                    <CertificateTemplate 
+                    <CertificateTemplate
                       studentName="John Doe"
                       internshipTitle="Frontend Developer Intern"
                       companyName="Acme Corp"
@@ -500,10 +524,11 @@ const CustomInternshipCertificateManager = () => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`relative flex items-center gap-2 px-5 py-3 text-sm font-semibold transition-colors rounded-t-xl ${activeTab === tab.id
+                className={`relative flex items-center gap-2 px-5 py-3 text-sm font-semibold transition-colors rounded-t-xl ${
+                  activeTab === tab.id
                     ? "text-indigo-600 bg-[#fafbfc]"
                     : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
-                  }`}
+                }`}
               >
                 {tab.icon}
                 {tab.label}
@@ -545,7 +570,8 @@ const CustomInternshipCertificateManager = () => {
                       {/* Name */}
                       <div>
                         <label className="block text-[13px] font-bold text-slate-700 mb-2">
-                          Certificate Name <span className="text-rose-500">*</span>
+                          Certificate Name{" "}
+                          <span className="text-rose-500">*</span>
                         </label>
                         <input
                           type="text"
@@ -559,13 +585,15 @@ const CustomInternshipCertificateManager = () => {
                       {/* File picker */}
                       <div>
                         <label className="block text-[13px] font-bold text-slate-700 mb-2">
-                          Background Image <span className="text-rose-500">*</span>
+                          Background Image{" "}
+                          <span className="text-rose-500">*</span>
                         </label>
                         <label
-                          className={`group flex flex-col items-center justify-center w-full py-10 px-4 border-2 border-dashed rounded-2xl cursor-pointer transition-all duration-300 ${selectedFile
+                          className={`group flex flex-col items-center justify-center w-full py-10 px-4 border-2 border-dashed rounded-2xl cursor-pointer transition-all duration-300 ${
+                            selectedFile
                               ? "border-indigo-300 bg-indigo-50/50"
                               : "border-slate-300 bg-slate-50/60 hover:border-indigo-300 hover:bg-indigo-50/30"
-                            }`}
+                          }`}
                         >
                           <input
                             id="customCertificateImageInput"
@@ -635,7 +663,9 @@ const CustomInternshipCertificateManager = () => {
                             </button>
                           ))}
                           <div className="flex items-center gap-2 ml-2 pl-3 border-l border-slate-200">
-                            <span className="text-xs font-semibold text-slate-500">Custom:</span>
+                            <span className="text-xs font-semibold text-slate-500">
+                              Custom:
+                            </span>
                             <div className="relative">
                               <input
                                 type="color"
@@ -656,15 +686,22 @@ const CustomInternshipCertificateManager = () => {
                             initial={{ opacity: 0, y: -6 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -6 }}
-                            className={`flex items-start gap-2.5 p-4 rounded-xl border text-sm font-semibold ${messageTone === "success"
+                            className={`flex items-start gap-2.5 p-4 rounded-xl border text-sm font-semibold ${
+                              messageTone === "success"
                                 ? "bg-emerald-50 border-emerald-200/70 text-emerald-800"
                                 : "bg-rose-50 border-rose-200/70 text-rose-800"
-                              }`}
+                            }`}
                           >
                             {messageTone === "success" ? (
-                              <CheckCircle2 size={18} className="text-emerald-500 mt-px shrink-0" />
+                              <CheckCircle2
+                                size={18}
+                                className="text-emerald-500 mt-px shrink-0"
+                              />
                             ) : (
-                              <AlertCircle size={18} className="text-rose-500 mt-px shrink-0" />
+                              <AlertCircle
+                                size={18}
+                                className="text-rose-500 mt-px shrink-0"
+                              />
                             )}
                             {message}
                           </motion.div>
@@ -703,19 +740,31 @@ const CustomInternshipCertificateManager = () => {
                     </div>
                     <div className="p-4 min-h-[240px] flex items-center justify-center bg-[#f8f9fb]">
                       {selectedImagePreview ? (
-                        <div 
+                        <div
                           className="w-full relative shadow-lg rounded-xl overflow-hidden cursor-pointer hover:shadow-xl hover:ring-2 hover:ring-indigo-500/30 transition-all"
                           style={{
                             /* Aspect ratio of 1120/792 ~ 1.41 */
-                            aspectRatio: '1120 / 792',
-                            maxWidth: '100%',
+                            aspectRatio: "1120 / 792",
+                            maxWidth: "100%",
                           }}
-                          onClick={() => setLightboxData({ imageUrl: selectedImagePreview, textColor: textColor })}
+                          onClick={() =>
+                            setLightboxData({
+                              imageUrl: selectedImagePreview,
+                              textColor: textColor,
+                            })
+                          }
                         >
                           {/* Use SVG foreignObject to responsively scale the original 1120x792 template into the container */}
-                          <svg viewBox="0 0 1120 792" style={{ width: "100%", height: "auto", display: "block" }}>
+                          <svg
+                            viewBox="0 0 1120 792"
+                            style={{
+                              width: "100%",
+                              height: "auto",
+                              display: "block",
+                            }}
+                          >
                             <foreignObject width="1120" height="792">
-                              <CertificateTemplate 
+                              <CertificateTemplate
                                 studentName="John Doe"
                                 internshipTitle="Frontend Developer Intern"
                                 companyName="Acme Corp"
@@ -726,7 +775,7 @@ const CustomInternshipCertificateManager = () => {
                               />
                             </foreignObject>
                           </svg>
-                          
+
                           <div className="absolute inset-0 bg-black/0 hover:bg-black/5 transition-colors flex items-center justify-center opacity-0 hover:opacity-100 z-10">
                             <span className="bg-white/90 backdrop-blur-sm text-slate-800 text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-sm">
                               <Eye size={14} /> Enlarge Preview
@@ -775,6 +824,26 @@ const CustomInternshipCertificateManager = () => {
                       ))}
                     </ul>
                   </div>
+
+                  {/* Logo Download */}
+                  <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2 mb-1">
+                        Skillnaav Official Logo
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        Download the Skillnaav logo to add to your custom certificates.
+                      </p>
+                    </div>
+                    <a
+                      href={skillnaavLogo}
+                      download="skillnav_logo_white.png"
+                      className="shrink-0 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white transition-colors text-sm font-bold shadow-sm"
+                    >
+                      <Download size={16} />
+                      Download Logo
+                    </a>
+                  </div>
                 </div>
               </div>
             </motion.div>
@@ -794,14 +863,18 @@ const CustomInternshipCertificateManager = () => {
                 <div className="mb-7 flex flex-col gap-3 sm:flex-row sm:items-center">
                   <div className="relative w-full flex-1 group">
                     <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-                      <Search size={15} className="text-slate-400 group-focus-within:text-indigo-500 transition-colors duration-200" />
+                      <Search
+                        size={15}
+                        className="text-slate-400 group-focus-within:text-indigo-500 transition-colors duration-200"
+                      />
                     </div>
+                    {/*Add the "!mt-0" for alignment - 04-08-2026 */}
                     <input
                       type="text"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       placeholder="Search designs by name…"
-                      className="w-full h-12 pl-10 pr-10 rounded-2xl bg-white border border-slate-200 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition-all duration-200 shadow-sm hover:border-slate-300"
+                      className="!mt-0 w-full h-12 pl-10 pr-10 rounded-2xl bg-white border border-slate-200 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition-all duration-200 shadow-sm hover:border-slate-300"
                     />
                     <AnimatePresence>
                       {searchQuery && (
@@ -840,7 +913,9 @@ const CustomInternshipCertificateManager = () => {
               {isLoading ? (
                 <div className="flex flex-col items-center justify-center py-20 text-center w-full">
                   <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
-                  <p className="text-sm font-semibold text-slate-600">Loading designs...</p>
+                  <p className="text-sm font-semibold text-slate-600">
+                    Loading designs...
+                  </p>
                 </div>
               ) : certificateItems.length === 0 ? (
                 <motion.div
@@ -849,7 +924,11 @@ const CustomInternshipCertificateManager = () => {
                   className="bg-white rounded-2xl border-2 border-dashed border-slate-200 py-20 flex flex-col items-center text-center"
                 >
                   <div className="w-20 h-20 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center mb-5 shadow-sm">
-                    <FileBadge size={36} className="text-slate-300" strokeWidth={1.3} />
+                    <FileBadge
+                      size={36}
+                      className="text-slate-300"
+                      strokeWidth={1.3}
+                    />
                   </div>
                   <h3 className="text-lg font-bold text-slate-800">
                     No designs yet
@@ -871,10 +950,20 @@ const CustomInternshipCertificateManager = () => {
                   animate={{ opacity: 1, y: 0 }}
                   className="bg-white rounded-2xl border-2 border-dashed border-slate-200 py-16 flex flex-col items-center text-center"
                 >
-                  <Search size={36} className="text-slate-300 mb-4" strokeWidth={1.3} />
-                  <h3 className="text-lg font-bold text-slate-800">No results found</h3>
+                  <Search
+                    size={36}
+                    className="text-slate-300 mb-4"
+                    strokeWidth={1.3}
+                  />
+                  <h3 className="text-lg font-bold text-slate-800">
+                    No results found
+                  </h3>
                   <p className="text-sm text-slate-400 mt-2 max-w-sm">
-                    No designs match "<span className="font-semibold text-slate-500">{searchQuery}</span>". Try a different name.
+                    No designs match "
+                    <span className="font-semibold text-slate-500">
+                      {searchQuery}
+                    </span>
+                    ". Try a different name.
                   </p>
                   <button
                     onClick={() => setSearchQuery("")}
@@ -898,7 +987,12 @@ const CustomInternshipCertificateManager = () => {
                         {/* Image */}
                         <div
                           className="h-48 bg-slate-50 overflow-hidden relative cursor-pointer"
-                          onClick={() => setLightboxData({ imageUrl: item.imageUrl, textColor: item.textColor || "#1f2937" })}
+                          onClick={() =>
+                            setLightboxData({
+                              imageUrl: item.imageUrl,
+                              textColor: item.textColor || "#1f2937",
+                            })
+                          }
                         >
                           <img
                             src={item.imageUrl}
@@ -907,15 +1001,21 @@ const CustomInternshipCertificateManager = () => {
                           />
                           {/* Status Badge */}
                           <div className="absolute top-3 right-3 z-10 flex gap-2">
-                             {item.status === 'Approved' && (
-                                <span className="bg-emerald-100 text-emerald-800 text-[11px] font-bold px-2.5 py-1 rounded-md flex items-center gap-1 shadow-sm"><CheckCircle2 size={12} /> Approved</span>
-                             )}
-                             {item.status === 'Rejected' && (
-                                <span className="bg-rose-100 text-rose-800 text-[11px] font-bold px-2.5 py-1 rounded-md flex items-center gap-1 shadow-sm"><AlertCircle size={12} /> Rejected</span>
-                             )}
-                             {(!item.status || item.status === 'Pending') && (
-                                <span className="bg-amber-100 text-amber-800 text-[11px] font-bold px-2.5 py-1 rounded-md flex items-center gap-1 shadow-sm"><Clock size={12} /> Pending</span>
-                             )}
+                            {item.status === "Approved" && (
+                              <span className="bg-emerald-100 text-emerald-800 text-[11px] font-bold px-2.5 py-1 rounded-md flex items-center gap-1 shadow-sm">
+                                <CheckCircle2 size={12} /> Approved
+                              </span>
+                            )}
+                            {item.status === "Rejected" && (
+                              <span className="bg-rose-100 text-rose-800 text-[11px] font-bold px-2.5 py-1 rounded-md flex items-center gap-1 shadow-sm">
+                                <AlertCircle size={12} /> Rejected
+                              </span>
+                            )}
+                            {(!item.status || item.status === "Pending") && (
+                              <span className="bg-amber-100 text-amber-800 text-[11px] font-bold px-2.5 py-1 rounded-md flex items-center gap-1 shadow-sm">
+                                <Clock size={12} /> Pending
+                              </span>
+                            )}
                           </div>
                           {/* Hover overlay */}
                           <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
@@ -940,10 +1040,14 @@ const CustomInternshipCertificateManager = () => {
                             </p>
                           )}
 
-                          {item.status === 'Rejected' && item.adminRemarks && (
+                          {item.status === "Rejected" && item.adminRemarks && (
                             <div className="mt-3 bg-rose-50/50 p-2.5 rounded-xl border border-rose-100/50">
-                               <p className="text-[11px] font-bold text-rose-800 mb-0.5">Admin Remarks</p>
-                               <p className="text-xs text-rose-600/90 leading-relaxed">{item.adminRemarks}</p>
+                              <p className="text-[11px] font-bold text-rose-800 mb-0.5">
+                                Admin Remarks
+                              </p>
+                              <p className="text-xs text-rose-600/90 leading-relaxed">
+                                {item.adminRemarks}
+                              </p>
                             </div>
                           )}
 
@@ -952,7 +1056,9 @@ const CustomInternshipCertificateManager = () => {
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                               <span className="text-xs text-slate-500 font-semibold flex items-center gap-1.5">
                                 <Calendar size={12} />
-                                {new Date(item.createdAt).toLocaleDateString("en-GB")}
+                                {new Date(item.createdAt).toLocaleDateString(
+                                  "en-GB",
+                                )}
                               </span>
 
                               <motion.button
@@ -976,15 +1082,22 @@ const CustomInternshipCertificateManager = () => {
                     <div className="mt-8 flex flex-col gap-4 rounded-2xl border border-slate-200/80 bg-white px-4 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:px-5">
                       <p className="text-sm font-semibold text-slate-500 text-center sm:text-left">
                         Showing {(galleryPage - 1) * DESIGNS_PER_PAGE + 1}-
-                        {Math.min(galleryPage * DESIGNS_PER_PAGE, filteredItems.length)} of{" "}
-                        {filteredItems.length} designs
+                        {Math.min(
+                          galleryPage * DESIGNS_PER_PAGE,
+                          filteredItems.length,
+                        )}{" "}
+                        of {filteredItems.length} designs
                       </p>
 
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                         <div className="flex items-center justify-center gap-2">
                           <button
                             type="button"
-                            onClick={() => setGalleryPage((prevPage) => Math.max(prevPage - 1, 1))}
+                            onClick={() =>
+                              setGalleryPage((prevPage) =>
+                                Math.max(prevPage - 1, 1),
+                              )
+                            }
                             disabled={galleryPage === 1}
                             className="inline-flex h-10 min-w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
                             aria-label="Previous page"
@@ -1014,7 +1127,7 @@ const CustomInternshipCertificateManager = () => {
                                 >
                                   {pageNumber}
                                 </button>
-                              )
+                              ),
                             )}
                           </div>
 
@@ -1022,7 +1135,7 @@ const CustomInternshipCertificateManager = () => {
                             type="button"
                             onClick={() =>
                               setGalleryPage((prevPage) =>
-                                Math.min(prevPage + 1, totalGalleryPages)
+                                Math.min(prevPage + 1, totalGalleryPages),
                               )
                             }
                             disabled={galleryPage === totalGalleryPages}

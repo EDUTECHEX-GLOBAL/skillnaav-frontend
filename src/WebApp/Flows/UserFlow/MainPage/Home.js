@@ -5,7 +5,7 @@ import {
   faClock,
   faDollarSign,
   faHeart,
-  faGlobe
+  faGlobe,
 } from "@fortawesome/free-solid-svg-icons";
 import ApplyCards from "./ApplyCards";
 import { useTabContext } from "./UserHomePageContext/HomePageContext";
@@ -17,8 +17,8 @@ import { format } from "date-fns";
 const Homeimage = "/Home-Image.png";
 
 const MAX_LIMITS = {
-  "Free": 5,
-  "Freemium": 5,
+  Free: 5,
+  Freemium: 5,
   "Premium Basic": 25,
   "Premium Plus": Infinity,
 };
@@ -75,7 +75,7 @@ const Home = () => {
       const isPremiumUser = userInfo.isPremium ? "true" : "false";
 
       const response = await axios.get(
-        `/api/interns/approved?isPremium=${isPremiumUser}&page=${pageNumber}&limit=6`
+        `/api/interns/approved?isPremium=${isPremiumUser}&page=${pageNumber}&limit=6`,
       );
 
       const { data, hasMore: more } = response.data;
@@ -122,12 +122,15 @@ const Home = () => {
           {};
         if (userInfo._id) {
           const { data: countData } = await axios.get(
-            `/api/applications/count/${userInfo._id}`
+            `/api/applications/count/${userInfo._id}`,
           );
           setApplicationCount(countData.count);
         }
       } catch (error) {
-        console.error("Error fetching user profile or application count:", error);
+        console.error(
+          "Error fetching user profile or application count:",
+          error,
+        );
       }
     };
 
@@ -150,7 +153,7 @@ const Home = () => {
           fetchJobData(page + 1);
         }
       },
-      { threshold: 0.8 }
+      { threshold: 0.8 },
     );
 
     observer.observe(loadMoreRef.current);
@@ -166,7 +169,7 @@ const Home = () => {
       if (!userInfo) return;
 
       const { data: checkData } = await axios.get(
-        `/api/applications/check-applied/${userInfo._id}/${job._id}`
+        `/api/applications/check-applied/${userInfo._id}/${job._id}`,
       );
 
       if (checkData.isApplied) {
@@ -178,7 +181,7 @@ const Home = () => {
       }
 
       const { data: countData } = await axios.get(
-        `/api/applications/count/${userInfo._id}`
+        `/api/applications/count/${userInfo._id}`,
       );
       setApplicationCount(countData.count);
 
@@ -215,12 +218,14 @@ const Home = () => {
       const savedLimit = getSavedLimitByPlan(planType);
       const jobExists = savedJobs.some((savedJob) => {
         const jobToCheck = savedJob.savedJob || savedJob;
-        return (
-          jobToCheck.jobId?._id === job._id || jobToCheck._id === job._id
-        );
+        return jobToCheck.jobId?._id === job._id || jobToCheck._id === job._id;
       });
 
-      if (!jobExists && savedJobs.length >= savedLimit && savedLimit !== Infinity) {
+      if (
+        !jobExists &&
+        savedJobs.length >= savedLimit &&
+        savedLimit !== Infinity
+      ) {
         setShowSavedJobPopup(true);
         return;
       }
@@ -239,7 +244,7 @@ const Home = () => {
     const postedDate = new Date(date);
     const currentDate = new Date();
     const differenceInDays = Math.floor(
-      (currentDate - postedDate) / (1000 * 60 * 60 * 24)
+      (currentDate - postedDate) / (1000 * 60 * 60 * 24),
     );
     if (differenceInDays === 0) return "Today";
     if (differenceInDays === 1) return "Yesterday";
@@ -253,7 +258,11 @@ const Home = () => {
         // ── Detail view ──────────────────────────────────────────────────
         // selectedJob is set → list is NOT rendered → IntersectionObserver
         // does NOT fire → no background pagination requests.
-        <ApplyCards job={selectedJob} onBack={handleBack} isPremium={isPremium} />
+        <ApplyCards
+          job={selectedJob}
+          onBack={handleBack}
+          isPremium={isPremium}
+        />
       ) : (
         // ── List view ────────────────────────────────────────────────────
         <>
@@ -272,7 +281,9 @@ const Home = () => {
           {/* Job cards */}
           <section className="py-10 px-2 lg:px-4">
             <h2 className="text-3xl font-bold mb-2">Find your next role</h2>
-            <p className="text-gray-600 mb-6">Recommendations based on your profile</p>
+            <p className="text-gray-600 mb-6">
+              Recommendations based on your profile
+            </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4 lg:gap-6">
               {jobData.map((job) => {
@@ -280,22 +291,26 @@ const Home = () => {
                   (savedJob) =>
                     savedJob.jobId?._id === job._id ||
                     savedJob.jobId === job._id ||
-                    savedJob._id === job._id
+                    savedJob._id === job._id,
                 );
 
                 return (
-                  <div key={job._id} className="relative border rounded-lg p-6 shadow-sm">
+                  <div
+                    key={job._id}
+                    className="relative border rounded-lg p-6 shadow-sm"
+                  >
                     {/* Badge */}
                     {job.internshipType && (
                       <span
-                        className={`absolute top-2 right-2 px-3 py-1 text-xs font-semibold uppercase rounded-full ${job.internshipType === "FREE"
+                        className={`absolute top-2 right-2 px-3 py-1 text-xs font-semibold uppercase rounded-full ${
+                          job.internshipType === "FREE"
                             ? "bg-green-100 text-green-700"
                             : job.internshipType === "STIPEND"
                               ? "bg-blue-100 text-blue-700"
                               : job.internshipType === "PAID"
                                 ? "bg-red-100 text-red-700"
                                 : ""
-                          }`}
+                        }`}
                       >
                         {job.internshipType}
                       </span>
@@ -305,8 +320,11 @@ const Home = () => {
                     <div className="absolute top-10 right-2">
                       <button
                         onClick={() => toggleSaveJob(job)}
-                        className={`transition ${saved ? "text-red-500" : "text-gray-500 hover:text-red-500"
-                          }`}
+                        className={`transition ${
+                          saved
+                            ? "text-red-500"
+                            : "text-gray-500 hover:text-red-500"
+                        }`}
                         aria-label={saved ? "Unsave job" : "Save job"}
                       >
                         <FontAwesomeIcon icon={faHeart} className="w-6 h-6" />
@@ -328,13 +346,25 @@ const Home = () => {
                         }}
                       />
                       <div className="flex-1 min-w-0 pr-12">
-                        <h3 className="text-xl font-semibold truncate" title={job.jobTitle}>{job.jobTitle}</h3>
+                        <h3
+                          className="text-xl font-semibold truncate"
+                          title={job.jobTitle}
+                        >
+                          {job.jobTitle}
+                        </h3>
                         <div className="flex items-center text-gray-600">
-                          <span className="truncate" title={job.companyName}>{job.companyName}</span>
+                          <span className="truncate" title={job.companyName}>
+                            {job.companyName}
+                          </span>
                           <span className="mx-1">•</span>
-                          <span className="whitespace-nowrap">{calculatePostedTime(job.createdAt)}</span>
+                          <span className="whitespace-nowrap">
+                            {calculatePostedTime(job.createdAt)}
+                          </span>
                         </div>
-                        <p className="text-xs text-gray-400 mt-1 whitespace-nowrap">ID: {job._id}</p>
+                        {/*Remove "whitespace-nowrap" add "break-all" for alignment in tabs - 07-08-2026*/}
+                        <p className="text-xs text-gray-400 mt-1 break-all">
+                          ID: {job._id}
+                        </p>
                       </div>
                     </div>
 
@@ -351,7 +381,10 @@ const Home = () => {
                           : "—"}{" "}
                         –{" "}
                         {job.endDateOrDuration
-                          ? format(new Date(job.endDateOrDuration), "dd MMM yyyy")
+                          ? format(
+                              new Date(job.endDateOrDuration),
+                              "dd MMM yyyy",
+                            )
                           : "—"}
                       </p>
                       <div className="flex items-center gap-2 text-sm md:text-base leading-none">
@@ -370,7 +403,10 @@ const Home = () => {
                         </span>
                       </div>
                       <p className="flex items-center mt-0">
-                        <FontAwesomeIcon icon={faGlobe} className="mr-2 text-gray-600" />
+                        <FontAwesomeIcon
+                          icon={faGlobe}
+                          className="mr-2 text-gray-600"
+                        />
                         <span className="font-medium text-gray-600">
                           {job.internshipMode === "ONLINE"
                             ? "Online"
@@ -393,11 +429,12 @@ const Home = () => {
                               {q}
                             </span>
                           ))}
-                        {job.qualifications && job.qualifications.length > 2 && (
-                          <span className="text-sm bg-gray-100 text-gray-700 py-1 px-3 rounded-full">
-                            +{job.qualifications.length - 2}
-                          </span>
-                        )}
+                        {job.qualifications &&
+                          job.qualifications.length > 2 && (
+                            <span className="text-sm bg-gray-100 text-gray-700 py-1 px-3 rounded-full">
+                              +{job.qualifications.length - 2}
+                            </span>
+                          )}
                       </div>
                       <button
                         className="text-purple-600 hover:underline"
@@ -413,9 +450,14 @@ const Home = () => {
 
             {/* Load-more sentinel — inside list branch so observer is disconnected
                 when the detail view is shown, preventing background fetches */}
-            <div ref={loadMoreRef} className="h-10 flex justify-center items-center mt-4">
+            <div
+              ref={loadMoreRef}
+              className="h-10 flex justify-center items-center mt-4"
+            >
               {loadingJobs && (
-                <span className="text-gray-500 text-sm">Loading more internships…</span>
+                <span className="text-gray-500 text-sm">
+                  Loading more internships…
+                </span>
               )}
             </div>
           </section>
@@ -428,7 +470,11 @@ const Home = () => {
           onClick={() => navigate("/skillnaav-analysis")}
           className="bg-white text-white rounded-full shadow-lg p-4 hover:bg-blue-700 transition duration-300"
         >
-          <img src={Skillnaavlogo} alt="Skillnaav Analysis" className="w-12 h-12" />
+          <img
+            src={Skillnaavlogo}
+            alt="Skillnaav Analysis"
+            className="w-12 h-12"
+          />
         </button>
       </div>
 
@@ -436,11 +482,16 @@ const Home = () => {
       {showLimitPopup && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
           <div className="bg-white p-6 rounded-lg shadow-lg max-w-sm text-center">
-            <h2 className="text-xl font-semibold text-gray-800">Application Limit Reached</h2>
+            <h2 className="text-xl font-semibold text-gray-800">
+              Application Limit Reached
+            </h2>
             <p className="text-gray-600 mt-2">
-              You have reached the maximum of {MAX_LIMITS[planType] || 5} applications allowed under your plan ({planType}).
+              You have reached the maximum of {MAX_LIMITS[planType] || 5}{" "}
+              applications allowed under your plan ({planType}).
             </p>
-            <p className="text-gray-600 mt-1">Upgrade your account to apply for more jobs.</p>
+            <p className="text-gray-600 mt-1">
+              Upgrade your account to apply for more jobs.
+            </p>
             <div className="flex justify-between mt-4">
               <button
                 className="bg-gray-400 text-white px-4 py-2 rounded-md hover:bg-gray-500"
@@ -466,7 +517,9 @@ const Home = () => {
       {showSavedJobPopup && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
           <div className="bg-white p-6 rounded-lg shadow-lg max-w-sm text-center">
-            <h2 className="text-xl font-semibold text-gray-800">Saved Jobs Limit Reached</h2>
+            <h2 className="text-xl font-semibold text-gray-800">
+              Saved Jobs Limit Reached
+            </h2>
             <p className="text-gray-600 mt-2">
               You have reached the maximum of{" "}
               {getSavedLimitByPlan(planType) === Infinity

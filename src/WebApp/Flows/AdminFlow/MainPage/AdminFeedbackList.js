@@ -43,7 +43,7 @@ export default function AdminFeedbackList({ flow: initialFlowProp } = {}) {
       .toLowerCase()
       .trim()
       .split(/\s+/)
-      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
       .join(" ");
   }
 
@@ -66,7 +66,8 @@ export default function AdminFeedbackList({ flow: initialFlowProp } = {}) {
     for (const c of candidates) {
       if (c !== undefined && c !== null && String(c).trim() !== "") {
         const num = Number(c);
-        if (!Number.isNaN(num)) return Math.max(0, Math.min(5, Math.round(num)));
+        if (!Number.isNaN(num))
+          return Math.max(0, Math.min(5, Math.round(num)));
       }
     }
 
@@ -78,7 +79,8 @@ export default function AdminFeedbackList({ flow: initialFlowProp } = {}) {
         const keyLower = String(k).toLowerCase();
         if (/(^overall$|overall_|_overall|rating|score|stars)/.test(keyLower)) {
           const num = Number(v);
-          if (!Number.isNaN(num)) return Math.max(0, Math.min(5, Math.round(num)));
+          if (!Number.isNaN(num))
+            return Math.max(0, Math.min(5, Math.round(num)));
         }
         if (typeof v === "object") {
           const found = recursiveSearch(v);
@@ -106,11 +108,15 @@ export default function AdminFeedbackList({ flow: initialFlowProp } = {}) {
       return item.questionMeta.map((q) => {
         const key = q.id;
         const label = q.label || key;
-        const val = Object.prototype.hasOwnProperty.call(item.answers, key) ? item.answers[key] : "";
+        const val = Object.prototype.hasOwnProperty.call(item.answers, key)
+          ? item.answers[key]
+          : "";
         return (
           <div key={key} className="mb-2">
             <div className="text-xs text-gray-500">{label}</div>
-            <div className="text-sm whitespace-pre-wrap">{String(val ?? "")}</div>
+            <div className="text-sm whitespace-pre-wrap">
+              {String(val ?? "")}
+            </div>
           </div>
         );
       });
@@ -162,7 +168,10 @@ export default function AdminFeedbackList({ flow: initialFlowProp } = {}) {
       if (flowFilter && flowFilter !== "all") params.flow = flowFilter;
       if (fromDate) params.from = fromDate;
       if (toDate) params.to = toDate;
-      const res = await axios.get("/api/feedback/export", { params, responseType: "blob" });
+      const res = await axios.get("/api/feedback/export", {
+        params,
+        responseType: "blob",
+      });
       const blob = new Blob([res.data], { type: "text/csv" });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -179,7 +188,9 @@ export default function AdminFeedbackList({ flow: initialFlowProp } = {}) {
   const downloadPDF = async (id) => {
     try {
       const API = process.env.REACT_APP_API_URL?.replace(/\/$/, "") || "";
-      const url = API ? `${API}/api/feedback/${id}/pdf` : `/api/feedback/${id}/pdf`;
+      const url = API
+        ? `${API}/api/feedback/${id}/pdf`
+        : `/api/feedback/${id}/pdf`;
 
       const res = await axios.get(url, {
         responseType: "blob",
@@ -202,14 +213,17 @@ export default function AdminFeedbackList({ flow: initialFlowProp } = {}) {
     } catch (err) {
       console.error("PDF download failed", err);
       if (!navigator.onLine) {
-        alert("You appear to be offline. Check your network connection and try again.");
+        alert(
+          "You appear to be offline. Check your network connection and try again.",
+        );
         return;
       }
       const msg = err?.response?.status
         ? `Server returned status ${err.response.status}`
-        : err?.code === "ECONNREFUSED" || err?.message?.includes("Network Error")
-        ? "Unable to reach backend server. Is the backend running?"
-        : "Failed to download PDF. Check server logs or the network tab.";
+        : err?.code === "ECONNREFUSED" ||
+            err?.message?.includes("Network Error")
+          ? "Unable to reach backend server. Is the backend running?"
+          : "Failed to download PDF. Check server logs or the network tab.";
       alert(msg);
     }
   };
@@ -269,13 +283,30 @@ export default function AdminFeedbackList({ flow: initialFlowProp } = {}) {
     }
 
     if (page >= totalPages - 3) {
-      return [1, "ellipsis-left", totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+      return [
+        1,
+        "ellipsis-left",
+        totalPages - 4,
+        totalPages - 3,
+        totalPages - 2,
+        totalPages - 1,
+        totalPages,
+      ];
     }
 
-    return [1, "ellipsis-left", page - 1, page, page + 1, "ellipsis-right", totalPages];
+    return [
+      1,
+      "ellipsis-left",
+      page - 1,
+      page,
+      page + 1,
+      "ellipsis-right",
+      totalPages,
+    ];
   };
 
-  const nextPage = () => setPage((current) => Math.min(current + 1, totalPages));
+  const nextPage = () =>
+    setPage((current) => Math.min(current + 1, totalPages));
   const prevPage = () => setPage((current) => Math.max(current - 1, 1));
 
   return (
@@ -285,43 +316,56 @@ export default function AdminFeedbackList({ flow: initialFlowProp } = {}) {
         {/* Header Section */}
         <div className="p-6 border-b border-gray-200">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-            <h1 className="text-2xl font-semibold text-gray-800">Feedback Inbox</h1>
-            
+            <h1 className="text-2xl font-semibold text-gray-800">
+              Feedback Inbox
+            </h1>
+
             <div className="flex flex-col lg:flex-row items-start lg:items-center gap-3 w-full sm:w-auto">
               {/* Flow Tabs */}
               <div className="flex flex-wrap gap-2 w-full lg:w-auto">
-                <button 
-                  onClick={() => handleTabClick("all")} 
+                <button
+                  onClick={() => handleTabClick("all")}
                   className={`px-4 py-2 text-sm font-medium rounded-lg border transition-colors ${flowFilter === "all" ? "bg-blue-600 text-white border-blue-600 shadow-sm" : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"}`}
                 >
                   All
                 </button>
-                <button 
-                  onClick={() => handleTabClick("user")} 
+                <button
+                  onClick={() => handleTabClick("user")}
                   className={`px-4 py-2 text-sm font-medium rounded-lg border transition-colors ${flowFilter === "user" ? "bg-blue-600 text-white border-blue-600 shadow-sm" : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"}`}
                 >
                   User
                 </button>
-                <button 
-                  onClick={() => handleTabClick("partner")} 
+                <button
+                  onClick={() => handleTabClick("partner")}
                   className={`px-4 py-2 text-sm font-medium rounded-lg border transition-colors ${flowFilter === "partner" ? "bg-blue-600 text-white border-blue-600 shadow-sm" : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"}`}
                 >
                   Partner
                 </button>
-                <button 
-                  onClick={() => handleTabClick("schoolAdmin")} 
+                <button
+                  onClick={() => handleTabClick("schoolAdmin")}
                   className={`px-4 py-2 text-sm font-medium rounded-lg border transition-colors ${flowFilter === "schoolAdmin" ? "bg-blue-600 text-white border-blue-600 shadow-sm" : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"}`}
                 >
                   School Admin
                 </button>
               </div>
-              
+
               <button
                 onClick={downloadCSV}
                 className="w-full lg:w-auto justify-center px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors flex items-center gap-2"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
                 </svg>
                 Export CSV
               </button>
@@ -333,12 +377,15 @@ export default function AdminFeedbackList({ flow: initialFlowProp } = {}) {
             <CustomSelect
               label="Flow"
               value={flowFilter}
-              onChange={(val) => { setFlowFilter(val); setPage(1); }}
+              onChange={(val) => {
+                setFlowFilter(val);
+                setPage(1);
+              }}
               options={[
                 { value: "all", label: "All" },
                 { value: "user", label: "User" },
                 { value: "partner", label: "Partner" },
-                { value: "schoolAdmin", label: "School Admin" }
+                { value: "schoolAdmin", label: "School Admin" },
               ]}
             />
 
@@ -351,24 +398,27 @@ export default function AdminFeedbackList({ flow: initialFlowProp } = {}) {
                 { value: "new", label: "New" },
                 { value: "in_review", label: "In Review" },
                 { value: "actioned", label: "Actioned" },
-                { value: "resolved", label: "Resolved" }
+                { value: "resolved", label: "Resolved" },
               ]}
             />
 
             <div className="flex flex-col gap-2">
-              <label className="text-xs font-medium text-gray-600 uppercase tracking-wider">Date Range</label>
+              <label className="text-xs font-medium text-gray-600 uppercase tracking-wider">
+                Date Range
+              </label>
               <div className="flex flex-col sm:flex-row gap-2">
-                <input 
-                  type="date" 
-                  value={fromDate} 
-                  onChange={(e) => setFromDate(e.target.value)} 
-                  className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                {/*Add "!mt-0" for both inputs of date range for alignment - 06-08-2026 */}
+                <input
+                  type="date"
+                  value={fromDate}
+                  onChange={(e) => setFromDate(e.target.value)}
+                  className="!mt-0 w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                 />
-                <input 
-                  type="date" 
-                  value={toDate} 
-                  onChange={(e) => setToDate(e.target.value)} 
-                  className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                <input
+                  type="date"
+                  value={toDate}
+                  onChange={(e) => setToDate(e.target.value)}
+                  className="!mt-0 w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                 />
               </div>
             </div>
@@ -377,25 +427,39 @@ export default function AdminFeedbackList({ flow: initialFlowProp } = {}) {
           {/* Search Bar */}
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="flex-1 relative w-full">
+              {/*Add the "!mt-0 h-12" for alignment - 06-08-2026*/}
               <input
                 placeholder="Search text, email or notes"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") handleSearch(); }}
-                className="w-full border border-gray-300 rounded-lg p-3 pl-10 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSearch();
+                }}
+                className="!mt-0 h-12 w-full border border-gray-300 rounded-lg p-3 pl-10 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
               />
-              <svg className="absolute left-3 top-3.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              <svg
+                className="absolute left-3 top-3.5 w-4 h-4 text-gray-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
               </svg>
             </div>
-            <button 
-              onClick={handleSearch} 
+            <button
+              onClick={handleSearch}
               className="px-5 py-3 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors w-full sm:w-auto"
             >
               Search
             </button>
-            <button 
-              onClick={resetFilters} 
+            <button
+              onClick={resetFilters}
               className="px-5 py-3 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors w-full sm:w-auto"
             >
               Reset
@@ -406,15 +470,26 @@ export default function AdminFeedbackList({ flow: initialFlowProp } = {}) {
         {/* Table Section */}
         <div className="overflow-x-auto">
           <table className="w-full">
-          
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="p-4 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Date</th>
-                <th className="p-4 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Flow</th>
-                <th className="p-4 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">User Details</th>
-                <th className="p-4 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">OverAll Rating</th>
-                <th className="p-4 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Status</th>
-                <th className="p-4 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Actions</th>
+                <th className="p-4 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
+                  Date
+                </th>
+                <th className="p-4 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
+                  Flow
+                </th>
+                <th className="p-4 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
+                  User Details
+                </th>
+                <th className="p-4 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
+                  OverAll Rating
+                </th>
+                <th className="p-4 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
+                  Status
+                </th>
+                <th className="p-4 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
+                  Actions
+                </th>
               </tr>
             </thead>
 
@@ -424,7 +499,9 @@ export default function AdminFeedbackList({ flow: initialFlowProp } = {}) {
                   <td colSpan={7} className="p-8 text-center">
                     <div className="flex flex-col items-center gap-3">
                       <Spinner />
-                      <span className="text-sm text-gray-600">Loading feedback...</span>
+                      <span className="text-sm text-gray-600">
+                        Loading feedback...
+                      </span>
                     </div>
                   </td>
                 </tr>
@@ -432,8 +509,19 @@ export default function AdminFeedbackList({ flow: initialFlowProp } = {}) {
                 <tr>
                   <td colSpan={7} className="p-8 text-center">
                     <div className="flex flex-col items-center gap-2 text-gray-500">
-                      <svg className="w-12 h-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      <svg
+                        className="w-12 h-12 text-gray-300"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.5}
+                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                        />
                       </svg>
                       <span className="text-sm">No feedback found</span>
                     </div>
@@ -441,12 +529,14 @@ export default function AdminFeedbackList({ flow: initialFlowProp } = {}) {
                 </tr>
               ) : (
                 items.map((it, index) => (
-                  <tr 
-                    key={it._id} 
-                    className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}
+                  <tr
+                    key={it._id}
+                    className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${index % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}
                   >
                     <td className="p-4 align-top">
-                      <div className="text-sm text-gray-900">{fmtDate(it.createdAt || it.timestamp)}</div>
+                      <div className="text-sm text-gray-900">
+                        {fmtDate(it.createdAt || it.timestamp)}
+                      </div>
                     </td>
                     <td className="p-4 align-top">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
@@ -454,8 +544,18 @@ export default function AdminFeedbackList({ flow: initialFlowProp } = {}) {
                       </span>
                     </td>
                     <td className="p-4 align-top">
-                      <div className="font-medium text-gray-900">{it.userName || (it.answers && it.answers.contactName) || "—"}</div>
-                      <div className="text-xs text-gray-500 mt-1">{it.userEmail || (it.answers && (it.answers.contactEmail || it.answers.contactEmail_partner)) || "—"}</div>
+                      <div className="font-medium text-gray-900">
+                        {it.userName ||
+                          (it.answers && it.answers.contactName) ||
+                          "—"}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        {it.userEmail ||
+                          (it.answers &&
+                            (it.answers.contactEmail ||
+                              it.answers.contactEmail_partner)) ||
+                          "—"}
+                      </div>
                     </td>
 
                     <td className="p-4 align-top">
@@ -466,7 +566,7 @@ export default function AdminFeedbackList({ flow: initialFlowProp } = {}) {
                             return [...Array(5)].map((_, i) => (
                               <svg
                                 key={i}
-                                className={`w-4 h-4 ${i < overall ? 'text-yellow-400' : 'text-gray-300'}`}
+                                className={`w-4 h-4 ${i < overall ? "text-yellow-400" : "text-gray-300"}`}
                                 fill="currentColor"
                                 viewBox="0 0 20 20"
                               >
@@ -485,38 +585,70 @@ export default function AdminFeedbackList({ flow: initialFlowProp } = {}) {
                     </td>
 
                     <td className="p-4 align-top">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        it.status === 'resolved' ? 'bg-green-100 text-green-800' :
-                        it.status === 'in_review' ? 'bg-yellow-100 text-yellow-800' :
-                        it.status === 'new' ? 'bg-blue-100 text-blue-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          it.status === "resolved"
+                            ? "bg-green-100 text-green-800"
+                            : it.status === "in_review"
+                              ? "bg-yellow-100 text-yellow-800"
+                              : it.status === "new"
+                                ? "bg-blue-100 text-blue-800"
+                                : "bg-gray-100 text-gray-800"
+                        }`}
+                      >
                         {it.status || "new"}
                       </span>
                     </td>
                     <td className="p-4 align-top">
                       <div className="flex items-center gap-2">
-                        <button 
-                          onClick={() => openDetail(it)} 
+                        <button
+                          onClick={() => openDetail(it)}
                           className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded hover:bg-indigo-700 transition-colors flex items-center gap-1"
                         >
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          <svg
+                            className="w-3 h-3"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                            />
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                            />
                           </svg>
                           View
                         </button>
-                        <button 
-                          onClick={() => downloadPDF(it._id)} 
+                        <button
+                          onClick={() => downloadPDF(it._id)}
                           className="px-3 py-1.5 border border-gray-300 text-gray-700 text-xs font-medium rounded hover:bg-gray-50 transition-colors flex items-center gap-1"
                         >
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          <svg
+                            className="w-3 h-3"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                            />
                           </svg>
                           PDF
                         </button>
-                        <button 
-                          onClick={() => markStatus(it._id, "in_review")} 
+                        <button
+                          onClick={() => markStatus(it._id, "in_review")}
                           className="px-3 py-1.5 bg-yellow-500 text-white text-xs font-medium rounded hover:bg-yellow-600 transition-colors"
                         >
                           Review
@@ -610,20 +742,25 @@ export default function AdminFeedbackList({ flow: initialFlowProp } = {}) {
           <div className="bg-white w-full max-w-3xl rounded-xl shadow-lg p-6 overflow-auto max-h-[90vh]">
             <div className="flex flex-col sm:flex-row items-start justify-between gap-4 mb-6">
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">Feedback Detail</h3>
-                <div className="text-sm text-gray-500 mt-1">{selected._id} • {selected.flow} • {fmtDate(selected.createdAt || selected.timestamp)}</div>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Feedback Detail
+                </h3>
+                <div className="text-sm text-gray-500 mt-1">
+                  {selected._id} • {selected.flow} •{" "}
+                  {fmtDate(selected.createdAt || selected.timestamp)}
+                </div>
               </div>
 
               <div className="flex flex-wrap gap-2 w-full sm:w-auto mt-4 sm:mt-0">
-                <button 
-                  onClick={() => markStatus(selected._id, "resolved")} 
+                <button
+                  onClick={() => markStatus(selected._id, "resolved")}
                   disabled={actionLoading}
                   className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
                 >
                   {actionLoading ? "Saving..." : "Mark Resolved"}
                 </button>
-                <button 
-                  onClick={closeDetail} 
+                <button
+                  onClick={closeDetail}
                   className="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   Close
@@ -634,28 +771,47 @@ export default function AdminFeedbackList({ flow: initialFlowProp } = {}) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4">
                 <div>
-                  <h4 className="text-sm font-semibold text-gray-900 mb-3">User Information</h4>
+                  <h4 className="text-sm font-semibold text-gray-900 mb-3">
+                    User Information
+                  </h4>
                   <div className="space-y-2">
                     <div className="flex">
                       <span className="text-sm text-gray-500 w-24">Name:</span>
-                      <span className="text-sm text-gray-900">{selected.userName || "—"}</span>
+                      <span className="text-sm text-gray-900">
+                        {selected.userName || "—"}
+                      </span>
                     </div>
                     <div className="flex">
                       <span className="text-sm text-gray-500 w-24">Email:</span>
-                      <span className="text-sm text-gray-900">{selected.userEmail || (selected.answers && (selected.answers.contactEmail || selected.answers.contactEmail_partner)) || "—"}</span>
+                      <span className="text-sm text-gray-900">
+                        {selected.userEmail ||
+                          (selected.answers &&
+                            (selected.answers.contactEmail ||
+                              selected.answers.contactEmail_partner)) ||
+                          "—"}
+                      </span>
                     </div>
                     <div className="flex">
                       <span className="text-sm text-gray-500 w-24">Page:</span>
-                      <span className="text-sm text-gray-900">{selected.page || "—"}</span>
+                      <span className="text-sm text-gray-900">
+                        {selected.page || "—"}
+                      </span>
                     </div>
                     <div className="flex">
-                      <span className="text-sm text-gray-500 w-24">Status:</span>
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        selected.status === 'resolved' ? 'bg-green-100 text-green-800' :
-                        selected.status === 'in_review' ? 'bg-yellow-100 text-yellow-800' :
-                        selected.status === 'new' ? 'bg-blue-100 text-blue-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
+                      <span className="text-sm text-gray-500 w-24">
+                        Status:
+                      </span>
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          selected.status === "resolved"
+                            ? "bg-green-100 text-green-800"
+                            : selected.status === "in_review"
+                              ? "bg-yellow-100 text-yellow-800"
+                              : selected.status === "new"
+                                ? "bg-blue-100 text-blue-800"
+                                : "bg-gray-100 text-gray-800"
+                        }`}
+                      >
                         {selected.status || "new"}
                       </span>
                     </div>
@@ -664,20 +820,31 @@ export default function AdminFeedbackList({ flow: initialFlowProp } = {}) {
               </div>
 
               <div>
-                <h4 className="text-sm font-semibold text-gray-900 mb-3">Feedback Summary</h4>
+                <h4 className="text-sm font-semibold text-gray-900 mb-3">
+                  Feedback Summary
+                </h4>
                 <div className="bg-gray-50 rounded-lg p-4">
                   {selected.answers && typeof selected.answers === "object" ? (
                     renderAnswersWithLabels(selected)
                   ) : (
-                    <div className="text-sm text-gray-700">{String(selected.answers)}</div>
+                    <div className="text-sm text-gray-700">
+                      {String(selected.answers)}
+                    </div>
                   )}
                 </div>
               </div>
             </div>
 
             <div className="mt-6 pt-6 border-t border-gray-200">
-              <h4 className="text-sm font-semibold text-gray-900 mb-3">Internal Notes</h4>
-              <InternalNoteEditor feedback={selected} onSaved={() => { setRefreshKey((k) => k + 1); }} />
+              <h4 className="text-sm font-semibold text-gray-900 mb-3">
+                Internal Notes
+              </h4>
+              <InternalNoteEditor
+                feedback={selected}
+                onSaved={() => {
+                  setRefreshKey((k) => k + 1);
+                }}
+              />
             </div>
           </div>
         </div>
@@ -689,9 +856,25 @@ export default function AdminFeedbackList({ flow: initialFlowProp } = {}) {
 function Spinner() {
   return (
     <div className="flex items-center justify-center">
-      <svg className="animate-spin h-6 w-6 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+      <svg
+        className="animate-spin h-6 w-6 text-blue-600"
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+      >
+        <circle
+          className="opacity-25"
+          cx="12"
+          cy="12"
+          r="10"
+          stroke="currentColor"
+          strokeWidth="4"
+        ></circle>
+        <path
+          className="opacity-75"
+          fill="currentColor"
+          d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+        ></path>
       </svg>
     </div>
   );
@@ -701,17 +884,22 @@ function InternalNoteEditor({ feedback, onSaved }) {
   const [note, setNote] = useState(feedback?.note || "");
   const [loading, setLoading] = useState(false);
 
-  React.useEffect(() => { setNote(feedback?.note || ""); }, [feedback]);
+  React.useEffect(() => {
+    setNote(feedback?.note || "");
+  }, [feedback]);
 
   const saveNote = async () => {
     try {
       setLoading(true);
-      await axios.patch(`/api/feedback/${feedback._id}`, { note, status: 'in_review' });
-      alert('Saved');
+      await axios.patch(`/api/feedback/${feedback._id}`, {
+        note,
+        status: "in_review",
+      });
+      alert("Saved");
       onSaved && onSaved();
     } catch (err) {
-      console.error('save note failed', err);
-      alert('Could not save note');
+      console.error("save note failed", err);
+      alert("Could not save note");
     } finally {
       setLoading(false);
     }
@@ -719,33 +907,51 @@ function InternalNoteEditor({ feedback, onSaved }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <textarea 
-        value={note} 
-        onChange={e => setNote(e.target.value)} 
-        className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" 
-        rows={4} 
+      <textarea
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+        rows={4}
         placeholder="Add internal notes or action items..."
       />
       <div className="flex gap-2">
-        <button 
-          onClick={saveNote} 
+        <button
+          onClick={saveNote}
           disabled={loading}
           className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center gap-2"
         >
           {loading ? (
             <>
-              <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+              <svg
+                className="animate-spin h-4 w-4"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                ></circle>
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                ></path>
               </svg>
               Saving...
             </>
           ) : (
-            'Save note'
+            "Save note"
           )}
         </button>
-        <button 
-          onClick={() => { setNote(''); }} 
+        <button
+          onClick={() => {
+            setNote("");
+          }}
           className="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
         >
           Clear
@@ -769,27 +975,46 @@ function CustomSelect({ label, value, options, onChange }) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const selectedOption = options.find(o => o.value === value) || options[0];
+  const selectedOption = options.find((o) => o.value === value) || options[0];
 
   return (
     <div className="flex flex-col gap-2 relative" ref={ref}>
-      {label && <label className="text-xs font-medium text-gray-600 uppercase tracking-wider">{label}</label>}
-      <div 
+      {label && (
+        <label className="text-xs font-medium text-gray-600 uppercase tracking-wider">
+          {label}
+        </label>
+      )}
+      <div
         onClick={() => setOpen(!open)}
         className="w-full bg-white border border-gray-300 rounded-lg p-2.5 text-sm outline-none cursor-pointer flex justify-between items-center hover:bg-gray-50 transition-colors"
       >
-        <span className="text-gray-800">{selectedOption?.label || "Select..."}</span>
-        <svg className={`w-4 h-4 text-gray-500 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        <span className="text-gray-800">
+          {selectedOption?.label || "Select..."}
+        </span>
+        <svg
+          className={`w-4 h-4 text-gray-500 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M19 9l-7 7-7-7"
+          />
         </svg>
       </div>
       {open && (
         <div className="absolute top-[100%] left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl z-50 overflow-hidden py-1">
           {options.map((opt) => (
-            <div 
+            <div
               key={opt.value}
-              onClick={() => { onChange(opt.value); setOpen(false); }}
-              className={`px-3 py-2 text-sm cursor-pointer transition-colors ${value === opt.value ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-blue-50'}`}
+              onClick={() => {
+                onChange(opt.value);
+                setOpen(false);
+              }}
+              className={`px-3 py-2 text-sm cursor-pointer transition-colors ${value === opt.value ? "bg-blue-600 text-white" : "text-gray-700 hover:bg-blue-50"}`}
             >
               {opt.label}
             </div>
