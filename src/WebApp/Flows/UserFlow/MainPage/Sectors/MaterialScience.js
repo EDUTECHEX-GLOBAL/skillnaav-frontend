@@ -38,7 +38,7 @@ const MaterialScience = () => {
   if (error) return <p>{error}</p>;
 
   return (
-    <div className="p-4">
+    <div className="p-4 font-poppins">
       {/* Page Title */}
       <h1 className="text-2xl font-bold mb-2">Advanced Materials Science Internships ({internships.length})</h1>
 
