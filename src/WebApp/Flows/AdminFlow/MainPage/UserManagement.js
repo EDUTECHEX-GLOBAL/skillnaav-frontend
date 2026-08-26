@@ -346,11 +346,20 @@ const UserManagement = () => {
       return profileImage;
     }
 
-    if (profileImage.startsWith("/")) {
-      return `${window.location.origin}${profileImage}`;
+    const baseUrl = process.env.REACT_APP_API_BASE || "http://localhost:5000";
+
+    // Standardize slashes for windows paths if needed
+    const normalizedImage = profileImage.replace(/\\/g, "/");
+
+    if (normalizedImage.startsWith("/")) {
+      return `${baseUrl}${normalizedImage}`;
+    }
+    
+    if (normalizedImage.startsWith("uploads/")) {
+      return `${baseUrl}/${normalizedImage}`;
     }
 
-    return `${window.location.origin}/uploads/${profileImage}`;
+    return `${baseUrl}/uploads/${normalizedImage}`;
   };
 
   // Render loading state

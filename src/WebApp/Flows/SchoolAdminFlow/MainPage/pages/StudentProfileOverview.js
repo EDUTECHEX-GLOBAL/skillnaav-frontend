@@ -18,9 +18,22 @@ function imageIsFilled(val) {
   return (
     val.startsWith("data:image") ||
     val.startsWith("http") ||
-    val.startsWith("/")
+    val.startsWith("/") ||
+    val.startsWith("uploads")
   );
 }
+
+const getProfileImageUrl = (profileImage) => {
+  if (!profileImage || typeof profileImage !== "string" || profileImage.trim() === "") return null;
+  if (profileImage.startsWith("data:image") || profileImage.startsWith("http://") || profileImage.startsWith("https://")) {
+    return profileImage;
+  }
+  const baseUrl = process.env.REACT_APP_API_BASE || "http://localhost:5000";
+  const normalizedImage = profileImage.replace(/\\/g, "/");
+  if (normalizedImage.startsWith("/")) return `${baseUrl}${normalizedImage}`;
+  if (normalizedImage.startsWith("uploads/")) return `${baseUrl}/${normalizedImage}`;
+  return `${baseUrl}/uploads/${normalizedImage}`;
+};
 
 // ─── Avatar — renders image or initial/icon fallback ─────────────────────────
 function StudentAvatar({ src, name }) {
@@ -30,7 +43,7 @@ function StudentAvatar({ src, name }) {
   if (valid) {
     return (
       <img
-        src={src}
+        src={getProfileImageUrl(src)}
         alt=""
         onError={() => setBroken(true)}
         className="w-8 h-8 rounded-full object-cover flex-shrink-0"

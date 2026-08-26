@@ -75,8 +75,20 @@ function fieldIsFilled(val) {
 // For profileImage: treat a base64 data URL or a proper URL as "filled"
 function imageIsFilled(val) {
   if (!val || typeof val !== 'string' || val.trim() === '') return false;
-  return val.startsWith('data:image') || val.startsWith('http') || val.startsWith('/');
+  return val.startsWith('data:image') || val.startsWith('http') || val.startsWith('/') || val.startsWith('uploads');
 }
+
+const getProfileImageUrl = (profileImage) => {
+  if (!profileImage || typeof profileImage !== "string" || profileImage.trim() === "") return null;
+  if (profileImage.startsWith("data:image") || profileImage.startsWith("http://") || profileImage.startsWith("https://")) {
+    return profileImage;
+  }
+  const baseUrl = process.env.REACT_APP_API_BASE || "http://localhost:5000";
+  const normalizedImage = profileImage.replace(/\\/g, "/");
+  if (normalizedImage.startsWith("/")) return `${baseUrl}${normalizedImage}`;
+  if (normalizedImage.startsWith("uploads/")) return `${baseUrl}/${normalizedImage}`;
+  return `${baseUrl}/uploads/${normalizedImage}`;
+};
 
 function displayValue(key, val) {
   // profileImage is handled separately — never render raw string here
@@ -96,7 +108,7 @@ function ProfileImageField({ src }) {
     <div className="flex items-center gap-3 mt-1">
       {hasSrc ? (
         <img
-          src={src}
+          src={getProfileImageUrl(src)}
           alt="Profile"
           onError={() => setBroken(true)}
           className="w-14 h-14 rounded-full object-cover border border-gray-200 shadow-sm"
@@ -184,7 +196,7 @@ const StudentProfileDetailModal = ({ studentId, onClose }) => {
           <div className="flex items-center gap-3">
             {topAvatarSrc ? (
               <img
-                src={topAvatarSrc}
+                src={getProfileImageUrl(topAvatarSrc)}
                 alt=""
                 className="w-10 h-10 rounded-full object-cover"
               />

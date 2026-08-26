@@ -22,6 +22,18 @@ const Navbar = ({ onToggleSidebar }) => {
 
   const { openFeedback } = useFeedback();
 
+  const getProfileImageUrl = (profileImage) => {
+    if (!profileImage || typeof profileImage !== "string" || profileImage.trim() === "") return null;
+    if (profileImage.startsWith("data:image") || profileImage.startsWith("http://") || profileImage.startsWith("https://")) {
+      return profileImage;
+    }
+    const baseUrl = process.env.REACT_APP_API_BASE || "http://localhost:5000";
+    const normalizedImage = profileImage.replace(/\\/g, "/");
+    if (normalizedImage.startsWith("/")) return `${baseUrl}${normalizedImage}`;
+    if (normalizedImage.startsWith("uploads/")) return `${baseUrl}/${normalizedImage}`;
+    return `${baseUrl}/uploads/${normalizedImage}`;
+  };
+
   const syncUserInfoFromStorage = () => {
     const rawUserInfo = localStorage.getItem("studentInfo") || localStorage.getItem("userInfo");
     if (!rawUserInfo) return;
@@ -188,7 +200,7 @@ const Navbar = ({ onToggleSidebar }) => {
           <div className="relative" onClick={handleUserClick}>
             {userInfo.profileImage ? (
               <img
-                src={userInfo.profileImage}
+                src={getProfileImageUrl(userInfo.profileImage)}
                 alt="Profile"
                 className="w-9 h-9 rounded-full object-cover cursor-pointer shadow-md border-2 border-purple-300 hover:scale-105"
               />

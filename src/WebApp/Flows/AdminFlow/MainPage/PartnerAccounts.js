@@ -110,6 +110,18 @@ const PartnerManagement = () => {
     partner.profileImage !== "undefined" &&
     partner.profileImage.trim() !== "";
 
+  const getProfileImageUrl = (profileImage) => {
+    if (!profileImage || profileImage.trim() === "") return null;
+    if (profileImage.startsWith("http://") || profileImage.startsWith("https://")) {
+      return profileImage;
+    }
+    const baseUrl = process.env.REACT_APP_API_BASE || "http://localhost:5000";
+    const normalizedImage = profileImage.replace(/\\/g, "/");
+    if (normalizedImage.startsWith("/")) return `${baseUrl}${normalizedImage}`;
+    if (normalizedImage.startsWith("uploads/")) return `${baseUrl}/${normalizedImage}`;
+    return `${baseUrl}/uploads/${normalizedImage}`;
+  };
+
   const getAvatarInitial = (name) => name?.charAt(0)?.toUpperCase() || "P";
 
   const getAvatarColor = (name) => {
@@ -283,7 +295,7 @@ const PartnerManagement = () => {
                   <div className="flex-shrink-0">
                     {hasProfileImage(partner) ? (
                       <img
-                        src={partner.profileImage}
+                        src={getProfileImageUrl(partner.profileImage)}
                         alt={partner.name}
                         className="w-14 h-14 rounded-xl object-cover border-4 border-white shadow-md"
                         onError={(e) => (e.target.style.display = "none")}
@@ -507,7 +519,7 @@ const PartnerManagement = () => {
               <div className="text-center">
                 {hasProfileImage(selectedPartner) ? (
                   <img
-                    src={selectedPartner.profileImage}
+                    src={getProfileImageUrl(selectedPartner.profileImage)}
                     alt={selectedPartner.name}
                     className="w-24 h-24 rounded-2xl object-cover border-4 border-white shadow-lg mx-auto"
                   />

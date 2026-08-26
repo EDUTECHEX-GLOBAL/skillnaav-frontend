@@ -93,6 +93,16 @@ const Ring = ({ score, profileImage }) => {
   const color = score >= 75 ? "#16a34a" : score >= 45 ? "#d97706" : "#dc2626";
   const labelColor = score >= 75 ? "text-green-600" : score >= 45 ? "text-amber-600" : "text-red-500";
 
+  const getProfileImageUrl = (img) => {
+    if (!img || typeof img !== "string" || img.trim() === "") return null;
+    if (img.startsWith("data:image") || img.startsWith("http://") || img.startsWith("https://")) return img;
+    const baseUrl = process.env.REACT_APP_API_BASE || "http://localhost:5000";
+    const normalizedImage = img.replace(/\\/g, "/");
+    if (normalizedImage.startsWith("/")) return `${baseUrl}${normalizedImage}`;
+    if (normalizedImage.startsWith("uploads/")) return `${baseUrl}/${normalizedImage}`;
+    return `${baseUrl}/uploads/${normalizedImage}`;
+  };
+
   return (
     <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
       {/* Ring + photo */}
@@ -107,7 +117,7 @@ const Ring = ({ score, profileImage }) => {
         <div className="rounded-full overflow-hidden bg-gray-100 border-2 border-white shadow-sm"
           style={{ width: size - 18, height: size - 18 }}>
           {profileImage ? (
-            <img src={profileImage} alt="Profile" className="w-full h-full object-cover" />
+            <img src={getProfileImageUrl(profileImage)} alt="Profile" className="w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-100 to-indigo-200">
               <svg className="w-8 h-8 text-indigo-400" fill="currentColor" viewBox="0 0 24 24">
