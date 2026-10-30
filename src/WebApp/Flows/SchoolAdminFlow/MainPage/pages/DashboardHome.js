@@ -1,0 +1,1533 @@
+import React, { useEffect, useState } from "react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  CartesianGrid,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+  AreaChart,
+  Area,
+} from "recharts";
+import {
+  FiKey,
+  FiClock,
+  FiBarChart2,
+  FiUploadCloud,
+  FiTrendingUp,
+  FiTrendingDown,
+  FiRefreshCw,
+  FiCalendar,
+} from "react-icons/fi";
+import { BsFileEarmarkCheck, BsClipboardData } from "react-icons/bs";
+import { motion } from "framer-motion";
+import axios from "../../../../../api/axiosInstance";
+import Papa from "papaparse";
+import ResponsiveSelect from "../../../../../components/ResponsiveSelect";
+
+const COLORS = ["#10B981", "#F59E0B", "#EF4444", "#4F46E5", "#E5E7EB"];
+
+// ─── Full-Page Blur Overlay + Modal ──────────────────────────────────────────
+function UploadOverlay({ modal, onClose }) {
+  if (!modal.show) return null;
+
+  const { generated, total, phase, currentName } = modal;
+  const pct = total > 0 ? Math.round((generated / total) * 100) : 0;
+  const isDone = phase === "done";
+  const isFailedZero = isDone && generated === 0;
+
+  const STEP_ORDER = [
+    "parsing",
+    "validating",
+    "generating",
+    "emailing",
+    "done",
+  ];
+  const currentIdx = STEP_ORDER.indexOf(phase);
+
+  const steps = [
+    { key: "parsing", label: "CSV file parsed" },
+    { key: "validating", label: "Student records validated" },
+    { key: "generating", label: "Generating credentials" },
+    {
+      key: "emailing",
+      label: isFailedZero
+        ? "No emails sent (0 new students created)"
+        : "Emails sent to students",
+    },
+  ];
+
+  return (
+    <>
+      <style>{`
+        @keyframes overlayIn  { from{opacity:0} to{opacity:1} }
+        @keyframes modalUp    { from{opacity:0;transform:translateY(24px) scale(0.96)} to{opacity:1;transform:translateY(0) scale(1)} }
+        @keyframes spinAnim   { to{transform:rotate(360deg)} }
+        @keyframes pulseDot   { 0%,100%{opacity:1} 50%{opacity:0.28} }
+        @keyframes countPop   { 0%{transform:scale(1)} 40%{transform:scale(1.2)} 100%{transform:scale(1)} }
+        @keyframes shimmer    { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+      `}</style>
+
+      {/* ── Fixed overlay — covers sidebar + entire viewport ── */}
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 9999,
+          backdropFilter: "blur(7px)",
+          WebkitBackdropFilter: "blur(7px)",
+          background: "rgba(10, 15, 40, 0.58)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          animation: "overlayIn 0.28s ease",
+          pointerEvents: "all",
+        }}
+      >
+        {/* ── Modal card ── */}
+        <div
+          style={{
+            background: "#ffffff",
+            borderRadius: 22,
+            padding: "32px 28px 26px",
+            width: "100%",
+            maxWidth: 460,
+            margin: "0 16px",
+            boxShadow: "0 30px 90px rgba(0,0,0,0.32)",
+            animation: "modalUp 0.32s cubic-bezier(0.16,1,0.3,1)",
+          }}
+        >
+          {/* Header */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 14,
+              marginBottom: 8,
+            }}
+          >
+            <div
+              style={{
+                width: 42,
+                height: 42,
+                borderRadius: "50%",
+                flexShrink: 0,
+                background: isDone
+                  ? isFailedZero
+                    ? "#FEE2E2"
+                    : "#D1FAE5"
+                  : "#EFF6FF",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {isDone ? (
+                isFailedZero ? (
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                    <path
+                      d="M10 6v5M10 13.5h.01"
+                      stroke="#DC2626"
+                      strokeWidth="2.2"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                ) : (
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                    <path
+                      d="M4 10l4.5 4.5 8-9"
+                      stroke="#059669"
+                      strokeWidth="2.2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                )
+              ) : (
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  style={{ animation: "spinAnim 0.85s linear infinite" }}
+                >
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="#BFDBFE"
+                    strokeWidth="3"
+                  />
+                  <path
+                    d="M12 2a10 10 0 0 1 10 10"
+                    stroke="#3B82F6"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              )}
+            </div>
+            <div>
+              <div
+                style={{
+                  fontSize: 17,
+                  fontWeight: 700,
+                  color: isFailedZero ? "#DC2626" : "#0F172A",
+                }}
+              >
+                {isDone
+                  ? isFailedZero
+                    ? "0 Credentials Generated"
+                    : "All Credentials Generated!"
+                  : "Generating Credentials…"}
+              </div>
+              <div style={{ fontSize: 12, color: "#64748B", marginTop: 3 }}>
+                {isDone
+                  ? isFailedZero
+                    ? "All uploaded students already exist or are duplicates. No emails sent."
+                    : `${generated} credentials created and emailed successfully.`
+                  : "Page is locked — please do not navigate away."}
+              </div>
+            </div>
+          </div>
+
+          <div
+            style={{ borderTop: "1px solid #F1F5F9", margin: "18px 0 16px" }}
+          />
+
+          {/* ── Live per-student counter ── */}
+          <div
+            style={{
+              background: isFailedZero
+                ? "linear-gradient(135deg,#FEF2F2,#FFF1F1)"
+                : "linear-gradient(135deg,#F8FAFF,#EFF6FF)",
+              border: isFailedZero ? "1px solid #FCA5A5" : "1px solid #DBEAFE",
+              borderRadius: 14,
+              padding: "18px 20px",
+              marginBottom: 18,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: isFailedZero ? "#EF4444" : "#94A3B8",
+                  letterSpacing: "0.08em",
+                  marginBottom: 6,
+                }}
+              >
+                CREDENTIALS GENERATED
+              </div>
+
+              {/* Big animated count */}
+              <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                <span
+                  key={generated}
+                  style={{
+                    fontSize: 44,
+                    fontWeight: 800,
+                    color: isDone ? (isFailedZero ? "#DC2626" : "#059669") : "#3B82F6",
+                    lineHeight: 1,
+                    display: "inline-block",
+                    animation: "countPop 0.38s ease",
+                  }}
+                >
+                  {generated}
+                </span>
+                <span
+                  style={{ fontSize: 24, color: "#CBD5E1", fontWeight: 300 }}
+                >
+                  /
+                </span>
+                <span
+                  style={{ fontSize: 24, fontWeight: 600, color: "#94A3B8" }}
+                >
+                  {total}
+                </span>
+              </div>
+
+              {/* Current student name */}
+              {!isDone && currentName && (
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: "#6366F1",
+                    marginTop: 7,
+                    fontStyle: "italic",
+                    maxWidth: 230,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Processing: {currentName}
+                </div>
+              )}
+            </div>
+
+            {/* Circular progress ring */}
+            <svg width="70" height="70" viewBox="0 0 70 70">
+              <circle
+                cx="35"
+                cy="35"
+                r="29"
+                fill="none"
+                stroke="#E2E8F0"
+                strokeWidth="6"
+              />
+              <circle
+                cx="35"
+                cy="35"
+                r="29"
+                fill="none"
+                stroke={isDone ? (isFailedZero ? "#EF4444" : "#10B981") : "#3B82F6"}
+                strokeWidth="6"
+                strokeLinecap="round"
+                strokeDasharray={`${2 * Math.PI * 29}`}
+                strokeDashoffset={`${2 * Math.PI * 29 * (1 - pct / 100)}`}
+                transform="rotate(-90 35 35)"
+                style={{
+                  transition: "stroke-dashoffset 0.38s ease, stroke 0.38s ease",
+                }}
+              />
+              <text
+                x="35"
+                y="35"
+                textAnchor="middle"
+                dominantBaseline="central"
+                fontSize="13"
+                fontWeight="700"
+                fill={isDone ? (isFailedZero ? "#DC2626" : "#059669") : "#3B82F6"}
+              >
+                {pct}%
+              </text>
+            </svg>
+          </div>
+
+          {/* ── Progress bar ── */}
+          <div style={{ marginBottom: 20 }}>
+            <div
+              style={{
+                height: 10,
+                background: "#F1F5F9",
+                borderRadius: 100,
+                overflow: "hidden",
+                position: "relative",
+              }}
+            >
+              <div
+                style={{
+                  height: "100%",
+                  width: `${pct}%`,
+                  borderRadius: 100,
+                  background: isDone
+                    ? isFailedZero
+                      ? "linear-gradient(90deg,#EF4444,#F87171)"
+                      : "linear-gradient(90deg,#059669,#10B981)"
+                    : "linear-gradient(90deg,#3B82F6,#818CF8)",
+                  transition: "width 0.35s ease",
+                  position: "relative",
+                  overflow: "hidden",
+                }}
+              >
+                {!isDone && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      background:
+                        "linear-gradient(90deg,transparent 0%,rgba(255,255,255,0.38) 50%,transparent 100%)",
+                      backgroundSize: "200% 100%",
+                      animation: "shimmer 1.4s linear infinite",
+                    }}
+                  />
+                )}
+              </div>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                marginTop: 5,
+                fontSize: 12,
+                color: isDone ? (isFailedZero ? "#DC2626" : "#059669") : "#64748B",
+                fontWeight: isDone ? 700 : 400,
+              }}
+            >
+              {pct}%
+            </div>
+          </div>
+
+          {/* ── Step list ── */}
+          <div
+            style={{
+              background: "#F8FAFC",
+              border: "1px solid #F1F5F9",
+              borderRadius: 12,
+              padding: "14px 16px",
+              display: "flex",
+              flexDirection: "column",
+              gap: 11,
+              marginBottom: 18,
+            }}
+          >
+            {steps.map((s) => {
+              const si = STEP_ORDER.indexOf(s.key);
+              const done = currentIdx > si;
+              const active = currentIdx === si;
+              const isEmailStepZero = s.key === "emailing" && isFailedZero;
+              return (
+                <div
+                  key={s.key}
+                  style={{ display: "flex", alignItems: "center", gap: 10 }}
+                >
+                  <div
+                    style={{
+                      width: 22,
+                      height: 22,
+                      borderRadius: "50%",
+                      flexShrink: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: isEmailStepZero
+                        ? "#FEE2E2"
+                        : done
+                          ? "#D1FAE5"
+                          : active
+                            ? "#DBEAFE"
+                            : "#F1F5F9",
+                      transition: "background 0.3s",
+                    }}
+                  >
+                    {isEmailStepZero ? (
+                      <svg
+                        width="11"
+                        height="11"
+                        viewBox="0 0 11 11"
+                        fill="none"
+                      >
+                        <path
+                          d="M2.5 2.5l6 6M8.5 2.5l-6 6"
+                          stroke="#DC2626"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                    ) : done ? (
+                      <svg
+                        width="11"
+                        height="11"
+                        viewBox="0 0 11 11"
+                        fill="none"
+                      >
+                        <path
+                          d="M2 5.5l2.5 2.5 4.5-5"
+                          stroke="#059669"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    ) : active ? (
+                      <div
+                        style={{
+                          width: 7,
+                          height: 7,
+                          borderRadius: "50%",
+                          background: "#3B82F6",
+                          animation: "pulseDot 1s ease-in-out infinite",
+                        }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: 7,
+                          height: 7,
+                          borderRadius: "50%",
+                          background: "#CBD5E1",
+                        }}
+                      />
+                    )}
+                  </div>
+                  <span
+                    style={{
+                      fontSize: 13,
+                      color: isEmailStepZero
+                        ? "#991B1B"
+                        : done
+                          ? "#065F46"
+                          : active
+                            ? "#1D4ED8"
+                            : "#94A3B8",
+                      fontWeight: done || active || isEmailStepZero ? 600 : 400,
+                      transition: "color 0.3s",
+                    }}
+                  >
+                    {s.key === "generating" && active
+                      ? `Generating credential ${generated + 1} of ${total}…`
+                      : s.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* ── Lock warning ── */}
+          {!isDone && (
+            <div
+              style={{
+                background: "#FFFBEB",
+                border: "1px solid #FDE68A",
+                borderRadius: 10,
+                padding: "10px 14px",
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                marginBottom: 18,
+              }}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 16 16"
+                fill="none"
+                style={{ flexShrink: 0 }}
+              >
+                <path
+                  d="M8 1.5L14.5 13H1.5L8 1.5Z"
+                  stroke="#D97706"
+                  strokeWidth="1.5"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M8 6v3.5"
+                  stroke="#D97706"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+                <circle cx="8" cy="11.5" r="0.75" fill="#D97706" />
+              </svg>
+              <span style={{ fontSize: 12, color: "#92400E", lineHeight: 1.5 }}>
+                🔒 Full page including sidebar is locked until credential
+                generation completes.
+              </span>
+            </div>
+          )}
+
+          {/* ── Action button ── */}
+          <button
+            disabled={!isDone}
+            onClick={onClose}
+            style={{
+              width: "100%",
+              padding: "13px 0",
+              borderRadius: 11,
+              border: "none",
+              background: isDone
+                ? isFailedZero
+                  ? "linear-gradient(135deg,#EF4444 0%,#DC2626 100%)"
+                  : "linear-gradient(135deg,#4F46E5 0%,#6366F1 100%)"
+                : "#E2E8F0",
+              color: isDone ? "#fff" : "#94A3B8",
+              fontWeight: 700,
+              fontSize: 15,
+              cursor: isDone ? "pointer" : "not-allowed",
+              letterSpacing: "0.01em",
+              boxShadow: isDone
+                ? isFailedZero
+                  ? "0 4px 18px rgba(220,38,38,0.38)"
+                  : "0 4px 18px rgba(99,102,241,0.38)"
+                : "none",
+              transition: "all 0.22s",
+            }}
+          >
+            {isDone
+              ? isFailedZero
+                ? "✕ Close (0 Credentials Created)"
+                : "✓  Done — Close"
+              : `Generating…  ${generated} / ${total}`}
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+const DashboardSkeleton = () => {
+  return (
+    <div className="animate-pulse space-y-6">
+      {/* Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+        {[1, 2, 3, 4].map((item) => (
+          <div key={item} className="h-52 rounded-2xl bg-gray-200" />
+        ))}
+      </div>
+
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {[1, 2, 3, 4, 5, 6].map((item) => (
+          <div key={item} className="h-80 rounded-2xl bg-gray-200" />
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ─── Mock Data for New Charts ────────────────────────────────────────────────
+const DashboardDatePicker = ({ value, onChange, placeholder = "dd-mm-yyyy", align = "left" }) => {
+  const [open, setOpen] = useState(false);
+  const containerRef = React.useRef(null);
+  const [popupStyle, setPopupStyle] = useState({});
+
+  const parsedDate = React.useMemo(() => {
+    if (!value) return null;
+    const [y, m, d] = value.split("-").map(Number);
+    if (!y || !m || !d) return null;
+    return new Date(y, m - 1, d);
+  }, [value]);
+
+  const [viewDate, setViewDate] = useState(() => parsedDate || new Date());
+
+  useEffect(() => {
+    if (parsedDate) setViewDate(new Date(parsedDate.getFullYear(), parsedDate.getMonth(), 1));
+  }, [parsedDate]);
+
+  useEffect(() => {
+    if (!open || !containerRef.current) return;
+
+    const updatePosition = () => {
+      if (!containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const popupWidth = 270;
+      const margin = 10;
+      const viewportWidth = window.innerWidth;
+
+      let targetLeft;
+      if (align === "right") {
+        targetLeft = rect.right - popupWidth;
+      } else {
+        targetLeft = rect.left;
+      }
+
+      const minX = margin;
+      const maxX = Math.max(margin, viewportWidth - popupWidth - margin);
+      const clampedX = Math.max(minX, Math.min(targetLeft, maxX));
+
+      setPopupStyle({
+        left: `${clampedX - rect.left}px`,
+        maxWidth: `calc(100vw - ${2 * margin}px)`,
+      });
+    };
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [open, align]);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    };
+    if (open) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("touchstart", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+    };
+  }, [open]);
+
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth();
+  const monthNames = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDayIndex = new Date(year, month, 1).getDay();
+
+  const selectDay = (day) => {
+    const mm = String(month + 1).padStart(2, "0");
+    const dd = String(day).padStart(2, "0");
+    onChange(`${year}-${mm}-${dd}`);
+    setOpen(false);
+  };
+
+  const displayLabel = React.useMemo(() => {
+    if (!value) return "";
+    const [y, m, d] = value.split("-");
+    if (!y || !m || !d) return value;
+    return `${d}-${m}-${y}`;
+  }, [value]);
+
+  return (
+    <div className="relative w-full sm:w-auto min-w-0" ref={containerRef}>
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className="w-full flex items-center justify-between gap-1.5 px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs text-gray-700 hover:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 cursor-pointer min-w-0 sm:min-w-[115px] whitespace-nowrap"
+      >
+        <span className={`whitespace-nowrap ${displayLabel ? "font-medium text-gray-800" : "text-gray-400"}`}>
+          {displayLabel || placeholder}
+        </span>
+        <FiCalendar className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+      </button>
+
+      {open && (
+        <div
+          style={popupStyle}
+          className="absolute top-full mt-1.5 bg-white border border-gray-200 rounded-xl shadow-2xl z-[9999] p-3 w-[270px] text-xs font-poppins"
+        >
+          <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-gray-100">
+            <span className="font-bold text-gray-800">
+              {monthNames[month]}, {year}
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setViewDate(new Date(year, month - 1, 1))}
+                className="p-1 hover:bg-gray-100 rounded text-gray-600 font-bold"
+              >
+                ◀
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewDate(new Date(year, month + 1, 1))}
+                className="p-1 hover:bg-gray-100 rounded text-gray-600 font-bold"
+              >
+                ▶
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-7 gap-1 text-center mb-1 font-semibold text-gray-400 text-[11px]">
+            {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
+              <div key={d}>{d}</div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-7 gap-1 text-center">
+            {Array.from({ length: firstDayIndex }).map((_, i) => (
+              <div key={`empty-${i}`} className="h-6" />
+            ))}
+            {Array.from({ length: daysInMonth }).map((_, i) => {
+              const day = i + 1;
+              const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+              const isSelected = value === dateStr;
+              return (
+                <button
+                  key={day}
+                  type="button"
+                  onClick={() => selectDay(day)}
+                  className={`h-6 w-full rounded text-xs flex items-center justify-center transition-colors ${isSelected
+                      ? "bg-indigo-600 text-white font-bold"
+                      : "hover:bg-indigo-50 text-gray-700"
+                    }`}
+                >
+                  {day}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-gray-100 text-[11px]">
+            <button
+              type="button"
+              onClick={() => {
+                onChange("");
+                setOpen(false);
+              }}
+              className="text-gray-500 hover:text-gray-700 font-medium"
+            >
+              Clear
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const now = new Date();
+                const y = now.getFullYear();
+                const m = String(now.getMonth() + 1).padStart(2, "0");
+                const d = String(now.getDate()).padStart(2, "0");
+                onChange(`${y}-${m}-${d}`);
+                setOpen(false);
+              }}
+              className="text-indigo-600 hover:text-indigo-800 font-bold"
+            >
+              Today
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
+export default function Dashboard() {
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [uploadStatus, setUploadStatus] = useState("");
+  const [creditError, setCreditError] = useState(""); // ← NEW
+  const [progress, setProgress] = useState(null);
+  //loading effect - 06-08-2026
+  const [loading, setLoading] = useState(true);
+
+  const [uploadModal, setUploadModal] = useState({
+    show: false,
+    generated: 0,
+    total: 0,
+    phase: "idle",
+    currentName: "",
+  });
+
+  const [timeRange, setTimeRange] = useState("allTime");
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const [metrics, setMetrics] = useState({
+    totalCredits: 0,
+    generated: 0,
+    remaining: 0,
+    plan: "N/A",
+    subscriptionStatus: "inactive",
+    generatedThisPeriod: 0,
+    generatedTrend: null,
+  });
+
+  const token = localStorage.getItem("schoolAdminToken");
+
+  useEffect(() => {
+    //06-08-2026
+    setLoading(true);
+    let query = `range=${timeRange}&_t=${Date.now()}`;
+    if (timeRange === "custom") {
+      if (!customStart || !customEnd) {
+        setLoading(false); // add this - 06-08-2026
+        return; // Wait until both are picked to avoid useless requests
+      }
+      query += `&startDate=${customStart}&endDate=${customEnd}`;
+    }
+
+    axios
+      .get(`/api/school-admin/dashboard-metrics?${query}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      .then((r) => {
+        setMetrics(r.data);
+        console.log("schooladmin dashboard data", r.data);
+      })
+      .catch((e) => console.error("Failed to fetch metrics:", e))
+      .finally(() => {
+        setLoading(false);
+        setIsRefreshing(false);
+      });
+  }, [token, timeRange, customStart, customEnd, refreshTrigger]);
+
+  const handleCSVChange = (e) => {
+    setSelectedFile(e.target.files[0]);
+    setUploadStatus("");
+    setCreditError(""); // ← clear error when new file is picked
+  };
+
+  const simulatePerStudentProgress = async (students) => {
+    for (let i = 0; i < students.length; i++) {
+      await delay(500);
+      setUploadModal((prev) => ({
+        ...prev,
+        generated: i + 1,
+        currentName: students[i]["Full Name"] || `Student ${i + 1}`,
+      }));
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!selectedFile) {
+      setUploadStatus("❗ Select a CSV file first.");
+      return;
+    }
+
+    Papa.parse(selectedFile, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async (results) => {
+        // ── Validate headers ──────────────────────────────────────
+        const requiredHeaders = [
+          "Full Name",
+          "Email Address",
+          "School Name",
+          "Grade",
+          "Stream/Curriculum",
+          "Field of Internship",
+        ];
+        const uploadedHeaders = Object.keys(results.data[0] || {});
+        const isValid = requiredHeaders.every((h) =>
+          uploadedHeaders.includes(h),
+        );
+
+        if (!isValid) {
+          setUploadStatus(
+            "❌ CSV format invalid. Expected columns: Full Name, Email Address, School Name, Grade, Stream/Curriculum, Field of Internship.",
+          );
+          return;
+        }
+
+        const students = results.data;
+        const total = students.length;
+        const remaining = metrics.remaining || 0;
+
+        // ── Credit check ──────────────────────────────────────────
+        if (total > remaining) {
+          setCreditError(
+            `Insufficient credits. You have ${remaining}, need ${total}.`,
+          );
+          return; // stop — do NOT open the upload overlay
+        }
+        setCreditError(""); // clear any previous error
+        // ─────────────────────────────────────────────────────────
+
+        // Phase 1 — parsing
+        setUploadModal({
+          show: true,
+          generated: 0,
+          total,
+          phase: "parsing",
+          currentName: "",
+        });
+        await delay(700);
+
+        // Phase 2 — validating
+        setUploadModal((p) => ({ ...p, phase: "validating" }));
+        await delay(700);
+
+        // Phase 3 — generating
+        setUploadModal((p) => ({ ...p, phase: "generating" }));
+        const formData = new FormData();
+        formData.append("csvFile", selectedFile);
+
+        try {
+          const [res] = await Promise.all([
+            axios.post("/api/school-admin/upload-students", formData, {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
+            simulatePerStudentProgress(students),
+          ]);
+
+          const resData = res.data;
+          const generatedCount = resData.generated ?? 0;
+
+          // Phase 4 — emailing
+          setUploadModal((p) => ({
+            ...p,
+            phase: "emailing",
+            generated: generatedCount,
+            currentName: "",
+          }));
+          await delay(900);
+
+          // Phase 5 — done
+          setUploadModal((p) => ({
+            ...p,
+            phase: "done",
+            generated: generatedCount,
+          }));
+
+          setProgress({ generated: generatedCount, total: resData.total || total });
+          const icon = resData.statusIcon || (generatedCount === 0 ? "❌" : "✅");
+          setUploadStatus(`${icon} ${resData.message}`);
+
+          // ✅ IMMEDIATELY UPDATE METRICS FROM RESDATA AND RE-FETCH!
+          if (resData.creditsAvailable !== undefined) {
+            setMetrics((prev) => ({
+              ...prev,
+              remaining: resData.creditsAvailable,
+              generated: prev.generated + generatedCount,
+              totalCredits: (resData.creditsAvailable || 0) + (prev.generated + generatedCount),
+            }));
+          }
+
+          // ✅ AUTO-REFRESH CREDITS!
+          setRefreshTrigger((prev) => prev + 1);
+        } catch (err) {
+          const errMsg =
+            err.response?.data?.message ||
+            err.message ||
+            "Upload failed. Please check the CSV file.";
+          console.error("Upload error:", err.response?.data || err.message);
+          setUploadModal({
+            show: false,
+            generated: 0,
+            total: 0,
+            phase: "idle",
+            currentName: "",
+          });
+          setUploadStatus(`❌ ${errMsg}`);
+          setRefreshTrigger((prev) => prev + 1);
+        }
+      },
+      error: (err) => {
+        console.error("CSV parse error:", err);
+        setUploadStatus("❌ Failed to read the file.");
+      },
+    });
+  };
+
+  const handleModalClose = () => {
+    setUploadModal({
+      show: false,
+      generated: 0,
+      total: 0,
+      phase: "idle",
+      currentName: "",
+    });
+    setSelectedFile(null);
+    setCreditError("");
+    setRefreshTrigger((prev) => prev + 1);
+  };
+
+  const stats = [
+    {
+      label: "Total Credentials Received",
+      value: metrics.totalCredits || 0,
+      icon: <FiBarChart2 size={32} />,
+      color: "from-orange-400 to-orange-200",
+      textColor: "text-orange-600",
+      showTimeInfo: true,
+    },
+    {
+      label: "Credentials Generated",
+      // value: metrics.generated || 0,  --remove add the below one for filter - 06-05-2026
+      value:
+        timeRange === "allTime"
+          ? metrics.generated
+          : metrics.generatedThisPeriod,
+      icon: <FiKey size={32} />,
+      color: "from-green-400 to-green-200",
+      textColor: "text-green-600",
+      trend: metrics.generatedTrend,
+      periodValue: metrics.generatedThisPeriod,
+    },
+    {
+      label: "Remaining Credentials",
+      value: metrics.remaining || 0,
+      icon: <FiClock size={32} />,
+      color: "from-pink-400 to-pink-200",
+      textColor: "text-pink-600",
+    },
+    {
+      label: "Upload Credentials CSV",
+      type: "upload",
+      icon: <FiUploadCloud size={32} />,
+      color: "from-indigo-500 to-indigo-300",
+      textColor: "text-indigo-700",
+    },
+  ];
+
+  return (
+    <div className="p-3 sm:p-6 bg-gray-50 min-h-screen font-poppins min-w-0">
+      {/* 🔒 Blur overlay */}
+      <UploadOverlay modal={uploadModal} onClose={handleModalClose} />
+      {/* Header & Range Selector */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-3 sm:gap-4 min-w-0">
+        <h2 className="text-xl sm:text-2xl font-bold text-gray-800 shrink-0">Overview</h2>
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full md:w-auto min-w-0">
+          <button
+            onClick={() => {
+              setIsRefreshing(true);
+              setRefreshTrigger((prev) => prev + 1);
+            }}
+            disabled={isRefreshing}
+            className={`flex items-center justify-center gap-2 px-3 sm:px-4 py-2 border border-indigo-200 text-indigo-600 rounded-lg transition-colors font-medium text-xs sm:text-sm bg-white shadow-sm shrink-0 cursor-pointer ${isRefreshing ? "opacity-70 cursor-not-allowed" : "hover:bg-indigo-50"}`}
+          >
+            <FiRefreshCw
+              size={18}
+              className={isRefreshing ? "animate-spin" : ""}
+            />
+            {isRefreshing ? "Refreshing..." : "Refresh"}
+          </button>
+          {timeRange === "custom" && (
+            <div className="flex flex-row items-center gap-1.5 sm:gap-2 bg-white px-2.5 sm:px-3 py-1.5 border border-gray-200 rounded-lg shadow-sm w-full sm:w-auto max-w-full">
+              <div className="flex-1 sm:flex-initial min-w-0">
+                <DashboardDatePicker
+                  value={customStart}
+                  onChange={setCustomStart}
+                  placeholder="Start Date"
+                  align="left"
+                />
+              </div>
+              <span className="text-gray-400 text-xs font-semibold shrink-0 px-0.5">to</span>
+              <div className="flex-1 sm:flex-initial min-w-0">
+                <DashboardDatePicker
+                  value={customEnd}
+                  onChange={setCustomEnd}
+                  placeholder="End Date"
+                  align="right"
+                />
+              </div>
+            </div>
+          )}
+          <div className="w-full sm:w-auto min-w-[180px] sm:min-w-[200px] shrink-0">
+            <ResponsiveSelect
+              value={timeRange}
+              onChange={(e) => setTimeRange(e.target.value)}
+              className="w-full"
+              options={[
+                { value: "last7", label: "Last 7 Days" },
+                { value: "last30", label: "Last 30 Days" },
+                { value: "thisYear", label: "This Year" },
+                { value: "allTime", label: "All Time" },
+                { value: "custom", label: "Custom Date Range" },
+              ]}
+            />
+          </div>
+        </div>
+      </div>
+      {/*For loading effect - 06-08-2026 */}
+      {loading ? (
+        <DashboardSkeleton />
+      ) : (
+        <>
+          {/* Stats cards */}
+          <div
+            key={`stats-${refreshTrigger}`}
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10"
+          >
+            {stats.map((stat, idx) => (
+              <motion.div
+                key={idx}
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.1, duration: 0.4, type: "spring" }}
+                whileHover={{ scale: 1.03 }}
+                className={`bg-gradient-to-br ${stat.color} p-6 rounded-xl shadow-md hover:shadow-xl transition duration-300 flex flex-col justify-between`}
+              >
+                <div className="flex justify-end mb-4">
+                  <div className="text-white">{stat.icon}</div>
+                </div>
+                <div className="text-white text-lg font-semibold leading-snug mb-2">
+                  {stat.label}
+                </div>
+
+                {stat.type === "upload" ? (
+                  <div className="flex flex-col gap-2">
+                    {/* File picker */}
+                    <div className="flex items-center gap-2">
+                      <label className="relative cursor-pointer bg-white text-indigo-700 p-2 rounded-full hover:bg-indigo-100 transition">
+                        <FiUploadCloud size={24} />
+                        <input
+                          type="file"
+                          accept=".csv"
+                          onChange={handleCSVChange}
+                          className="absolute left-0 top-0 w-full h-full opacity-0 cursor-pointer"
+                        />
+                      </label>
+                      <span className="text-sm text-white truncate">
+                        {selectedFile ? selectedFile.name : "No file chosen"}
+                      </span>
+                    </div>
+
+                    {/* ── Credit error banner ── */}
+                    {creditError && (
+                      <div
+                        style={{
+                          background: "#FEF2F2",
+                          border: "1px solid #FECACA",
+                          borderRadius: 8,
+                          padding: "8px 10px",
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: 6,
+                        }}
+                      >
+                        <svg
+                          width="14"
+                          height="14"
+                          viewBox="0 0 16 16"
+                          fill="none"
+                          style={{ flexShrink: 0, marginTop: 1 }}
+                        >
+                          <path
+                            d="M8 1.5L14.5 13H1.5L8 1.5Z"
+                            stroke="#DC2626"
+                            strokeWidth="1.5"
+                            strokeLinejoin="round"
+                          />
+                          <path
+                            d="M8 6v3.5"
+                            stroke="#DC2626"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                          />
+                          <circle cx="8" cy="11.5" r="0.75" fill="#DC2626" />
+                        </svg>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            color: "#991B1B",
+                            fontWeight: 600,
+                            lineHeight: 1.5,
+                          }}
+                        >
+                          {creditError}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Upload button — disabled when credit error exists */}
+                    <button
+                      onClick={handleUpload}
+                      disabled={!!creditError}
+                      className={`w-full font-semibold py-2 px-4 rounded transition ${creditError
+                          ? "bg-gray-300 text-gray-400 cursor-not-allowed"
+                          : "bg-white text-indigo-700 hover:bg-indigo-100 cursor-pointer"
+                        }`}
+                    >
+                      Upload
+                    </button>
+
+                    {/* Progress bar (after successful upload) */}
+                    {progress && (
+                      <div className="mt-1">
+                        <div className="flex justify-between text-xs text-white mb-1">
+                          <span>Credentials Generated</span>
+                          <span className="font-bold">
+                            {progress.generated}/{progress.total}
+                          </span>
+                        </div>
+                        <div className="w-full bg-white/30 rounded-full h-2">
+                          <div
+                            className="bg-white h-2 rounded-full transition-all duration-500"
+                            style={{
+                              width: `${(progress.generated / progress.total) * 100}%`,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    <a
+                      href="/student_template.csv"
+                      download
+                      className="block w-full text-center bg-white text-indigo-700 font-semibold py-2 px-4 rounded hover:bg-indigo-100 transition"
+                    >
+                      Download Template
+                    </a>
+
+                    {uploadStatus && (
+                      <div
+                        className={`mt-2 rounded-lg p-2.5 text-xs font-semibold leading-relaxed border ${uploadStatus.includes("✅")
+                            ? "bg-emerald-500/20 border-emerald-400/40 text-emerald-100"
+                            : uploadStatus.includes("⚠️")
+                              ? "bg-amber-500/20 border-amber-400/40 text-amber-100"
+                              : "bg-rose-500/20 border-rose-400/40 text-rose-100"
+                          }`}
+                      >
+                        {uploadStatus}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div>
+                    <div className={`text-4xl font-bold ${stat.textColor}`}>
+                      {stat.value}
+                    </div>
+
+                    {stat.trend !== undefined &&
+                      stat.trend !== null &&
+                      timeRange !== "allTime" && (
+                        <div className="mt-2 flex items-center gap-1.5 bg-white/30 rounded-full px-2.5 py-1 w-max">
+                          {stat.trend >= 0 ? (
+                            <FiTrendingUp
+                              className="text-emerald-700"
+                              size={14}
+                            />
+                          ) : (
+                            <FiTrendingDown
+                              className="text-red-700"
+                              size={14}
+                            />
+                          )}
+                          <span
+                            className={`text-xs font-bold ${stat.trend >= 0 ? "text-emerald-800" : "text-red-800"}`}
+                          >
+                            {stat.trend > 0 ? "+" : ""}
+                            {stat.trend}%
+                          </span>
+                          <span className="text-xs text-white opacity-90 font-medium ml-1">
+                            ({stat.periodValue} this period)
+                          </span>
+                        </div>
+                      )}
+                  </div>
+                )}
+              </motion.div>
+            ))}
+          </div>
+
+          {/* School Admin Specific Analytics */}
+          <h3 className="text-xl font-bold text-gray-800 mb-4 mt-6">
+            School Analytics
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6 mb-8">
+            <ChartCard
+              title="Student Enrollment Growth"
+              icon={<FiTrendingUp className="text-blue-500" />}
+              type="bar"
+              color="#3B82F6"
+              chartData={metrics.enrollmentData || []}
+            />
+            <ChartCard
+              title="Internship Overview"
+              icon={<BsFileEarmarkCheck className="text-yellow-500" />}
+              type="pie"
+              pieData={metrics.completionData || []}
+            />
+          </div>
+
+          {/* Charts */}
+          <div
+            key={`charts-${refreshTrigger}`}
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6 mb-8"
+          >
+            <ChartCard
+              title="Applications (Last 6 Months)"
+              icon={<BsClipboardData className="text-indigo-500" />}
+              type="bar"
+              color="#6366F1"
+              chartData={metrics.chartData || []}
+            />
+            <ChartCard
+              title="Application Trend"
+              icon={<BsClipboardData className="text-green-500" />}
+              type="line"
+              color="#10B981"
+              chartData={metrics.chartData || []}
+            />
+          </div>
+
+          {/* Status & Engagement */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6 pb-10">
+            <ChartCard
+              title="Application Status"
+              icon={<BsFileEarmarkCheck className="text-pink-500" />}
+              type="pie"
+              pieData={metrics.pieData || []}
+            />
+            <ChartCard
+              title="Daily Active Students"
+              icon={<FiClock className="text-teal-500" />}
+              type="line"
+              color="#14B8A6"
+              chartData={metrics.activeStudentsData || []}
+            />
+          </div>
+        </>
+      )}{" "}
+      {/* Add this for loading effect - 06-08-2026*/}
+    </div>
+  );
+}
+
+// ─── Utility ──────────────────────────────────────────────────────────────────
+function delay(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+const renderLegendText = (value, entry) => {
+  return (
+    <span
+      style={{
+        color: entry.color,
+        fontWeight: 500,
+        fontSize: "12px",
+        textTransform: "uppercase",
+      }}
+    >
+      {value}
+    </span>
+  );
+};
+
+// ─── ChartCard ────────────────────────────────────────────────────────────────
+function ChartCard({
+  title,
+  icon,
+  type,
+  color,
+  chartData = [],
+  pieData = [],
+  angleX = false,
+  className = "",
+}) {
+  const visiblePieData = pieData
+    .map((item) => ({ ...item, value: Number(item.value) || 0 }))
+    .filter((item) => item.value > 0);
+
+  return (
+    <div
+      className={`bg-white p-6 rounded-2xl shadow-md font-poppins ${className}`}
+    >
+      <div className="flex items-center gap-3 text-gray-800 text-lg font-medium mb-4">
+        {icon}
+        {title}
+      </div>
+      {type === "pie" && visiblePieData.length === 0 ? (
+        <div className="h-[200px] flex items-center justify-center text-sm text-gray-400">
+          No internship data available
+        </div>
+      ) : (
+        <ResponsiveContainer width="100%" height={200}>
+          {type === "bar" ? (
+            <BarChart data={chartData}>
+              <CartesianGrid
+                strokeDasharray="5 5"
+                stroke="#ccc"
+                vertical={true}
+                horizontal={true}
+              />
+              <XAxis
+                dataKey="name"
+                height={angleX ? 60 : 30}
+                tick={
+                  angleX
+                    ? {
+                      fontSize: 11,
+                      angle: -45,
+                      textAnchor: "end",
+                      fill: "#555",
+                    }
+                    : { fontSize: 12, fill: "#555" }
+                }
+                axisLine={{ stroke: "#999" }}
+                tickLine={true}
+              />
+              <YAxis
+                width={40}
+                tick={{ fontSize: 12, fill: "#555" }}
+                axisLine={{ stroke: "#999" }}
+                tickLine={true}
+              />
+              <Tooltip
+                contentStyle={{
+                  borderRadius: "8px",
+                  border: "none",
+                  boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+                }}
+              />
+              <Bar
+                dataKey="value"
+                fill={color}
+                radius={[5, 5, 0, 0]}
+                maxBarSize={40}
+              />
+            </BarChart>
+          ) : type === "horizontal-bar" ? (
+            <BarChart data={chartData} layout="vertical" margin={{ left: 20 }}>
+              <XAxis type="number" hide />
+              <YAxis
+                type="category"
+                dataKey="name"
+                width={120}
+                tick={{ fontSize: 11 }}
+              />
+              <Tooltip />
+              <Bar dataKey="value" fill={color} radius={[0, 5, 5, 0]} />
+            </BarChart>
+          ) : type === "line" ? (
+            <LineChart data={chartData}>
+              <CartesianGrid
+                strokeDasharray="5 5"
+                stroke="#ccc"
+                vertical={true}
+                horizontal={true}
+              />
+              <XAxis
+                dataKey="name"
+                tick={{ fontSize: 12, fill: "#555" }}
+                axisLine={{ stroke: "#999" }}
+                tickLine={true}
+              />
+              <YAxis
+                tick={{ fontSize: 12, fill: "#555" }}
+                axisLine={{ stroke: "#999" }}
+                tickLine={true}
+              />
+              <Tooltip
+                contentStyle={{
+                  borderRadius: "8px",
+                  border: "none",
+                  boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+                }}
+              />
+              <Line
+                type="monotone"
+                dataKey="value"
+                stroke={color}
+                strokeWidth={2.5}
+                dot={{ r: 4, strokeWidth: 2, fill: "#fff", stroke: color }}
+                activeDot={{ r: 6, strokeWidth: 0, fill: color }}
+              />
+            </LineChart>
+          ) : type === "area" ? (
+            <AreaChart data={chartData}>
+              <XAxis dataKey="name" />
+              <YAxis />
+              <Tooltip />
+              <Area
+                type="monotone"
+                dataKey="value"
+                stroke={color}
+                fillOpacity={0.2}
+                fill={color}
+                strokeWidth={3}
+              />
+            </AreaChart>
+          ) : (
+            <PieChart margin={{ top: 20, right: 30, bottom: 10, left: 30 }}>
+              <Pie data={visiblePieData} dataKey="value" outerRadius={50} label>
+                {visiblePieData.map((_, i) => (
+                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip
+                contentStyle={{
+                  borderRadius: "8px",
+                  border: "none",
+                  boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+                }}
+              />
+              <Legend
+                iconType="square"
+                formatter={renderLegendText}
+                layout="horizontal"
+                verticalAlign="bottom"
+                align="center"
+                wrapperStyle={{ paddingTop: "20px" }}
+              />
+            </PieChart>
+          )}
+        </ResponsiveContainer>
+      )}
+    </div>
+  );
+}

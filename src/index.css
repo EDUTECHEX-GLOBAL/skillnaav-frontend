@@ -1,0 +1,203 @@
+/* ── Font imports MUST come before @tailwind directives ─────────────────────── */
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+
+/* Poppins is loaded via Google Fonts in public/index.html — see instructions below */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Global Layout Boundaries ─────────────────────────────────────────────── */
+html,
+body,
+#root {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+/* ── Global input / textarea defaults ───────────────────────────────────────── */
+input:not([type="checkbox"]):not([type="radio"]):not([type="search"]):not([class*="Mui"]):not([class*="search"]):not([class*="filter"]):not([placeholder*="Search"]):not([placeholder*="search"]):not([name*="search"]):not([name*="Search"]):not([class*="pl-"]):not([class*="!pl-"]):not([class*="rounded"]):not([class*="border-"]):not([class*="bg-"]):not([class*="focus:"]) {
+  height: 40px;
+  border: 1px solid gray;
+  width: 100%;
+  padding-left: 20px;
+  margin-top: 20px;
+}
+
+/* Reset MUI and modern inputs so global styles never distort them */
+.MuiInputBase-root,
+.MuiInputBase-input,
+.MuiOutlinedInput-input {
+  margin-top: 0 !important;
+  border: none !important;
+}
+
+.MuiInputBase-input:focus,
+.MuiOutlinedInput-input:focus {
+  border: none !important;
+  outline: none !important;
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  width: auto !important;
+  height: auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: initial !important;
+  flex-shrink: 0;
+}
+
+/* Hide Edge native password reveal & clear icons */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+  display: none;
+}
+
+input:not([class*="Mui"]):not([class*="search"]):not([class*="focus:"]):not([class*="rounded"]):not([class*="border-"]):focus {
+  outline: none;
+  border: 2px solid rgb(86, 65, 65);
+}
+
+textarea {
+  height: 100px;
+  padding: 10px;
+}
+
+/* ── Scrollbar utilities ─────────────────────────────────────────────────────── */
+@layer utilities {
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    width: 0 !important;
+    height: 0 !important;
+    background: transparent;
+  }
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ── Custom Dropdown Scrollbar (Smooth & Visible) ────────────────────────── */
+.dropdown-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #94a3b8 #f1f5f9;
+}
+.dropdown-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.dropdown-scrollbar::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 9999px;
+}
+.dropdown-scrollbar::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 9999px;
+}
+.dropdown-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+/*Add this style for the export csv in the internship payments details modal - 04-08-2026 */
+.export-btn-internship {
+  height: 40px;
+}
+
+@media (min-width: 640px) {
+  .export-btn-internship {
+    height: 100px;
+  }
+}
+
+/* ── Toast styling & positioning across devices ────────────────────────────── */
+.Toastify__toast-container {
+  z-index: 999999 !important;
+}
+
+@media (max-width: 768px) {
+  .Toastify__toast-container {
+    top: 16px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    width: 92% !important;
+    max-width: 420px !important;
+    padding: 0 !important;
+  }
+  .Toastify__toast {
+    margin-bottom: 8px !important;
+    border-radius: 12px !important;
+    font-size: 13px !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.2) !important;
+  }
+}
+
+/* ── React-DatePicker mobile fixes ──────────────────────────────────────────── */
+/* Ensure the datepicker wrapper fills its parent */
+.react-datepicker-wrapper {
+  display: block;
+  width: 100%;
+}
+.react-datepicker__input-container {
+  display: block;
+  width: 100%;
+}
+
+/* Keep popper within viewport on small screens */
+.react-datepicker-popper {
+  z-index: 9999 !important;
+  max-width: calc(100vw - 32px) !important;
+}
+
+/* Make calendar fit on small screens */
+.react-datepicker {
+  font-size: 0.85rem !important;
+  max-width: calc(100vw - 32px) !important;
+}
+
+/* Constrain day cells and header */
+.react-datepicker__month-container {
+  width: 100%;
+  max-width: calc(100vw - 32px);
+}
+
+/* Style header to match indigo theme */
+.react-datepicker__header {
+  background-color: #4f46e5 !important;
+  border-bottom: none !important;
+  border-radius: 8px 8px 0 0 !important;
+}
+.react-datepicker__current-month,
+.react-datepicker__day-name {
+  color: #fff !important;
+}
+.react-datepicker__day--selected,
+.react-datepicker__day--keyboard-selected {
+  background-color: #4f46e5 !important;
+  border-radius: 50% !important;
+}
+.react-datepicker__day:hover {
+  background-color: #e0e7ff !important;
+  border-radius: 50% !important;
+}
+.react-datepicker__navigation-icon::before {
+  border-color: #fff !important;
+}
+
+
+/* ── Hide scrollbar for Chrome, Safari, Edge, Firefox ── */
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+}
+.no-scrollbar {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
